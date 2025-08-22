@@ -7,10 +7,10 @@ This is a **hands-on workshop repository** for building cloud-native platforms u
 ### Core Architecture Pattern
 
 ```
-Workshop Labs (lab/) → Automation Scripts (scripts/) → Platform Components
-└── 01-talos/          └── install-*.sh           └── Kubernetes Operators
-└── 02-networking/     └── dev-setup.sh           └── CNCF Stack
-└── 03-gitops/         └── create-*.sh            └── Self-Service Platform
+Workshop Labs (lab/) → Automation Scripts (scripts/) → Platform Components → Presentation (slides/)
+└── 01-talos/          └── install-*.sh           └── Kubernetes Operators    └── slides.md
+└── 02-networking/     └── dev-setup.sh           └── CNCF Stack              └── components/
+└── 03-gitops/         └── create-*.sh            └── Self-Service Platform   └── package.json
 ```
 
 ## Critical Workflow Knowledge
@@ -86,6 +86,24 @@ Workshop Labs (lab/) → Automation Scripts (scripts/) → Platform Components
 - **New resources**: Use `create-*.sh` pattern for cluster resources
 - **New tools**: Add to `mise.toml` tools section
 - **New tasks**: Add to `mise.toml` tasks with proper dependencies
+
+### Slides Development (`slides/`)
+- **Slidev framework** with Vue.js components and Mermaid diagrams
+- **Seriph dark theme** - ensure bright backgrounds use dark text (`text-gray-800`, `text-gray-700`)
+- **Progressive disclosure** - use `v-click` animations for step-by-step reveals
+- **Clean design principles** - avoid walls of text, use speaker notes instead
+- **Magic Move transitions** - leverage `$$magic-move` for code transformations
+- **Task integration** - `mise run slides:dev` for development, `slides:export` for PDF
+- **Bright background fix pattern**: `bg-blue-50 text-gray-800`, `bg-orange-50 text-gray-800`
+
+#### Slide Content Guidelines
+- **Speaker notes over text** - extensive content goes in `<!-- -->` comments
+- **Visual hierarchy** - icons, grids, and layout over bullet points
+- **Code demonstrations** - inline scripts with explanations
+- **Interactive elements** - use Vue components for dynamic content
+- **Mermaid diagrams** - architecture and flow visualization
+- **File structure**: `slides.md` (main content), `components/` (Vue), `package.json` (deps)
+- **Development workflow**: `mise run slides:dev` → edit → `slides:presenter` → `slides:export`
 
 ## Workshop Context
 
