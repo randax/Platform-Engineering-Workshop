@@ -1,0 +1,119 @@
+# =============================================================================
+# JavaZone 2025 Platform Workshops
+# =============================================================================
+
+[tools]
+"aqua:siderolabs/talos" = "latest"
+go = "1.24"
+node = "24"
+kubectl = "latest"
+helm = "latest"
+"npm:@antfu/ni" = "latest"
+
+# =============================================================================
+# Workshop Presentation Tasks
+# =============================================================================
+
+[tasks."slides:dev"]
+description = "🎤 Start Slidev presentation in development mode"
+run = "cd slides && npm run dev"
+
+[tasks."slides:build"]
+description = "📦 Build Slidev presentation for production"
+run = "cd slides && npm run build"
+
+[tasks."slides:export"]
+description = "📄 Export slides to PDF"
+run = "cd slides && npm run export"
+
+[tasks."slides:presenter"]
+description = "🎯 Start presenter mode for workshop"
+run = "cd slides && npm run dev -- --presenter"
+
+# =============================================================================
+# Kubernetes & Infrastructure Tasks
+# =============================================================================
+
+[tasks."k8s:init"]
+description = "🚀 Initialize CloudBox platform (create namespaces and RBAC)"
+run = "./scripts/cloudbox-init.sh"
+
+[tasks."k8s:install"]
+description = "🎯 Install all required Kubernetes operators"
+depends = ["k8s:init"]
+run = "./scripts/install-all-operators.sh"
+
+[tasks."k8s:install-cnpg"]
+description = "🗄️  Install CloudNativePG operator for PostgreSQL"
+run = "./scripts/install-cloudnative-pg.sh"
+
+[tasks."k8s:install-kafka"]
+description = "📨 Install Strimzi Kafka operator"
+run = "./scripts/install-strimzi-kafka.sh"
+
+[tasks."k8s:install-minio-operator"]
+description = "💾 Install MinIO operator for object storage"
+run = "./scripts/install-minio-operator.sh"
+
+[tasks."k8s:install-minio-tenant"]
+description = "💾 Install MinIO tenant for object storage"
+run = "./scripts/install-minio-tenant.sh"
+
+[tasks."k8s:install-knative"]
+description = "⚡ Install Knative Serving for serverless"
+run = "./scripts/install-knative-serving.sh"
+
+[tasks."k8s:install-zot"]
+description = "📦 Install Zot container registry"
+run = "./scripts/install-zot.sh"
+
+[tasks."k8s:install-tekton"]
+description = "🔧 Install Tekton Pipelines for CI/CD"
+run = "./scripts/install-tekton.sh"
+
+[tasks."k8s:functions"]
+description = "⚡ Show function build status and logs"
+run = [
+  "echo '=== Function Builds ==='",
+  "kubectl get pipelineruns -n cloudbox-functions",
+  "echo '=== Function ConfigMaps ==='",
+  "kubectl get configmaps -n cloudbox-functions",
+  "echo '=== Knative Services ==='",
+  "kubectl get ksvc -n default",
+]
+
+[tasks."k8s:deploy"]
+description = "🚀 Deploy application to Kubernetes cluster"
+run = "kubectl apply -f deploy/"
+
+[tasks."k8s:undeploy"]
+description = "🗑️  Remove application from Kubernetes cluster"
+run = "kubectl delete -f deploy/"
+
+[tasks."k8s:status"]
+description = "📋 Check Kubernetes cluster and operator status"
+run = [
+  "echo '=== Cluster Info ==='",
+  "kubectl cluster-info",
+  "echo '=== Operator Pods ==='",
+  "kubectl get pods -A | grep -E '(cnpg|kafka|minio|knative|zot)'",
+  "echo '=== Custom Resources ==='",
+  "kubectl get crd | grep -E '(postgresql|kafka|minio|knative)'",
+  "echo '=== Zot Registry Status ==='",
+  "kubectl get pods -n zot-registry 2>/dev/null || echo 'Zot not installed'",
+]
+
+# =============================================================================
+# Utility Tasks
+# =============================================================================
+
+[tasks.schema]
+description = "📋 Show GraphQL schema information"
+run = [
+  "echo 'GraphQL schema is available at /graphql endpoint'",
+  "echo 'Use GraphQL Playground at http://localhost:8080/playground'",
+]
+
+[tasks.help]
+description = "❓ Show all available tasks"
+run = "mise tasks ls"
