@@ -85,7 +85,34 @@ talosctl cluster create \
   --config-patch @cilium-patch.yml \
   --skip-k8s-node-readiness-check
 ```
+### Step 3: Configure Access
 
+Once the cluster is created:
+
+```bash
+# Merge the kubeconfig
+talosctl kubeconfig --nodes 127.0.0.1
+
+# Verify access
+kubectl get nodes
+kubectl get pods -A
+```
+
+### Step 4: Explore Talos
+
+```bash
+# Check cluster health
+talosctl health --nodes 127.0.0.1
+
+# View services
+talosctl services --nodes 127.0.0.1
+
+# Check logs
+talosctl logs kubernetes --nodes 127.0.0.1
+
+# View configuration
+talosctl get machineconfig --nodes 127.0.0.1
+```
 
 ## Troubleshooting 
 
@@ -95,6 +122,14 @@ If you are using Docker Desktop on a macOS computer, if you encounter the error:
 
 ```bash
 sudo ln -s "$HOME/.docker/run/docker.sock" /var/run/docker.sock
+```
+
+### Cluster stuck in creating. 
+
+Delete the cluster and start over
+
+```bash
+talosctl cluster destroy --name platform-cluster
 ```
 
 
