@@ -262,7 +262,7 @@ talosctl cluster create
 
 </div>
 
-<div v-click class="mt-4 p-4 bg-green-50 rounded">
+<div v-click class="mt-4 p-4 bg-green-50 text-gray-800 rounded">
   **Result**: More secure, more predictable, easier to manage at scale
 </div>
 
@@ -347,17 +347,17 @@ class: text-center
 </v-clicks>
 
 <div v-click="6" class="mt-6 grid grid-cols-3 gap-4 text-center">
-  <div class="p-4 bg-blue-50 rounded">
+  <div class="p-4 bg-blue-50 text-gray-800 rounded">
     <div class="text-xl">⚡</div>
-    <div class="text-sm">Auto Failover</div>
+    <div class="text-sm text-gray-700">Auto Failover</div>
   </div>
-  <div class="p-4 bg-green-50 rounded">
+  <div class="p-4 bg-green-50 text-gray-800 rounded">
     <div class="text-xl">📊</div>
-    <div class="text-sm">Built-in Monitoring</div>
+    <div class="text-sm text-gray-700">Built-in Monitoring</div>
   </div>
-  <div class="p-4 bg-purple-50 rounded">
+  <div class="p-4 bg-purple-50 text-gray-800 rounded">
     <div class="text-xl">🔄</div>
-    <div class="text-sm">Point-in-Time Recovery</div>
+    <div class="text-sm text-gray-700">Point-in-Time Recovery</div>
   </div>
 </div>
 
@@ -485,7 +485,7 @@ SELECT * FROM users;
 
 </div>
 
-<div v-click class="mt-4 p-4 bg-blue-50 rounded">
+<div v-click class="mt-4 p-4 bg-blue-50 text-gray-800 rounded">
   **Result**: Production-ready PostgreSQL with zero manual database administration
 </div>
 
@@ -498,16 +498,16 @@ class: text-center
 
 <div class="grid grid-cols-2 gap-8 mt-8">
 
-<div class="p-6 bg-green-50 rounded-lg">
+<div class="p-6 bg-green-50 text-gray-800 rounded-lg">
   <div class="text-2xl mb-2">🏗️</div>
-  <div class="font-bold">Kubernetes Foundation</div>
-  <div class="text-sm opacity-80">Talos Linux, Cilium networking</div>
+  <div class="font-bold text-gray-800">Kubernetes Foundation</div>
+  <div class="text-sm opacity-80 text-gray-700">Talos Linux, Cilium networking</div>
 </div>
 
-<div class="p-6 bg-purple-50 rounded-lg">
+<div class="p-6 bg-purple-50 text-gray-800 rounded-lg">
   <div class="text-2xl mb-2">🐘</div>
-  <div class="font-bold">Database Platform</div>
-  <div class="text-sm opacity-80">PostgreSQL with automatic HA</div>
+  <div class="font-bold text-gray-800">Database Platform</div>
+  <div class="text-sm opacity-80 text-gray-700">PostgreSQL with automatic HA</div>
 </div>
 
 </div>
