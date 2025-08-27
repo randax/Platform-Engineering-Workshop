@@ -16,28 +16,52 @@ transition: slide-left
 mdc: true
 ---
 
-<!--
-The slides have been organized into separate files in the pages/ directory:
+# Cloud on Your Terms
+## Building Your Own Cloud-Native Platform
 
+**JavaZone 2025 Workshop**
+
+<div class="pt-12">
+  <span @click="$slidev.nav.next" class="px-2 py-1 rounded cursor-pointer bg-blue-600 text-white hover:bg-blue-700">
+    Start Building! <carbon:arrow-right class="inline"/>
+  </span>
+</div>
+
+<div class="abs-br m-6 flex gap-2">
+  <div class="text-sm opacity-50">
+    Øyvind Randa • Hans Kristian Flaatten
+  </div>
+</div>
+
+<!--
+Welcome to the JavaZone 2025 Platform Engineering Workshop!
+
+The slides have been organized into separate files in the pages/ directory:
 - pages/intro.md: Welcome, challenge, and technology stack overview
 - pages/workshop-structure.md: Lab overview and learning objectives
 - pages/lab1-talos.md: Kubernetes foundation with Talos Linux
 - pages/lab2-database.md: Database platform with CloudNativePG
 - pages/conclusion.md: Summary and next steps
 
-Each section is self-contained with comprehensive speaker notes and can be
-presented independently or as part of the full workshop.
-
-To build a presentation with all sections, concatenate the content from
-each page file or use Slidev's import mechanisms.
-
-Structure:
-1. intro.md - Title slide, welcome, challenge explanation, technology stack
-2. workshop-structure.md - Labs overview, learning path, format
-3. lab1-talos.md - Talos Linux foundation lab with demos
-4. lab2-database.md - CloudNativePG database platform lab
-5. conclusion.md - Progress summary and next steps
-
-All bright background elements have been updated with dark text colors
-for proper readability in the seriph dark theme.
+Each section is self-contained with comprehensive speaker notes.
 -->
+
+---
+src: ./pages/intro.md
+---
+
+---
+src: ./pages/workshop-structure.md
+---
+
+---
+src: ./pages/lab1-talos.md
+---
+
+---
+src: ./pages/lab2-database.md
+---
+
+---
+src: ./pages/conclusion.md
+---
