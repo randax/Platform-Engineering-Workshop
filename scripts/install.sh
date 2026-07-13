@@ -1,154 +1,212 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# =============================================================================
+# install.sh — CloudBox pre-flight check (step 3, the go/no-go gate)
+#
+# Checks that this machine can run the workshop. It only READS state —
+# it never installs anything, never touches a cluster, never pulls images.
+#
+# Usage:
+#   ./scripts/install.sh --check    # run the pre-flight check
+#   ./scripts/install.sh            # same check + usage text
+#
+# Checked:
+#   * CPU architecture (amd64/arm64) and WSL2 hints
+#   * Docker daemon reachable; CPUs/RAM allocatable to Docker; free disk
+#   * Required CLI tools present at the pinned versions
+#   * Pre-pulled images from scripts/images.txt (host cache + mirror registry)
+#
+# Exit code: 0 = ready for the workshop, 1 = at least one check failed.
+# If a check fails, fix it and re-run. Failing machines can still join via
+# the devcontainer/Codespaces lifeboat — see the repo README.
+# =============================================================================
+set -euo pipefail
 
-set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib.sh"
 
-echo "🚀 Installing Private Cloud Platform..."
+usage() {
+  # print this script's header comment block as the usage text
+  awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "${BASH_SOURCE[0]}"
+}
 
-# Check prerequisites
-echo "📋 Checking prerequisites..."
+case "${1:-}" in
+  --check) ;;
+  "") usage; echo ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage; die "Unknown argument: $1 (this script only checks; it installs nothing)" ;;
+esac
 
-if ! command -v kubectl &> /dev/null; then
-    echo "❌ kubectl is not installed"
-    exit 1
+failures=0
+check_fail() { fail "$*"; failures=$((failures + 1)); }
+
+step "CloudBox pre-flight check"
+
+# --- Platform -------------------------------------------------------------------
+if arch="$(detect_arch)"; then
+  ok "CPU architecture: ${arch}"
+else
+  check_fail "Unsupported CPU architecture '$(uname -m)' (need x86_64 or arm64)"
 fi
 
-if ! command -v helm &> /dev/null; then
-    echo "❌ helm is not installed"
-    exit 1
+os="$(uname -s)"
+if is_wsl2; then
+  ok "Platform: WSL2 (best-effort support — pair up if things get weird)"
+  info "WSL2 hints: give the WSL2 VM >= 12 GB memory via %UserProfile%\\.wslconfig"
+  info "  [wsl2]"
+  info "  memory=12GB"
+  info "and use the Docker Desktop WSL2 backend (Settings -> Resources -> WSL integration)."
+elif [[ "${os}" == "Darwin" || "${os}" == "Linux" ]]; then
+  ok "Platform: ${os}"
+else
+  check_fail "Unsupported platform: ${os} (macOS, Linux or WSL2 required)"
 fi
 
-# Check if Kubernetes cluster is accessible
-if ! kubectl cluster-info &> /dev/null; then
-    echo "❌ Kubernetes cluster is not accessible"
-    exit 1
+# --- Docker ---------------------------------------------------------------------
+if ! have docker; then
+  check_fail "docker CLI not found — install Docker Desktop, OrbStack or docker-ce"
+elif ! docker_running; then
+  check_fail "Docker daemon not reachable — is Docker started?"
+else
+  ok "Docker daemon reachable ($(docker info -f '{{.OperatingSystem}}' 2>/dev/null))"
+
+  # CPUs available to Docker
+  ncpu="$(docker info -f '{{.NCPU}}' 2>/dev/null || echo 0)"
+  if [[ "${ncpu}" -ge "${MIN_CPUS}" ]]; then
+    ok "Docker CPUs: ${ncpu} (need >= ${MIN_CPUS})"
+  else
+    check_fail "Docker CPUs: ${ncpu} — need >= ${MIN_CPUS}. Raise it in Docker settings."
+  fi
+
+  # Memory allocatable to Docker (on Linux this is host RAM; on macOS/WSL2 the VM)
+  mem_bytes="$(docker info -f '{{.MemTotal}}' 2>/dev/null || echo 0)"
+  mem_gb=$(( mem_bytes / 1024 / 1024 / 1024 ))
+  if [[ "${mem_gb}" -ge "${MIN_DOCKER_MEMORY_GB}" ]]; then
+    ok "Memory allocatable to Docker: ${mem_gb} GB (need >= ${MIN_DOCKER_MEMORY_GB} GB)"
+  else
+    check_fail "Memory allocatable to Docker: ${mem_gb} GB — need >= ${MIN_DOCKER_MEMORY_GB} GB"
+    info "  Docker Desktop: Settings -> Resources -> Memory. OrbStack: orb config set memory_mib."
+  fi
+
+  # Free disk where Docker stores images. On macOS/WSL2 the Docker root dir
+  # lives inside the VM, so fall back to checking the home filesystem too.
+  docker_root="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || true)"
+  df_target="${HOME}"
+  [[ -n "${docker_root}" && -d "${docker_root}" ]] && df_target="${docker_root}"
+  free_kb="$(df -Pk "${df_target}" | awk 'NR==2 {print $4}')"
+  free_gb=$(( free_kb / 1024 / 1024 ))
+  if [[ "${free_gb}" -ge "${MIN_DISK_FREE_GB}" ]]; then
+    ok "Free disk on ${df_target}: ${free_gb} GB (need >= ${MIN_DISK_FREE_GB} GB)"
+  else
+    check_fail "Free disk on ${df_target}: ${free_gb} GB — need >= ${MIN_DISK_FREE_GB} GB"
+  fi
 fi
 
-echo "✅ Prerequisites check passed"
+# --- Tools -----------------------------------------------------------------------
+step "CLI tools (installed by ./scripts/dev-setup.sh)"
 
-# Install required operators
-echo "📦 Installing operators..."
+check_tool() {
+  local name="$1" want="$2"; shift 2
+  local out
+  if ! have "${name}"; then
+    check_fail "${name}: not found — run ./scripts/dev-setup.sh (then restart your shell)"
+    return
+  fi
+  out="$("$@" 2>/dev/null | tr -s '\n\t' '  ' || true)"
+  if [[ -z "${want}" ]]; then
+    ok "${name}: $(echo "${out}" | cut -c1-80)"
+  elif [[ "${out}" == *"${want}"* ]]; then
+    ok "${name} ${want}"
+  else
+    check_fail "${name}: wrong version (want ${want}, got: $(echo "${out}" | cut -c1-60))"
+  fi
+}
 
-# Install CloudNativePG for PostgreSQL
-echo "Installing CloudNativePG operator..."
-kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.21/releases/cnpg-1.21.0.yaml
+check_tool talosctl "${TALOS_VERSION}"        talosctl version --client --short
+check_tool kubectl  "v${KUBERNETES_VERSION}"  kubectl version --client
+check_tool helm     ""                        helm version --short
+check_tool kind     ""                        kind version
+check_tool crane    ""                        crane version
 
-# Install Knative Serving for Functions
-echo "Installing Knative Serving..."
-kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.12.0/serving-crds.yaml
-kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.12.0/serving-core.yaml
+# --- Pre-pulled images --------------------------------------------------------------
+step "Pre-pulled images (populated by ./scripts/cloudbox-init.sh)"
 
-# Install Kourier as Knative networking layer
-kubectl apply -f https://github.com/knative/net-kourier/releases/download/knative-v1.12.0/kourier.yaml
-kubectl patch configmap/config-network \
-  --namespace knative-serving \
-  --type merge \
-  --patch '{"data":{"ingress-class":"kourier.ingress.networking.knative.dev"}}'
+if ! docker_running; then
+  check_fail "Skipping image checks — Docker is not running"
+else
+  # Parse images.txt (same format as cloudbox-init.sh)
+  section=""
+  host_missing=0; mirror_missing=0; host_total=0; mirror_total=0
 
-# Install Cilium CNI (if not already installed)
-echo "🌐 Installing Cilium CNI..."
-helm repo add cilium https://helm.cilium.io/
-helm upgrade --install cilium cilium/cilium \
-  --namespace kube-system \
-  --set operator.replicas=1 \
-  --set hubble.enabled=true \
-  --set hubble.relay.enabled=true \
-  --set hubble.ui.enabled=true
+  # Is the mirror registry up at all?
+  if mirror_running && curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1; then
+    ok "Mirror registry '${MIRROR_NAME}' is running on localhost:${MIRROR_PORT}"
+    mirror_up=true
+  else
+    check_fail "Mirror registry '${MIRROR_NAME}' is not running — run ./scripts/cloudbox-init.sh"
+    mirror_up=false
+  fi
 
-# Install Kyverno Policy Engine
-echo "🛡️  Installing Kyverno..."
-helm repo add kyverno https://kyverno.github.io/kyverno/
-helm upgrade --install kyverno kyverno/kyverno \
-  --namespace kyverno \
-  --create-namespace
+  # check_mirror_image <repo-path-with-tag-or-digest>
+  check_mirror_image() {
+    local path="$1" repo ref
+    if [[ "${path}" == *@sha256:* ]]; then
+      repo="${path%%@*}"; repo="${repo%%:*}"   # strip digest, then any tag
+      ref="sha256:${path##*@sha256:}"
+    else
+      repo="${path%%:*}"
+      ref="${path##*:}"
+    fi
+    curl -fsS -o /dev/null \
+      -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+      "http://localhost:${MIRROR_PORT}/v2/${repo}/manifests/${ref}"
+  }
 
-# Install monitoring stack with Tempo
-echo "📊 Installing monitoring stack..."
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo add grafana https://grafana.github.io/helm-charts
-helm repo update
+  while IFS= read -r line; do
+    line="${line%%#*}"; line="$(echo "${line}" | xargs)"
+    [[ -z "${line}" ]] && continue
+    case "${line}" in
+      "[host]")   section="host"; continue ;;
+      "[mirror]") section="mirror"; continue ;;
+    esac
+    if [[ "${section}" == "host" ]]; then
+      host_total=$((host_total + 1))
+      if docker image inspect "${line}" >/dev/null 2>&1; then
+        :
+      else
+        fail "missing from Docker: ${line}"
+        host_missing=$((host_missing + 1))
+      fi
+    elif [[ "${section}" == "mirror" && "${mirror_up}" == "true" ]]; then
+      mirror_total=$((mirror_total + 1))
+      if ! check_mirror_image "$(strip_registry "${line}")"; then
+        fail "missing from mirror: ${line}"
+        mirror_missing=$((mirror_missing + 1))
+      fi
+    fi
+  done < "${SCRIPT_DIR}/images.txt"
 
-# Install Prometheus + Grafana
-helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
-  --namespace monitoring \
-  --create-namespace \
-  --set grafana.adminPassword=admin123 \
-  --wait
+  if [[ ${host_missing} -eq 0 ]]; then
+    ok "Host images: ${host_total}/${host_total} present"
+  else
+    check_fail "Host images: $((host_total - host_missing))/${host_total} present — run ./scripts/cloudbox-init.sh"
+  fi
+  if [[ "${mirror_up}" == "true" ]]; then
+    if [[ ${mirror_missing} -eq 0 ]]; then
+      ok "Mirror images: ${mirror_total}/${mirror_total} present"
+    else
+      check_fail "Mirror images: $((mirror_total - mirror_missing))/${mirror_total} present — run ./scripts/cloudbox-init.sh"
+    fi
+  fi
+fi
 
-# Install Tempo for distributed tracing
-helm upgrade --install tempo grafana/tempo \
-  --namespace monitoring \
-  --set tempo.repository=grafana/tempo \
-  --set tempo.tag=latest
-
-# Install Loki for log aggregation
-helm upgrade --install loki grafana/loki-stack \
-  --namespace monitoring \
-  --set grafana.enabled=false \
-  --set prometheus.enabled=false \
-  --set promtail.enabled=true
-
-# Install Zitadel for authentication
-echo "🔐 Installing Zitadel..."
-helm repo add zitadel https://charts.zitadel.com
-helm upgrade --install zitadel zitadel/zitadel \
-  --namespace zitadel \
-  --create-namespace \
-  --set zitadel.masterkeySecretName=zitadel-masterkey \
-  --set zitadel.configmapConfig.ExternalSecure=false
-
-# Install MinIO
-echo "💾 Installing MinIO..."
-helm repo add minio https://charts.min.io/
-helm upgrade --install minio minio/minio \
-  --namespace minio \
-  --create-namespace \
-  --set rootUser=admin \
-  --set rootPassword=admin123 \
-  --set mode=distributed \
-  --set replicas=4 \
-  --wait
-
-# Install RedPanda
-echo "📨 Installing RedPanda..."
-helm repo add redpanda https://charts.redpanda.com/
-helm upgrade --install redpanda redpanda/redpanda \
-  --namespace redpanda \
-  --create-namespace \
-  --set statefulset.replicas=3 \
-  --set auth.sasl.enabled=false \
-  --wait
-
-# Build and deploy the platform API
-echo "🔧 Building and deploying platform API..."
-docker build -t private-cloud-api:latest .
-kubectl apply -f deploy/base/
-
-# Wait for deployments
-echo "⏳ Waiting for deployments to be ready..."
-kubectl wait --for=condition=available deployment/cloud-api -n cloud-system --timeout=300s
-
-echo "✅ Private Cloud Platform installed successfully!"
-echo ""
-echo "📖 Access Information:"
-echo "  API Endpoint: http://api.cloud.local (add to /etc/hosts)"
-echo "  Frontend: http://localhost:3000 (after running 'cd web && npm run dev')"
-echo "  Zitadel: http://zitadel.cloud.local (admin console)"
-echo "  Grafana: http://monitoring-grafana.monitoring.svc.cluster.local:80 (admin/admin123)"
-echo "  MinIO Console: http://minio-console.minio.svc.cluster.local:9001 (admin/admin123)"
-echo "  Hubble UI: http://hubble-ui.kube-system.svc.cluster.local:12000"
-echo ""
-echo "🔗 Port Forward Commands:"
-echo "  API: kubectl port-forward -n cloud-system svc/cloud-api 8080:80"
-echo "  Frontend: cd web && npm run dev"
-echo "  Grafana: kubectl port-forward -n monitoring svc/monitoring-grafana 3000:80"
-echo "  MinIO: kubectl port-forward -n minio svc/minio-console 9001:9001"
-echo "  Zitadel: kubectl port-forward -n zitadel svc/zitadel 8080:8080"
-echo "  Hubble: kubectl port-forward -n kube-system svc/hubble-ui 12000:80"
-echo ""
-echo "🔧 Next Steps:"
-echo "  1. Configure Zitadel: Create project and application"
-echo "  2. Update environment variables in web/.env.local"
-echo "  3. Start frontend: cd web && npm install && npm run dev"
-echo "  4. Access the platform at http://localhost:3000"
-echo ""
-echo "Happy coding! 🎉"
+# --- Verdict -------------------------------------------------------------------------
+echo
+if [[ ${failures} -eq 0 ]]; then
+  ok "All checks passed — you are ready for the workshop! 🎉"
+  info "At the venue: ./scripts/create-cluster.sh"
+  exit 0
+else
+  fail "${failures} check(s) failed — fix the ❌ items above and re-run."
+  info "No luck? The devcontainer/Codespaces path in the README is the lifeboat."
+  exit 1
+fi

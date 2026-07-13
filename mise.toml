@@ -1,17 +1,76 @@
 # =============================================================================
-# JavaZone 2025 Platform Workshops
+# CloudBox — JavaZone 2026: Cloud on Your Terms
+#
+# Tool pins for the workshop. Everything is pinned (principle 14) — versions
+# verified 2026-07-13, re-verify late August. Keep in sync with
+# scripts/versions.env when bumping.
+#
+#   mise install        # install all tools below
+#   mise tasks ls       # list workshop tasks
 # =============================================================================
 
 [tools]
-"aqua:siderolabs/talos" = "latest"
-go = "1.24"
+# Talos v1.13.6 — never 1.12.x (cni:none docker clusters hang, talos#12885)
+"aqua:siderolabs/talos" = "1.13.6"
+# kubectl matches the Kubernetes version Talos v1.13.6 ships
+kubectl = "1.36.2"
+helm = "3.21.3"
+# kind — only for scripts/kind-fallback.sh
+kind = "0.32.0"
+# crane — copies pinned images into the local mirror preserving digests
+crane = "0.21.7"
+# node — only for the Slidev presentation
 node = "24"
-kubectl = "latest"
-helm = "latest"
-"npm:@antfu/ni" = "latest"
 
 # =============================================================================
-# Workshop Presentation Tasks
+# Attendee flow (see scripts/README.md)
+# =============================================================================
+
+[tasks.setup]
+description = "🧰 Install workshop tools (mise) and verify them"
+run = "./scripts/dev-setup.sh"
+
+[tasks.init]
+description = "📦 Pre-pull all pinned images + start the local registry mirror (run at home!)"
+run = "./scripts/cloudbox-init.sh"
+
+[tasks.preflight]
+description = "🩺 Pre-flight check: Docker, resources, tools, pre-pulled images"
+run = "./scripts/install.sh --check"
+
+[tasks."cluster:create"]
+description = "🚀 Create the Talos-in-Docker cluster and install Cilium"
+run = "./scripts/create-cluster.sh"
+
+[tasks."cluster:destroy"]
+description = "💥 Destroy the Talos cluster (keeps the image mirror)"
+run = "./scripts/destroy-cluster.sh"
+
+[tasks."cluster:fallback"]
+description = "🛟 Fallback: kind cluster + Cilium (if Talos-in-Docker fails)"
+run = "./scripts/kind-fallback.sh"
+
+[tasks."gitops:bootstrap"]
+description = "🔁 Install Gitea + ArgoCD into the cluster (module 2)"
+run = "./scripts/bootstrap-gitops.sh"
+
+[tasks."gitops:seed"]
+description = "🌱 Push this repo to the in-cluster Gitea (push-to-create)"
+run = "./scripts/seed-gitea.sh"
+
+[tasks.status]
+description = "📋 Show cluster, ArgoCD app and platform pod status"
+run = [
+  "echo '=== Nodes ==='",
+  "kubectl get nodes -o wide",
+  "echo '=== ArgoCD Applications ==='",
+  "kubectl get applications -n argocd 2>/dev/null || echo 'ArgoCD not installed (run gitops:bootstrap)'",
+  "echo '=== Platform pods ==='",
+  "kubectl get pods -A",
+]
+
+# =============================================================================
+# Presentation (Slidev)
 # =============================================================================
 
 [tasks."slides:dev"]
@@ -31,88 +90,8 @@ description = "🎯 Start presenter mode for workshop"
 run = "cd slides && npm run dev -- --presenter"
 
 # =============================================================================
-# Kubernetes & Infrastructure Tasks
+# Utility
 # =============================================================================
-
-[tasks."k8s:init"]
-description = "🚀 Initialize CloudBox platform (create namespaces and RBAC)"
-run = "./scripts/cloudbox-init.sh"
-
-[tasks."k8s:install"]
-description = "🎯 Install all required Kubernetes operators"
-depends = ["k8s:init"]
-run = "./scripts/install-all-operators.sh"
-
-[tasks."k8s:install-cnpg"]
-description = "🗄️  Install CloudNativePG operator for PostgreSQL"
-run = "./scripts/install-cloudnative-pg.sh"
-
-[tasks."k8s:install-kafka"]
-description = "📨 Install Strimzi Kafka operator"
-run = "./scripts/install-strimzi-kafka.sh"
-
-[tasks."k8s:install-minio-operator"]
-description = "💾 Install MinIO operator for object storage"
-run = "./scripts/install-minio-operator.sh"
-
-[tasks."k8s:install-minio-tenant"]
-description = "💾 Install MinIO tenant for object storage"
-run = "./scripts/install-minio-tenant.sh"
-
-[tasks."k8s:install-knative"]
-description = "⚡ Install Knative Serving for serverless"
-run = "./scripts/install-knative-serving.sh"
-
-[tasks."k8s:install-zot"]
-description = "📦 Install Zot container registry"
-run = "./scripts/install-zot.sh"
-
-[tasks."k8s:install-tekton"]
-description = "🔧 Install Tekton Pipelines for CI/CD"
-run = "./scripts/install-tekton.sh"
-
-[tasks."k8s:functions"]
-description = "⚡ Show function build status and logs"
-run = [
-  "echo '=== Function Builds ==='",
-  "kubectl get pipelineruns -n cloudbox-functions",
-  "echo '=== Function ConfigMaps ==='",
-  "kubectl get configmaps -n cloudbox-functions",
-  "echo '=== Knative Services ==='",
-  "kubectl get ksvc -n default",
-]
-
-[tasks."k8s:deploy"]
-description = "🚀 Deploy application to Kubernetes cluster"
-run = "kubectl apply -f deploy/"
-
-[tasks."k8s:undeploy"]
-description = "🗑️  Remove application from Kubernetes cluster"
-run = "kubectl delete -f deploy/"
-
-[tasks."k8s:status"]
-description = "📋 Check Kubernetes cluster and operator status"
-run = [
-  "echo '=== Cluster Info ==='",
-  "kubectl cluster-info",
-  "echo '=== Operator Pods ==='",
-  "kubectl get pods -A | grep -E '(cnpg|kafka|minio|knative|zot)'",
-  "echo '=== Custom Resources ==='",
-  "kubectl get crd | grep -E '(postgresql|kafka|minio|knative)'",
-  "echo '=== Zot Registry Status ==='",
-  "kubectl get pods -n zot-registry 2>/dev/null || echo 'Zot not installed'",
-]
-
-# =============================================================================
-# Utility Tasks
-# =============================================================================
-
-[tasks.schema]
-description = "📋 Show GraphQL schema information"
-run = [
-  "echo 'GraphQL schema is available at /graphql endpoint'",
-  "echo 'Use GraphQL Playground at http://localhost:8080/playground'",
-]
 
 [tasks.help]
 description = "❓ Show all available tasks"
