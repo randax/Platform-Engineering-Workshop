@@ -1,0 +1,4 @@
+local-path-provisioner.yaml
+otel-lgtm.yaml
+cnpg-operator.yaml
+rustfs.yaml

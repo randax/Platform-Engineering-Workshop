@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Module 06 — full solution: enable knative, deploy the ksvc, exercise it once.
+set -euo pipefail
+
+LAB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$LAB_DIR/../.." && pwd)"
+# shellcheck source=../common.sh
+source "$REPO_ROOT/lab/common.sh"
+
+CLONE="$(gitops_clone)"
+enable_catalog "$CLONE" knative-serving.yaml
+mkdir -p "$CLONE/gitops/components/demo"
+cp "$LAB_DIR/hello-ksvc.yaml" "$CLONE/gitops/components/demo/hello-ksvc.yaml"
+gitops_push "$CLONE" "module 06: knative-serving + hello ksvc"
+
+wait_app knative-serving
+wait_app demo
+
+kubectl -n demo wait --for=condition=Ready ksvc/hello --timeout=300s
+
+HOST="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' | sed 's|^https\?://||')"
+echo "cold-starting hello via Kourier..."
+curl -fsS --max-time 60 -H "Host: $HOST" http://localhost:31080/
