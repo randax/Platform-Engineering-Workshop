@@ -1,80 +1,84 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# =============================================================================
+# dev-setup.sh — install the workshop tools (step 1 of the at-home setup)
+#
+# What it does:
+#   1. Ensures mise (https://mise.jdx.dev) is installed — asks before installing
+#   2. Runs `mise install` to install the pinned tools from mise.toml
+#      (talosctl, kubectl, helm, kind, crane, node)
+#   3. Verifies every tool and prints its version
+#
+# Usage:
+#   ./scripts/dev-setup.sh
+#
+# Works on macOS, Linux and WSL2. Docker is checked later by
+# `./scripts/install.sh --check` — this script is only about CLI tools.
+# =============================================================================
+set -euo pipefail
 
-set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib.sh"
 
-echo "🛠️  Setting up development environment..."
+step "CloudBox tool setup"
 
-# Check if Go is installed
-if ! command -v go &> /dev/null; then
-    echo "❌ Go is not installed. Please install Go 1.21 or later."
-    exit 1
+# --- 1. Ensure mise ----------------------------------------------------------
+if have mise; then
+  ok "mise $(mise version 2>/dev/null | head -n1)"
+else
+  warn "mise is not installed. It manages the pinned CLI tools for this workshop."
+  echo "   Installer: curl https://mise.run | sh   (installs to ~/.local/bin)"
+  if confirm "Install mise now?"; then
+    curl -fsSL https://mise.run | sh
+    export PATH="${HOME}/.local/bin:${PATH}"
+    have mise || die "mise installed but not on PATH — open a new shell and re-run this script."
+    ok "mise installed"
+    info "Add mise to your shell so tools are always on PATH, e.g. for bash:"
+    # shellcheck disable=SC2016  # deliberately printing an unexpanded snippet
+    echo '     echo '\''eval "$(~/.local/bin/mise activate bash)"'\'' >> ~/.bashrc'
+    echo "   (see https://mise.jdx.dev/getting-started.html for zsh/fish)"
+  else
+    die "Cannot continue without mise. Install it and re-run."
+  fi
 fi
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo "❌ Docker is not installed. Please install Docker."
-    exit 1
+# --- 2. Install pinned tools --------------------------------------------------
+step "Installing pinned tools from mise.toml (this can take a few minutes)"
+(cd "${REPO_ROOT}" && mise install)
+
+# --- 3. Verify ------------------------------------------------------------------
+step "Verifying tools"
+
+# Run tools via `mise exec` so verification works even before the attendee has
+# added mise activation to their shell profile.
+mise_exec() { (cd "${REPO_ROOT}" && mise exec -- "$@"); }
+
+failures=0
+verify_tool() {
+  local name="$1"; shift
+  local version
+  # squash multi-line version output (talosctl/kubectl) onto one short line
+  if version="$(mise_exec "$@" 2>/dev/null | tr -s '\n\t' '  ' | cut -c1-100)" \
+     && [[ -n "${version// /}" ]]; then
+    ok "${name}: ${version}"
+  else
+    fail "${name}: not working"
+    failures=$((failures + 1))
+  fi
+}
+
+verify_tool "talosctl" talosctl version --client --short
+verify_tool "kubectl"  kubectl version --client
+verify_tool "helm"     helm version --short
+verify_tool "kind"     kind version
+verify_tool "crane"    crane version
+verify_tool "node"     node --version
+
+echo
+if [[ ${failures} -gt 0 ]]; then
+  die "${failures} tool(s) failed to verify. Try 'mise doctor' or re-run this script."
 fi
 
-# Check if kubectl is installed
-if ! command -v kubectl &> /dev/null; then
-    echo "❌ kubectl is not installed. Please install kubectl."
-    exit 1
-fi
-
-echo "✅ Prerequisites check passed"
-
-# Install development tools
-echo "📦 Installing development tools..."
-
-# Install golangci-lint for linting
-if ! command -v golangci-lint &> /dev/null; then
-    echo "Installing golangci-lint..."
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
-fi
-
-# Install swag for API documentation
-if ! command -v swag &> /dev/null; then
-    echo "Installing swag..."
-    go install github.com/swaggo/swag/cmd/swag@latest
-fi
-
-# Download Go dependencies
-echo "📥 Downloading Go dependencies..."
-go mod download
-go mod tidy
-
-# Create necessary directories
-echo "📁 Creating directories..."
-mkdir -p bin/
-mkdir -p docs/swagger/
-mkdir -p web/src/
-
-# Generate go.sum if it doesn't exist
-if [ ! -f go.sum ]; then
-    echo "🔧 Generating go.sum..."
-    go mod tidy
-fi
-
-# Install pre-commit hook (optional)
-if [ -d .git ]; then
-    echo "🔗 Setting up git hooks..."
-    cat > .git/hooks/pre-commit << 'EOF'
-#!/bin/bash
-echo "Running pre-commit checks..."
-make fmt
-make lint
-make test
-EOF
-    chmod +x .git/hooks/pre-commit
-fi
-
-echo "✅ Development environment setup complete!"
-echo ""
-echo "🚀 Quick Start:"
-echo "  make dev        # Run the API server locally"
-echo "  make test       # Run tests"
-echo "  make build      # Build the binary"
-echo "  make help       # Show all available commands"
-echo ""
-echo "Happy coding! 🎉"
+ok "All tools installed and verified."
+info "Next steps (still at home, on good internet):"
+echo "   1. ./scripts/cloudbox-init.sh      # pre-pull all workshop images (~15-20 GB)"
+echo "   2. ./scripts/install.sh --check    # full pre-flight check"

@@ -1,131 +1,86 @@
-# CloudBox Platform - Operator Installation Scripts
+# CloudBox scripts
 
-This directory contains installation scripts for all the Kubernetes operators required by the CloudBox platform. These operators provide the foundation for managing databases, message queues, object storage, and serverless functions.
+Everything needed to set up, run and recover the workshop platform. Attendees
+are expected to read these scripts — they are part of the teaching material.
+All version pins live in [`versions.env`](versions.env) (tools additionally in
+the repo-root `mise.toml`); shared helpers live in [`lib.sh`](lib.sh).
 
-## Prerequisites
+## The attendee flow
 
-- Kubernetes cluster (tested with Colima)
-- `kubectl` configured and connected to your cluster
-- `helm` installed (for some operators)
-
-## Quick Start
-
-To install all operators at once:
+### At home, before the workshop (good internet required)
 
 ```bash
-./scripts/install-all-operators.sh
+./scripts/dev-setup.sh          # 1. install pinned CLI tools via mise
+./scripts/cloudbox-init.sh      # 2. pre-pull ~15-20 GB of images + start the local mirror
+./scripts/install.sh --check    # 3. pre-flight check — must be all green ✅
 ```
 
-## Individual Operator Installation
+Conference WiFi carries keystrokes, not gigabytes: after `cloudbox-init.sh`
+the workshop needs **no image downloads at the venue**.
 
-### 1. CloudNativePG (PostgreSQL Databases)
-```bash
-./scripts/install-cloudnative-pg.sh
-```
-- **Purpose**: Manages PostgreSQL clusters and databases
-- **Namespace**: `cnpg-system`
-- **CRDs**: `clusters.postgresql.cnpg.io`, `poolers.postgresql.cnpg.io`
-
-### 2. Strimzi Kafka (Message Queues)
-```bash
-./scripts/install-strimzi-kafka.sh
-```
-- **Purpose**: Manages Kafka clusters and topics
-- **Namespace**: `kafka-system`
-- **CRDs**: `kafkas.kafka.strimzi.io`, `kafkatopics.kafka.strimzi.io`
-
-### 3. MinIO Operator (Object Storage)
-```bash
-./scripts/install-minio-operator.sh
-```
-- **Purpose**: Manages MinIO object storage tenants
-- **Namespace**: `minio-operator`
-- **CRDs**: `tenants.minio.min.io`
-
-### 4. Knative Serving (Serverless Functions)
-```bash
-./scripts/install-knative-serving.sh
-```
-- **Purpose**: Manages serverless function deployments
-- **Namespace**: `knative-serving`
-- **CRDs**: `services.serving.knative.dev`, `configurations.serving.knative.dev`
-
-## Verification
-
-After installation, verify that all operators are running:
+### At the venue
 
 ```bash
-# Check all operator pods
-kubectl get pods -A | grep -E "(cnpg|kafka|minio|knative)"
-
-# Check installed CRDs
-kubectl get crd | grep -E "(postgresql|kafka|minio|knative)"
-
-# Check operator namespaces
-kubectl get namespaces | grep -E "(cnpg-system|kafka-system|minio-operator|knative-serving)"
+./scripts/create-cluster.sh     # module 1: Talos-in-Docker cluster + Cilium
+./scripts/bootstrap-gitops.sh   # module 2: Gitea + ArgoCD (the GitOps engine)
+./scripts/seed-gitea.sh         # module 2: push this repo into your cloud
 ```
 
-## Usage
+From that point on the platform is built by **pushing git commits**, not by
+running scripts: copy an Application manifest from `gitops/catalog/` into
+`gitops/apps/`, commit, push to Gitea, watch ArgoCD converge.
 
-Once the operators are installed, you can:
+### Recovery
 
-1. **Start the Go API server** - This will provide GraphQL APIs to manage resources
-2. **Access the Web UI** - Create and manage databases, queues, storage, and functions
-3. **Use kubectl directly** - Apply custom resource manifests if needed
-
-## Troubleshooting
-
-### Check operator logs
 ```bash
-# CloudNativePG
-kubectl logs -n cnpg-system deployment/cnpg-cloudnative-pg
-
-# Strimzi Kafka
-kubectl logs -n kafka-system deployment/strimzi-cluster-operator
-
-# MinIO
-kubectl logs -n minio-operator deployment/minio-operator
-
-# Knative
-kubectl logs -n knative-serving deployment/controller
+./scripts/catch-up.sh 3             # jump to the end-state of module 3
+./scripts/catch-up.sh 3 --rebuild   # nuclear: destroy + recreate + bootstrap
+                                    # + seed + catch up (~10 min, pre-pulled)
+./scripts/destroy-cluster.sh        # tear down the cluster (mirror survives)
+./scripts/kind-fallback.sh          # plan B if Talos-in-Docker won't run
 ```
 
-### Uninstall operators
-```bash
-# CloudNativePG
-helm uninstall cnpg -n cnpg-system
+## Script reference
 
-# Strimzi
-helm uninstall strimzi-kafka-operator -n kafka-system
+| Script | Purpose |
+|---|---|
+| `dev-setup.sh` | Install mise (with consent) + all pinned CLI tools, verify versions |
+| `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`; start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it |
+| `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
+| `create-cluster.sh` | `talosctl cluster create docker` (Talos v1.13.6, 1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm |
+| `destroy-cluster.sh` | `talosctl cluster destroy` + kubeconfig cleanup; `--purge-mirror` also removes the image mirror |
+| `bootstrap-gitops.sh` | local-path-provisioner + Gitea (single-pod SQLite, push-to-create) + ArgoCD (vendored manifest, NodePort 30080, Application health check) |
+| `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |
+| `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` state to Gitea; `--rebuild` for the full nuke-and-rebuild |
+| `kind-fallback.sh` | Same cluster shape on kind + Cilium (loses the Talos content, gains robustness) |
+| `lib.sh` | Shared logging/helpers — sourced by every script |
+| `versions.env` | Every version pin, in one place |
+| `images.txt` | Every image the workshop uses, pinned, split into `[host]` and `[mirror]` sections |
+| `manifests/` | Vendored, pinned upstream manifests (ArgoCD install.yaml, local-path-provisioner) so the venue needs no internet |
 
-# MinIO
-kubectl delete -f https://github.com/minio/operator/releases/latest/download/minio-operator.yaml
+## Why a local registry mirror?
 
-# Knative
-kubectl delete -f https://github.com/knative/serving/releases/download/knative-v1.11.0/serving-core.yaml
-kubectl delete -f https://github.com/knative/serving/releases/download/knative-v1.11.0/serving-crds.yaml
-kubectl delete -f https://github.com/knative/net-kourier/releases/download/knative-v1.11.0/kourier.yaml
-```
+The Talos "nodes" are Docker containers with their **own containerd inside** —
+the host Docker image cache is invisible to them. `cloudbox-init.sh` therefore
+runs a plain OCI registry (`cloudbox-mirror`, data in a Docker volume, so it
+survives cluster rebuilds) and copies every cluster image into it with crane,
+preserving repository paths and digests. `create-cluster.sh` points the Talos
+`machine.registries.mirrors` at it — with fallback to the real registries, so
+a stale mirror can never break the cluster, it just costs bandwidth.
 
-## Next Steps
+## Endpoints (after bootstrap)
 
-After installing the operators:
+| What | URL | Credentials |
+|---|---|---|
+| Gitea | http://localhost:30300 | `gitea_admin` / `cloudbox123` |
+| ArgoCD | http://localhost:30080 | `admin` / see `bootstrap-gitops.sh` output |
+| Zot registry | http://localhost:30500 | (enabled in module S2) |
+| Kourier (Knative) | http://localhost:31080 | (enabled in module S1) |
 
-1. **Configure the Go API server** to interact with these operators
-2. **Update the GraphQL schema** to include database, queue, storage, and function management
-3. **Implement controllers** in Go to create/manage resources via the operators
-4. **Update the Web UI** to provide management interfaces for each service type
+## Conventions
 
-## Architecture
-
-```
-Web UI (Next.js)
-     ↓
-Go API Server (GraphQL)
-     ↓
-Kubernetes API
-     ↓
-Operators (CloudNativePG, Strimzi, MinIO, Knative)
-     ↓
-Managed Resources (Databases, Queues, Storage, Functions)
-```
+- `bash` with `set -euo pipefail`; every script has a usage header comment
+- ✅/❌/⚠️ log lines via `lib.sh`; scripts are safe to re-run unless stated
+- **Everything is pinned** — no `:latest` anywhere. Bump pins in
+  `versions.env` + `mise.toml` + `images.txt` together, and re-verify with
+  `./scripts/install.sh --check` and CI

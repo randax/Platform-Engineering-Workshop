@@ -1,0 +1,81 @@
+# =============================================================================
+# Weekly full-bootstrap test — the complete attendee venue flow on a runner.
+#
+# ⚠️  RUNNER SIZING IS UNVERIFIED ⚠️
+# ubuntu-latest for public repos is 4 vCPU / 16 GB RAM. The cluster asks for
+# 4 GB (controlplane) + 6 GB (worker) container memory limits plus Cilium,
+# Gitea and ArgoCD on top — this *should* fit, but nobody has proven it.
+# Until a green run is observed, the whole job is continue-on-error so a
+# failure here never blocks pushes. Once it's proven, remove
+# continue-on-error and let drift break OUR build, not the workshop
+# (principle 14). If it genuinely doesn't fit, options: larger hosted
+# runners, a self-hosted runner, or a nightly run on a workshop laptop.
+# =============================================================================
+name: Bootstrap test
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, Monday 03:17 UTC (odd minute to dodge cron rush)
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  full-bootstrap:
+    name: create-cluster → bootstrap-gitops → seed-gitea
+    runs-on: ubuntu-latest
+    continue-on-error: true   # see header — remove once proven on this runner size
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show runner resources
+        run: |
+          nproc
+          free -h
+          df -h /
+          docker info | grep -E 'CPUs|Total Memory'
+
+      - name: Install mise + pinned tools
+        run: |
+          set -euo pipefail
+          curl -fsSL https://mise.run | sh
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          echo "${HOME}/.local/share/mise/shims" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/mise" trust
+          "${HOME}/.local/bin/mise" install
+
+      - name: Pre-flight (informational — no pre-pulled images on a runner)
+        run: ./scripts/install.sh --check || true
+
+      - name: Create cluster (Talos + Cilium)
+        run: ./scripts/create-cluster.sh
+
+      - name: Bootstrap GitOps (Gitea + ArgoCD)
+        run: ./scripts/bootstrap-gitops.sh
+
+      - name: Seed Gitea
+        run: ./scripts/seed-gitea.sh
+
+      - name: Smoke tests
+        run: |
+          set -euo pipefail
+          kubectl get nodes -o wide
+          kubectl get pods -A
+          # Gitea answers and the platform repo exists
+          curl -fsS http://localhost:30300/api/healthz
+          curl -fsS http://localhost:30300/api/v1/repos/cloudbox/platform | head -c 400
+          # ArgoCD UI answers on the NodePort
+          curl -fsS -o /dev/null http://localhost:30080
+          # Root application exists
+          kubectl get application platform -n argocd -o wide
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          docker ps -a || true
+          kubectl get pods -A || true
+          kubectl get events -A --sort-by=.lastTimestamp | tail -50 || true
+          kubectl -n argocd get applications -o yaml || true

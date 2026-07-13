@@ -1,0 +1,108 @@
+# =============================================================================
+# CI — static checks on every push/PR.
+# Principle 14: weekly drift is caught by bootstrap-test.yaml; this workflow
+# keeps the repo itself honest (shell syntax, YAML syntax, k8s schemas).
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash -n (syntax) on every script
+        run: |
+          set -euo pipefail
+          rc=0
+          while IFS= read -r -d '' script; do
+            if bash -n "${script}"; then
+              echo "ok: ${script}"
+            else
+              echo "SYNTAX ERROR: ${script}"
+              rc=1
+            fi
+          done < <(find . -path ./slides -prune -o -name '*.sh' -print0)
+          exit "${rc}"
+
+      - name: shellcheck (preinstalled on ubuntu runners)
+        run: |
+          set -euo pipefail
+          shellcheck --version
+          # -x follows sourced files (lib.sh, versions.env); SCRIPTDIR resolves them
+          shellcheck -x --source-path=SCRIPTDIR scripts/*.sh
+
+  yaml-syntax:
+    name: YAML syntax (gitops/, lab/, solutions/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate all YAML parses (multi-document aware)
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import pathlib, sys
+          import yaml  # PyYAML is preinstalled on GitHub runners
+
+          roots = [p for p in ("gitops", "lab", "solutions") if pathlib.Path(p).is_dir()]
+          if not roots:
+              print("no gitops/lab/solutions directories yet — nothing to validate")
+              sys.exit(0)
+
+          errors = 0
+          checked = 0
+          for root in roots:
+              for f in sorted(pathlib.Path(root).rglob("*.y*ml")):
+                  checked += 1
+                  try:
+                      list(yaml.safe_load_all(f.read_text()))
+                  except yaml.YAMLError as e:
+                      print(f"INVALID YAML: {f}\n  {e}")
+                      errors += 1
+          print(f"checked {checked} files, {errors} invalid")
+          sys.exit(1 if errors else 0)
+          EOF
+
+  kubeconform:
+    name: Kubernetes schema validation (gitops/)
+    runs-on: ubuntu-latest
+    env:
+      KUBECONFORM_VERSION: v0.8.0   # pinned — bump deliberately
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeconform ${{ env.KUBECONFORM_VERSION }}
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/kubeconform.tar.gz \
+            "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp kubeconform
+          sudo install /tmp/kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
+
+      - name: kubeconform gitops/
+        run: |
+          set -euo pipefail
+          if [ ! -d gitops ]; then
+            echo "no gitops/ directory yet — skipping"
+            exit 0
+          fi
+          # -ignore-missing-schemas: CRD-defined kinds (Application, Cluster,
+          # XRDs, ...) have no upstream JSON schema; CI checks core kinds and
+          # skips ArgoCD's own kinds explicitly per repo policy.
+          kubeconform \
+            -strict \
+            -summary \
+            -ignore-missing-schemas \
+            -skip Application,AppProject,ApplicationSet \
+            gitops/

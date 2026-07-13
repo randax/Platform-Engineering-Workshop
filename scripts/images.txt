@@ -1,0 +1,92 @@
+# =============================================================================
+# CloudBox — pinned image list, pre-pulled at home by scripts/cloudbox-init.sh
+# and verified by scripts/install.sh --check.
+#
+# Format:
+#   [host]   — images the HOST docker engine runs directly (docker pull)
+#   [mirror] — images cluster nodes pull; copied into the cloudbox-mirror
+#              registry (localhost:5001) preserving repository paths, so the
+#              Talos nodes' own containerd can fetch them without internet.
+#   Lines starting with # are comments. Every reference is pinned (tag and/or
+#   digest) — :latest silently defeats pre-pulling (principle 2/14).
+#
+# Verified against upstream registries 2026-07-13. The [mirror] component list
+# must track what gitops/ actually deploys — re-verify against gitops/ and
+# re-pin in late August.
+# =============================================================================
+
+[host]
+# Talos node container (1 CP + 1 worker run this image)
+ghcr.io/siderolabs/talos:v1.13.6
+# The local pull-through mirror itself
+docker.io/library/registry:3.1.1
+# kind fallback node image (only used by kind-fallback.sh — kept warm anyway)
+docker.io/kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
+
+[mirror]
+# --- Talos / Kubernetes system images (from `talosctl images default`, v1.13.6)
+# flannel is omitted (cni: none) and kube-proxy is omitted (proxy disabled).
+ghcr.io/siderolabs/kubelet:v1.36.2
+registry.k8s.io/kube-apiserver:v1.36.2
+registry.k8s.io/kube-controller-manager:v1.36.2
+registry.k8s.io/kube-scheduler:v1.36.2
+registry.k8s.io/etcd:v3.6.12
+registry.k8s.io/coredns/coredns:v1.14.2
+registry.k8s.io/pause:3.10.1
+registry.k8s.io/networking/kube-network-policies:v1.0.0
+
+# --- Cilium 1.19.5 (digests from `helm template cilium/cilium --version 1.19.5`)
+quay.io/cilium/cilium:v1.19.5@sha256:20fbbc14ac20b55a292c0dcda5571bf31cde30a7dbc68c29db3e709390ab0732
+quay.io/cilium/operator-generic:v1.19.5@sha256:be848a365776e07d0c5a895eda7aec928ddc52a5a1fa2f432fd7a286609e1db4
+quay.io/cilium/cilium-envoy:v1.36.8-1781157951-a7f42a3390781539911b5b9107881b35ecc4e752@sha256:326f872e19ce8aa45170efbf583b3f301586ba3feead14b864676d4baf3b45ed
+
+# --- Gitea (chart 12.6.0, rootless single-pod)
+docker.gitea.com/gitea:1.26.1-rootless
+
+# --- ArgoCD v3.4.5 (images from the vendored install.yaml)
+quay.io/argoproj/argocd:v3.4.5
+ghcr.io/dexidp/dex:v2.45.0
+public.ecr.aws/docker/library/redis:8.2.3-alpine
+
+# --- Wave 0: storage + observability
+docker.io/rancher/local-path-provisioner:v0.0.36
+docker.io/library/busybox:1.37.0
+docker.io/grafana/otel-lgtm:0.29.0
+
+# --- Wave 1: data services
+ghcr.io/cloudnative-pg/cloudnative-pg:1.28.4
+# Default postgres image compiled into CNPG 1.28.4 (pkg/versions/versions.go);
+# also pinned explicitly by the Backstage database in gitops/
+ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+# RustFS — Docker Hub only (no GHCR mirror upstream); beta by design, see RESEARCH.md §2
+docker.io/rustfs/rustfs:1.0.0-beta.8
+ghcr.io/project-zot/zot:v2.1.18
+
+# --- Wave 2: self-service, serverless, builds
+xpkg.crossplane.io/crossplane/crossplane:v2.3.3
+# Knative Serving v1.22.1 (digest-pinned in the upstream release YAMLs)
+gcr.io/knative-releases/knative.dev/serving/cmd/activator@sha256:5deaef961fef8d1417f6d4a4dfae2fc338f2d30d72c4ad58c3ab392b2c04705b
+gcr.io/knative-releases/knative.dev/serving/cmd/autoscaler@sha256:5bae38655d87df86b041083fbe51791816473245f752432ba9b85a7b12f73cd5
+gcr.io/knative-releases/knative.dev/serving/cmd/controller@sha256:94329d85200c2fc31ed1166a26568ca1357376c149c147e71f400cf28be3c816
+gcr.io/knative-releases/knative.dev/serving/cmd/queue@sha256:b1af8bda6c1d32b1cf5fbf8f1f6068c5007a5cebf091039fdea83b88b1fd87f4
+gcr.io/knative-releases/knative.dev/serving/cmd/webhook@sha256:8470456be214e93a84e3c7b79a632aa9978bd8ecda553feaa47878a2c24ab84d
+gcr.io/knative-releases/knative.dev/net-kourier/cmd/kourier@sha256:01abd2070ccf8680885c47990e42c05c09e30bc8595d9246f4dcd37f2220a2a2
+# Kourier gateway envoy — gitops/ pins the exact patch (upstream uses v1.37-latest)
+docker.io/envoyproxy/envoy:v1.37.2
+# Argo Workflows v4.0.7
+quay.io/argoproj/workflow-controller:v4.0.7
+quay.io/argoproj/argoexec:v4.0.7
+quay.io/argoproj/argocli:v4.0.7
+# Rootless BuildKit (in-cluster image builds)
+docker.io/moby/buildkit:v0.31.1-rootless
+
+# --- Lab workload images (modules 3, 4, 6)
+# aws-cli: bucket tooling in modules 03/04 (public.ecr.aws is in the mirror map)
+public.ecr.aws/aws-cli/aws-cli:2.27.49
+# Knative hello app (module 06) — upstream only publishes :latest, so pinned by digest
+ghcr.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba
+
+# --- Wave 3: Backstage (CNOE prebuilt image, tag pinned by gitops/catalog)
+# linux/amd64 only — Apple Silicon runs it emulated. Its database is a CNPG
+# cluster using the postgresql image pinned above.
+ghcr.io/cnoe-io/backstage-app:9232d633b2698fffa6d0a73b715e06640d170162
