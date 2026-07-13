@@ -1,0 +1,20 @@
+# Workshop addition: pinned composition function used by lab 04's Composition.
+#
+# OFFLINE NOTE (important): Crossplane's package manager fetches this package
+# straight from the registry over the network — it does NOT go through the
+# node's containerd image cache, so pre-pulling the image onto the Docker/Talos
+# nodes is not enough for the *package fetch* step. Enable the crossplane
+# Application (and let this Function become Healthy) while internet is still
+# available, or mirror the package into the in-cluster Zot registry and point
+# spec.package at zot.zot.svc.cluster.local:5000 instead.
+#
+# ghcr.io/crossplane-contrib/... is the same artifact as
+# xpkg.crossplane.io/crossplane-contrib/... (xpkg.crossplane.io fronts GHCR);
+# we pin the GHCR form to match the workshop's "everything on GHCR" rule.
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-patch-and-transform
+spec:
+  package: ghcr.io/crossplane-contrib/function-patch-and-transform:v0.10.7
+  packagePullPolicy: IfNotPresent

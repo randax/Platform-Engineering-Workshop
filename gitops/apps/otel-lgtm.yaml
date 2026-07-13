@@ -1,0 +1,33 @@
+# Single-pod observability stack (OTel Collector + Prometheus + Loki +
+# Tempo + Grafana). Wave 0 so every later module has "look at what you
+# built" moments. Grafana: kubectl -n observability port-forward svc/lgtm 3000
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-lgtm
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/platform.git
+    targetRevision: main
+    path: gitops/components/otel-lgtm
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
