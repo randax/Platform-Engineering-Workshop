@@ -1,0 +1,53 @@
+// Dev container for the JavaZone 2026 workshop — the "lifeboat" path (PLAN.md decision 1).
+// If `./scripts/install.sh --check` fails on your laptop, open this repo in GitHub
+// Codespaces (4-core / 16 GB machine or larger) or any Dev Containers-spec editor and
+// you get the same workshop content with Docker-in-Docker.
+// Spec reference: https://containers.dev/implementors/json_reference/
+{
+  "name": "jz-2026-platform-engineering",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+
+  "features": {
+    // Talos-in-Docker needs a real Docker daemon inside the container.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  // Codespaces machine-type hint: the published workshop spec is 16 GB RAM
+  // (>=10 GB to Docker), 4+ cores, 40 GB disk. Storage below is the Codespaces
+  // minimum that fits the pre-pulled images; local users need 40 GB free.
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "32gb"
+  },
+
+  // Install mise, then the pinned workshop toolchain.
+  // NOTE: `./scripts/cloudbox-init.sh` (pre-pull several GB of images) is deliberately
+  // NOT run automatically — it is too heavy for container creation. Run it manually
+  // once inside the container, before the workshop:
+  //   ./scripts/cloudbox-init.sh && ./scripts/install.sh --check
+  "postCreateCommand": "curl -fsSL https://mise.run | sh && export PATH=\"$HOME/.local/bin:$PATH\" && ./scripts/dev-setup.sh",
+
+  // NodePorts exposed by the in-cluster platform.
+  "forwardPorts": [30300, 30080, 30500, 30700, 30900, 31080],
+  "portsAttributes": {
+    "30300": { "label": "Gitea (in-cluster git)" },
+    "30080": { "label": "ArgoCD" },
+    "30500": { "label": "Zot registry" },
+    "30700": { "label": "Backstage portal" },
+    "30900": { "label": "RustFS S3" },
+    "31080": { "label": "App ingress (Kourier)" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "files.eol": "\n"
+      }
+    }
+  }
+}

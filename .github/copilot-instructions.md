@@ -1,116 +1,65 @@
-# JavaZone 2025 Platform Engineering Workshop - AI Instructions
+<!-- Canonical copy: /CLAUDE.md — keep this file in sync with it.
+     (.clinerules, .cursorrules and .windsurfrules symlink here.) -->
 
-## Project Overview
+# Repo guide for AI agents
 
-This is a **hands-on workshop repository** for building cloud-native platforms using CNCF tools. The architecture follows a **progressive lab structure** teaching platform engineering concepts through practical implementation.
+This is the **JavaZone 2026 workshop** "Cloud on Your Terms: Building Your Own
+Cloud-Native Platform" (240 min, hands-on). Attendees build a full platform —
+Talos-in-Docker, Cilium, in-cluster Gitea + ArgoCD, CNPG, RustFS, Crossplane v2 —
+on their own laptops. Working offline after image pre-pull is a hard requirement.
 
-### Core Architecture Pattern
+## Authoritative documents — read before changing anything substantial
+
+- **PLAN.md** — the construction plan: modules, timeline, decisions, risks.
+- **docs/RESEARCH.md** — grounded, verified version/verdict decisions. If you think a
+  version or approach is wrong, check here first; it probably was chosen deliberately.
+- **docs/PRINCIPLES.md** — 15 design rules every lab and script must follow
+  (outcome-oriented labs, verify.sh exit-0 contract, layered hints, offline-first,
+  honest specs). When a lab violates a principle, fix the lab.
+
+## Repository layout
 
 ```
-Workshop Labs (lab/) → Automation Scripts (scripts/) → Platform Components → Presentation (slides/)
-└── 01-talos/          └── install-*.sh           └── Kubernetes Operators    └── slides.md
-└── 02-networking/     └── dev-setup.sh           └── CNCF Stack              └── components/
-└── 03-gitops/         └── create-*.sh            └── Self-Service Platform   └── package.json
+scripts/     dev-setup.sh · cloudbox-init.sh · install.sh --check · create-cluster.sh
+             bootstrap-gitops.sh · seed-gitea.sh · catch-up.sh <module> · kind-fallback.sh
+gitops/      apps/       ArgoCD app-of-apps root — what is actually enabled
+             catalog/    available capabilities (attendees copy catalog/<x>.yaml → apps/)
+             components/ per-component manifests/values, sync-waved
+lab/         00-setup … 08-portal — outcome + verify.sh + layered hints (+ faults/ in 05)
+solutions/   canonical end-state per module (what catch-up.sh force-pushes to Gitea)
+docs/        RESEARCH.md · PRINCIPLES.md
+slides/      Slidev deck
+.devcontainer/  Codespaces lifeboat — same content when local preflight fails
 ```
 
-## Critical Workflow Knowledge
+## Architecture contract
 
-### Development Environment Setup
-- **Always run `./scripts/dev-setup.sh` first** - installs Go tools, kubectl, docker verification
-- **Use `mise` for tool management** - defined in `mise.toml` with Talos, kubectl, helm, node 24, go 1.24
-- **Scripts are the primary interface** - prefer using existing scripts over raw kubectl/helm commands
+- **Single source of version pins: `scripts/versions.env`** (plus pinned `mise.toml`).
+  Never introduce `:latest` or a second place where a version is written down.
+- Pinned stack: Talos **v1.13.6** (never 1.12.x), Cilium **1.19.5**, ArgoCD **v3.4.5**,
+  Crossplane **v2**, CloudNativePG, RustFS (standalone, beta — SeaweedFS is Plan B),
+  Knative + Kourier (stretch), Argo Workflows + BuildKit + Zot (stretch),
+  Backstage CNOE image (stretch), grafana/otel-lgtm (observability).
+- Cluster: `talosctl cluster create docker`, 1 CP + 1 worker, raised memory limits,
+  `cni: none` + Helm-installed Cilium.
+- GitOps write path: ArgoCD points **only at the in-cluster Gitea** (single-pod SQLite,
+  push-create, seeded by seed-gitea.sh) — never at GitHub.
+- **Progressive-enable mechanic:** capabilities ship as ArgoCD Application manifests in
+  `gitops/catalog/`; attendees enable one by copying it to `gitops/apps/` and pushing to
+  Gitea. App-of-apps with sync waves; Application CRD health check restored in argocd-cm;
+  `ServerSideApply=true` on CRD-heavy apps.
+- One namespace per platform component, defined in that component's manifests under
+  `gitops/components/`.
+- All images pinned and hosted on GHCR (Docker Hub is rate-limited at the venue);
+  `cloudbox-init.sh` pre-pulls them.
 
-### Platform Installation Pattern
-1. `./scripts/cloudbox-init.sh` - Initialize base platform
-2. `./scripts/install-all-operators.sh` - Deploy all CNCF operators in sequence
-3. Individual operators: `install-cloudnative-pg.sh`, `install-strimzi-kafka.sh`, etc.
+## Conventions
 
-### Lab Structure Convention
-- Each lab in `lab/XX-name/` contains:
-  - `README.md` with step-by-step instructions
-  - Configuration patches (e.g., `cilium-patch.yml`)
-  - Quick reference guides
-- **Labs build progressively** - later labs depend on earlier infrastructure
-
-## Technology Stack Specifics
-
-### Kubernetes Distribution: Talos Linux
-- **Immutable, API-driven OS** - no SSH/shell access
-- **Use `talosctl` not SSH** for cluster management
-- **Cilium CNI required** - always disable default CNI with config patches
-- **Multi-node default**: 3 controlplanes, 2 workers for HA
-
-### CNCF Operator Stack
-- **CloudNativePG**: PostgreSQL clusters (`cnpg-system` namespace)
-- **Strimzi**: Kafka clusters (`kafka-system` namespace)
-- **MinIO**: Object storage (`minio-operator` namespace)
-- **Knative**: Serverless functions (`knative-serving` namespace)
-- **Tekton**: CI/CD pipelines (`tekton-pipelines` namespace)
-- **ArgoCD**: GitOps delivery
-- **Cilium**: eBPF networking and security
-
-### Workshop-Specific Patterns
-
-#### Script Naming Convention
-- `install-*.sh` - Deploy individual operators
-- `create-*.sh` - Create cluster resources (postgres, kafka)
-- `dev-setup.sh` - Development environment preparation
-- `cloudbox-init.sh` - Platform initialization
-
-#### Configuration Management
-- **Config patches over full manifests** - see `cilium-patch.yml` pattern
-- **Namespace isolation** - each operator gets dedicated namespace
-- **Helm for operators, kubectl for applications**
-
-#### Troubleshooting Workflow
-1. Check operator pods: `kubectl get pods -A | grep -E "(cnpg|kafka|minio|knative)"`
-2. Verify CRDs: `kubectl get crd | grep -E "(postgresql|kafka|minio|knative)"`
-3. Use `mise run k8s:status` for comprehensive platform health check
-
-## Development Guidelines
-
-### When Adding New Labs
-- Follow `XX-name/` directory pattern with zero-padded numbers
-- Include comprehensive README with prerequisites, objectives, troubleshooting
-- Provide configuration files and quick reference guides
-- Test installation scripts for idempotency
-
-### When Modifying Scripts
-- **Maintain script execution order** in `install-all-operators.sh`
-- Add status checks and verification steps
-- Include namespace and CRD validation
-- Follow the error handling pattern: `set -e` for strict mode
-
-### Platform Extension Points
-- **New operators**: Add install script + update `install-all-operators.sh`
-- **New resources**: Use `create-*.sh` pattern for cluster resources
-- **New tools**: Add to `mise.toml` tools section
-- **New tasks**: Add to `mise.toml` tasks with proper dependencies
-
-### Slides Development (`slides/`)
-- **Slidev framework** with Vue.js components and Mermaid diagrams
-- **Seriph dark theme** - ensure bright backgrounds use dark text (`text-gray-800`, `text-gray-700`)
-- **Progressive disclosure** - use `v-click` animations for step-by-step reveals
-- **Clean design principles** - avoid walls of text, use speaker notes instead
-- **Magic Move transitions** - leverage `$$magic-move` for code transformations
-- **Task integration** - `mise run slides:dev` for development, `slides:export` for PDF
-- **Bright background fix pattern**: `bg-blue-50 text-gray-800`, `bg-orange-50 text-gray-800`
-
-#### Slide Content Guidelines
-- **Speaker notes over text** - extensive content goes in `<!-- -->` comments
-- **Visual hierarchy** - icons, grids, and layout over bullet points
-- **Code demonstrations** - inline scripts with explanations
-- **Interactive elements** - use Vue components for dynamic content
-- **Mermaid diagrams** - architecture and flow visualization
-- **File structure**: `slides.md` (main content), `components/` (Vue), `package.json` (deps)
-- **Development workflow**: `mise run slides:dev` → edit → `slides:presenter` → `slides:export`
-
-## Workshop Context
-
-This is **educational content** for a 4-hour JavaZone workshop. Prioritize:
-- **Clear documentation** over complex automation
-- **Progressive complexity** - simple concepts first
-- **Practical examples** over theoretical explanations
-- **Troubleshooting guides** - workshop attendees will encounter issues
-
-The goal is teaching **platform engineering principles** through hands-on CNCF tool implementation, not production-ready infrastructure.
+- Labs state **outcomes, not steps**; each ships `verify.sh` (exit 0 on success,
+  `FAIL:`-prefixed actionable messages) and `solve.sh`, CI-tested against each other.
+- Hints are layered and collapsed in `<details>` blocks; full solution is the last layer.
+- Shell scripts: bash, `set -euo pipefail`, shellcheck-clean, idempotent, check-only
+  flags never mutate.
+- Facts matter to this audience: RustFS is an Apache-2.0 *alternative* to MinIO, whose
+  open-source community edition was discontinued in 2025–26 in favor of the proprietary
+  AIStor. Never write "MinIO went proprietary" or call RustFS a "successor".
