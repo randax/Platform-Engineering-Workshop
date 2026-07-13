@@ -1,0 +1,149 @@
+# HOW a WorkshopDatabase is implemented: one CNPG Postgres cluster + one Job
+# that provisions an S3 bucket in RustFS. Crossplane v2 compositions emit
+# plain Kubernetes resources directly — no provider wrapping. Pipeline mode
+# with function-patch-and-transform (native P&T was removed in v2).
+#
+# Because the XR is namespaced, everything composed here lands in the XR's
+# own namespace.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: workshopdatabase-cnpg
+  labels:
+    provider: cnpg
+spec:
+  compositeTypeRef:
+    apiVersion: platform.cloudbox.io/v1alpha1
+    kind: WorkshopDatabase
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        # Must match the installed Function's name:
+        #   kubectl get functions.pkg.crossplane.io
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          # ------------------------------------------------ the database
+          - name: database
+            base:
+              apiVersion: postgresql.cnpg.io/v1
+              kind: Cluster
+              spec:
+                instances: 1
+                bootstrap:
+                  initdb:
+                    database: app
+                    owner: app
+                storage:
+                  size: 1Gi # patched from spec.storageGB
+                  storageClass: local-path
+                resources:
+                  requests:
+                    memory: 256Mi # patched from spec.size
+                    cpu: 100m
+                  limits:
+                    memory: 512Mi # patched from spec.size
+                    cpu: 500m
+                postgresql:
+                  parameters:
+                    max_connections: "100"
+                    shared_buffers: 64MB
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-pg"
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.storageGB
+                toFieldPath: spec.storage.size
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%dGi"
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.size
+                toFieldPath: spec.resources.requests.memory
+                transforms:
+                  - type: map
+                    map:
+                      small: 256Mi
+                      medium: 512Mi
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.size
+                toFieldPath: spec.resources.limits.memory
+                transforms:
+                  - type: map
+                    map:
+                      small: 512Mi
+                      medium: 1Gi
+            readinessChecks:
+              - type: MatchCondition
+                matchCondition:
+                  type: Ready
+                  status: "True"
+
+          # ------------------------------------------------ the bucket
+          # Honest and simple: a Job that talks S3 to RustFS. (A Crossplane
+          # S3 provider would also work — this shows compositions can emit
+          # ANY Kubernetes resource, batch Jobs included.)
+          - name: bucket
+            base:
+              apiVersion: batch/v1
+              kind: Job
+              spec:
+                backoffLimit: 6
+                template:
+                  spec:
+                    restartPolicy: OnFailure
+                    containers:
+                      - name: make-bucket
+                        image: public.ecr.aws/aws-cli/aws-cli:2.27.49
+                        command: ["/bin/sh", "-c"]
+                        args:
+                          - |
+                            set -e
+                            EP=http://rustfs-svc.rustfs.svc.cluster.local:9000
+                            if aws --endpoint-url "$EP" s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+                              echo "bucket $BUCKET already exists"
+                            else
+                              aws --endpoint-url "$EP" s3 mb "s3://$BUCKET"
+                            fi
+                        env:
+                          - name: AWS_ACCESS_KEY_ID
+                            value: cloudbox
+                          - name: AWS_SECRET_ACCESS_KEY
+                            value: cloudbox123
+                          - name: AWS_REGION
+                            value: us-east-1
+                          - name: BUCKET
+                            value: patched # patched from metadata.name
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-bucket"
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.template.spec.containers[0].env[3].value
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-assets"
+            readinessChecks:
+              - type: MatchCondition
+                matchCondition:
+                  type: Complete
+                  status: "True"
