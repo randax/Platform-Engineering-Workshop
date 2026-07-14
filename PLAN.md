@@ -105,7 +105,7 @@ docs/             RESEARCH.md · PRINCIPLES.md
       corrected MinIO/RustFS wording
 - [x] Commit PLAN.md + docs/; remove dead scripts (Strimzi, MinIO, Tekton, duplicate CNPG)
 - [ ] Email JavaZone organizers: workshop day/venue/seat cap/tables/power/wired network/SSH (issue #11)
-- [ ] Rename repo to `jz-2026-platform-engineering` — GATED behind the publish sequence, issue #7
+- [x] Rename repo — done 2026-07-14, as `Platform-Engineering-Workshop` (year-neutral; old URLs redirect). ⚠️ Went public BEFORE the image publish — issue #7 sequence now urgent
 
 ### Phase 1 — Spike the unknowns (July → rehearsal; the full matrix is issue #8)
 - [ ] One-evening RustFS spike (standalone chart, presigned URLs) — else flip to SeaweedFS now
