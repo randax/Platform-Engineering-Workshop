@@ -15,11 +15,12 @@
   <title>Cloudbox Console</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js"></script>
+  <script defer src="/static/egg.js"></script>
 </head>
 <body>
 <div class="shell">
 <aside class="rail">
-  <span class="logo">⬢ Cloudbox Console</span>
+  <span class="logo" id="logo">⬢ Cloudbox Console</span>
   <nav>
     {{/* built from the page registry — a new page file adds itself here */}}
     {{- range nav}}
@@ -45,6 +46,13 @@
 </div>
 </body>
 </html>
+{{end}}
+
+{{define "notfound"}}
+{{template "head" ""}}
+<h1>This page scaled to zero.</h1>
+<p>It may cold-start if you retry. (It will not.)</p>
+{{template "foot" .}}
 {{end}}
 
 {{define "error"}}

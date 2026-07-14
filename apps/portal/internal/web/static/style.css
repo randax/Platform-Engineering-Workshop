@@ -311,3 +311,12 @@ pre.code {
 }
 .fill { height: 100%; background: var(--accent); border-radius: 999px; }
 .usagetext { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+
+/* Easter egg: billing fine print — deliberately, lawyerly small. */
+.fineprint {
+  font-size: 9px;
+  line-height: 1.4;
+  color: var(--muted, #94a3b8);
+  max-width: 40rem;
+  margin-top: 0.75rem;
+}
