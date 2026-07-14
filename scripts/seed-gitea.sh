@@ -50,7 +50,7 @@ if ! curl -fsS -u "${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}" \
   info "Creating Gitea organization '${ORG}'"
   curl -fsS -X POST -u "${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}" \
     -H "Content-Type: application/json" \
-    -d "{\"username\": \"${ORG}\", \"visibility\": \"public\"}" \
+    -d "{\"username\": \"${ORG}\", \"visibility\": \"public\", \"description\": \"Est. this morning. Uptime: since you created it.\"}" \
     "${GITEA_HOST_URL}/api/v1/orgs" >/dev/null \
     || die "Could not create Gitea org '${ORG}'."
 fi

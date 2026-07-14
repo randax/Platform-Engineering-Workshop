@@ -238,6 +238,7 @@ echo
 if [[ ${failures} -eq 0 ]]; then
   ok "All checks passed — you are ready for the workshop! 🎉"
   info "At the venue: ./scripts/create-cluster.sh"
+  echo "   Forecast: cloudy, locally."
   exit 0
 else
   fail "${failures} check(s) failed — fix the ❌ items above and re-run."
