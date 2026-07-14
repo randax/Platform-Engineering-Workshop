@@ -20,8 +20,6 @@ spec:
     repoURL: http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/platform.git
     targetRevision: main
     path: gitops/components/argo-workflows
-    directory:
-      recurse: false
   destination:
     server: https://kubernetes.default.svc
     namespace: argo
