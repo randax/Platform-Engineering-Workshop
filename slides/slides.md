@@ -1,67 +1,109 @@
 ---
 theme: seriph
-background: https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=2072&q=80
-title: Cloud on Your Terms - Building Your Own Cloud-Native Platform
+title: Cloud on Your Terms — Building Your Own Cloud-Native Platform
+titleTemplate: '%s'
 info: |
-  ## JavaZone 2025 - Platform Engineering Workshop
+  ## JavaZone 2026 — Platform Engineering Workshop
 
-  Build your own cloud-native platform using CNCF tools.
-  Learn Kubernetes, operators, databases, and platform engineering.
+  Build a complete cloud-native platform — Kubernetes, GitOps, databases-as-a-service,
+  object storage, self-service infrastructure — running entirely on your own laptop.
 
   Speakers: Øyvind Randa & Hans Kristian Flaatten
 class: text-center
+highlighter: shiki
 drawings:
   persist: false
 transition: slide-left
 mdc: true
+fonts:
+  provider: none
+# offline rule: no CDN assets — inline emoji favicon instead of Slidev's jsdelivr default
+favicon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☁️</text></svg>'
+themeConfig:
+  primary: '#38bdf8'
+layout: cover
 ---
 
 # Cloud on Your Terms
+
 ## Building Your Own Cloud-Native Platform
 
-**JavaZone 2025 Workshop**
+<div class="pt-4 text-lg opacity-90">JavaZone 2026 · 4-hour hands-on workshop</div>
 
-<div class="pt-12">
-  <span @click="$slidev.nav.next" class="px-2 py-1 rounded cursor-pointer bg-blue-600 text-white hover:bg-blue-700">
-    Start Building! <carbon:arrow-right class="inline"/>
-  </span>
+<div class="pt-6 text-sm leading-relaxed opacity-80">
+  <strong>Øyvind Randa</strong> — Software Architect at NextGenTel, Lead Organizer GDG Bergen<br>
+  <strong>Hans Kristian Flaatten</strong> — Platform Engineer in Norwegian Government, CNCF Ambassador
 </div>
 
-<div class="abs-br m-6 flex gap-2">
-  <div class="text-sm opacity-50">
-    Øyvind Randa • Hans Kristian Flaatten
-  </div>
+<div class="callout mt-8 mx-auto max-w-130">
+  <strong>Did you run the prework?</strong><br>
+  <code>./scripts/install.sh --check</code> must be all green.<br>
+  Not green? Start <strong>now</strong> — or grab a helper.
+</div>
+
+<div class="abs-br m-6 text-sm opacity-60">
+  github.com/randax/jz-2025-platform-engineering
 </div>
 
 <!--
-Welcome to the JavaZone 2025 Platform Engineering Workshop!
+Welcome! While people trickle in, this slide does the most important job of the day: getting everyone to run the pre-flight check immediately.
 
-The slides have been organized into separate files in the pages/ directory:
-- pages/intro.md: Welcome, challenge, and technology stack overview
-- pages/workshop-structure.md: Lab overview and learning objectives
-- pages/lab1-talos.md: Kubernetes foundation with Talos Linux
-- pages/lab2-database.md: Database platform with CloudNativePG
-- pages/conclusion.md: Summary and next steps
+- Introduce yourselves briefly: Øyvind (NextGenTel, GDG Bergen) and Hans (platform engineer in the Norwegian Government, CNCF Ambassador, co-host of Plattformpodden).
+- Point at the callout: "If you haven't run the three prework scripts, start `./scripts/cloudbox-init.sh` RIGHT NOW — it pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
+- Repo URL is at the bottom — it's public, everything (labs, solutions, slides) lives there, and it will keep working after today. (Repo is being renamed to jz-2026; the old URL redirects.)
+- Helpers: point them out, explain the sticky notes briefly (more on that in a few slides).
 
-Each section is self-contained with comprehensive speaker notes.
+Timing: keep the cover + "why" section to ~15 minutes total. Hands on keyboards within the first 10 minutes is the goal — module 00 is running in the background for anyone who skipped the prework.
 -->
 
 ---
-src: ./pages/intro.md
+src: ./pages/why.md
 ---
 
 ---
-src: ./pages/workshop-structure.md
+src: ./pages/how.md
 ---
 
 ---
-src: ./pages/lab1-talos.md
+src: ./pages/module-00.md
 ---
 
 ---
-src: ./pages/lab2-database.md
+src: ./pages/module-01.md
 ---
 
 ---
-src: ./pages/conclusion.md
+src: ./pages/module-02.md
+---
+
+---
+src: ./pages/module-03.md
+---
+
+---
+src: ./pages/module-04.md
+---
+
+---
+src: ./pages/module-05.md
+---
+
+---
+src: ./pages/module-06.md
+---
+
+---
+src: ./pages/module-07.md
+---
+
+---
+src: ./pages/module-08.md
+---
+
+---
+src: ./pages/module-09.md
+---
+
+---
+src: ./pages/closing.md
 ---

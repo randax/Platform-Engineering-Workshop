@@ -1,0 +1,68 @@
+/* Global styles for the JavaZone 2026 deck.
+   No external assets — gradients instead of background images (offline rule). */
+
+:root {
+  --jz-accent: #38bdf8;
+  --jz-accent-dim: #0ea5e9;
+}
+
+/* Cover and section dividers: solid gradient instead of the old Unsplash photo */
+.slidev-layout.cover,
+.slidev-layout.section {
+  background-image: linear-gradient(135deg, #0f172a 0%, #164e63 100%) !important;
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+.slidev-layout.cover h1,
+.slidev-layout.section h1 {
+  color: #f8fafc;
+}
+
+.slidev-layout.cover h2,
+.slidev-layout.section p {
+  color: #bae6fd;
+}
+
+/* Consistent accent for inline code on dark slides */
+.slidev-layout.cover code,
+.slidev-layout.section code {
+  color: #7dd3fc;
+}
+
+/* The "did you run the prework?" style callout box */
+.callout {
+  border: 2px solid var(--jz-accent);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+/* Module time-budget badge used on section slides */
+.badge {
+  display: inline-block;
+  border: 1px solid var(--jz-accent);
+  border-radius: 9999px;
+  padding: 0.1rem 0.8rem;
+  font-size: 0.85rem;
+  color: #7dd3fc;
+}
+
+/* Default-layout content slides: vertically center the content column so
+   sparse slides don't leave a dead bottom half on the projector, and bump
+   the base content size one step. (Cover/section/fact center themselves.) */
+.slidev-layout.default {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+/* Slightly tighter tables so the module overview fits on one slide */
+.slidev-layout table {
+  font-size: 0.82rem;
+}
+.slidev-layout td,
+.slidev-layout th {
+  padding: 0.3rem 0.6rem;
+}
