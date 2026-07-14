@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -104,7 +105,10 @@ func (k *kubeClient) do(ctx context.Context, method, path string, body io.Reader
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, strings.TrimSpace(string(msg)))
+		return &apiError{
+			Status: resp.StatusCode,
+			Msg:    fmt.Sprintf("%s %s: %s: %s", method, path, resp.Status, strings.TrimSpace(string(msg))),
+		}
 	}
 	if out == nil {
 		return nil
@@ -114,4 +118,18 @@ func (k *kubeClient) do(ctx context.Context, method, path string, body io.Reader
 
 func (k *kubeClient) get(ctx context.Context, path string, out any) error {
 	return k.do(ctx, http.MethodGet, path, nil, out)
+}
+
+// apiError keeps the HTTP status so callers can tell "does not exist" (a
+// normal answer) apart from "something is broken".
+type apiError struct {
+	Status int
+	Msg    string
+}
+
+func (e *apiError) Error() string { return e.Msg }
+
+func isNotFound(err error) bool {
+	var ae *apiError
+	return errors.As(err, &ae) && ae.Status == http.StatusNotFound
 }

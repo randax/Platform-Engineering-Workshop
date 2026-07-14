@@ -1,0 +1,84 @@
+{{define "database-detail"}}
+{{template "head" "databases"}}
+<p><a href="/databases">← all databases</a></p>
+<h1>{{.Name}}
+  {{with .DB}}<span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span>{{end}}
+</h1>
+
+{{with .DB}}
+<p class="lede">A <code>WorkshopDatabase</code> — size <b>{{.Spec.Size}}</b>,
+storage <b>{{.Spec.StorageGB}} GiB</b>, composed by Crossplane into the CNPG
+cluster and bucket below.</p>
+{{else}}
+<p class="lede">No WorkshopDatabase named <code>{{.Name}}</code> exists (deleted, or this
+is an unmanaged CNPG cluster).</p>
+{{end}}
+
+<h2>Backing Postgres cluster <small>({{.ClusterName}})</small></h2>
+{{with .Cluster}}
+<p class="stats"><b>{{.Status.ReadyInstances}}</b>/<b>{{.Spec.Instances}}</b> instances ready ·
+phase: {{.Status.Phase}} · storage {{.Spec.Storage.Size}}</p>
+<table>
+  <thead><tr><th>Condition</th><th>Status</th><th>Reason</th><th>Message</th></tr></thead>
+  <tbody>
+  {{range .Status.Conditions}}
+    <tr><td>{{.Type}}</td><td>{{.Status}}</td><td>{{.Reason}}</td><td class="wrap">{{.Message}}</td></tr>
+  {{else}}
+    <tr><td colspan="4" class="empty">No conditions reported yet.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty">Not composed yet — Crossplane is still working, or the composition failed
+(check <a href="/activity">Activity</a>).</p>
+{{end}}
+
+{{with .DB}}
+<h2>WorkshopDatabase conditions</h2>
+<table>
+  <thead><tr><th>Condition</th><th>Status</th><th>Reason</th><th>Message</th></tr></thead>
+  <tbody>
+  {{range .Status.Conditions}}
+    <tr><td>{{.Type}}</td><td>{{.Status}}</td><td>{{.Reason}}</td><td class="wrap">{{.Message}}</td></tr>
+  {{else}}
+    <tr><td colspan="4" class="empty">No conditions yet.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+
+<h2>Connect</h2>
+<p>CNPG puts the credentials in the Secret <code>{{.Secret}}</code> (namespace demo).
+Ready to paste:</p>
+<pre class="code">{{.Psql}}</pre>
+<p><a href="{{.GrafanaURL}}" target="_blank">Explore metrics in Grafana →</a>
+<span class="hint">(PromQL placeholder prefilled — CNPG metrics scraping is a
+follow-up, issue #8)</span></p>
+
+<h2>Recent events</h2>
+<table>
+  <thead><tr><th>Age</th><th>Type</th><th>Reason</th><th>Message</th></tr></thead>
+  <tbody>
+  {{range .Events}}
+    <tr {{if eq .Type "Warning"}}class="evwarn"{{end}}>
+      <td>{{.Age}}</td><td>{{.Type}}</td><td>{{.Reason}}</td><td class="wrap">{{.Message}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4" class="empty">No events recorded for {{.ClusterName}}.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+
+{{if .DB}}
+<h2>Danger zone</h2>
+<div id="delete-result"></div>
+<p>
+  {{/* destructive action on the detail page, real-console style */}}
+  <button class="danger" hx-delete="/databases/{{.Name}}" hx-target="#delete-result"
+          hx-confirm="Delete database {{.Name}}? This removes the Postgres cluster and its data.">
+    Delete this database
+  </button>
+</p>
+{{end}}
+{{template "foot" .}}
+{{end}}

@@ -1,0 +1,41 @@
+{{define "billing"}}
+{{template "head" "billing"}}
+<h1>Billing</h1>
+<p class="lede">Usage and charges for your cloud. Figures are computed live from the API
+server: container resource requests versus node allocatable capacity.</p>
+
+<div class="invoice">
+  <div class="invoice-head">
+    <span>Invoice — {{.Month}}</span>
+    <span class="invoice-total">kr 0,00</span>
+  </div>
+  <table>
+    <thead><tr><th>Line item</th><th>Usage</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>Compute ({{len .Nodes}} nodes)</td><td>see utilization below</td><td class="num">kr 0,00</td></tr>
+      <tr><td>Storage</td><td>every PVC on your own disk</td><td class="num">kr 0,00</td></tr>
+      <tr><td>Egress</td><td>also no</td><td class="num">kr 0,00</td></tr>
+      <tr><td>Managed databases</td><td>{{.DBCount}} provisioned</td><td class="num">kr 0,00</td></tr>
+      <tr class="invoice-sum"><td>Total due</td><td>it's your hardware</td><td class="num">kr 0,00</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Node utilization <small>(requests vs allocatable — no metrics-server needed)</small></h2>
+{{range .Nodes}}
+<div class="nodeusage">
+  <b>{{.Name}}</b>
+  <div class="usagerow"><span class="usagelabel">cpu</span>
+    <div class="bar"><div class="fill" style="width: {{.CPUPct}}%"></div></div>
+    <span class="usagetext">{{.CPUText}}</span>
+  </div>
+  <div class="usagerow"><span class="usagelabel">mem</span>
+    <div class="bar"><div class="fill" style="width: {{.MemPct}}%"></div></div>
+    <span class="usagetext">{{.MemText}}</span>
+  </div>
+</div>
+{{else}}
+<p class="empty">Could not list nodes.</p>
+{{end}}
+{{template "foot" .}}
+{{end}}
