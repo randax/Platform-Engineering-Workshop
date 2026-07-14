@@ -74,6 +74,11 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
+	// Infrastructure-level routes (no nav entry), alongside /healthz.
+	mux.HandleFunc("GET /teapot", bind(srv, web.Teapot))
+	// Catch-all: any GET the registry didn't claim renders the 404 page.
+	// Less specific than "/{$}" and every "GET /page", so it only fires last.
+	mux.HandleFunc("GET /", bind(srv, web.NotFound))
 
 	// Every page mounts itself via the registry — adding a page never
 	// touches this file (see internal/web/registry.go).
@@ -90,7 +95,7 @@ func main() {
 
 	// One server span per page request; health probes and static assets
 	// would only be noise in Grafana.
-	handler := otelhttp.NewHandler(mux, "portal",
+	traced := otelhttp.NewHandler(mux, "portal",
 		otelhttp.WithFilter(func(r *http.Request) bool {
 			return r.URL.Path != "/healthz" && !strings.HasPrefix(r.URL.Path, "/static/")
 		}),
@@ -98,6 +103,8 @@ func main() {
 			return r.Method + " " + r.URL.Path
 		}),
 	)
+	// Your monthly invoice, on every response header.
+	handler := web.CloudHeaders(traced)
 
 	addr := ":" + cfg.Port
 	log.Printf("cloudbox console listening on %s", addr)

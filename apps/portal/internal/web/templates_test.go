@@ -177,9 +177,11 @@ func TestTemplatesRender(t *testing.T) {
 				`2 provisioned`, // managed databases count
 				`width: 37%`,    // 1500/4000 requests bar
 				`1500m of 4000m requested`,
+				`fineprint`, `which on kr 0,00 is kr 0,00`, // egg
 			},
 		},
-		"error": {data: "boom", want: []string{"boom"}},
+		"notfound": {data: nil, want: []string{"This page scaled to zero.", `class="rail"`}},
+		"error":    {data: "boom", want: []string{"boom"}},
 	}
 
 	for name, tc := range pages {
