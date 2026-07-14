@@ -73,6 +73,18 @@ jobs:
           sys.exit(1 if errors else 0)
           EOF
 
+  consistency:
+    name: Cross-file consistency (no drift)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Everything that must agree, agrees
+        # solutions↔catalog copies, deployed images ⊆ images.txt,
+        # versions.env↔mise.toml pins, devcontainer MISE_VERSION,
+        # pinned artifacts present. See the script header for the full list.
+        run: ./scripts/check-consistency.sh
+
   kubeconform:
     name: Kubernetes schema validation (gitops/)
     runs-on: ubuntu-latest

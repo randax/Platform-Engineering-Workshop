@@ -33,12 +33,11 @@ kubectl get nodes >/dev/null 2>&1 \
 
 # --- 1. Storage class -----------------------------------------------------------
 step "Installing local-path-provisioner ${LOCAL_PATH_PROVISIONER_VERSION} (storage for Gitea)"
-# Server-side apply so the wave-0 ArgoCD Application can adopt these resources
-# later without field-ownership conflicts.
+# Applied straight from the gitops component — the SAME manifest the wave-0
+# ArgoCD Application later adopts, so the two can never drift. Server-side
+# apply avoids field-ownership conflicts on adoption.
 kubectl apply --server-side --force-conflicts \
-  -f "${SCRIPT_DIR}/manifests/local-path-storage-${LOCAL_PATH_PROVISIONER_VERSION}.yaml"
-kubectl annotate storageclass local-path \
-  storageclass.kubernetes.io/is-default-class=true --overwrite >/dev/null
+  -f "${REPO_ROOT}/gitops/components/local-path-provisioner/local-path-storage.yaml"
 kubectl -n local-path-storage rollout status deployment/local-path-provisioner --timeout=180s
 ok "Default storage class 'local-path' ready"
 

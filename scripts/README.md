@@ -51,12 +51,13 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `destroy-cluster.sh` | `talosctl cluster destroy` + kubeconfig cleanup; `--purge-mirror` also removes the image mirror |
 | `bootstrap-gitops.sh` | local-path-provisioner + Gitea (single-pod SQLite, push-to-create) + ArgoCD (vendored manifest, NodePort 30080, Application health check) |
 | `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |
-| `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` state to Gitea; `--rebuild` for the full nuke-and-rebuild |
+| `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` + `gitops/components` state to Gitea, then run the module's post-steps; `--rebuild` for the full nuke-and-rebuild |
 | `kind-fallback.sh` | Same cluster shape on kind + Cilium (loses the Talos content, gains robustness) |
+| `check-consistency.sh` | Drift detection between everything that must agree: solutions↔catalog copies, deployed images ⊆ `images.txt`, `versions.env`↔`mise.toml`, devcontainer pins. Runs in CI on every push |
 | `lib.sh` | Shared logging/helpers — sourced by every script |
 | `versions.env` | Every version pin, in one place |
 | `images.txt` | Every image the workshop uses, pinned, split into `[host]` and `[mirror]` sections |
-| `manifests/` | Vendored, pinned upstream manifests (ArgoCD install.yaml, local-path-provisioner) so the venue needs no internet |
+| `manifests/` | Vendored, pinned upstream manifests (ArgoCD install.yaml) so the venue needs no internet. local-path-provisioner is applied straight from `gitops/components/` — one copy, no drift |
 
 ## Why a local registry mirror?
 
