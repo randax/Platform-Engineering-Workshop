@@ -1,0 +1,41 @@
+# Knative Eventing v1.22.2 (module 09: event-driven pipeline). Core +
+# in-memory channel + multi-tenant channel-based Broker — the smallest
+# working Broker/Trigger stack (in-memory = no Kafka; fine for a lab,
+# events are lost on dispatcher restart). Resource requests are halved vs
+# upstream (small cluster). SkipDryRun: mt-channel-broker ships CRs
+# (ConfigMap-backed defaults reference channel CRDs from the same sync).
+# Pairs with knative-serving (same wave, same minor version).
+#
+# Enable with:  cp gitops/catalog/knative-eventing.yaml gitops/apps/ && git add . && git commit -m 'enable knative-eventing' && git push
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: knative-eventing
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/platform.git
+    targetRevision: main
+    path: gitops/components/knative-eventing
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: knative-eventing
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

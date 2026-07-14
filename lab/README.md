@@ -2,8 +2,9 @@
 
 You are going to build a small but real cloud platform on your own laptop: an immutable
 Kubernetes OS, eBPF networking, GitOps delivery, database- and storage-as-a-service,
-a self-service platform API, and (if you're fast) serverless, in-cluster CI, and a
-developer portal. Everything keeps working when you leave the building — that's the point.
+a self-service platform API, and (if you're fast) serverless, in-cluster CI, a developer
+portal, and an event-driven picture pipeline that ties it all together. Everything keeps
+working when you leave the building — that's the point.
 
 ## Module overview
 
@@ -17,7 +18,8 @@ developer portal. Everything keeps working when you leave the building — that'
 | 05 | [Debug it (with or without AI)](05-debug-with-ai/) | 25 min | core | You found the seeded fault — and proved your (or your AI's) diagnosis against live state |
 | 06 | [Serverless: Knative](06-serverless/) | stretch | self-paced | `curl` cold-starts a pod from zero, then it scales back to zero |
 | 07 | [In-cluster CI: Workflows + BuildKit + Zot](07-ci/) | stretch | demo + self-paced | An image built *inside* your cluster, pushed to *your* registry, running as a pod |
-| 08 | [Portal: Backstage](08-portal/) | stretch | self-paced | Scaffold an app from a portal template → new Gitea repo → ArgoCD deploys it |
+| 08 | [Portal: the Cloudbox Console](08-portal/) | stretch | self-paced + demo | Create a database through a portal *you can read the source of* — plus a Backstage presenter demo |
+| 09 | [Capstone: the picture pipeline](09-capstone/) | stretch | self-paced finale | Upload a photo → a resizer that didn't exist scales from zero → thumbnail, metadata, and the whole chain as one trace |
 
 Core = 00–05. Stretch modules are for the fast 20% and for home; nothing later depends on them.
 

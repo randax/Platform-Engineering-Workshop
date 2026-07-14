@@ -1,95 +1,158 @@
-# Module 08 (stretch) — Backstage: a front door for your platform
+# Module 08 (stretch) — The Cloudbox Console: a portal you can actually read
 
 ## The goal
 
-At the end of this module your platform has a developer portal: Backstage running at
-http://localhost:30700, its catalog listing your platform's components, and — the full
-loop — a software template that scaffolds a new app into a fresh Gitea repo and hands it
-to ArgoCD. You prove the base outcome with `./verify.sh`; the template loop is the trophy.
+At the end of this module your platform has a front door: the **Cloudbox Console** at
+http://localhost:30600, showing — live — the ArgoCD apps, Postgres clusters, and Knative
+services *you built today*. The trophy: you create a database through its "New database"
+form and prove with `kubectl` that a real `WorkshopDatabase` XR and a real CNPG cluster
+appeared. Then you read the portal's entire source code, because it's small enough that
+you can.
 
 ## Why this matters
 
 Everything you built so far is APIs and YAML — perfect for platform engineers, invisible
-to everyone else. A portal is how a platform gets *adopted*: catalog ("what exists, who
-owns it"), templates ("new service, golden path, one form"), and plugins surfacing ArgoCD
-status next to the code. Backstage (CNCF) is the de-facto standard; we run the CNOE
-prebuilt image, which comes wired for exactly our Gitea + ArgoCD combo.
-
-> **RAM & rehearsal note:** Backstage is the heaviest single component (~1.5–2 GB, plus
-> its Postgres) — that's why it's last. On a 16 GB machine consider stopping something
-> first (module 07's builds, for instance). If the template step misbehaves, that's what
-> the presenter's instance on the projector is for — watch the loop there, run the
-> catalog part locally.
+to everyone else. A portal is how a platform gets *adopted*: one place that answers "what
+exists?" and "how do I get one?". The industry reflex is "portal = Backstage", and
+sometimes that's right (we'll be honest about when, below). But a portal is not magic:
+this one is ~730 lines of Go and htmx that read the Kubernetes API with a ServiceAccount
+token. The entire source is in this repo under [`apps/portal/`](../../apps/portal/) —
+after today you can read every line of your platform's front door. Try saying that about
+most portals.
 
 ## The task
 
-1. Enable `backstage.yaml` from the catalog. This one takes a few minutes — it also
-   brings its own Postgres. Watch `kubectl -n backstage get pods`.
-2. Open http://localhost:30700 and sign in as **guest**.
-3. Explore the catalog: which of the things *you built today* does it already know about?
-   Where does that knowledge come from (what feeds a Backstage catalog)?
-4. **The loop:** Create → choose the app template → fill the form → run it. Then chase
-   what it did: a new repo in Gitea (http://localhost:30300), a new Application in ArgoCD
-   (http://localhost:30080), and eventually pods. One form → running service, entirely
-   inside your laptop.
+1. Enable `portal.yaml` from the catalog. It lands in ns `portal` and takes seconds — it's
+   one small Go binary (compare that to what module 08 used to be…).
+2. Open **http://localhost:30600** and explore. The overview, Databases, and Services
+   pages aren't a mock — every row is a live read from your cluster. For each page, answer:
+   *which Kubernetes API is this?* (You installed all of them today.)
+3. **The star task.** On the Databases page, use the **New database** form: name it
+   `console-db`, size `small`. Then prove it's real, the module-04 way:
+   - `kubectl -n demo get workshopdatabase console-db` — the XR the form created
+   - `kubectl -n demo get cluster console-db-pg -w` — the composed CNPG cluster booting
+
+   This is *exactly* the self-service loop you built in module 04 — same XRD, same
+   Composition, same controllers — with a form in front of it. The portal didn't gain any
+   new powers; your platform already had the API. That's the lesson.
+4. Spot the difference: your module-04 database went through git; this one didn't. Find
+   the evidence (`kubectl -n demo get workshopdatabase console-db -o yaml` — who created
+   it? Is it in your Gitea repo?). Keep that thought for the explain-back.
 5. Run `./verify.sh`.
+
+## How it works (read the source!)
+
+The whole portal is five Go files and four HTML templates in
+[`apps/portal/`](../../apps/portal/):
+
+- **`kube.go`** — talks to the Kubernetes API from inside the pod: the ServiceAccount
+  token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/` is all the auth it
+  has. Check what it's *allowed* to do: `kubectl describe clusterrole portal-read` —
+  read-only on exactly the four things it renders, plus one namespaced Role in `demo`
+  for `workshopdatabases`. No admin token, no magic.
+- **`resources.go`** — the "platform model": list ArgoCD `Applications`, CNPG `Clusters`,
+  Knative `Services` as dynamic/unstructured resources.
+- **`handlers.go`** — the form POST builds a `WorkshopDatabase` object and creates it via
+  the API — 20 lines that replace a whole portal product's scaffolder, because module 04
+  already did the hard part.
+- **`s3.go`** + the Gallery page — S3 reads against RustFS (this page comes alive in
+  module 09).
+- **htmx** (one vendored `.js` file, no build step) makes the forms and refreshes work.
+
+## Build vs. buy: when you'd reach for Backstage instead
+
+Be honest with yourself at work — bespoke won here because the platform is small and the
+audience is you. Backstage earns its weight when you need:
+
+- **The plugin ecosystem** — hundreds of integrations (ArgoCD, PagerDuty, Sonar, cost
+  insights…) you'd otherwise write and *maintain* yourself.
+- **A catalog at org scale** — hundreds of services, real ownership metadata,
+  discoverability across dozens of teams; our console lists everything because
+  everything fits on one screen.
+- **TechDocs & scaffolder templates** — docs-as-code and golden-path templates with an
+  ecosystem behind them.
+
+The costs are real too: ~2 GB of Node.js + Postgres, YAML-heavy configuration, and
+typically a team that owns it. A portal is a *product decision*, not a default.
+
+> **Presenter demo (~5 min):** the presenter now enables `backstage.yaml` from the
+> catalog on the projector cluster and runs the classic loop: catalog → software template
+> → new Gitea repo → ArgoCD app → pods. Watch for what the template wires together —
+> that integration glue is the real work of running Backstage.
+>
+> *Presenter notes:* pre-enable `backstage.yaml` before the module (first boot is slow,
+> ~2 GB image + CNPG database — it's why this is a demo, not the lab). Show: guest
+> sign-in at :30700, catalog entities fed from Gitea, run the template, then chase it
+> through Gitea (:30300) and ArgoCD (:30080). `backstage.yaml` stays in the catalog —
+> attendees with RAM to spare can run the same loop at home.
 
 ## Hints
 
 <details>
 <summary>Hint 1: Enabling, and what "up" looks like</summary>
 
+In your Gitea clone:
+
 ```bash
-cd ~/cloudbox-platform
-cp gitops/catalog/backstage.yaml gitops/apps/
-git add . && git commit -m "enable backstage" && git push
-kubectl -n backstage get pods -w    # backstage + postgres; first boot is the slowest
+cp gitops/catalog/portal.yaml gitops/apps/
+git add . && git commit -m "enable the cloudbox console" && git push
+kubectl -n portal get pods -w    # one small pod
 ```
 
-It's ready when `curl -s http://localhost:30700` returns HTML instead of nothing.
+It's up when `curl -s http://localhost:30600/healthz` answers `ok`. Note the portal needs
+the `demo` namespace and the module-04 platform API to exist — it *is* the UI for them.
 </details>
 
 <details>
-<summary>Hint 2: Where the catalog content comes from</summary>
+<summary>Hint 2: The form did something — where did it go?</summary>
 
-Backstage reads `catalog-info.yaml` entities from configured locations — the CNOE image
-is preconfigured to read from your Gitea. Check its config:
-`kubectl -n backstage get configmap -o name`, then look for `app-config` and its
-`catalog.locations` section. That's the answer to task 3.
+The form POSTs to the portal, which creates a `WorkshopDatabase` in ns `demo` — from
+there it's the module-04 machinery, so the module-04 commands apply:
+
+```bash
+kubectl -n demo get workshopdatabase                  # or: kubectl -n demo get wdb
+kubectl -n demo describe workshopdatabase console-db  # composition events
+kubectl -n demo get cluster,job,pods                  # the composed stack
+```
+
+`SYNCED True / READY False` while Postgres boots is normal; give it 2–3 minutes.
 </details>
 
 <details>
-<summary>Hint 3: The template ran but nothing deployed?</summary>
+<summary>Hint 3: The portal is up but a page errors</summary>
 
-Follow the chain in order — the template does three separate things:
-1. Gitea: does the new repo exist and contain the scaffolded code + manifests?
-2. ArgoCD: did an Application get created for it? Is it Synced?
-3. Cluster: `kubectl get pods -n <new-app-namespace>`.
+Each page is one API call — the error names the resource it couldn't read.
 
-The step that broke names the integration that needs attention (Gitea token, ArgoCD
-credentials — both preconfigured in the CNOE image, but the projector fallback exists
-for a reason).
+1. `kubectl -n portal logs deploy/portal --tail=20` — RBAC denials and API errors land here.
+2. A `workshopdatabases.platform.cloudbox.io is forbidden` or `not found` error means
+   module 04 isn't in place — the portal is a *view* on the platform API; it can't invent one.
+3. The Gallery page needs RustFS (module 03) and shows an empty grid until module 09
+   creates the `images` bucket — empty is fine, an error is not.
 </details>
 
 <details>
 <summary>Full solution</summary>
 
 ```bash
-cd ~/cloudbox-platform
-cp gitops/catalog/backstage.yaml gitops/apps/
-git add . && git commit -m "module 08: enable backstage" && git push
+WORKSHOP="$(git rev-parse --show-toplevel)"
+cd ~/cloudbox-platform   # your Gitea clone
 
-kubectl -n backstage rollout status deploy/backstage --timeout=600s
-open http://localhost:30700    # guest sign-in
+cp gitops/catalog/portal.yaml gitops/apps/
+git add . && git commit -m "module 08: enable the cloudbox console" && git push
 
-# UI: Create → template → name it "my-first-portal-app" → Run
-# then verify the chain:
-#   http://localhost:30300  → new repo exists
-#   http://localhost:30080  → new Application synced
-#   kubectl get pods -A | grep my-first-portal-app
+kubectl -n portal rollout status deploy/portal --timeout=300s
+open http://localhost:30600            # explore, then: Databases → New database
+                                       # name: console-db, size: small → Create
 
-cd "$(git rev-parse --show-toplevel)/lab/08-portal" && ./verify.sh
+kubectl -n demo get workshopdatabase console-db -w    # until SYNCED + READY
+kubectl -n demo get cluster console-db-pg             # the real database behind the form
+
+cd "$WORKSHOP/lab/08-portal" && ./verify.sh
 ```
+
+(No UI handy? The form is sugar over the API — `kubectl apply` the same 10-line
+`WorkshopDatabase` YAML from module 04 with name `console-db`, which is exactly what
+`solve.sh` does.)
 </details>
 
 ## Check your work
@@ -98,23 +161,29 @@ cd "$(git rev-parse --show-toplevel)/lab/08-portal" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: the backstage app is Synced/Healthy; the Backstage deployment (and its
-Postgres) are ready; the UI answers on :30700; and the catalog API responds (portal
-actually functional, not just a pod that's Running). The template loop is verified by
-your own eyes — it's UI-driven and named by you, so the script can't chase it.
+It checks: the portal app is Synced/Healthy; the deployment is ready; the UI answers on
+:30600; the `portal` ServiceAccount exists (that token is the portal's only credential);
+and — once you've created it — that `console-db` is a real, Ready `WorkshopDatabase`
+with a healthy CNPG cluster behind it.
 
 ## Explain-back
 
-Tell your neighbor: trace the template run end to end — form → Gitea → ArgoCD → pods.
-Which credentials/integrations had to exist for each arrow? (That wiring — not the UI —
-is the actual work of running a portal.)
+Tell your neighbor: your module-04 database went `git push → ArgoCD → Crossplane`; the
+console's database went `form → Kubernetes API → Crossplane`, skipping git entirely.
+What did you lose by skipping git? (Who can delete `console-db`, and would anything bring
+it back?) When is a direct-to-API portal the right trade, and when must the form write to
+git instead?
 
 ## Going deeper
 
-- Add one of *today's* components to the catalog by hand: write a `catalog-info.yaml`
-  for `hello-site` or your WorkshopDatabase XRD, push it to Gitea, register it in the UI.
-- Find the ArgoCD plugin card on a component page. Where does Backstage get live sync
-  status from?
-- The real question to take home: your platform now has an API (module 04) *and* a
-  portal (module 08). For your team — which one is the product, and which one is the
-  view? Argue both ways.
+- **Add a column.** Show each CNPG cluster's `instances` count on the Databases page
+  (`resources.go` + `databases.html` — it's one field and one `<td>`).
+- **Add a page.** The portal already has RBAC to list pods. A "Pods" page is ~30 lines
+  by copying the Services page end to end.
+- **Ship it like you mean it:** rebuild your changed portal *inside the cluster* with
+  module 07's pipeline (BuildKit → Zot), point the Deployment at
+  `zot.zot.svc.cluster.local:5000/...` via git, and watch ArgoCD roll it out. Your
+  platform now builds and deploys its own front door.
+- The take-home question: your platform has an API (module 04) *and* a portal. Which one
+  is the product, and which one is the view? Argue both ways, then read
+  `handlers.go` again and notice how little the portal actually does.

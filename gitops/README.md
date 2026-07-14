@@ -20,8 +20,11 @@ gitops/
 │   ├── zot.yaml                      (wave 1)
 │   ├── crossplane.yaml               (wave 2)
 │   ├── knative-serving.yaml          (wave 2)
+│   ├── knative-eventing.yaml         (wave 2)
 │   ├── argo-workflows.yaml           (wave 2)
-│   └── backstage.yaml                (wave 3)
+│   ├── backstage.yaml                (wave 3)
+│   ├── portal.yaml                   (wave 3)
+│   └── picture-pipeline.yaml         (wave 3)
 └── components/    # the actual Kubernetes manifests, one dir per component
     └── <name>/
         ├── VENDOR.md                 # where it came from + exact re-vendor cmd
@@ -42,8 +45,12 @@ Disabling is the reverse: `git rm` the file from `apps/`, push, and the root
 app prunes the child Application (which prunes its resources).
 
 Each catalog entry is designed to work when enabled standalone *in module
-order* — the only hard dependency is **backstage → cnpg-operator** (its
-database is a CNPG `Cluster`).
+order* — the hard dependencies are **backstage → cnpg-operator** (its
+database is a CNPG `Cluster`) and **picture-pipeline → knative-serving +
+knative-eventing** (module 09: enable serving and eventing before the
+pipeline). The **portal** (module 08) is independent, but its gallery page
+needs the `images` bucket that picture-pipeline's Job creates, and its
+self-service page needs the `demo` namespace from module 04.
 
 ## Sync waves
 
@@ -60,8 +67,11 @@ Applications (`argocd.argoproj.io/sync-wave`).
 | 1 | zot | zot | registry before anything builds/pushes |
 | 2 | crossplane | crossplane-system | composes CNPG resources (wave 1) |
 | 2 | knative-serving | knative-serving (+ kourier-system) | pulls app images from zot |
+| 2 | knative-eventing | knative-eventing | broker/trigger mesh for the pipeline |
 | 2 | argo-workflows | argo (pods in builds) | pushes to zot |
 | 3 | backstage | backstage | heaviest; scaffolds against everything else |
+| 3 | portal | portal (+ Role in demo) | Cloudbox Console; reads everything below it |
+| 3 | picture-pipeline | pipeline | ksvcs + Broker/Trigger need waves 1–2 (rustfs, serving, eventing) |
 
 Note: wave gating between Applications requires the Application health check
 in `argocd-cm` (removed upstream in ArgoCD 1.8, must be restored by the

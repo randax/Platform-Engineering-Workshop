@@ -57,7 +57,8 @@ solution to re-sync.
 | 5 | **Fault injection + AI agent segment** — break it, diagnose it (with or without an agent), verify the agent's claim | 25 | core/flex | found and fixed the seeded fault |
 | S1 | Knative — deploy the app serverless | stretch | self-paced + demo | curl a scale-from-zero URL |
 | S2 | Argo Workflows — in-cluster image build → Zot → deploy | stretch | presenter demo + self-paced lab | pipeline goes green |
-| S3 | Backstage — CNOE portal, template → Gitea → ArgoCD loop | stretch | last module / demo | scaffold an app from the portal |
+| S3 | Bespoke Cloudbox Console (hands-on) + Backstage (presenter demo) | stretch | self-paced + demo | create a database from a portal form; read the whole portal's source |
+| S4 | Capstone — picture pipeline: Knative Eventing + portal gallery | stretch | self-paced finale | upload → resizer scales from zero → thumbnail + trace in Grafana |
 | — | Observability | woven | otel-lgtm installed in module 2's tree; "look at what you built" moments in every module | |
 
 Core = 155 min + module 0 ⇒ fits with slack; stretch material absorbs the fast 20%.
@@ -76,7 +77,9 @@ attendee laptop
         ├── Crossplane v2 + XRD/composition               │ ArgoCD apps from
         ├── Knative Serving + Kourier          (stretch)  │ the in-cluster
         ├── Argo Workflows + BuildKit + Zot    (stretch)  │ Gitea
-        ├── Backstage (CNOE image)             (stretch)  │
+        ├── Cloudbox Console (bespoke portal)  (stretch)  │
+        ├── Knative Eventing + picture pipeline (capstone)│
+        ├── Backstage (CNOE image, presenter demo)        │
         └── grafana/otel-lgtm                  ───────────┘
 ```
 
@@ -165,3 +168,9 @@ docs/             RESEARCH.md · PRINCIPLES.md
    URL printed on the conference page.
 5. **Object storage: RustFS stays the default**, SeaweedFS is the rehearsed Plan B with the
    mid-August switch triggers in docs/RESEARCH.md.
+6. **Bespoke portal + capstone pipeline** (decided 2026-07-14): module 08's hands-on is the
+   bespoke Go+htmx **Cloudbox Console** (`apps/`, NodePort 30600) — small enough to read,
+   honest about build-vs-buy; Backstage stays in the catalog as a 5-minute presenter demo
+   inside module 08. New module 09 caps the day: Knative Eventing + a picture pipeline
+   (portal gallery upload → CloudEvent → resizer scales from zero → thumbnail + metadata
+   in RustFS, traced in Grafana).

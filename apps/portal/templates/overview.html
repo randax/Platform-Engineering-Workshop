@@ -1,0 +1,29 @@
+{{define "overview"}}
+{{template "head" .}}
+<h1>Overview</h1>
+<p class="lede">Everything on this page is read straight from the Kubernetes API with the
+portal's ServiceAccount token — no client-go, no ArgoCD API server, just
+<code>GET /apis/argoproj.io/v1alpha1/applications</code>.</p>
+
+<p class="stats">
+  <b>{{.Summary.Namespaces}}</b> namespaces ·
+  <b>{{.Summary.PodsRunning}}</b>/<b>{{.Summary.Pods}}</b> pods running ·
+  <b>{{len .Apps}}</b> ArgoCD applications
+</p>
+
+<table>
+  <thead><tr><th>Application</th><th>Sync</th><th>Health</th></tr></thead>
+  <tbody>
+  {{range .Apps}}
+    <tr>
+      <td>{{.Metadata.Name}}</td>
+      <td>{{template "badge" .Status.Sync.Status}}</td>
+      <td>{{template "badge" .Status.Health.Status}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="3" class="empty">No Applications found — is ArgoCD bootstrapped (module 02)?</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{template "foot" .}}
+{{end}}

@@ -45,6 +45,10 @@ The mechanic you'll use all day: the platform capabilities live as a catalog of 
 Gitea — then you watch ArgoCD converge. Edit → push → converge. That's GitOps, and it
 never touches GitHub or the conference WiFi.
 
+The platform even gets its own front door: the **Cloudbox Console**, a bespoke Go+htmx
+portal (source in `apps/`, small enough to read over coffee) that surfaces everything you
+built and lets you self-service a database from a form.
+
 On object storage: we use [RustFS](https://rustfs.com), an Apache-2.0 alternative to
 MinIO, whose open-source community edition was discontinued in 2025–26 in favor of the
 proprietary AIStor. Same S3 API, licence you can live with.
@@ -121,7 +125,8 @@ gentle nudge to full solution — you choose how much to open.
 | [05-debug-with-ai](lab/05-debug-with-ai) | Fault injection + AI-assisted diagnosis | core | found and fixed the seeded fault |
 | [06-serverless](lab/06-serverless) | Knative Serving + Kourier | stretch | curl a scale-from-zero URL |
 | [07-ci](lab/07-ci) | Argo Workflows + BuildKit + Zot | stretch | in-cluster image build goes green |
-| [08-portal](lab/08-portal) | Backstage developer portal (CNOE) | stretch | scaffold an app from the portal |
+| [08-portal](lab/08-portal) | Cloudbox Console — a portal you can read (+ Backstage demo) | stretch | create a database from a form, prove it with kubectl |
+| [09-capstone](lab/09-capstone) | Capstone: event-driven picture pipeline (Knative Eventing) | stretch | upload a photo → watch a resizer scale from zero → thumbnail + trace |
 
 Core modules are the plan; stretch modules are for the fast 20% — and for your couch
 afterwards. Canonical end-states live in `solutions/`.

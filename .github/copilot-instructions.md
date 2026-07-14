@@ -25,8 +25,10 @@ scripts/     dev-setup.sh · cloudbox-init.sh · install.sh --check · create-cl
 gitops/      apps/       ArgoCD app-of-apps root — what is actually enabled
              catalog/    available capabilities (attendees copy catalog/<x>.yaml → apps/)
              components/ per-component manifests/values, sync-waved
-lab/         00-setup … 08-portal — outcome + verify.sh + layered hints (+ faults/ in 05)
+lab/         00-setup … 09-capstone — outcome + verify.sh + layered hints (+ faults/ in 05)
 solutions/   canonical end-state per module (what catch-up.sh force-pushes to Gitea)
+apps/        first-party Go apps: cloudbox-portal (Console, module 08), uploader +
+             resizer (picture pipeline, module 09) — built to GHCR by build-images.yaml
 docs/        RESEARCH.md · PRINCIPLES.md
 slides/      Slidev deck
 .devcontainer/  Codespaces lifeboat — same content when local preflight fails

@@ -107,7 +107,8 @@ if have docker && [[ -n "$(docker ps -q --filter "label=talos.cluster.name=${CLU
   ok "Cluster '${CLUSTER_NAME}' is already running — its ports are expected to be bound"
 else
   for port in "${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
-              "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" "${NODEPORT_KOURIER}"; do
+              "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
+              "${NODEPORT_KOURIER}"; do
     if (echo > "/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
       check_fail "Port ${port} is already in use — the cluster needs it; free it first (lsof -i :${port})"
     else

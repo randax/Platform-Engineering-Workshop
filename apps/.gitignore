@@ -1,0 +1,4 @@
+# compiled binaries from `go build`
+/portal/portal
+/uploader/uploader
+/resizer/resizer

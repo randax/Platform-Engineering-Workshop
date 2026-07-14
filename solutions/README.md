@@ -20,7 +20,10 @@ against its `verify.sh`.
 
 Module 01 has no GitOps state (see `module-01/README.md`). `module-05` is identical to
 `module-04` by design — module 05's faults live in `faultlab-*` namespaces outside GitOps
-(`lab/05-debug-with-ai/restore.sh clean` removes them).
+(`lab/05-debug-with-ai/restore.sh clean` removes them). Module 08's star-task database
+(`console-db`) is deliberately *not* here: the portal creates it straight against the
+Kubernetes API, outside git — that gap is the module's explain-back. Module 09's `images`
+bucket needs no post.sh: a Job inside the picture-pipeline component creates it.
 
 > **Known gap (for `catch-up.sh`):** the script currently pushes `apps/` only. For a full
 > catch-up it should also (a) copy each `solutions/module-0N/components/<dir>/` over
@@ -48,4 +51,5 @@ lab/03-data/verify.sh                 # confirm
 | 04 / 05 | + crossplane, platform-api |
 | 06 | + knative-serving |
 | 07 | + zot, argo-workflows |
-| 08 | + backstage |
+| 08 | + portal, backstage |
+| 09 | + knative-eventing, picture-pipeline |
