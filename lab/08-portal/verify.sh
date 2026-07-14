@@ -42,7 +42,7 @@ fi
 WDB_READY="$(kubectl -n demo get workshopdatabase console-db \
   -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
 if [ -z "$WDB_READY" ]; then
-  echo "…no WorkshopDatabase 'console-db' yet — the star task awaits (Databases → New database → console-db)"
+  echo "○ star task not done yet: create 'console-db' via the console's New database form (http://localhost:30600/databases) — verify passes without it, but the module's trophy is missing"
 else
   if [ "$WDB_READY" = "True" ]; then
     ok "WorkshopDatabase console-db exists and is Ready (created via the console!)"

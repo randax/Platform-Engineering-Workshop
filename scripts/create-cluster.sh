@@ -142,12 +142,13 @@ ok "API server is answering (nodes are NotReady until Cilium arrives — expecte
 
 # --- 3. Cilium ------------------------------------------------------------------------
 step "Installing Cilium ${CILIUM_VERSION} (CNI + kube-proxy replacement)"
+# Chart is vendored into scripts/manifests/ (re-vendor from CILIUM_HELM_REPO
+# when bumping) so this needs no internet at the venue — principle 2.
 # Values from the official Talos Cilium guide:
 # https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium
 # k8sServiceHost=localhost:7445 is KubePrism, Talos' local API server balancer.
-helm repo add cilium "${CILIUM_HELM_REPO}" --force-update >/dev/null
-helm upgrade --install cilium cilium/cilium \
-  --version "${CILIUM_VERSION}" \
+helm upgrade --install cilium \
+  "${SCRIPT_DIR}/manifests/cilium-${CILIUM_VERSION}.tgz" \
   --namespace kube-system \
   --set ipam.mode=kubernetes \
   --set kubeProxyReplacement=true \

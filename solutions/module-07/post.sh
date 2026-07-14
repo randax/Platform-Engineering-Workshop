@@ -17,6 +17,11 @@ if curl -fsS --max-time 5 http://localhost:30500/v2/_catalog 2>/dev/null | grep 
   exit 0
 fi
 
+# 2a. Seed Zot with the base image the Dockerfile builds FROM
+#     (zot.zot.svc.cluster.local:5000/library/busybox). Idempotent.
+mise x crane@0.21.7 -- crane copy --insecure \
+  docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
+
 WF_NAME="$(kubectl create -f "$REPO_ROOT/lab/07-ci/workflow-run.yaml" -o jsonpath='{.metadata.name}')"
 echo "submitted build workflow: $WF_NAME"
 

@@ -91,7 +91,7 @@ list_keys() { # <prefix>
 
 ORIGINALS="$(list_keys originals/)"
 if [ -z "$ORIGINALS" ]; then
-  echo "…no uploads yet — the moment awaits: http://localhost:30600/gallery (+ kubectl -n pipeline get pods -w)"
+  echo "○ star task not done yet: upload a photo at http://localhost:30600/gallery (watch kubectl -n pipeline get pods -w) — verify passes without it, but the capstone moment is missing"
 else
   THUMBS="$(list_keys thumbs/)"
   MATCHED=""

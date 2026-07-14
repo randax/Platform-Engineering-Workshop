@@ -5,8 +5,8 @@ Each module directory is **cumulative** (it contains everything from earlier mod
 so catching up to module N never requires replaying modules 2..N-1.
 
 Consumed by `./scripts/catch-up.sh <module>`; also readable by humans who want to diff
-their state against the canonical one, and by CI, which runs each module's `solve.sh`
-against its `verify.sh`.
+their state against the canonical one. Each module's `solve.sh` is designed to be run
+against its `verify.sh` for CI regression (job tracked in issue #10).
 
 ## Layout of a module directory
 
@@ -25,13 +25,10 @@ Module 01 has no GitOps state (see `module-01/README.md`). `module-05` is identi
 Kubernetes API, outside git — that gap is the module's explain-back. Module 09's `images`
 bucket needs no post.sh: a Job inside the picture-pipeline component creates it.
 
-> **Known gap (for `catch-up.sh`):** the script currently pushes `apps/` only. For a full
-> catch-up it should also (a) copy each `solutions/module-0N/components/<dir>/` over
-> `gitops/components/<dir>/` in the clone before pushing, and (b) run
-> `solutions/module-0N/post.sh` after ArgoCD converges. Until then, a caught-up attendee
-> must additionally copy the module's `components/demo` (and `components/platform-api`)
-> files into their repo — the module READMEs show exactly those `cp` commands — and run
-> the bucket/build steps by hand.
+> `catch-up.sh` performs a full catch-up: it *replaces* the clone's `gitops/apps` and
+> `gitops/components` with the canonical state (module `apps/`, the repo's platform
+> components, and the module's solution `components/`), force-pushes, waits for every
+> enabled Application to reach Synced/Healthy, and then runs the module's `post.sh`.
 
 ## What catch-up looks like for an attendee
 
@@ -51,5 +48,9 @@ lab/03-data/verify.sh                 # confirm
 | 04 / 05 | + crossplane, platform-api |
 | 06 | + knative-serving |
 | 07 | + zot, argo-workflows |
-| 08 | + portal, backstage |
+| 08 | + portal |
 | 09 | + knative-eventing, picture-pipeline |
+
+Backstage is deliberately absent: it's the module-08 *presenter demo* (a ~2 GB
+amd64-only image), so catch-up never forces it onto attendee laptops. Enable it
+yourself from `gitops/catalog/backstage.yaml` if you want to run the demo at home.

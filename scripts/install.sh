@@ -142,6 +142,8 @@ check_tool kubectl  "v${KUBERNETES_VERSION}"  kubectl version --client
 check_tool helm     ""                        helm version --short
 check_tool kind     ""                        kind version
 check_tool crane    ""                        crane version
+check_tool cilium   ""                        cilium version --client
+check_tool jq       ""                        jq --version
 
 # --- Pre-pulled images --------------------------------------------------------------
 step "Pre-pulled images (populated by ./scripts/cloudbox-init.sh)"
@@ -157,6 +159,22 @@ else
   if mirror_running && curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1; then
     ok "Mirror registry '${MIRROR_NAME}' is running on localhost:${MIRROR_PORT}"
     mirror_up=true
+
+    # The cluster NODES are containers — reaching the mirror from localhost
+    # proves nothing about them. Probe from container context too (docker-ce
+    # inside WSL2, for example, has no host.docker.internal).
+    mirror_ep="$(mirror_host_endpoint)"
+    if [[ "${mirror_ep}" == "http://${TALOS_SUBNET_GATEWAY}:${MIRROR_PORT}" ]] && \
+       ! docker network inspect "${CLUSTER_NAME}" >/dev/null 2>&1; then
+      # Native Linux: the gateway address only exists once the cluster's
+      # docker network does — nothing to probe yet, and nothing to fix.
+      info "Container-side mirror probe skipped (${TALOS_SUBNET_GATEWAY} appears with the '${CLUSTER_NAME}' network)"
+    elif docker run --rm "docker.io/library/busybox:1.37.0" \
+         wget -q -T 5 -O- "${mirror_ep}/v2/" >/dev/null 2>&1; then
+      ok "Mirror reachable from containers at ${mirror_ep}"
+    else
+      check_fail "Mirror not reachable from containers at ${mirror_ep} — set CLOUDBOX_MIRROR_HOST to an address containers can reach (docker-ce in WSL2 has no host.docker.internal)"
+    fi
   else
     check_fail "Mirror registry '${MIRROR_NAME}' is not running — run ./scripts/cloudbox-init.sh"
     mirror_up=false

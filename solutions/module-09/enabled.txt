@@ -7,6 +7,5 @@ knative-serving.yaml
 zot.yaml
 argo-workflows.yaml
 portal.yaml
-backstage.yaml
 knative-eventing.yaml
 picture-pipeline.yaml

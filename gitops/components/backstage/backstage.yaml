@@ -196,7 +196,10 @@ data:
         - type: 'config'
           instances:
             - name: in-cluster
-              url: https://argocd-server.argocd.svc.cluster.local
+              # Plain HTTP: the bootstrap runs argocd-server with
+              # server.insecure=true (the Service maps 443 -> 8080 with no
+              # TLS, so an https:// URL would fail the handshake).
+              url: http://argocd-server.argocd.svc.cluster.local
               username: ${ARGOCD_USERNAME}
               password: ${ARGOCD_ADMIN_PASSWORD}
 ---
@@ -269,7 +272,9 @@ spec:
           env:
             - name: LOG_LEVEL
               value: info
-            # ArgoCD's in-cluster API serves a self-signed certificate.
+            # Kept from the CNOE reference setup. The ArgoCD integration is
+            # plain HTTP (server.insecure=true), so nothing in-cluster needs
+            # TLS today — harmless belt-and-braces for a lab sandbox.
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "0"
             - name: POSTGRES_HOST

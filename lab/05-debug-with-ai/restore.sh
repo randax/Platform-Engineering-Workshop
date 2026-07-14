@@ -42,7 +42,11 @@ case "${1:-}" in
     echo "usage: ./restore.sh <1-4> | all | clean"; exit 1
     ;;
   *)
-    printf -v NN '%02d' "$1"
+    # Force base-10: a bare '%02d' chokes on "08"/"09" (leading zero = octal).
+    case "$1" in
+      *[!0-9]*) echo "usage: ./restore.sh <1-4> | all | clean"; exit 1 ;;
+    esac
+    printf -v NN '%02d' "$((10#$1))"
     restore_one "$NN"
     ;;
 esac

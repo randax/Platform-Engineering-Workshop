@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -105,10 +106,11 @@ func (s *server) handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	if err := s.kube.createWorkshopDatabase(r.Context(), name, size, storageGB); err != nil {
 		fl = errorFlash("Create failed: " + err.Error())
 	}
+	// Always answer with the fragment htmx targeted — a full 500 error page
+	// would not be swapped in and the button would appear to do nothing.
 	data, err := s.databasesData(r.Context(), fl)
 	if err != nil {
-		s.renderError(w, err)
-		return
+		data = databasesData{Namespace: xrNamespace, Flash: errorFlash("API error: " + err.Error())}
 	}
 	s.render(w, "db-list", data)
 }
@@ -119,10 +121,10 @@ func (s *server) handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	if err := s.kube.deleteWorkshopDatabase(r.Context(), name); err != nil {
 		fl = errorFlash("Delete failed: " + err.Error())
 	}
+	// Fragment even on failure — see handleCreateDatabase.
 	data, err := s.databasesData(r.Context(), fl)
 	if err != nil {
-		s.renderError(w, err)
-		return
+		data = databasesData{Namespace: xrNamespace, Flash: errorFlash("API error: " + err.Error())}
 	}
 	s.render(w, "db-list", data)
 }
@@ -155,11 +157,16 @@ func (s *server) handleGalleryGrid(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "gallery-grid", galleryData{Items: items})
 }
 
+// maxUploadBytes caps proxied uploads at 25 MB (the uploader enforces the
+// same limit — this just fails fast without shipping the bytes anywhere).
+const maxUploadBytes = 25 << 20
+
 // handleUpload forwards the browser's multipart POST to the uploader Knative
 // Service. The browser can't reach the uploader itself — its URL only
 // resolves inside the cluster — so the portal replays the request body
 // verbatim (a three-line reverse proxy).
 func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, s.uploaderURL+"/upload", r.Body)
 	if err != nil {
 		s.renderError(w, err)
@@ -169,9 +176,13 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	fl := flash{Msg: "Uploaded — the resizer is waking from zero; the thumbnail and analysis will appear below."}
 	resp, err := s.httpClient.Do(req)
-	if err != nil {
+	var tooBig *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooBig):
+		fl = errorFlash("Upload too large — max 25 MB.")
+	case err != nil:
 		fl = errorFlash("Upload failed: " + err.Error() + " (is the uploader Knative Service running?)")
-	} else {
+	default:
 		defer resp.Body.Close()
 		reply, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		log.Printf("uploader replied %s: %s", resp.Status, reply)
@@ -180,9 +191,10 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fragment even on failure — see handleCreateDatabase.
 	items, err := s.s3.listGallery(r.Context())
 	if err != nil {
-		s.renderError(w, err)
+		s.render(w, "gallery-grid", galleryData{Flash: errorFlash("S3 error: " + err.Error())})
 		return
 	}
 	s.render(w, "gallery-grid", galleryData{Items: items, Flash: fl})

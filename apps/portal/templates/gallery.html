@@ -8,7 +8,7 @@ Image links are presigned S3 URLs, valid 15 minutes.</p>
 
 <form hx-post="/gallery/upload" hx-encoding="multipart/form-data"
       hx-target="#gallery" hx-swap="outerHTML">
-  <label>Image (JPEG or PNG) <input type="file" name="file" accept="image/jpeg,image/png" required></label>
+  <label>Image (JPEG or PNG, max 25 MB) <input type="file" name="file" accept="image/jpeg,image/png" required></label>
   <button type="submit">Upload</button>
   <button type="button" hx-get="/gallery/grid" hx-target="#gallery" hx-swap="outerHTML">Refresh</button>
 </form>

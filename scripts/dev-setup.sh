@@ -5,7 +5,7 @@
 # What it does:
 #   1. Ensures mise (https://mise.jdx.dev) is installed — asks before installing
 #   2. Runs `mise install` to install the pinned tools from mise.toml
-#      (talosctl, kubectl, helm, kind, crane, node)
+#      (talosctl, kubectl, helm, kind, crane, cilium, jq, node)
 #   3. Verifies every tool and prints its version
 #
 # Usage:
@@ -71,6 +71,8 @@ verify_tool "kubectl"  kubectl version --client
 verify_tool "helm"     helm version --short
 verify_tool "kind"     kind version
 verify_tool "crane"    crane version
+verify_tool "cilium"   cilium version --client
+verify_tool "jq"       jq --version
 verify_tool "node"     node --version
 
 echo

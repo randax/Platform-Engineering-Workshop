@@ -54,7 +54,11 @@ Values rationale:
 - Credentials `cloudbox`/`cloudbox123` are **workshop-grade and committed on
   purpose** (ephemeral lab sandbox); a comment in `rustfs.yaml` says the same.
 
-After re-rendering, re-add the credentials comment above the Secret.
+After re-rendering, re-add the credentials comment above the Secret, and
+re-add `argocd.argoproj.io/sync-options: Prune=false` to the `rustfs-data`
+PVC: the chart's `helm.sh/resource-policy: keep` is ignored by ArgoCD, so
+without the ArgoCD annotation disabling the app would prune the PVC and all
+uploaded images.
 
 Plan B (SeaweedFS, per RESEARCH.md switch triggers): re-vendor from the
 `seaweedfs` chart with `allInOne.enabled=true` into this same directory and

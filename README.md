@@ -55,15 +55,16 @@ proprietary AIStor. Same S3 API, licence you can live with.
 
 ## Prerequisites — do this BEFORE the conference
 
-Conference WiFi carries keystrokes, not gigabytes. The setup downloads several GB of
+Conference WiFi carries keystrokes, not gigabytes. The setup downloads 15–20 GB of
 container images. **Run all three steps at home, on a network you trust:**
 
 ```bash
-git clone https://github.com/randax/jz-2026-platform-engineering.git
-cd jz-2026-platform-engineering
+git clone https://github.com/randax/jz-2025-platform-engineering.git
+# (will be renamed to jz-2026-platform-engineering — the old URL will redirect)
+cd jz-2025-platform-engineering
 
 ./scripts/dev-setup.sh        # 1. install the pinned CLI tools (via mise)
-./scripts/cloudbox-init.sh    # 2. pre-pull all pinned images (several GB — be patient)
+./scripts/cloudbox-init.sh    # 2. pre-pull all pinned images (15–20 GB — be patient)
 ./scripts/install.sh --check  # 3. preflight: prints ✅/❌ for everything
 ```
 
@@ -95,7 +96,8 @@ memory limit. WSL2 users: raise the limit in `.wslconfig`.
 ## At the venue
 
 You'll run these together with us — no need to run them at home (but you can; the whole
-workshop works offline once images are pulled):
+workshop works offline once the images are pre-pulled and the Helm charts are vendored —
+they are, in `scripts/manifests/`):
 
 ```bash
 ./scripts/create-cluster.sh     # Talos-in-Docker cluster + Cilium

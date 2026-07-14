@@ -20,10 +20,11 @@ From the repository root:
 
 1. Install the tool chain: `./scripts/dev-setup.sh` (uses [mise](https://mise.jdx.dev/) with
    pinned versions — nothing floats).
-2. Run the pre-flight gate: `./scripts/install.sh --check`. Fix what it flags (most common:
-   Docker not running, or Docker's memory limit below 10 GB).
-3. Pre-pull the workshop images: `./scripts/cloudbox-init.sh` (fills a local registry
+2. Pre-pull the workshop images: `./scripts/cloudbox-init.sh` (fills a local registry
    mirror, `cloudbox-mirror`, on port 5001 — this is the slow step, do it on good WiFi).
+3. Run the pre-flight gate: `./scripts/install.sh --check`. It checks *everything*,
+   including the images from step 2 — that's why it goes last. Fix what it flags (most
+   common: Docker not running, or Docker's memory limit below 10 GB).
 4. Run `./verify.sh` in this directory.
 
 **Hardware reality check:** 16 GB RAM is the absolute minimum (with ≥10 GB allocatable to
@@ -72,8 +73,8 @@ run it again and it skips images already in the mirror. Check progress with
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 ./scripts/dev-setup.sh
-./scripts/install.sh --check     # fix anything red, re-run until green
 ./scripts/cloudbox-init.sh
+./scripts/install.sh --check     # fix anything red, re-run until green
 cd lab/00-setup && ./verify.sh
 ```
 </details>

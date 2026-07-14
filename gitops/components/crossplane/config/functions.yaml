@@ -1,12 +1,15 @@
 # Workshop addition: pinned composition function used by lab 04's Composition.
 #
-# OFFLINE NOTE (important): Crossplane's package manager fetches this package
-# straight from the registry over the network — it does NOT go through the
-# node's containerd image cache, so pre-pulling the image onto the Docker/Talos
-# nodes is not enough for the *package fetch* step. Enable the crossplane
-# Application (and let this Function become Healthy) while internet is still
-# available, or mirror the package into the in-cluster Zot registry and point
-# spec.package at zot.zot.svc.cluster.local:5000 instead.
+# OFFLINE NOTE (important): this is the ONE component that requires internet
+# at enable time. Crossplane's package manager fetches this package straight
+# from ghcr.io over the network — it does NOT go through the node's
+# containerd image cache, so pre-pulling the image onto the Docker/Talos
+# nodes does not help the *package fetch* step. At the venue: enable the
+# crossplane Application (and let this Function become Healthy) while
+# internet is still available. The real fix is mirroring the package into
+# the in-cluster Zot registry and pointing spec.package at
+# zot.zot.svc.cluster.local:5000 — that needs rehearsal-validated seeding
+# and is tracked in issue #8; do not re-plumb it ad hoc.
 #
 # ghcr.io/crossplane-contrib/... is the same artifact as
 # xpkg.crossplane.io/crossplane-contrib/... (xpkg.crossplane.io fronts GHCR);

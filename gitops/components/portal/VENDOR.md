@@ -17,14 +17,17 @@ Nothing to re-vendor. To ship a new portal version: bump the tag in
 - **RBAC is least-privilege by design** (teaching contrast with the
   Backstage demo's read-all ClusterRole): a ClusterRole reading only
   `applications.argoproj.io`, `clusters.postgresql.cnpg.io`,
-  `services.serving.knative.dev`, `pods`, `namespaces`; plus a
-  namespaced Role in `demo` granting create/get/list/delete on
-  `workshopdatabases.platform.cloudbox.io` (the Crossplane v2 namespaced
-  XR from `lab/04-self-service/platform/xrd.yaml`).
-- **The Role lives in the `demo` namespace**, which this component does
-  NOT create (module 04's demo component owns it). Enabling portal before
-  module 04 leaves the Application retrying/degraded until `demo` exists —
-  acceptable in module order, documented in the catalog header.
+  `services.serving.knative.dev`, `pods`, `namespaces`.
+- **This component ships NO resources in the `demo` namespace.** XR
+  self-service (the Databases page: create/get/list/delete on
+  `workshopdatabases.platform.cloudbox.io`, the Crossplane v2 namespaced XR
+  from `lab/04-self-service/platform/xrd.yaml`) requires the module-08 Role
+  in `gitops/components/demo/`, which ships alongside the `demo` namespace
+  itself. Shipping that Role from here would deadlock a mass sync: portal
+  syncs at wave 3, the namespace arrives later, the dry-run fails on the
+  missing namespace and the health gate blocks every later wave. Module 08
+  teaches pushing the Role as a one-file change; until it lands, the
+  Databases page shows a friendly forbidden error.
 - **`UPLOADER_URL=http://uploader.pipeline.svc.cluster.local`** — the
   cluster-local domain of the `uploader` Knative Service
   (`networking.knative.dev/visibility: cluster-local` gives a ksvc the URL

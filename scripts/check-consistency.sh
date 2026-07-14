@@ -6,12 +6,14 @@
 #
 # Checks:
 #   1. solutions/module-0N/apps/*  ==  gitops/{catalog,apps}/* (byte-for-byte)
-#   2. every image reference in gitops/, lab/, solutions/ is covered by
-#      scripts/images.txt (the offline pre-pull guarantee)
+#   2. every image reference in gitops/, lab/, solutions/ YAML — and every
+#      --image= ref in scripts/, lab/, solutions/ shell scripts — is covered
+#      by scripts/images.txt (the offline pre-pull guarantee)
 #   3. versions.env pins match mise.toml tool pins
 #   4. MISE_VERSION matches the inline copy in .devcontainer/devcontainer.json
 #   5. version-pinned artifacts referenced by versions.env actually exist
-#      (vendored ArgoCD manifest, local-path version in the gitops component)
+#      (vendored ArgoCD manifest, vendored Cilium + Gitea chart .tgz files,
+#      local-path version in the gitops component)
 #
 # Usage:
 #   ./scripts/check-consistency.sh
@@ -87,9 +89,21 @@ while IFS= read -r ref; do
   done
   grep -qxF "${norm}" <<<"${known}" \
     || bad "image ${norm} is deployed but missing from scripts/images.txt"
-done < <(grep -rhoE '[A-Za-z-]*[iI]mage(Name)?:[[:space:]]*"?[^"[:space:]]+' \
-           gitops lab solutions --include='*.yaml' 2>/dev/null \
-         | sed -E 's/.*[iI]mage(Name)?:[[:space:]]*//' | sort -u)
+done < <(
+  {
+    grep -rhoE '[A-Za-z-]*[iI]mage(Name)?:[[:space:]]*"?[^"[:space:]]+' \
+      gitops lab solutions --include='*.yaml' 2>/dev/null \
+      | sed -E 's/.*[iI]mage(Name)?:[[:space:]]*//'
+    grep -rhoE -- '--image=[^"'\''[:space:]]+' \
+      scripts lab solutions --include='*.sh' 2>/dev/null \
+      | sed -E 's/^--image=//' | grep -E '^[A-Za-z0-9]' || true
+  } | sort -u)
+# Sources scanned above: image:/imageName: fields in YAML plus kubectl-run
+# style --image= flags in shell scripts — both must honor the pre-pull
+# guarantee. The ref-shape filter drops the matches that this very script
+# produces against itself (BSD grep cannot exclude one file reliably when
+# --include is also given). NOTE for bash 3.2: no comments or apostrophes
+# inside the process substitution — its parser cannot find the closing paren.
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "all ${checked} unique deployed image refs are on the pre-pull list"
 
@@ -129,6 +143,18 @@ if grep -q "local-path-provisioner:${LOCAL_PATH_PROVISIONER_VERSION}" \
   ok "gitops local-path component matches ${LOCAL_PATH_PROVISIONER_VERSION}"
 else
   bad "gitops local-path component does not pin ${LOCAL_PATH_PROVISIONER_VERSION}"
+fi
+
+if [[ -f "scripts/manifests/cilium-${CILIUM_VERSION}.tgz" ]]; then
+  ok "vendored Cilium chart exists for ${CILIUM_VERSION}"
+else
+  bad "scripts/manifests/cilium-${CILIUM_VERSION}.tgz missing — re-vendor: helm pull cilium --repo ${CILIUM_HELM_REPO} --version ${CILIUM_VERSION} -d scripts/manifests/"
+fi
+
+if [[ -f "scripts/manifests/gitea-${GITEA_CHART_VERSION}.tgz" ]]; then
+  ok "vendored Gitea chart exists for ${GITEA_CHART_VERSION}"
+else
+  bad "scripts/manifests/gitea-${GITEA_CHART_VERSION}.tgz missing — re-vendor: helm pull gitea --repo ${GITEA_HELM_REPO} --version ${GITEA_CHART_VERSION} -d scripts/manifests/"
 fi
 
 echo

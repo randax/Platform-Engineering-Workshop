@@ -19,6 +19,10 @@ helm = "3.21.3"
 kind = "0.32.0"
 # crane — copies pinned images into the local mirror preserving digests
 crane = "0.21.7"
+# cilium CLI — lab 01 uses `cilium status` to inspect the CNI
+"aqua:cilium/cilium-cli" = "0.19.5"
+# jq — JSON plumbing in verify scripts and lab hints
+jq = "1.8.2"
 # node — only for the Slidev presentation
 node = "24"
 

@@ -8,7 +8,9 @@ REPO_ROOT="$(cd "$LAB_DIR/../.." && pwd)"
 source "$REPO_ROOT/lab/common.sh"
 
 # 1. Bootstrap Gitea + ArgoCD and seed the repo (skip if already done).
-if ! kubectl -n argocd get application platform >/dev/null 2>&1; then
+# Marker for "bootstrap already ran" is the ArgoCD server Deployment — the
+# `platform` Application only appears later, when seed-gitea.sh creates it.
+if ! kubectl -n argocd get deploy argocd-server >/dev/null 2>&1; then
   "$REPO_ROOT/scripts/bootstrap-gitops.sh"
 fi
 if ! curl -fsS --max-time 5 -u gitea_admin:cloudbox123 \

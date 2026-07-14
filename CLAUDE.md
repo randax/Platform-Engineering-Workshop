@@ -55,7 +55,8 @@ slides/      Slidev deck
 ## Conventions
 
 - Labs state **outcomes, not steps**; each ships `verify.sh` (exit 0 on success,
-  `FAIL:`-prefixed actionable messages) and `solve.sh`, CI-tested against each other.
+  `FAIL:`-prefixed actionable messages) and `solve.sh`, designed for CI regression
+  against each other (job tracked in issue #10).
 - Hints are layered and collapsed in `<details>` blocks; full solution is the last layer.
 - Shell scripts: bash, `set -euo pipefail`, shellcheck-clean, idempotent, check-only
   flags never mutate.

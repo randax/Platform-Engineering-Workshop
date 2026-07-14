@@ -16,8 +16,9 @@
 # Usage:
 #   ./scripts/bootstrap-gitops.sh
 #
-# Requires: a running cluster (./scripts/create-cluster.sh) and internet OR a
-# filled cloudbox-mirror (the Helm chart itself is fetched from the repo cache).
+# Requires: a running cluster (./scripts/create-cluster.sh). Fully offline:
+# the Gitea chart and the ArgoCD install manifest are vendored into
+# scripts/manifests/, and images come from the cloudbox-mirror.
 # Idempotent: safe to re-run.
 # =============================================================================
 set -euo pipefail
@@ -42,14 +43,15 @@ kubectl -n local-path-storage rollout status deployment/local-path-provisioner -
 ok "Default storage class 'local-path' ready"
 
 # --- 2. Gitea ----------------------------------------------------------------------
-step "Installing Gitea (chart ${GITEA_CHART_VERSION}) — your cloud's git server"
-helm repo add gitea-charts "${GITEA_HELM_REPO}" --force-update >/dev/null
+step "Installing Gitea (chart ${GITEA_CHART_VERSION}, vendored) — your cloud's git server"
 
+# Chart is vendored into scripts/manifests/ (re-vendor from GITEA_HELM_REPO
+# when bumping) so this needs no internet at the venue — principle 2.
 # Single-pod mode: SQLite + in-memory cache/session, no HA subcharts. This is
 # a workshop git server for ~1 user, not a production forge — and that is fine.
 # Values are fed on stdin (-f -) to keep everything in this one readable file.
-helm upgrade --install gitea gitea-charts/gitea \
-  --version "${GITEA_CHART_VERSION}" \
+helm upgrade --install gitea \
+  "${SCRIPT_DIR}/manifests/gitea-${GITEA_CHART_VERSION}.tgz" \
   --namespace gitea --create-namespace \
   -f - <<EOF
 image:
