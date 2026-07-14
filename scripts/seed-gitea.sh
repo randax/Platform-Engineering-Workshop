@@ -40,7 +40,22 @@ curl -fsS "${GITEA_HOST_URL}/api/healthz" >/dev/null 2>&1 \
   || die "Gitea is not answering on ${GITEA_HOST_URL} — run ./scripts/bootstrap-gitops.sh first."
 ok "Gitea is up"
 
-# --- 2. Push -----------------------------------------------------------------------
+# --- 2. Ensure the organization exists ---------------------------------------------
+# Push-to-create makes the REPO on first push, but not the ORG that owns it
+# (ENABLE_PUSH_CREATE_ORG only permits creation inside an existing org) —
+# found by rehearsal-in-CI. Idempotent: 404 -> create, anything else -> keep going.
+ORG="${PLATFORM_REPO_PATH%%/*}"
+if ! curl -fsS -u "${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}" \
+     "${GITEA_HOST_URL}/api/v1/orgs/${ORG}" >/dev/null 2>&1; then
+  info "Creating Gitea organization '${ORG}'"
+  curl -fsS -X POST -u "${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}" \
+    -H "Content-Type: application/json" \
+    -d "{\"username\": \"${ORG}\", \"visibility\": \"public\"}" \
+    "${GITEA_HOST_URL}/api/v1/orgs" >/dev/null \
+    || die "Could not create Gitea org '${ORG}'."
+fi
+
+# --- 3. Push -----------------------------------------------------------------------
 cd "${REPO_ROOT}"
 if ! git diff --quiet || ! git diff --cached --quiet; then
   warn "You have uncommitted changes — they will NOT be pushed (commit them first if intended)."
