@@ -30,6 +30,10 @@ jobs:
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
+        with:
+          # seed-gitea.sh pushes this checkout into the in-cluster Gitea,
+          # which rejects shallow pushes ("shallow update not allowed").
+          fetch-depth: 0
 
       - name: Show runner resources
         run: |
