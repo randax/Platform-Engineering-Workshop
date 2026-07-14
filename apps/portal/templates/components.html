@@ -1,0 +1,35 @@
+{{define "components"}}
+{{template "head" "components"}}
+<h1>Components</h1>
+<p class="lede">Platform health at a glance. One namespace per component is a repo
+convention, so this page is just three cluster-wide lists (Deployments, StatefulSets,
+DaemonSets) grouped by namespace — <code>kubectl get deploy -A</code> with a coat of paint.</p>
+
+{{template "components-list" .}}
+{{template "foot" .}}
+{{end}}
+
+{{/* Self-refreshing fragment, same polling trio as the other pages but at a
+     calmer 10s — component health changes on the minute scale. */}}
+{{define "components-list"}}
+<div id="components" hx-get="/components/list" hx-trigger="every 10s" hx-swap="outerHTML">
+  {{template "flash" .Flash}}
+  <p class="hint">auto-refreshes every 10 s</p>
+  <ul class="statuslist">
+  {{range .Rows}}
+    <li>
+      <span class="dot {{.Class}}" title="{{.Status}}"></span>
+      <div class="statusbody">
+        <span class="statustitle">{{.Title}}
+          {{if .Total}}<small>{{.Ready}}/{{.Total}} workloads ready · ns {{.Namespace}}</small>{{end}}
+        </span>
+        <span class="statusdesc">{{.Description}}{{if .Hint}} — <code>{{.Hint}}</code>{{end}}</span>
+      </div>
+      <span class="badge {{.Class}}">{{.Status}}</span>
+    </li>
+  {{else}}
+    <li class="empty">Nothing to show — could not list workloads.</li>
+  {{end}}
+  </ul>
+</div>
+{{end}}

@@ -1,0 +1,33 @@
+{{define "workshop"}}
+{{template "head" "workshop"}}
+<h1>Workshop progress</h1>
+<p class="lede">Where you are in the 10 modules, inferred from what actually runs in your
+cluster right now.</p>
+<p class="flash">This page infers progress from cluster state — <code>./verify.sh</code>
+in each lab folder is the authoritative check.</p>
+
+{{template "workshop-list" .}}
+{{template "foot" .}}
+{{end}}
+
+{{/* Self-refreshing fragment (10s): finish a lab, watch the row flip. */}}
+{{define "workshop-list"}}
+<div id="workshop" hx-get="/workshop/list" hx-trigger="every 10s" hx-swap="outerHTML">
+  {{template "flash" .Flash}}
+  <p class="hint">auto-refreshes every 10 s</p>
+  <ul class="statuslist">
+  {{range .Modules}}
+    <li>
+      <span class="modnum">{{.Number}}</span>
+      <div class="statusbody">
+        <span class="statustitle">{{.Title}}</span>
+        {{if .Next}}<span class="statusdesc">{{.Next}}</span>{{end}}
+      </div>
+      <span class="badge {{.Class}}">{{.Status}}</span>
+    </li>
+  {{else}}
+    <li class="empty">Nothing to show.</li>
+  {{end}}
+  </ul>
+</div>
+{{end}}

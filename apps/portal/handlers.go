@@ -3,7 +3,9 @@ package main
 // HTTP handlers — one per page, plus the htmx fragment endpoints. The pattern
 // throughout: forms and buttons carry hx-* attributes, the server answers
 // with a rendered HTML fragment, htmx swaps it into the page. No JSON API, no
-// frontend build step.
+// frontend build step. The db-list and gallery fragments also poll themselves
+// every 5 seconds (see the hx-trigger comments in the templates), which is
+// all it takes to make the console feel live.
 
 import (
 	"context"
@@ -12,6 +14,15 @@ import (
 	"net/http"
 	"strconv"
 )
+
+// flash is a one-shot notice rendered at the top of a fragment. Error flips
+// the styling from info-blue to error-red so failures stand out on sight.
+type flash struct {
+	Msg   string
+	Error bool
+}
+
+func errorFlash(msg string) flash { return flash{Msg: msg, Error: true} }
 
 func (s *server) render(w http.ResponseWriter, name string, data any) {
 	if err := s.tmpl.ExecuteTemplate(w, name, data); err != nil {
@@ -45,10 +56,10 @@ type databasesData struct {
 	Clusters  []cnpgCluster
 	Databases []workshopDB
 	Namespace string
-	Flash     string
+	Flash     flash
 }
 
-func (s *server) databasesData(ctx context.Context, flash string) (databasesData, error) {
+func (s *server) databasesData(ctx context.Context, fl flash) (databasesData, error) {
 	clusters, err := s.kube.listCNPGClusters(ctx)
 	if err != nil {
 		return databasesData{}, err
@@ -57,16 +68,29 @@ func (s *server) databasesData(ctx context.Context, flash string) (databasesData
 	if err != nil {
 		return databasesData{}, err
 	}
-	return databasesData{Clusters: clusters, Databases: dbs, Namespace: xrNamespace, Flash: flash}, nil
+	return databasesData{Clusters: clusters, Databases: dbs, Namespace: xrNamespace, Flash: fl}, nil
 }
 
 func (s *server) handleDatabases(w http.ResponseWriter, r *http.Request) {
-	data, err := s.databasesData(r.Context(), "")
+	data, err := s.databasesData(r.Context(), flash{})
 	if err != nil {
 		s.renderError(w, err)
 		return
 	}
 	s.render(w, "databases", data)
+}
+
+// handleDatabasesList serves the self-refreshing tables fragment that htmx
+// polls every 5 seconds. On error it renders the fragment with an error
+// flash instead of a full error page — that keeps the polling attributes in
+// the DOM, so the tables heal themselves once the API answers again.
+func (s *server) handleDatabasesList(w http.ResponseWriter, r *http.Request) {
+	data, err := s.databasesData(r.Context(), flash{})
+	if err != nil {
+		log.Printf("poll error: %v", err)
+		data = databasesData{Namespace: xrNamespace, Flash: errorFlash("API error: " + err.Error())}
+	}
+	s.render(w, "db-list", data)
 }
 
 // handleCreateDatabase is the "platform API in one POST" moment: the form
@@ -77,11 +101,11 @@ func (s *server) handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	size := r.FormValue("size")
 	storageGB, _ := strconv.Atoi(r.FormValue("storageGB"))
 
-	flash := "Created " + name + " — Crossplane is composing a Postgres cluster and a bucket. Refresh to watch it turn Ready."
+	fl := flash{Msg: "Created " + name + " — Crossplane is composing a Postgres cluster and a bucket. Watch it turn Ready below."}
 	if err := s.kube.createWorkshopDatabase(r.Context(), name, size, storageGB); err != nil {
-		flash = "Create failed: " + err.Error()
+		fl = errorFlash("Create failed: " + err.Error())
 	}
-	data, err := s.databasesData(r.Context(), flash)
+	data, err := s.databasesData(r.Context(), fl)
 	if err != nil {
 		s.renderError(w, err)
 		return
@@ -91,11 +115,11 @@ func (s *server) handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	flash := "Deleted " + name + " (composed resources are garbage-collected with it)."
+	fl := flash{Msg: "Deleted " + name + " (composed resources are garbage-collected with it)."}
 	if err := s.kube.deleteWorkshopDatabase(r.Context(), name); err != nil {
-		flash = "Delete failed: " + err.Error()
+		fl = errorFlash("Delete failed: " + err.Error())
 	}
-	data, err := s.databasesData(r.Context(), flash)
+	data, err := s.databasesData(r.Context(), fl)
 	if err != nil {
 		s.renderError(w, err)
 		return
@@ -107,7 +131,7 @@ func (s *server) handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
 
 type galleryData struct {
 	Items []galleryItem
-	Flash string
+	Flash flash
 }
 
 func (s *server) handleGallery(w http.ResponseWriter, r *http.Request) {
@@ -119,10 +143,13 @@ func (s *server) handleGallery(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "gallery", galleryData{Items: items})
 }
 
+// handleGalleryGrid serves the polled grid fragment; like the databases
+// list, errors become a flash inside the fragment so polling keeps running.
 func (s *server) handleGalleryGrid(w http.ResponseWriter, r *http.Request) {
 	items, err := s.s3.listGallery(r.Context())
 	if err != nil {
-		s.renderError(w, err)
+		log.Printf("poll error: %v", err)
+		s.render(w, "gallery-grid", galleryData{Flash: errorFlash("S3 error: " + err.Error())})
 		return
 	}
 	s.render(w, "gallery-grid", galleryData{Items: items})
@@ -140,16 +167,16 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("Content-Type", r.Header.Get("Content-Type")) // multipart boundary lives here
 
-	flash := "Uploaded. The resizer wakes from zero to process it — refresh in a few seconds to see the thumbnail."
+	fl := flash{Msg: "Uploaded — the resizer is waking from zero; the thumbnail and analysis will appear below."}
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		flash = "Upload failed: " + err.Error() + " (is the uploader Knative Service running?)"
+		fl = errorFlash("Upload failed: " + err.Error() + " (is the uploader Knative Service running?)")
 	} else {
 		defer resp.Body.Close()
 		reply, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		log.Printf("uploader replied %s: %s", resp.Status, reply)
 		if resp.StatusCode >= 300 {
-			flash = "Uploader said " + resp.Status + ": " + string(reply)
+			fl = errorFlash("Uploader said " + resp.Status + ": " + string(reply))
 		}
 	}
 
@@ -158,7 +185,7 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, err)
 		return
 	}
-	s.render(w, "gallery-grid", galleryData{Items: items, Flash: flash})
+	s.render(w, "gallery-grid", galleryData{Items: items, Flash: fl})
 }
 
 // ---------------------------------------------------------------- services

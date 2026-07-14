@@ -28,13 +28,29 @@ type condition struct {
 	Reason string `json:"reason"`
 }
 
-func readyCondition(conds []condition) string {
+// readiness turns a raw Ready condition into what a human expects on a
+// dashboard: green "Ready", or — while the controller is still converging —
+// its own progress word ("Creating", "Deploying", ...) in amber. A resource
+// that is 10 seconds old is not *failing*, it is *becoming*; a red badge
+// would tell the wrong story.
+type readiness struct {
+	Label string
+	Class string // CSS badge class: "ok" (green) or "meh" (amber)
+}
+
+func readinessOf(conds []condition) readiness {
 	for _, c := range conds {
-		if c.Type == "Ready" {
-			return c.Status
+		if c.Type != "Ready" {
+			continue
+		}
+		if c.Status == "True" {
+			return readiness{Label: "Ready", Class: "ok"}
+		}
+		if c.Reason != "" {
+			return readiness{Label: c.Reason, Class: "meh"}
 		}
 	}
-	return "Unknown"
+	return readiness{Label: "Not ready", Class: "meh"}
 }
 
 // ---------------------------------------------------------------- ArgoCD
@@ -128,7 +144,7 @@ type knativeService struct {
 	} `json:"status"`
 }
 
-func (s knativeService) Ready() string { return readyCondition(s.Status.Conditions) }
+func (s knativeService) Readiness() readiness { return readinessOf(s.Status.Conditions) }
 
 func (k *kubeClient) listKnativeServices(ctx context.Context) ([]knativeService, error) {
 	var list struct {
@@ -164,7 +180,7 @@ type workshopDB struct {
 	} `json:"status"`
 }
 
-func (d workshopDB) Ready() string { return readyCondition(d.Status.Conditions) }
+func (d workshopDB) Readiness() readiness { return readinessOf(d.Status.Conditions) }
 
 func (k *kubeClient) listWorkshopDatabases(ctx context.Context) ([]workshopDB, error) {
 	var list struct {

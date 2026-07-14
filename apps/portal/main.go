@@ -80,7 +80,12 @@ func main() {
 	})
 
 	mux.HandleFunc("GET /{$}", srv.handleOverview)
+	mux.HandleFunc("GET /components", srv.handleComponents)
+	mux.HandleFunc("GET /components/list", srv.handleComponentsList) // polled by htmx
+	mux.HandleFunc("GET /workshop", srv.handleWorkshop)
+	mux.HandleFunc("GET /workshop/list", srv.handleWorkshopList) // polled by htmx
 	mux.HandleFunc("GET /databases", srv.handleDatabases)
+	mux.HandleFunc("GET /databases/list", srv.handleDatabasesList) // polled by htmx
 	mux.HandleFunc("POST /databases", srv.handleCreateDatabase)
 	mux.HandleFunc("DELETE /databases/{name}", srv.handleDeleteDatabase)
 	mux.HandleFunc("GET /gallery", srv.handleGallery)
