@@ -23,9 +23,10 @@ type objMeta struct {
 
 // condition is the standard Kubernetes status condition shape.
 type condition struct {
-	Type   string `json:"type"`
-	Status string `json:"status"`
-	Reason string `json:"reason"`
+	Type    string `json:"type"`
+	Status  string `json:"status"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
 }
 
 // readiness turns a raw Ready condition into what a human expects on a

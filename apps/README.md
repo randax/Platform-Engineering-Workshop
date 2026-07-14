@@ -6,7 +6,7 @@ actually needs:
 
 | App | What it is | The point it makes |
 |---|---|---|
-| [`portal/`](portal/) | **Cloudbox Console** — the hands-on developer portal (module 08). Server-rendered HTML + htmx over the Kubernetes API and RustFS. | A portal is just REST calls: ~50 lines of `net/http` replace client-go; creating a database is one POST of a Crossplane XR. |
+| [`portal/`](portal/) | **Cloudbox Console** — the hands-on developer portal (module 08). Server-rendered HTML + htmx over the Kubernetes API, RustFS, and Prometheus. Pages: Overview, Components (statuspage + marketplace), Workshop progress, Activity (cluster events), Billing (the kr 0,00 invoice), Databases (+ per-database detail page), Services (with request-rate sparklines), Gallery. | A portal is just REST calls: ~50 lines of `net/http` replace client-go; a database is one POST of a Crossplane XR; a metrics chart is one Prometheus query and some SVG. |
 | [`uploader/`](uploader/) | Capstone pipeline, front half: accepts an image upload, stores it in the `images` bucket, announces it as a CloudEvent. | A binary-mode CloudEvent is an HTTP POST with five `ce-*` headers — no SDK. |
 | [`resizer/`](resizer/) | Capstone pipeline, back half: receives the CloudEvent from the broker, writes a 320px thumbnail to `thumbs/` and an analysis JSON to `meta/`. | Event-driven autoscaling: watch its pod appear from zero when an upload lands. |
 
@@ -52,7 +52,7 @@ Common to all three (defaults match the in-cluster RustFS):
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | `cloudbox` / `cloudbox123` | credentials |
 | `S3_BUCKET` | `images` | pipeline bucket |
 | `PORT` | `8080` | listen port (Knative injects this) |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://lgtm.observability.svc.cluster.local:4318` | where traces are pushed (OTLP/HTTP) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://lgtm.observability.svc.cluster.local:4318` | where traces AND metrics are pushed (OTLP/HTTP) |
 | `OTEL_SERVICE_NAME` | `cloudbox-portal` / `-uploader` / `-resizer` | service name shown in Grafana |
 
 Portal only:
@@ -60,6 +60,8 @@ Portal only:
 | Var | Default | |
 |---|---|---|
 | `S3_PUBLIC_ENDPOINT` | `localhost:30900` | endpoint presigned URLs are signed for — must be the address **your browser** can reach (the RustFS NodePort) |
+| `PROM_URL` | `http://lgtm.observability.svc.cluster.local:9090` | Prometheus API for the sparklines |
+| `GRAFANA_URL` | `http://localhost:30030` | browser-facing Grafana for the deep links (NodePort) |
 | `UPLOADER_URL` | `http://uploader.pipeline.svc.cluster.local` | where upload POSTs are forwarded |
 | `KUBE_API_URL` / `KUBE_TOKEN` | *(unset)* | override in-cluster API discovery for local dev |
 
@@ -69,10 +71,11 @@ Uploader only:
 |---|---|---|
 | `BROKER_URL` | `http://broker-ingress.knative-eventing.svc.cluster.local/pipeline/default` | Knative broker ingress the CloudEvents are POSTed to |
 
-## Tracing
+## Tracing and metrics
 
-All three apps push OpenTelemetry traces (OTLP/HTTP) to the platform's
-`grafana/otel-lgtm` pod and propagate W3C `traceparent` headers on every hop —
+All three apps push OpenTelemetry traces AND metrics (OTLP/HTTP) to the
+platform's `grafana/otel-lgtm` pod and propagate W3C `traceparent` headers on
+every hop —
 including through the CloudEvent POST, which Knative's broker forwards to the
 resizer. The payoff: one upload from the portal shows up in Grafana
 (`kubectl -n observability port-forward svc/lgtm 3000`, then Explore → Tempo)
@@ -80,9 +83,18 @@ as a **single distributed trace**,
 `cloudbox-portal → cloudbox-uploader → cloudbox-resizer`, with the S3 calls
 and the resize step as child spans.
 
-Each app's `tracing.go` is ~40 lines and identical apart from the service
-name. If the observability stack isn't running, the apps log one warning and
-keep working — spans are dropped in the background, never blocking a request.
+Each app's `telemetry.go` is identical apart from the service name. If the
+observability stack isn't running, the apps log one warning and keep working —
+data is dropped in the background, never blocking a request.
+
+Metrics: otelhttp emits request count/duration per service for free once a
+global meter provider exists; on top of that each app keeps one counter —
+`cloudbox.pages.rendered` (portal), `cloudbox.uploads.accepted` (uploader),
+`cloudbox.images.processed` (resizer). Prometheus normalizes OTLP names on
+ingest, so query them as `cloudbox_pages_rendered_total` etc., with the OTel
+service name in the `job` label. The portal's sparklines are exactly that:
+`sum(rate(http_server_duration_milliseconds_count{job="cloudbox-uploader"}[5m]))`
+rendered as a hand-rolled SVG polyline.
 
 ## Tests
 

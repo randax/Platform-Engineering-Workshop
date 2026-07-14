@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"html/template"
 	"strings"
 	"testing"
 )
@@ -12,7 +11,7 @@ import (
 // For the interactive fragments it also asserts the UX-critical markup:
 // delete confirmation, the htmx polling attributes, and the analysis output.
 func TestTemplatesRender(t *testing.T) {
-	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
+	tmpl, err := parseTemplates() // same constructor main uses (FuncMap!)
 	if err != nil {
 		t.Fatalf("parsing templates: %v", err)
 	}
@@ -42,20 +41,23 @@ func TestTemplatesRender(t *testing.T) {
 				// the sidebar's grouped sections
 				`>Platform</span>`, `>Self-service</span>`, `>Capstone</span>`,
 				`href="/components"`, `href="/workshop"`,
+				`href="/activity"`, `href="/billing"`,
+				`Grafana →`, // rail footer deep link
 			},
 		},
 		"components": {
-			data: componentsData{Rows: componentRows(map[string]nsHealth{
+			data: splitRows(componentRows(map[string]nsHealth{
 				"kube-system": {Ready: 3, Total: 3},
 				"pipeline":    {Ready: 1, Total: 2},
 				"rustfs":      {Ready: 0, Total: 1},
-			})},
+			})),
 			want: []string{
 				`hx-trigger="every 10s"`, // statuspage polls itself
 				`dot ok`, `>Operational</span>`,
 				`dot meh`, `>Degraded</span>`,
 				`dot bad`, `>Down</span>`,
 				`dot off`, `>Not installed</span>`,
+				`>Running</h2>`, `Marketplace <small>— one file away</small>`,
 				`enable gitops/catalog/crossplane.yaml`, // hint for missing components
 			},
 		},
@@ -82,9 +84,9 @@ func TestTemplatesRender(t *testing.T) {
 				Namespace: xrNamespace,
 			},
 			want: []string{
-				`hx-confirm`,            // destructive actions confirm
-				`hx-trigger="every 5s"`, // the tables poll themselves
-				`>Creating</span>`,      // condition Reason, not a red "False"
+				`hx-trigger="every 5s"`,   // the tables poll themselves
+				`>Creating</span>`,        // condition Reason, not a red "False"
+				`href="/databases/my-db"`, // rows link to the detail page
 			},
 		},
 		"db-list": {
@@ -111,8 +113,58 @@ func TestTemplatesRender(t *testing.T) {
 			want: []string{`Nothing here yet — upload the first image.`},
 		},
 		"services": {
-			data: []knativeService{{}},
-			want: []string{`Not ready`}, // empty conditions: amber fallback, not a red "False"
+			data: []serviceRow{
+				{Spark: sparkline([]float64{0, 1, 2, 1}), Grafana: "http://grafana/explore?x"},
+				{}, // uninstrumented service: no metrics
+			},
+			want: []string{
+				`Not ready`,                      // empty conditions: amber fallback, not a red "False"
+				`<svg class="spark"`, `polyline`, // server-rendered sparkline
+				`— no metrics yet`, // the required empty state
+				`traces →`,         // Grafana Tempo deep link
+			},
+		},
+		"database-detail": {
+			data: dbDetailData{
+				Name: "my-db", DB: &db, ClusterName: "my-db-pg",
+				Secret: "my-db-pg-app",
+				Psql:   "kubectl -n demo exec -it my-db-pg-1 -- psql -U app app",
+				Events: []k8sEvent{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
+			},
+			want: []string{
+				`hx-confirm`, `Delete this database`, // destructive action lives HERE now
+				`my-db-pg-app`,    // connection secret
+				`psql -U app app`, // paste-ready one-liner
+				`evwarn`,          // warning event tinted
+				`Explore metrics in Grafana`,
+			},
+		},
+		"activity": {
+			data: activityData{Events: []k8sEvent{
+				{Type: "Warning", Reason: "BackOff", Message: "restarting container", Count: 3},
+				{Type: "Normal", Reason: "Created", Message: "created pod"},
+			}},
+			want: []string{
+				`hx-trigger="every 10s"`,
+				`evwarn`, `BackOff`, `×3`,
+				`CloudTrail-lite`,
+			},
+		},
+		"activity-list": {
+			data: activityData{},
+			want: []string{`a quiet cluster is a happy cluster`}, // empty state
+		},
+		"billing": {
+			data: billingData{Month: "July 2026", DBCount: 2, Nodes: []nodeUsage{
+				{Name: "cloudbox-worker", CPUReq: 1500, CPUAlloc: 4000, MemReq: 3 << 30, MemAlloc: 8 << 30},
+			}},
+			want: []string{
+				`Invoice — July 2026`,
+				`kr 0,00`, `also no`, `it's your hardware`,
+				`2 provisioned`, // managed databases count
+				`width: 37%`,    // 1500/4000 requests bar
+				`1500m of 4000m requested`,
+			},
 		},
 		"error": {data: "boom", want: []string{"boom"}},
 	}
