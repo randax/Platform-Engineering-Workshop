@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # seed-gitea.sh pushes this checkout into the in-cluster Gitea,
           # which rejects shallow pushes ("shallow update not allowed").
