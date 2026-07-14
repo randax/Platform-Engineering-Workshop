@@ -35,3 +35,16 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - SkipDryRunOnMissingResource=true
+  # Knative's webhook injects the caBundle into its own webhook configs at
+  # runtime, so git (empty) never matches live → the app flaps OutOfSync
+  # forever and the health gate stalls app-of-apps. Ignore just that field.
+  # (Found by rehearsal-in-CI: knative-serving stuck OutOfSync Healthy.)
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - '.webhooks[]?.clientConfig.caBundle'
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - '.webhooks[]?.clientConfig.caBundle'
