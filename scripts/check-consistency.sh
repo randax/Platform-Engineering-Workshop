@@ -97,14 +97,18 @@ done < <(grep -rhoE '[A-Za-z-]*[iI]mage(Name)?:[[:space:]]*"?[^"[:space:]]+' \
 mise_pin() { sed -nE "s|^\"?${1}\"?[[:space:]]*=[[:space:]]*\"([^\"]+)\".*|\1|p" mise.toml | head -1; }
 
 talos_mise="$(mise_pin 'aqua:siderolabs/talos')"
-[[ "v${talos_mise}" == "${TALOS_VERSION}" ]] \
-  && ok "Talos pin: versions.env ${TALOS_VERSION} == mise.toml ${talos_mise}" \
-  || bad "Talos pin drift: versions.env ${TALOS_VERSION} vs mise.toml ${talos_mise}"
+if [[ "v${talos_mise}" == "${TALOS_VERSION}" ]]; then
+  ok "Talos pin: versions.env ${TALOS_VERSION} == mise.toml ${talos_mise}"
+else
+  bad "Talos pin drift: versions.env ${TALOS_VERSION} vs mise.toml ${talos_mise}"
+fi
 
 kubectl_mise="$(mise_pin 'kubectl')"
-[[ "${kubectl_mise}" == "${KUBERNETES_VERSION}" ]] \
-  && ok "kubectl pin: versions.env ${KUBERNETES_VERSION} == mise.toml ${kubectl_mise}" \
-  || bad "kubectl pin drift: versions.env ${KUBERNETES_VERSION} vs mise.toml ${kubectl_mise}"
+if [[ "${kubectl_mise}" == "${KUBERNETES_VERSION}" ]]; then
+  ok "kubectl pin: versions.env ${KUBERNETES_VERSION} == mise.toml ${kubectl_mise}"
+else
+  bad "kubectl pin drift: versions.env ${KUBERNETES_VERSION} vs mise.toml ${kubectl_mise}"
+fi
 
 # --- 4. MISE_VERSION inline copy in devcontainer.json --------------------------
 if grep -q "MISE_VERSION=${MISE_VERSION} " .devcontainer/devcontainer.json; then
@@ -114,9 +118,11 @@ else
 fi
 
 # --- 5. pinned artifacts exist where versions.env points -----------------------
-[[ -f "scripts/manifests/argocd-install-${ARGOCD_VERSION}.yaml" ]] \
-  && ok "vendored ArgoCD manifest exists for ${ARGOCD_VERSION}" \
-  || bad "scripts/manifests/argocd-install-${ARGOCD_VERSION}.yaml missing (ARGOCD_VERSION drift?)"
+if [[ -f "scripts/manifests/argocd-install-${ARGOCD_VERSION}.yaml" ]]; then
+  ok "vendored ArgoCD manifest exists for ${ARGOCD_VERSION}"
+else
+  bad "scripts/manifests/argocd-install-${ARGOCD_VERSION}.yaml missing (ARGOCD_VERSION drift?)"
+fi
 
 if grep -q "local-path-provisioner:${LOCAL_PATH_PROVISIONER_VERSION}" \
      gitops/components/local-path-provisioner/local-path-storage.yaml; then
