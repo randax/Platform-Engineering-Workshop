@@ -48,7 +48,7 @@ else
 fi
 
 # --- kube-proxy must be absent ---------------------------------------------
-KP="$(kubectl -n kube-system get pods --no-headers 2>/dev/null | grep -c kube-proxy || true)"
+KP="$(kubectl -n kube-system get pods --no-headers 2>/dev/null | awk '/kube-proxy/ {n++} END {print n+0}')"
 if [ "${KP:-0}" -eq 0 ]; then
   ok "no kube-proxy pods (Cilium eBPF handles Services)"
 else

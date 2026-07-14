@@ -41,7 +41,8 @@ jobs:
       - name: Install mise + pinned tools
         run: |
           set -euo pipefail
-          curl -fsSL https://mise.run | sh
+          source scripts/versions.env
+          curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" sh
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
           echo "${HOME}/.local/share/mise/shims" >> "${GITHUB_PATH}"
           "${HOME}/.local/bin/mise" trust

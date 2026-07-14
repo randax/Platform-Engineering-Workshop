@@ -27,7 +27,8 @@ source "${SCRIPT_DIR}/lib.sh"
 need git
 need kubectl
 
-PUSH_URL="http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}@localhost:${NODEPORT_GITEA}/${PLATFORM_REPO_PATH}.git"
+# Credentials are supplied via GIT_ASKPASS (git_as_gitea_admin), not the URL.
+PUSH_URL="http://localhost:${NODEPORT_GITEA}/${PLATFORM_REPO_PATH}.git"
 
 # --- 1. Wait for Gitea ---------------------------------------------------------
 step "Checking Gitea at ${GITEA_HOST_URL}"
@@ -46,7 +47,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 step "Pushing local checkout to ${GITEA_HOST_URL}/${PLATFORM_REPO_PATH} (branch main)"
-git push --force "${PUSH_URL}" "HEAD:refs/heads/main"
+git_as_gitea_admin push --force "${PUSH_URL}" "HEAD:refs/heads/main"
 ok "Pushed $(git rev-parse --short HEAD) to ${PLATFORM_REPO_PATH}:main"
 
 # Safety net: push-to-create honors DEFAULT_PUSH_CREATE_PRIVATE=false from the

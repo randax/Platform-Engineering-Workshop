@@ -51,6 +51,10 @@ nodes:
         hostPort: ${NODEPORT_ARGOCD}
       - containerPort: ${NODEPORT_ZOT}
         hostPort: ${NODEPORT_ZOT}
+      - containerPort: ${NODEPORT_BACKSTAGE}
+        hostPort: ${NODEPORT_BACKSTAGE}
+      - containerPort: ${NODEPORT_RUSTFS_S3}
+        hostPort: ${NODEPORT_RUSTFS_S3}
       - containerPort: ${NODEPORT_KOURIER}
         hostPort: ${NODEPORT_KOURIER}
 EOF

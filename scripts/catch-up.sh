@@ -64,13 +64,14 @@ fi
 
 need git
 
-CLONE_URL="http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}@localhost:${NODEPORT_GITEA}/${PLATFORM_REPO_PATH}.git"
+# Credentials are supplied via GIT_ASKPASS (git_as_gitea_admin), not the URL.
+CLONE_URL="http://localhost:${NODEPORT_GITEA}/${PLATFORM_REPO_PATH}.git"
 
 # --- 1. Clone the attendee's platform repo from Gitea -----------------------------
 step "Cloning your platform repo from Gitea"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
-if ! git clone --quiet --depth 1 --branch main "${CLONE_URL}" "${TMP_DIR}/platform"; then
+if ! git_as_gitea_admin clone --quiet --depth 1 --branch main "${CLONE_URL}" "${TMP_DIR}/platform"; then
   die "Could not clone from Gitea. Is the platform seeded? Run ./scripts/seed-gitea.sh first."
 fi
 
@@ -108,7 +109,7 @@ if git diff --cached --quiet; then
 else
   git -c user.name="catch-up" -c user.email="catch-up@cloudbox.local" \
     commit --quiet -m "catch-up: enable module ${MODULE} applications"
-  git push --force --quiet origin main
+  git_as_gitea_admin push --force --quiet origin main
   ok "Pushed module ${MODULE} state to Gitea"
 fi
 
