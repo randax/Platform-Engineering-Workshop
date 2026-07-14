@@ -58,10 +58,28 @@ func TestFetchComponentsViaFake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(data.Running) != 1 || data.Running[0].Namespace != "gitea" {
-		t.Errorf("running = %+v", data.Running)
+	// Marketplace holds only catalog-backed components that aren't installed.
+	// Catalog-less bootstrap rows (like gitea) stay in the health section
+	// regardless of workload count — so they're never offered "one file away".
+	catalogBacked := 0
+	for _, c := range componentCatalog {
+		if c.Catalog != "" {
+			catalogBacked++
+		}
 	}
-	if len(data.Marketplace) != len(componentCatalog)-1 {
-		t.Errorf("marketplace = %d, want %d", len(data.Marketplace), len(componentCatalog)-1)
+	if len(data.Marketplace) != catalogBacked {
+		t.Errorf("marketplace = %d, want %d (catalog-backed)", len(data.Marketplace), catalogBacked)
+	}
+	if len(data.Running) != len(componentCatalog)-catalogBacked {
+		t.Errorf("running = %d, want %d", len(data.Running), len(componentCatalog)-catalogBacked)
+	}
+	var gitea *componentRow
+	for i := range data.Running {
+		if data.Running[i].Namespace == "gitea" {
+			gitea = &data.Running[i]
+		}
+	}
+	if gitea == nil || gitea.Status != "Operational" {
+		t.Errorf("gitea should be Operational in Running, got %+v", gitea)
 	}
 }

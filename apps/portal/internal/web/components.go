@@ -100,10 +100,15 @@ type componentsData struct {
 func splitRows(rows []componentRow) componentsData {
 	var d componentsData
 	for _, row := range rows {
-		if row.Total > 0 {
-			d.Running = append(d.Running, row)
-		} else {
+		// Marketplace = catalog-backed AND not yet installed. A component
+		// with no catalog file (Cilium, Gitea, ArgoCD, the demo namespace)
+		// can't be "enabled", so it always stays in the health section —
+		// shown as Down/Not installed if it has no workloads, never offered
+		// as "one file away" with a hint pointing at a file that doesn't exist.
+		if row.Catalog != "" && row.Total == 0 {
 			d.Marketplace = append(d.Marketplace, row)
+		} else {
+			d.Running = append(d.Running, row)
 		}
 	}
 	return d

@@ -85,6 +85,9 @@ func handleUpload(s *Server, w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, err)
 		return
 	}
+	// Preserve Content-Length; otherwise Go falls back to chunked encoding,
+	// which some ingress/Knative paths reject or can't size-validate.
+	req.ContentLength = r.ContentLength
 	req.Header.Set("Content-Type", r.Header.Get("Content-Type")) // multipart boundary lives here
 
 	fl := flash{Msg: "Uploaded — the resizer is waking from zero; the thumbnail and analysis will appear below."}

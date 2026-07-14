@@ -47,6 +47,9 @@ phase: {{.Status.Phase}} · storage {{.Spec.Storage.Size}}</p>
 </table>
 {{end}}
 
+{{/* Only invite a connection once the backing cluster actually exists —
+     otherwise the psql one-liner points at a pod and Secret that aren't there. */}}
+{{if .Cluster}}
 <h2>Connect</h2>
 <p>CNPG puts the credentials in the Secret <code>{{.Secret}}</code> (namespace demo).
 Ready to paste:</p>
@@ -54,6 +57,7 @@ Ready to paste:</p>
 <p><a href="{{.GrafanaURL}}" target="_blank">Explore metrics in Grafana →</a>
 <span class="hint">(PromQL placeholder prefilled — CNPG metrics scraping is a
 follow-up, issue #8)</span></p>
+{{end}}
 
 <h2>Recent events</h2>
 <table>
