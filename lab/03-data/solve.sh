@@ -16,10 +16,22 @@ cp "$LAB_DIR/postgres-cluster.yaml" "$CLONE/gitops/components/demo/postgres-clus
 gitops_push "$CLONE" "module 03: enable cnpg-operator + rustfs, add app-db"
 
 wait_app cnpg-operator
+# The demo app can report Synced without creating app-db if it synced before
+# CNPG's CRD was Established (SkipDryRunOnMissingResource) — a race that leaves
+# cluster/app-db missing. Wait for the CRD first, then make sure the Cluster
+# actually materializes before waiting on its readiness.
+kubectl wait --for=condition=Established crd/clusters.postgresql.cnpg.io --timeout=180s
 wait_app rustfs
 wait_app demo
 
 # 2. Wait for the database to be genuinely healthy, prove it with SELECT 1.
+# Nudge the demo app in case it first-synced before the CRD existed, then
+# wait for the Cluster object to appear (self-heal applies it once it can).
+kubectl -n argocd annotate application demo argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+for _ in $(seq 1 60); do
+  kubectl -n demo get cluster/app-db >/dev/null 2>&1 && break
+  sleep 5
+done
 kubectl -n demo wait --for=condition=Ready cluster/app-db --timeout=420s
 kubectl -n demo exec app-db-1 -- psql -U postgres -d app -tAc 'SELECT 1;'
 
