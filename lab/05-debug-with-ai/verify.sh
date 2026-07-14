@@ -70,7 +70,7 @@ if kubectl -n demo get cluster app-db >/dev/null 2>&1; then
     fail "app-db in ns demo is no longer healthy ('$PHASE') — did a fix land in the wrong namespace? ./scripts/catch-up.sh 04 can restore module state"
   fi
 fi
-DEGRADED="$(kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name}={.status.health.status} {end}' 2>/dev/null | tr ' ' '\n' | grep -cv -e '=Healthy' -e '^$' || true)"
+DEGRADED="$(kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name}={.status.health.status} {end}' 2>/dev/null | tr ' ' '\n' | awk '!/=Healthy/ && !/^$/ {n++} END {print n+0}')"
 if [ "${DEGRADED:-0}" -eq 0 ]; then
   ok "all ArgoCD applications still Healthy"
 else

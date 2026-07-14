@@ -28,7 +28,7 @@ else
   warn "mise is not installed. It manages the pinned CLI tools for this workshop."
   echo "   Installer: curl https://mise.run | sh   (installs to ~/.local/bin)"
   if confirm "Install mise now?"; then
-    curl -fsSL https://mise.run | sh
+    curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" sh
     export PATH="${HOME}/.local/bin:${PATH}"
     have mise || die "mise installed but not on PATH — open a new shell and re-run this script."
     ok "mise installed"

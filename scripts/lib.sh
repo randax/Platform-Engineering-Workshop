@@ -107,3 +107,18 @@ strip_registry() {
     echo "${ref}"   # no registry host prefix (shouldn't happen in images.txt)
   fi
 }
+
+# git_as_gitea_admin <git args...> — run git authenticating as the Gitea admin
+# via GIT_ASKPASS instead of credentials embedded in the URL, so they stay out
+# of process arguments and error output. (Workshop-grade creds, but URLs with
+# passwords also break when the password ever needs URL-encoding.)
+git_as_gitea_admin() {
+  local askpass rc=0
+  askpass="$(mktemp)"
+  printf '#!/bin/sh\ncase "$1" in\n  Username*) echo "%s" ;;\n  *) echo "%s" ;;\nesac\n' \
+    "${GITEA_ADMIN_USER}" "${GITEA_ADMIN_PASSWORD}" > "${askpass}"
+  chmod 700 "${askpass}"
+  GIT_ASKPASS="${askpass}" GIT_TERMINAL_PROMPT=0 git "$@" || rc=$?
+  rm -f "${askpass}"
+  return "${rc}"
+}
