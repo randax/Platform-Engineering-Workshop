@@ -6,4 +6,5 @@ crossplane.yaml
 knative-serving.yaml
 zot.yaml
 argo-workflows.yaml
+portal.yaml
 backstage.yaml

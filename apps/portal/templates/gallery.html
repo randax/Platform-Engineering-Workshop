@@ -1,0 +1,44 @@
+{{define "gallery"}}
+{{template "head" .}}
+<h1>Gallery</h1>
+<p class="lede">The capstone pipeline, seen from the outside: upload an image here → the
+portal forwards it to the <b>uploader</b> → the uploader stores it in RustFS and emits a
+CloudEvent → the broker wakes the <b>resizer</b> from zero → thumbnail and analysis appear.
+Image links are presigned S3 URLs, valid 15 minutes.</p>
+
+<form hx-post="/gallery/upload" hx-encoding="multipart/form-data"
+      hx-target="#gallery" hx-swap="outerHTML">
+  <label>Image (JPEG or PNG) <input type="file" name="file" accept="image/jpeg,image/png" required></label>
+  <button type="submit">Upload</button>
+  <button type="button" hx-get="/gallery/grid" hx-target="#gallery" hx-swap="outerHTML">Refresh</button>
+</form>
+
+{{template "gallery-grid" .}}
+{{template "foot" .}}
+{{end}}
+
+{{define "gallery-grid"}}
+<div id="gallery">
+  {{template "flash" .Flash}}
+  <div class="grid">
+  {{range .Items}}
+    <figure class="card">
+      {{if .ThumbURL}}
+        <a href="{{.URL}}" target="_blank"><img src="{{.ThumbURL}}" alt="{{.Name}}"></a>
+      {{else}}
+        <a href="{{.URL}}" target="_blank" class="pending">original uploaded,<br>waiting for the resizer…</a>
+      {{end}}
+      <figcaption>
+        <b>{{.Name}}</b>
+        {{with .Meta}}
+          <br>{{.Width}}×{{.Height}} {{.Format}}, {{.Bytes}} bytes
+          <br>dominant <span class="swatch" style="background:{{.DominantColor}}"></span> <code>{{.DominantColor}}</code>
+        {{end}}
+      </figcaption>
+    </figure>
+  {{else}}
+    <p class="empty">Bucket is empty — upload something!</p>
+  {{end}}
+  </div>
+</div>
+{{end}}

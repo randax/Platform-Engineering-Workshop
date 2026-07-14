@@ -1,0 +1,23 @@
+{{define "services"}}
+{{template "head" .}}
+<h1>Knative Services</h1>
+<p class="lede">Serverless workloads from modules 06 and the capstone. A Ready service
+with zero pods is normal — that is scale-to-zero doing its job.</p>
+
+<table>
+  <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th></tr></thead>
+  <tbody>
+  {{range .}}
+    <tr>
+      <td>{{.Metadata.Name}}</td>
+      <td>{{.Metadata.Namespace}}</td>
+      <td><code>{{.Status.URL}}</code></td>
+      <td>{{template "badge" .Ready}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4" class="empty">No Knative Services — enable knative-serving from the catalog (module 06).</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{template "foot" .}}
+{{end}}

@@ -1,51 +1,66 @@
 #!/usr/bin/env bash
-# Module 08 — verify the Backstage portal is up and functional.
+# Module 08 — verify the Cloudbox Console is up, and (if created) that the
+# form-made database is real.
 set -euo pipefail
 
 FAILED=0
 ok()   { echo "✅ $1"; }
 fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 
-ST="$(kubectl -n argocd get application backstage \
+# --- The portal app -----------------------------------------------------------
+ST="$(kubectl -n argocd get application portal \
   -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || echo missing)"
 if [ "$ST" = "Synced Healthy" ]; then
-  ok "ArgoCD app 'backstage' is Synced/Healthy"
+  ok "ArgoCD app 'portal' is Synced/Healthy"
 else
-  fail "backstage app is '$ST' — cp gitops/catalog/backstage.yaml to gitops/apps/ and push (then give it a few minutes, it's the heavy one)"
+  fail "portal app is '$ST' — cp gitops/catalog/portal.yaml to gitops/apps/ and push (needs the demo ns + module 04's API)"
 fi
 
-# --- Deployments ready -----------------------------------------------------
-BS_READY="$(kubectl -n backstage get deploy --no-headers 2>/dev/null | awk '{split($2,a,"/"); if (a[1]==a[2] && a[1]>0) n++} END {print n+0}')"
-BS_TOTAL="$(kubectl -n backstage get deploy --no-headers 2>/dev/null | wc -l | tr -d ' ')"
-if [ "${BS_TOTAL:-0}" -ge 1 ] && [ "$BS_READY" = "$BS_TOTAL" ]; then
-  ok "all $BS_TOTAL deployment(s) in ns backstage are ready"
-elif [ "${BS_TOTAL:-0}" -eq 0 ]; then
-  fail "no deployments in ns backstage — is the app synced? kubectl -n backstage get all"
+if kubectl -n portal wait --for=condition=Available deploy/portal --timeout=5s >/dev/null 2>&1; then
+  ok "portal deployment is ready"
 else
-  fail "only $BS_READY/$BS_TOTAL backstage deployments ready — kubectl -n backstage get pods (first boot is slow; OOM on 16GB machines is the usual suspect)"
+  fail "portal deployment not ready — kubectl -n portal get pods; logs tell you which API it's missing"
 fi
 
-# --- UI answers --------------------------------------------------------------
-HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:30700/ 2>/dev/null || echo 000)"
+# The ServiceAccount is the portal's only credential — its existence (plus the
+# RBAC shipped in the same component) is what makes the pages work.
+if kubectl -n portal get serviceaccount portal >/dev/null 2>&1; then
+  ok "ServiceAccount portal/portal exists (the portal's only credential)"
+else
+  fail "no ServiceAccount 'portal' in ns portal — the component didn't sync fully; kubectl -n argocd get app portal -o yaml"
+fi
+
+# --- The UI answers ------------------------------------------------------------
+HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:30600/ 2>/dev/null || echo 000)"
 if [ "$HTTP_CODE" = "200" ]; then
-  ok "Backstage UI answers on :30700"
+  ok "Cloudbox Console answers on :30600"
 else
-  fail "no UI on :30700 (HTTP $HTTP_CODE) — kubectl -n backstage get svc; pod logs if pending"
+  fail "no console on :30600 (HTTP $HTTP_CODE) — kubectl -n portal get svc portal; kubectl -n portal logs deploy/portal --tail=20"
 fi
 
-# --- Catalog API answers -------------------------------------------------------
-# 200 = open access; 401 = up but wants a token — both prove the backend + catalog
-# plugin are alive, which is what we're checking.
-CAT_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:30700/api/catalog/entities 2>/dev/null || echo 000)"
-if [ "$CAT_CODE" = "200" ] || [ "$CAT_CODE" = "401" ]; then
-  ok "catalog API responds on /api/catalog/entities (HTTP $CAT_CODE)"
+# --- The star task: the form-created database, if you've made it ----------------
+WDB_READY="$(kubectl -n demo get workshopdatabase console-db \
+  -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
+if [ -z "$WDB_READY" ]; then
+  echo "…no WorkshopDatabase 'console-db' yet — the star task awaits (Databases → New database → console-db)"
 else
-  fail "catalog API not responding (HTTP $CAT_CODE) — kubectl -n backstage logs deploy/backstage --tail=50 (DB connection issues show here)"
+  if [ "$WDB_READY" = "True" ]; then
+    ok "WorkshopDatabase console-db exists and is Ready (created via the console!)"
+  else
+    fail "console-db exists but isn't Ready — kubectl -n demo describe workshopdatabase console-db (2–3 min boot is normal)"
+  fi
+  PG_PHASE="$(kubectl -n demo get cluster console-db-pg \
+    -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+  if [ "$PG_PHASE" = "Cluster in healthy state" ]; then
+    ok "composed CNPG cluster console-db-pg is healthy — the form made a real database"
+  else
+    fail "CNPG cluster console-db-pg is '${PG_PHASE:-missing}' — kubectl -n demo describe cluster console-db-pg"
+  fi
 fi
 
 echo
 if [ "$FAILED" -gt 0 ]; then
-  echo "❌ $FAILED check(s) failed. Backstage is the presenter-fallback module — if the room is short on time or RAM, watch the loop on the projector."
+  echo "❌ $FAILED check(s) failed."
   exit 1
 fi
-echo "✅ Module 08 complete — your platform has a front door. That's the whole tour."
+echo "✅ Module 08 complete — your platform has a front door, and you can read every line of it."

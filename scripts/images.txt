@@ -73,6 +73,18 @@ gcr.io/knative-releases/knative.dev/serving/cmd/webhook@sha256:8470456be214e93a8
 gcr.io/knative-releases/knative.dev/net-kourier/cmd/kourier@sha256:01abd2070ccf8680885c47990e42c05c09e30bc8595d9246f4dcd37f2220a2a2
 # Kourier gateway envoy — gitops/ pins the exact patch (upstream uses v1.37-latest)
 docker.io/envoyproxy/envoy:v1.37.2
+# Knative Eventing v1.22.2 (module 09; digest-pinned in the upstream release
+# YAMLs — refs listed in gitops/components/knative-eventing/VENDOR.md)
+gcr.io/knative-releases/knative.dev/eventing/cmd/controller@sha256:866896c0d955ec7774e6c85e6349e034470ccb3317d34f08b3273c950c59eb39
+gcr.io/knative-releases/knative.dev/eventing/cmd/webhook@sha256:b116f58ff8b3b8d2c03d96ebefa32f7d66715d07e31528c3cbdf0bbc9626e85e
+gcr.io/knative-releases/knative.dev/eventing/cmd/jobsink@sha256:bd23e8d8cef444bba1873efc629fed5785257fa3a3ceb0621a2ec8ac5a19a3cc
+gcr.io/knative-releases/knative.dev/eventing/cmd/mtping@sha256:963722f316ec570fcaf116363c2e0f6fc1bd3fbbed8e25ae1eefee9b930bb091
+gcr.io/knative-releases/knative.dev/eventing/cmd/requestreply@sha256:f4d194097b43865e396f54b4fd94f779a2ed96c9691a3a8de4740722e5535804
+gcr.io/knative-releases/knative.dev/eventing/cmd/in_memory/channel_controller@sha256:0855eba113da71ebd433ca5e7c583ba2601c4d55e0c52ca0d6ab19edfbed1513
+gcr.io/knative-releases/knative.dev/eventing/cmd/in_memory/channel_dispatcher@sha256:aa39224456b80b2734729450a9eb6076b13e008060a522436e2475b1ca9b058e
+gcr.io/knative-releases/knative.dev/eventing/cmd/broker/filter@sha256:9080a69414303816e82886ea2b280a01f5c0fd1e0cadad06283450bc2b39d78b
+gcr.io/knative-releases/knative.dev/eventing/cmd/broker/ingress@sha256:8b14a777da20f25d477c367ffdd26dec31fdb3d14bd50c99134ef527c540fbe1
+gcr.io/knative-releases/knative.dev/eventing/cmd/mtchannel_broker@sha256:9ea2a9c99843614f544738c01b6d4e2e0fa5b06722aa50380f18b8af80918f59
 # Argo Workflows v4.0.7
 quay.io/argoproj/workflow-controller:v4.0.7
 quay.io/argoproj/argoexec:v4.0.7
@@ -86,7 +98,16 @@ public.ecr.aws/aws-cli/aws-cli:2.27.49
 # Knative hello app (module 06) — upstream only publishes :latest, so pinned by digest
 ghcr.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba
 
+# --- Wave 3: Cloudbox Console + picture pipeline (modules 08/09)
+# First-party apps, built multi-arch from apps/ by .github/workflows/
+# build-images.yaml. ⚠️ NOT yet published to GHCR as of 2026-07-14 —
+# publish (run the workflow) before rehearsal, then verify with crane.
+ghcr.io/randax/cloudbox-portal:v0.1.0
+ghcr.io/randax/cloudbox-uploader:v0.1.0
+ghcr.io/randax/cloudbox-resizer:v0.1.0
+
 # --- Wave 3: Backstage (CNOE prebuilt image, tag pinned by gitops/catalog)
 # linux/amd64 only — Apple Silicon runs it emulated. Its database is a CNPG
-# cluster using the postgresql image pinned above.
+# cluster using the postgresql image pinned above. Presenter demo in
+# module 08; stays pre-pulled so attendees can run it at home.
 ghcr.io/cnoe-io/backstage-app:9232d633b2698fffa6d0a73b715e06640d170162

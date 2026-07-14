@@ -1,0 +1,46 @@
+{{/* Shared page chrome. Every page starts with "head" and ends with "foot".
+     htmx is served from the binary itself — view-source and check: no CDN. */}}
+
+{{define "head"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloudbox Console</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+<header>
+  <span class="logo">⬢ Cloudbox Console</span>
+  <nav>
+    <a href="/">Overview</a>
+    <a href="/databases">Databases</a>
+    <a href="/gallery">Gallery</a>
+    <a href="/services">Services</a>
+  </nav>
+</header>
+<main>
+{{end}}
+
+{{define "foot"}}
+</main>
+<footer>your platform, your laptop — JavaZone 2026</footer>
+</body>
+</html>
+{{end}}
+
+{{define "error"}}
+{{template "head" .}}
+<h1>Something answered with an error</h1>
+<p>That is normal in this workshop — read it, it usually says exactly what is missing:</p>
+<pre class="error">{{.}}</pre>
+{{template "foot" .}}
+{{end}}
+
+{{define "flash"}}{{if .}}<p class="flash">{{.}}</p>{{end}}{{end}}
+
+{{define "badge"}}{{/* green for good states, gray otherwise */ -}}
+<span class="badge {{if or (eq . "Healthy") (eq . "Synced") (eq . "True")}}ok{{else if or (eq . "Degraded") (eq . "False")}}bad{{else}}meh{{end}}">{{.}}</span>
+{{- end}}
