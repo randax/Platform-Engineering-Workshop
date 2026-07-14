@@ -128,6 +128,12 @@ talosctl cluster create docker \
 
 # --- 2. kubeconfig ------------------------------------------------------------------
 step "Merging kubeconfig"
+# The controlplane always gets the first host address of TALOS_SUBNET (.2 —
+# .1 is the gateway). Set it as the context's default node so every later
+# talosctl command (yours included) works without a -n flag; on a fresh
+# machine `talosctl kubeconfig` fails without this (found by rehearsal-in-CI).
+TALOS_CP_IP="${TALOS_SUBNET_GATEWAY%.*}.2"
+talosctl --context "${CLUSTER_NAME}" config node "${TALOS_CP_IP}"
 talosctl --context "${CLUSTER_NAME}" kubeconfig --force
 kubectl config use-context "admin@${CLUSTER_NAME}" >/dev/null
 ok "kubectl context: admin@${CLUSTER_NAME}"
@@ -171,5 +177,5 @@ info "Next steps:"
 echo "   ./scripts/bootstrap-gitops.sh   # module 2: Gitea + ArgoCD"
 echo "   ./scripts/seed-gitea.sh         # module 2: push this repo to your cloud"
 info "Useful:"
-echo "   talosctl --context ${CLUSTER_NAME} -n 10.5.0.2 dashboard   # Talos node dashboard"
+echo "   talosctl --context ${CLUSTER_NAME} dashboard   # Talos node dashboard"
 echo "   ./scripts/destroy-cluster.sh                          # tear it all down"
