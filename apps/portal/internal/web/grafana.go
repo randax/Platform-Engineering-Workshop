@@ -1,9 +1,9 @@
-package main
+package web
 
 // Grafana deep links. grafana/otel-lgtm provisions its datasources with
 // stable uids ("prometheus", "tempo"), so a link that opens Explore with a
 // query prefilled is just a URL — a plain <a>, no iframe embedding, no
-// Grafana API. GRAFANA_URL must be the address the *browser* can reach
+// Grafana API. The base URL must be the address the *browser* can reach
 // (the NodePort), not the cluster-internal service.
 
 import (
@@ -13,13 +13,9 @@ import (
 	"strings"
 )
 
-func grafanaBase() string {
-	return strings.TrimSuffix(envOr("GRAFANA_URL", "http://localhost:30030"), "/")
-}
-
 // grafanaExplore links to Grafana Explore with the datasource and query
 // expression prefilled (Grafana's `panes` URL parameter is just JSON).
-func grafanaExplore(datasourceUID, expr string) string {
+func grafanaExplore(base, datasourceUID, expr string) string {
 	pane := map[string]any{
 		"a": map[string]any{
 			"datasource": datasourceUID,
@@ -31,10 +27,10 @@ func grafanaExplore(datasourceUID, expr string) string {
 		},
 	}
 	b, _ := json.Marshal(pane)
-	return grafanaBase() + "/explore?schemaVersion=1&orgId=1&panes=" + url.QueryEscape(string(b))
+	return strings.TrimSuffix(base, "/") + "/explore?schemaVersion=1&orgId=1&panes=" + url.QueryEscape(string(b))
 }
 
 // grafanaTraces opens a TraceQL search for one service's spans in Tempo.
-func grafanaTraces(serviceName string) string {
-	return grafanaExplore("tempo", fmt.Sprintf(`{resource.service.name=%q}`, serviceName))
+func grafanaTraces(base, serviceName string) string {
+	return grafanaExplore(base, "tempo", fmt.Sprintf(`{resource.service.name=%q}`, serviceName))
 }

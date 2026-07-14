@@ -26,6 +26,36 @@ ghcr.io/randax/cloudbox-resizer:v0.1.0
 > images; the source is here for reading, tinkering after the workshop, and as
 > build fodder for the in-cluster CI module.
 
+## Architecture (portal)
+
+```
+apps/portal/
+  main.go            wiring only: config → clients → page registry → serve
+  config.go          every env var, parsed once, defaults on one screen
+  telemetry.go       OTLP traces + metrics setup
+  internal/kube/     the plain-HTTP Kubernetes client + typed resources,
+                     workshop progress rules, workload/node accounting
+  internal/store/    the S3 gallery store (RustFS)
+  internal/metrics/  Prometheus range queries + hand-rolled SVG sparklines
+  internal/web/      one file per page + templates/ + static/ (go:embed)
+```
+
+**Adding a page** (the extension point — also lab 08's going-deeper
+exercise): the sidebar and the routes are both built from the page registry
+in `internal/web/registry.go`, so:
+
+1. Copy any page file in `internal/web/` (say `billing.go`) to `mypage.go`.
+2. Change the `register(Page{...})` call: pick a `Weight` (sidebar position),
+   section, title, and path; point `Handler` at your handler.
+3. Add a template in `internal/web/templates/` and render it. Done — no
+   router edits, no layout edits, no central list.
+
+All configuration enters through `config.go` — see the
+[environment variables](#environment-variables) table below.
+
+The uploader and resizer deliberately do NOT get this structure: a service
+that fits in one readable file should stay one file.
+
 ## Running locally
 
 Each app is its own Go module (Go 1.24). Dependencies are deliberately

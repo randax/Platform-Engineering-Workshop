@@ -1,6 +1,6 @@
-package main
+package metrics
 
-// Sparklines without a charting stack. The teaching beat of this file: a
+// Package metrics: sparklines without a charting stack. The teaching beat of this file: a
 // metrics chart is one HTTP GET (Prometheus's /api/v1/query_range) and some
 // SVG — that is what every real console does behind much more machinery.
 
@@ -16,20 +16,20 @@ import (
 	"time"
 )
 
-type promClient struct {
+type Client struct {
 	base string
 	http *http.Client
 }
 
-func newPromClient() *promClient {
-	return &promClient{
-		base: strings.TrimSuffix(envOr("PROM_URL", "http://lgtm.observability.svc.cluster.local:9090"), "/"),
+func New(promURL string) *Client {
+	return &Client{
+		base: strings.TrimSuffix(promURL, "/"),
 		// Short timeout: a sparkline is decoration, never worth a slow page.
 		http: &http.Client{Timeout: 3 * time.Second},
 	}
 }
 
-// requestRateQuery builds the PromQL for a service's request rate. otelhttp
+// RequestRateQuery builds the PromQL for a service's request rate. otelhttp
 // exports an OTLP histogram named "http.server.duration" (milliseconds);
 // Prometheus normalizes that on ingest to
 //
@@ -37,15 +37,15 @@ func newPromClient() *promClient {
 //
 // with the OTel service.name ("cloudbox-uploader", ...) arriving as the
 // `job` label. rate() of a histogram's _count series = requests per second.
-func requestRateQuery(job string) string {
+func RequestRateQuery(job string) string {
 	return fmt.Sprintf(`sum(rate(http_server_duration_milliseconds_count{job=%q}[5m]))`, job)
 }
 
-// queryRange fetches the last 30 minutes of a PromQL expression at 60s
+// QueryRange fetches the last 30 minutes of a PromQL expression at 60s
 // resolution and returns just the values. No matching series is a normal
 // state (component disabled, no traffic yet) and returns nil, nil — the
 // caller renders a "no metrics yet" dash, never an error.
-func (p *promClient) queryRange(ctx context.Context, query string) ([]float64, error) {
+func (p *Client) QueryRange(ctx context.Context, query string) ([]float64, error) {
 	end := time.Now()
 	params := url.Values{
 		"query": {query},
@@ -87,10 +87,10 @@ func (p *promClient) queryRange(ctx context.Context, query string) ([]float64, e
 	return vals, nil
 }
 
-// sparkline turns a series into one inline SVG <polyline> — hand-rolled,
+// Sparkline turns a series into one inline SVG <polyline> — hand-rolled,
 // ~25 lines, zero dependencies. Returns "" for missing data so templates
 // can show their empty-state dash instead.
-func sparkline(vals []float64) template.HTML {
+func Sparkline(vals []float64) template.HTML {
 	if len(vals) < 2 {
 		return ""
 	}

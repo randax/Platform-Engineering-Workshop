@@ -1,4 +1,4 @@
-package main
+package kube
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 // group platform.cloudbox.io, version v1alpha1, kind WorkshopDatabase,
 // namespaced, with spec.size and spec.storageGB.
 func TestBuildWorkshopDatabase(t *testing.T) {
-	raw, err := buildWorkshopDatabase("my-db", "medium", 5)
+	raw, err := BuildWorkshopDatabase("my-db", "medium", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -57,8 +57,8 @@ func TestBuildWorkshopDatabaseValidation(t *testing.T) {
 		{"ok", "small", 11},       // above XRD maximum
 	}
 	for _, c := range cases {
-		if _, err := buildWorkshopDatabase(c.name, c.size, c.storageGB); err == nil {
-			t.Errorf("buildWorkshopDatabase(%q, %q, %d): expected error, got none", c.name, c.size, c.storageGB)
+		if _, err := BuildWorkshopDatabase(c.name, c.size, c.storageGB); err == nil {
+			t.Errorf("BuildWorkshopDatabase(%q, %q, %d): expected error, got none", c.name, c.size, c.storageGB)
 		}
 	}
 }

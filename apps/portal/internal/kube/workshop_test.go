@@ -1,9 +1,9 @@
-package main
+package kube
 
 import "testing"
 
-func fixtureApp(name, health string) argoApp {
-	a := argoApp{}
+func fixtureApp(name, health string) ArgoApp {
+	a := ArgoApp{}
 	a.Metadata.Name = name
 	a.Status.Health.Status = health
 	return a
@@ -12,8 +12,8 @@ func fixtureApp(name, health string) argoApp {
 // A mid-workshop cluster: modules 01/02/06/08 complete, 03 half-way,
 // 04/07/09 untouched. The rules must map that state onto the checklist.
 func TestEvaluateModules(t *testing.T) {
-	snap := snapshot{
-		apps: map[string]argoApp{
+	snap := Snapshot{
+		Apps: map[string]ArgoApp{
 			"platform":        fixtureApp("platform", "Healthy"),
 			"cnpg-operator":   fixtureApp("cnpg-operator", "Healthy"),
 			"knative-serving": fixtureApp("knative-serving", "Healthy"),
@@ -21,11 +21,11 @@ func TestEvaluateModules(t *testing.T) {
 			// note: rustfs exists but is NOT Healthy → does not count
 			"rustfs": fixtureApp("rustfs", "Progressing"),
 		},
-		nodesTotal:    2,
-		nodesReady:    2,
-		kubeProxyPods: 0, // Cilium replaced kube-proxy
-		giteaHealthy:  true,
-		ksvcReady:     true,
+		NodesTotal:    2,
+		NodesReady:    2,
+		KubeProxyPods: 0, // Cilium replaced kube-proxy
+		GiteaHealthy:  true,
+		KsvcReady:     true,
 	}
 
 	want := map[string]string{
@@ -41,7 +41,7 @@ func TestEvaluateModules(t *testing.T) {
 		"09": "Not started",
 	}
 
-	rows := evaluateModules(snap)
+	rows := EvaluateModules(snap)
 	if len(rows) != 10 {
 		t.Fatalf("expected 10 modules, got %d", len(rows))
 	}
@@ -61,8 +61,8 @@ func TestEvaluateModules(t *testing.T) {
 
 // Fresh cluster with kube-proxy still running: module 01 is only half-true.
 func TestEvaluateModulesKubeProxyStillThere(t *testing.T) {
-	snap := snapshot{apps: map[string]argoApp{}, nodesTotal: 2, nodesReady: 2, kubeProxyPods: 2}
-	for _, r := range evaluateModules(snap) {
+	snap := Snapshot{Apps: map[string]ArgoApp{}, NodesTotal: 2, NodesReady: 2, KubeProxyPods: 2}
+	for _, r := range EvaluateModules(snap) {
 		if r.Number == "01" && r.Status != "In progress" {
 			t.Errorf("module 01 with kube-proxy present: %q, want In progress", r.Status)
 		}

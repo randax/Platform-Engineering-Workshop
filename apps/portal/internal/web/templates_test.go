@@ -1,31 +1,44 @@
-package main
+package web
 
 import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
+	"cloudbox.io/portal/internal/store"
 )
+
+// fixtureApp builds an ArgoCD Application fixture (same helper the kube
+// package tests use).
+func fixtureApp(name, health string) kube.ArgoApp {
+	a := kube.ArgoApp{}
+	a.Metadata.Name = name
+	a.Status.Health.Status = health
+	return a
+}
 
 // Executes every page template with representative data, so a typo in a
 // template or a renamed struct field fails `go test` instead of a live page.
 // For the interactive fragments it also asserts the UX-critical markup:
 // delete confirmation, the htmx polling attributes, and the analysis output.
 func TestTemplatesRender(t *testing.T) {
-	tmpl, err := parseTemplates() // same constructor main uses (FuncMap!)
+	tmpl, err := ParseTemplates("http://localhost:30030") // same constructor main uses (FuncMap!)
 	if err != nil {
 		t.Fatalf("parsing templates: %v", err)
 	}
 
-	app := argoApp{}
+	app := kube.ArgoApp{}
 	app.Metadata.Name = "gitea"
 	app.Status.Sync.Status = "Synced"
 	app.Status.Health.Status = "Healthy"
 
-	db := workshopDB{}
+	db := kube.WorkshopDB{}
 	db.Metadata.Name = "my-db"
 	db.Spec.Size = "small"
 	db.Spec.StorageGB = 1
-	db.Status.Conditions = []condition{{Type: "Ready", Status: "False", Reason: "Creating"}}
+	db.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "False", Reason: "Creating"}}
 
 	pages := map[string]struct {
 		data any
@@ -33,8 +46,8 @@ func TestTemplatesRender(t *testing.T) {
 	}{
 		"overview": {
 			data: map[string]any{
-				"Apps":    []argoApp{app},
-				"Summary": clusterSummary{Namespaces: 3, Pods: 10, PodsRunning: 9},
+				"Apps":    []kube.ArgoApp{app},
+				"Summary": kube.ClusterSummary{Namespaces: 3, Pods: 10, PodsRunning: 9},
 			},
 			want: []string{
 				`aria-current="page"`,
@@ -46,7 +59,7 @@ func TestTemplatesRender(t *testing.T) {
 			},
 		},
 		"components": {
-			data: splitRows(componentRows(map[string]nsHealth{
+			data: splitRows(componentRows(map[string]kube.NSHealth{
 				"kube-system": {Ready: 3, Total: 3},
 				"pipeline":    {Ready: 1, Total: 2},
 				"rustfs":      {Ready: 0, Total: 1},
@@ -62,9 +75,9 @@ func TestTemplatesRender(t *testing.T) {
 			},
 		},
 		"workshop": {
-			data: workshopData{Modules: evaluateModules(snapshot{
-				apps:       map[string]argoApp{"platform": fixtureApp("platform", "Healthy")},
-				nodesTotal: 2, nodesReady: 2, kubeProxyPods: 2,
+			data: workshopData{Modules: kube.EvaluateModules(kube.Snapshot{
+				Apps:       map[string]kube.ArgoApp{"platform": fixtureApp("platform", "Healthy")},
+				NodesTotal: 2, NodesReady: 2, KubeProxyPods: 2,
 			})},
 			want: []string{
 				`hx-trigger="every 10s"`,
@@ -79,9 +92,9 @@ func TestTemplatesRender(t *testing.T) {
 		},
 		"databases": {
 			data: databasesData{
-				Clusters:  []cnpgCluster{{}},
-				Databases: []workshopDB{db},
-				Namespace: xrNamespace,
+				Clusters:  []kube.CNPGCluster{{}},
+				Databases: []kube.WorkshopDB{db},
+				Namespace: kube.XRNamespace,
 			},
 			want: []string{
 				`hx-trigger="every 5s"`,   // the tables poll themselves
@@ -94,9 +107,9 @@ func TestTemplatesRender(t *testing.T) {
 			want: []string{`flash-error`, `No databases yet`},
 		},
 		"gallery": {
-			data: galleryData{Items: []galleryItem{
+			data: galleryData{Items: []store.Item{
 				{Key: "originals/1-cat.png", Name: "1-cat.png", URL: "http://x", ThumbURL: "http://y",
-					Meta: &imageMeta{Width: 800, Height: 600, Format: "jpeg", Bytes: 250880, DominantColor: "#aabbcc"}},
+					Meta: &store.ImageMeta{Width: 800, Height: 600, Format: "jpeg", Bytes: 250880, DominantColor: "#aabbcc"}},
 				{Key: "originals/2-dog.png", Name: "2-dog.png"}, // not yet processed
 			}},
 			want: []string{
@@ -114,7 +127,7 @@ func TestTemplatesRender(t *testing.T) {
 		},
 		"services": {
 			data: []serviceRow{
-				{Spark: sparkline([]float64{0, 1, 2, 1}), Grafana: "http://grafana/explore?x"},
+				{Spark: metrics.Sparkline([]float64{0, 1, 2, 1}), Grafana: "http://grafana/explore?x"},
 				{}, // uninstrumented service: no metrics
 			},
 			want: []string{
@@ -129,7 +142,7 @@ func TestTemplatesRender(t *testing.T) {
 				Name: "my-db", DB: &db, ClusterName: "my-db-pg",
 				Secret: "my-db-pg-app",
 				Psql:   "kubectl -n demo exec -it my-db-pg-1 -- psql -U app app",
-				Events: []k8sEvent{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
+				Events: []kube.Event{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
 			},
 			want: []string{
 				`hx-confirm`, `Delete this database`, // destructive action lives HERE now
@@ -140,7 +153,7 @@ func TestTemplatesRender(t *testing.T) {
 			},
 		},
 		"activity": {
-			data: activityData{Events: []k8sEvent{
+			data: activityData{Events: []kube.Event{
 				{Type: "Warning", Reason: "BackOff", Message: "restarting container", Count: 3},
 				{Type: "Normal", Reason: "Created", Message: "created pod"},
 			}},
@@ -155,7 +168,7 @@ func TestTemplatesRender(t *testing.T) {
 			want: []string{`a quiet cluster is a happy cluster`}, // empty state
 		},
 		"billing": {
-			data: billingData{Month: "July 2026", DBCount: 2, Nodes: []nodeUsage{
+			data: billingData{Month: "July 2026", DBCount: 2, Nodes: []kube.NodeUsage{
 				{Name: "cloudbox-worker", CPUReq: 1500, CPUAlloc: 4000, MemReq: 3 << 30, MemAlloc: 8 << 30},
 			}},
 			want: []string{
@@ -179,24 +192,6 @@ func TestTemplatesRender(t *testing.T) {
 			if !strings.Contains(buf.String(), want) {
 				t.Errorf("%q: rendered HTML missing %q", name, want)
 			}
-		}
-	}
-}
-
-func TestReadinessOf(t *testing.T) {
-	cases := []struct {
-		conds []condition
-		want  readiness
-	}{
-		{[]condition{{Type: "Ready", Status: "True"}}, readiness{"Ready", "ok"}},
-		{[]condition{{Type: "Ready", Status: "False", Reason: "Creating"}}, readiness{"Creating", "meh"}},
-		{[]condition{{Type: "Ready", Status: "Unknown", Reason: "Deploying"}}, readiness{"Deploying", "meh"}},
-		{[]condition{{Type: "Ready", Status: "False"}}, readiness{"Not ready", "meh"}},
-		{nil, readiness{"Not ready", "meh"}},
-	}
-	for _, c := range cases {
-		if got := readinessOf(c.conds); got != c.want {
-			t.Errorf("readinessOf(%v) = %v, want %v", c.conds, got, c.want)
 		}
 	}
 }

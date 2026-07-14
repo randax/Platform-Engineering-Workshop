@@ -12,7 +12,6 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 	"sync"
 	"time"
 
@@ -31,11 +30,7 @@ import (
 // blocks and never fails the app: if the collector is unreachable, the
 // background exporters keep dropping data while everything else works — the
 // observability stack being off is a normal state in this workshop.
-func initTelemetry(serviceName string) (shutdown func()) {
-	endpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "http://lgtm.observability.svc.cluster.local:4318")
-	if v := os.Getenv("OTEL_SERVICE_NAME"); v != "" {
-		serviceName = v
-	}
+func initTelemetry(endpoint, serviceName string) (shutdown func()) {
 	res := resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName(serviceName))
 	ctx := context.Background()
 	var shutdowns []func(context.Context) error

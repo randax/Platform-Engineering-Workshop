@@ -1,0 +1,52 @@
+package web
+
+// The Services page: Knative Services with request-rate sparklines and
+// Grafana trace links.
+
+import (
+	"html/template"
+	"net/http"
+
+	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
+)
+
+func init() {
+	register(Page{
+		Weight:     70,
+		NavSection: "Self-service",
+		NavTitle:   "Services",
+		Path:       "/services",
+		Handler:    handleServices,
+	})
+}
+
+// serviceRow decorates a Knative Service with its request-rate sparkline
+// and a Grafana trace-search link. Instrumented services report to
+// Prometheus under job = OTEL_SERVICE_NAME = "cloudbox-<name>"; anything
+// uninstrumented simply has no series and renders the empty-state dash.
+type serviceRow struct {
+	kube.KnativeService
+	Spark   template.HTML
+	Grafana string
+}
+
+func handleServices(s *Server, w http.ResponseWriter, r *http.Request) {
+	svcs, err := s.Kube.ListKnativeServices(r.Context())
+	if err != nil {
+		s.renderError(w, err)
+		return
+	}
+	rows := make([]serviceRow, 0, len(svcs))
+	for _, k := range svcs {
+		job := "cloudbox-" + k.Metadata.Name
+		row := serviceRow{KnativeService: k, Grafana: grafanaTraces(s.GrafanaURL, job)}
+		// Sparkline is best-effort: a prom error means the same thing as no
+		// data — the dash renders, the page never fails over decoration.
+		if vals, err := s.Prom.QueryRange(r.Context(), metrics.RequestRateQuery(job)); err == nil {
+			row.Spark = metrics.Sparkline(vals)
+		}
+		rows = append(rows, row)
+	}
+	s.render(w, "services", rows)
+}

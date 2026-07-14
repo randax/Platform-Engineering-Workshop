@@ -1,21 +1,18 @@
-package main
+package kube
 
-// The Billing page — the sovereignty punchline, rendered with a straight
-// face. The usage numbers are real: container requests summed per node
-// against the node's allocatable capacity, straight from the API server
-// (no metrics-server, no billing export, no FinOps tooling). The prices
-// are the point.
+// Node capacity accounting for the Billing page: container requests summed
+// per node against allocatable, straight from the API server — no
+// metrics-server required. Includes just enough of a Kubernetes quantity
+// parser for a lab cluster.
 
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
-type nodeUsage struct {
+type NodeUsage struct {
 	Name     string
 	CPUReq   int64 // millicores requested by scheduled pods
 	CPUAlloc int64 // millicores allocatable
@@ -30,18 +27,18 @@ func pct(part, whole int64) int {
 	return int(part * 100 / whole)
 }
 
-func (n nodeUsage) CPUPct() int { return pct(n.CPUReq, n.CPUAlloc) }
-func (n nodeUsage) MemPct() int { return pct(n.MemReq, n.MemAlloc) }
-func (n nodeUsage) CPUText() string {
+func (n NodeUsage) CPUPct() int { return pct(n.CPUReq, n.CPUAlloc) }
+func (n NodeUsage) MemPct() int { return pct(n.MemReq, n.MemAlloc) }
+func (n NodeUsage) CPUText() string {
 	return fmt.Sprintf("%dm of %dm requested", n.CPUReq, n.CPUAlloc)
 }
-func (n nodeUsage) MemText() string {
+func (n NodeUsage) MemText() string {
 	return fmt.Sprintf("%.1f GiB of %.1f GiB requested",
 		float64(n.MemReq)/(1<<30), float64(n.MemAlloc)/(1<<30))
 }
 
-// parseCPU turns a Kubernetes CPU quantity ("100m", "2") into millicores.
-func parseCPU(q string) int64 {
+// ParseCPU turns a Kubernetes CPU quantity ("100m", "2") into millicores.
+func ParseCPU(q string) int64 {
 	if q == "" {
 		return 0
 	}
@@ -53,9 +50,9 @@ func parseCPU(q string) int64 {
 	return int64(v * 1000)
 }
 
-// parseMem turns a memory quantity ("256Mi", "1Gi", "500M") into bytes —
+// ParseMem turns a memory quantity ("256Mi", "1Gi", "500M") into bytes —
 // just the suffixes that actually occur on a lab cluster.
-func parseMem(q string) int64 {
+func ParseMem(q string) int64 {
 	if q == "" {
 		return 0
 	}
@@ -76,13 +73,13 @@ func parseMem(q string) int64 {
 	return v
 }
 
-// nodeUsages joins two lists the portal already knows how to fetch: nodes
+// NodeUsages joins two lists the portal already knows how to fetch: nodes
 // (allocatable capacity) and pods (per-container requests, grouped by the
 // node they run on).
-func (k *kubeClient) nodeUsages(ctx context.Context) ([]nodeUsage, error) {
+func (k *Client) NodeUsages(ctx context.Context) ([]NodeUsage, error) {
 	var nodeList struct {
 		Items []struct {
-			Metadata objMeta `json:"metadata"`
+			Metadata ObjMeta `json:"metadata"`
 			Status   struct {
 				Allocatable map[string]string `json:"allocatable"`
 			} `json:"status"`
@@ -111,13 +108,13 @@ func (k *kubeClient) nodeUsages(ctx context.Context) ([]nodeUsage, error) {
 		return nil, err
 	}
 
-	byNode := map[string]*nodeUsage{}
+	byNode := map[string]*NodeUsage{}
 	var order []string
 	for _, n := range nodeList.Items {
-		byNode[n.Metadata.Name] = &nodeUsage{
+		byNode[n.Metadata.Name] = &NodeUsage{
 			Name:     n.Metadata.Name,
-			CPUAlloc: parseCPU(n.Status.Allocatable["cpu"]),
-			MemAlloc: parseMem(n.Status.Allocatable["memory"]),
+			CPUAlloc: ParseCPU(n.Status.Allocatable["cpu"]),
+			MemAlloc: ParseMem(n.Status.Allocatable["memory"]),
 		}
 		order = append(order, n.Metadata.Name)
 	}
@@ -127,39 +124,14 @@ func (k *kubeClient) nodeUsages(ctx context.Context) ([]nodeUsage, error) {
 			continue // finished pods hold no requests
 		}
 		for _, c := range p.Spec.Containers {
-			u.CPUReq += parseCPU(c.Resources.Requests["cpu"])
-			u.MemReq += parseMem(c.Resources.Requests["memory"])
+			u.CPUReq += ParseCPU(c.Resources.Requests["cpu"])
+			u.MemReq += ParseMem(c.Resources.Requests["memory"])
 		}
 	}
 
-	usages := make([]nodeUsage, 0, len(order))
+	usages := make([]NodeUsage, 0, len(order))
 	for _, name := range order {
 		usages = append(usages, *byNode[name])
 	}
 	return usages, nil
-}
-
-// ---------------------------------------------------------------- handler
-
-type billingData struct {
-	Month   string
-	Nodes   []nodeUsage
-	DBCount int
-}
-
-func (s *server) handleBilling(w http.ResponseWriter, r *http.Request) {
-	nodes, err := s.kube.nodeUsages(r.Context())
-	if err != nil {
-		s.renderError(w, err)
-		return
-	}
-	dbCount := 0
-	if dbs, err := s.kube.listWorkshopDatabases(r.Context()); err == nil {
-		dbCount = len(dbs)
-	}
-	s.render(w, "billing", billingData{
-		Month:   time.Now().Format("January 2006"),
-		Nodes:   nodes,
-		DBCount: dbCount,
-	})
 }

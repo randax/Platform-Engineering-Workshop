@@ -21,23 +21,15 @@
 <aside class="rail">
   <span class="logo">⬢ Cloudbox Console</span>
   <nav>
+    {{/* built from the page registry — a new page file adds itself here */}}
+    {{- range nav}}
     <div class="nav-group">
-      <span class="nav-label">Platform</span>
-      <a href="/" {{if eq . "overview"}}aria-current="page"{{end}}>Overview</a>
-      <a href="/components" {{if eq . "components"}}aria-current="page"{{end}}>Components</a>
-      <a href="/workshop" {{if eq . "workshop"}}aria-current="page"{{end}}>Workshop</a>
-      <a href="/activity" {{if eq . "activity"}}aria-current="page"{{end}}>Activity</a>
-      <a href="/billing" {{if eq . "billing"}}aria-current="page"{{end}}>Billing</a>
+      <span class="nav-label">{{.Label}}</span>
+      {{- range .Items}}
+      <a href="{{.Href}}" {{if eq $ .Key}}aria-current="page"{{end}}>{{.Title}}</a>
+      {{- end}}
     </div>
-    <div class="nav-group">
-      <span class="nav-label">Self-service</span>
-      <a href="/databases" {{if eq . "databases"}}aria-current="page"{{end}}>Databases</a>
-      <a href="/services" {{if eq . "services"}}aria-current="page"{{end}}>Services</a>
-    </div>
-    <div class="nav-group">
-      <span class="nav-label">Capstone</span>
-      <a href="/gallery" {{if eq . "gallery"}}aria-current="page"{{end}}>Gallery</a>
-    </div>
+    {{- end}}
   </nav>
   {{/* plain link, browser-facing NodePort — never an iframe */}}
   <a class="rail-foot" href="{{grafanaURL}}" target="_blank">Grafana →</a>

@@ -1,4 +1,4 @@
-package main
+package kube
 
 import "testing"
 
@@ -7,8 +7,8 @@ func TestParseCPU(t *testing.T) {
 		"100m": 100, "2": 2000, "1500m": 1500, "0.5": 500, "": 0,
 	}
 	for in, want := range cases {
-		if got := parseCPU(in); got != want {
-			t.Errorf("parseCPU(%q) = %d, want %d", in, got, want)
+		if got := ParseCPU(in); got != want {
+			t.Errorf("ParseCPU(%q) = %d, want %d", in, got, want)
 		}
 	}
 }
@@ -23,14 +23,14 @@ func TestParseMem(t *testing.T) {
 		"":      0,
 	}
 	for in, want := range cases {
-		if got := parseMem(in); got != want {
-			t.Errorf("parseMem(%q) = %d, want %d", in, got, want)
+		if got := ParseMem(in); got != want {
+			t.Errorf("ParseMem(%q) = %d, want %d", in, got, want)
 		}
 	}
 }
 
 func TestNodeUsagePct(t *testing.T) {
-	n := nodeUsage{CPUReq: 1500, CPUAlloc: 4000, MemReq: 0, MemAlloc: 0}
+	n := NodeUsage{CPUReq: 1500, CPUAlloc: 4000, MemReq: 0, MemAlloc: 0}
 	if n.CPUPct() != 37 {
 		t.Errorf("CPUPct = %d, want 37", n.CPUPct())
 	}

@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"net/http"
@@ -8,20 +8,20 @@ import (
 )
 
 func TestSparkline(t *testing.T) {
-	if got := sparkline(nil); got != "" {
+	if got := Sparkline(nil); got != "" {
 		t.Errorf("nil input must render nothing (empty-state dash), got %q", got)
 	}
-	if got := sparkline([]float64{1}); got != "" {
+	if got := Sparkline([]float64{1}); got != "" {
 		t.Errorf("single point can't make a line, got %q", got)
 	}
-	svg := string(sparkline([]float64{0, 2, 1, 3}))
+	svg := string(Sparkline([]float64{0, 2, 1, 3}))
 	for _, want := range []string{"<svg", "polyline", "aria-label"} {
 		if !strings.Contains(svg, want) {
 			t.Errorf("sparkline missing %q in %s", want, svg)
 		}
 	}
 	// A flat all-zero series (idle service) must still render a line.
-	if flat := string(sparkline([]float64{0, 0, 0})); !strings.Contains(flat, "polyline") {
+	if flat := string(Sparkline([]float64{0, 0, 0})); !strings.Contains(flat, "polyline") {
 		t.Errorf("flat series must render: %s", flat)
 	}
 }
@@ -39,8 +39,8 @@ func TestQueryRange(t *testing.T) {
 	}))
 	defer prom.Close()
 
-	p := &promClient{base: prom.URL, http: prom.Client()}
-	vals, err := p.queryRange(t.Context(), requestRateQuery("cloudbox-uploader"))
+	p := &Client{base: prom.URL, http: prom.Client()}
+	vals, err := p.QueryRange(t.Context(), RequestRateQuery("cloudbox-uploader"))
 	if err != nil {
 		t.Fatalf("queryRange: %v", err)
 	}
@@ -53,21 +53,8 @@ func TestQueryRange(t *testing.T) {
 		w.Write([]byte(`{"status":"success","data":{"result":[]}}`))
 	}))
 	defer empty.Close()
-	p = &promClient{base: empty.URL, http: empty.Client()}
-	if vals, err := p.queryRange(t.Context(), "whatever"); err != nil || vals != nil {
+	p = &Client{base: empty.URL, http: empty.Client()}
+	if vals, err := p.QueryRange(t.Context(), "whatever"); err != nil || vals != nil {
 		t.Errorf("empty result: got (%v, %v), want (nil, nil)", vals, err)
-	}
-}
-
-func TestGrafanaLinks(t *testing.T) {
-	u := grafanaExplore("prometheus", `up{job="x"}`)
-	if !strings.HasPrefix(u, "http://localhost:30030/explore?") {
-		t.Errorf("unexpected base: %s", u)
-	}
-	if strings.ContainsAny(u[len("http://localhost:30030/explore?"):], `{}"`) {
-		t.Errorf("query JSON not URL-escaped: %s", u)
-	}
-	if !strings.Contains(grafanaTraces("cloudbox-uploader"), "tempo") {
-		t.Error("trace link must target the tempo datasource")
 	}
 }
