@@ -1,0 +1,54 @@
+# =============================================================================
+# Image pre-pull gate — every ref in scripts/images.txt must exist upstream.
+# Turns the "verified on <date>" comment into a running check (issue #10):
+# weekly (catches upstream deletions/retags) and on any PR touching the list.
+# =============================================================================
+name: Image gate
+
+on:
+  pull_request:
+    paths: ['scripts/images.txt', '.github/workflows/images-gate.yaml']
+  schedule:
+    - cron: "43 4 * * 1"   # weekly, Monday 04:43 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crane-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install crane (pinned via mise)
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" sh
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          echo "${HOME}/.local/share/mise/shims" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/mise" trust && "${HOME}/.local/bin/mise" install crane
+
+      - name: Every pinned image exists upstream
+        run: |
+          set -euo pipefail
+          fail=0; warn=0
+          while IFS= read -r ref; do
+            if crane manifest "${ref}" >/dev/null 2>&1; then
+              echo "ok  ${ref}"
+            # TEMPORARY exception until issue #7 completes: first-party images
+            # are pending their first tagged publish + visibility flip.
+            # Remove this branch once crane passes for all three.
+            elif [[ "${ref}" == ghcr.io/randax/cloudbox-* ]]; then
+              echo "::warning::PENDING (issue #7): ${ref}"
+              warn=$((warn + 1))
+            else
+              echo "::error::MISSING upstream: ${ref}"
+              fail=$((fail + 1))
+            fi
+          done < <(grep -vE '^\s*(#|\[|$)' scripts/images.txt)
+          echo "---"
+          echo "${fail} missing, ${warn} pending"
+          exit "${fail}"

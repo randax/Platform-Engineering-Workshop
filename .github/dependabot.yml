@@ -1,0 +1,23 @@
+# Dependency update policy (issue #16).
+#
+# Several apps/ Go dependencies are DELIBERATELY held back so the
+# golang:1.24-alpine in-cluster builds keep working — newer releases demand
+# a go1.25 toolchain (see apps/README.md "Dependency pins"):
+#   minio-go v7.0.95 · x/image v0.28.0 · OTel SDK v1.36.0 / otelhttp v0.61.0
+# Dependabot must not propose those; everything else updates weekly.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories: ["/apps/portal", "/apps/uploader", "/apps/resizer"]
+    schedule: {interval: weekly}
+    ignore:
+      - dependency-name: "github.com/minio/minio-go/v7"
+      - dependency-name: "golang.org/x/image"
+      - dependency-name: "go.opentelemetry.io/otel*"
+      - dependency-name: "go.opentelemetry.io/contrib/*"
+  - package-ecosystem: npm
+    directory: "/slides"
+    schedule: {interval: monthly}
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: {interval: monthly}
