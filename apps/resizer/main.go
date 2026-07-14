@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -35,6 +36,20 @@ import (
 )
 
 const thumbWidth = 320
+
+// maxPixels caps the images we are willing to decode. Decoding allocates
+// ~4 bytes per pixel, so a 108MP phone photo would want ~430 MB inside a
+// 256Mi pod — instant OOMKill. 25MP (a 6000x4000 photo) is plenty for a
+// thumbnail pipeline.
+const maxPixels = 25_000_000
+
+// permanentError marks failures that no amount of retrying will fix (a
+// garbage image stays garbage). handleEvent answers 200 for these so the
+// broker does not redeliver them.
+type permanentError struct{ error }
+
+func permanent(err error) error  { return permanentError{err} }
+func isPermanent(err error) bool { var p permanentError; return errors.As(err, &p) }
 
 type resizer struct {
 	s3     *minio.Client
@@ -100,24 +115,40 @@ func (rz *resizer) handleEvent(w http.ResponseWriter, r *http.Request) {
 
 	var data eventData
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&data); err != nil {
-		httpError(w, http.StatusBadRequest, fmt.Sprintf("bad event data: %v", err))
+		// Malformed payload is permanent too — redelivering it would just
+		// fail identically, so accept-and-drop with a reason.
+		dropEvent(w, fmt.Sprintf("bad event data: %v", err))
 		return
 	}
 	if !strings.HasPrefix(data.Key, "originals/") {
 		// Guard against event loops: only ever process originals.
-		log.Printf("ignoring key outside originals/: %q", data.Key)
-		w.WriteHeader(http.StatusOK)
+		dropEvent(w, fmt.Sprintf("key outside originals/: %q", data.Key))
 		return
 	}
 
-	// A non-2xx response makes the broker redeliver the event later, so
-	// transient failures (RustFS restarting, ...) heal themselves.
+	// Error semantics matter here: the broker redelivers on non-2xx (capped
+	// at ~10 attempts, no dead-letter queue in this setup — each retry is a
+	// fresh cold start). So 5xx is reserved for *transient* failures worth
+	// retrying (S3/network hiccups); permanent ones — undecodable images,
+	// decode bombs, missing keys — are logged and dropped with a 200.
 	if err := rz.process(r.Context(), data); err != nil {
+		if isPermanent(err) {
+			dropEvent(w, err.Error())
+			return
+		}
 		httpError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("processed " + data.Key))
+}
+
+// dropEvent acknowledges an event we will never be able to process: 200 so
+// the broker stops, with the reason in the body and the log.
+func dropEvent(w http.ResponseWriter, reason string) {
+	log.Printf("DROPPED event (permanent, will not retry): %s", reason)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("dropped: " + reason))
 }
 
 // process is the actual pipeline step: GET original → decode → thumbnail →
@@ -142,15 +173,21 @@ func (rz *resizer) process(ctx context.Context, data eventData) error {
 	original, err := io.ReadAll(obj)
 	dl.End()
 	if err != nil {
+		// minio's GetObject is lazy — a missing key only surfaces here, at
+		// the first read. That one is permanent; anything else (network,
+		// RustFS restarting) is worth a retry.
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			return permanent(fmt.Errorf("%s does not exist in bucket %s", data.Key, bucket))
+		}
 		return fmt.Errorf("reading %s: %w", data.Key, err)
 	}
 	log.Printf("downloaded %s (%d bytes)", data.Key, len(original))
 
 	_, rs := tracer.Start(ctx, "decode and resize")
-	src, format, err := image.Decode(bytes.NewReader(original))
+	src, format, err := decodeChecked(original)
 	if err != nil {
 		rs.End()
-		return fmt.Errorf("decoding %s: %w", data.Key, err)
+		return permanent(fmt.Errorf("decoding %s: %w", data.Key, err))
 	}
 	bounds := src.Bounds()
 	log.Printf("decoded %s: %dx%d", format, bounds.Dx(), bounds.Dy())
@@ -186,6 +223,22 @@ func (rz *resizer) process(ctx context.Context, data eventData) error {
 	log.Printf("wrote %s: %s", metaKey, meta)
 	log.Printf("=== done with %s", data.Key)
 	return nil
+}
+
+// decodeChecked refuses to decode an image before DecodeConfig has confirmed
+// the *declared* dimensions are sane. DecodeConfig reads only the header —
+// essential, because a 30-byte PNG can declare 100000x100000 pixels and the
+// full decode would then try to allocate ~40 GB. Headers lie; memory doesn't.
+func decodeChecked(data []byte) (image.Image, string, error) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("not a decodable image: %w", err)
+	}
+	if px := cfg.Width * cfg.Height; px > maxPixels {
+		return nil, "", fmt.Errorf("image declares %dx%d = %d pixels, over the %d limit",
+			cfg.Width, cfg.Height, px, maxPixels)
+	}
+	return image.Decode(bytes.NewReader(data))
 }
 
 // derivedKeys maps an original's key to where its thumbnail and analysis go.

@@ -14,6 +14,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -104,11 +105,22 @@ func (u *uploader) ensureBucket() {
 	}
 }
 
+// maxUploadBytes caps uploads at 25 MB. Besides basic hygiene, this keeps
+// the request under Go's 32 MB multipart threshold — above it, form parsing
+// spills to a temp file, and a FROM scratch image has no /tmp to spill to.
+const maxUploadBytes = 25 << 20
+
 // handleUpload: multipart POST with a "file" field → originals/<ts>-<name>
 // in S3 → CloudEvent to the broker → JSON reply.
 func (u *uploader) handleUpload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
 	file, hdr, err := r.FormFile("file")
 	if err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			jsonError(w, http.StatusRequestEntityTooLarge, "upload too large (max 25 MB)")
+			return
+		}
 		jsonError(w, http.StatusBadRequest, fmt.Sprintf("expected multipart field %q: %v", "file", err))
 		return
 	}

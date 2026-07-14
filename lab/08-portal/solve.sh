@@ -12,9 +12,15 @@ source "$REPO_ROOT/lab/common.sh"
 
 CLONE="$(gitops_clone)"
 enable_catalog "$CLONE" portal.yaml
-gitops_push "$CLONE" "module 08: enable the cloudbox console"
+# The write grant for the star task: the portal's Role/RoleBinding for
+# WorkshopDatabases lives in the demo component — the platform owner hands
+# the portal its keys; the portal ships without them.
+mkdir -p "$CLONE/gitops/components/demo"
+cp "$LAB_DIR/portal-access.yaml" "$CLONE/gitops/components/demo/portal-access.yaml"
+gitops_push "$CLONE" "module 08: enable the cloudbox console + grant it demo access"
 
 wait_app portal
+wait_app demo
 
 # Wait until the UI actually answers on the NodePort.
 WAITED=0

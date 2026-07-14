@@ -7,10 +7,13 @@
 # scripted state, not hope):
 #
 #   1. Clones your platform repo from Gitea into a temp dir
-#   2. Copies solutions/module-0N/apps/* into gitops/apps/
-#      (each module's dir is cumulative — it contains everything enabled
-#       by the end of that module)
-#   3. Commits and force-pushes to Gitea, then asks ArgoCD to refresh
+#   2. REPLACES gitops/apps and gitops/components with the canonical state:
+#      solutions/module-0N/apps/* (each module's dir is cumulative — it
+#      contains everything enabled by the end of that module), the platform
+#      component manifests from this repo, and the module's solution
+#      components — broken extra files do not survive
+#   3. Commits and force-pushes to Gitea, waits for ArgoCD to converge,
+#      then runs the module's imperative post-steps (post.sh)
 #
 # Usage:
 #   ./scripts/catch-up.sh <module>            # e.g. ./scripts/catch-up.sh 3
@@ -77,6 +80,12 @@ fi
 
 # --- 2. Enable the module's applications --------------------------------------------
 step "Enabling applications for module ${MODULE}"
+# Catch-up REPLACES gitops/apps and gitops/components with the canonical state
+# (principle 11: scripted state, not hope) — a broken extra file the attendee
+# pushed must not survive the catch-up. Everything removed here is restored
+# from the canonical trees below.
+git -C "${TMP_DIR}/platform" rm -r -q --ignore-unmatch gitops/apps gitops/components
+
 mkdir -p "${TMP_DIR}/platform/gitops/apps"
 enabled=()
 for f in "${APPS_DIR}"/*; do
@@ -90,20 +99,29 @@ for name in "${enabled[@]}"; do
   echo "   + gitops/apps/${name}"
 done
 
+# Platform component manifests come back verbatim from this repo's canonical
+# gitops/components tree (the same content seed-gitea.sh pushed originally).
+mkdir -p "${TMP_DIR}/platform/gitops/components"
+for d in "${REPO_ROOT}/gitops/components"/*/; do
+  [[ -d "${d}" ]] || continue
+  # NOTE: strip the trailing slash — BSD cp -R copies a dir/'s CONTENTS
+  # (flattening the tree) instead of the directory itself.
+  cp -R "${d%/}" "${TMP_DIR}/platform/gitops/components/"
+done
+
 # Module-specific workloads (demo databases, XRDs, ksvcs, …) live under
 # solutions/module-0N/components/ and land in gitops/components/.
 if [[ -d "${SOLUTION_DIR}/components" ]]; then
-  mkdir -p "${TMP_DIR}/platform/gitops/components"
   for d in "${SOLUTION_DIR}/components"/*/; do
     [[ -d "${d}" ]] || continue
-    cp -R "${d}" "${TMP_DIR}/platform/gitops/components/"
+    cp -R "${d%/}" "${TMP_DIR}/platform/gitops/components/"
     echo "   + gitops/components/$(basename "${d}")"
   done
 fi
 
 # --- 3. Commit + push -----------------------------------------------------------------
 cd "${TMP_DIR}/platform"
-git add gitops/apps gitops/components
+git add -A gitops
 if git diff --cached --quiet; then
   ok "Gitea already matches module ${MODULE} — nothing to push."
 else
@@ -118,9 +136,35 @@ if have kubectl && kubectl get application platform -n argocd >/dev/null 2>&1; t
   kubectl annotate application platform -n argocd \
     argocd.argoproj.io/refresh=normal --overwrite >/dev/null 2>&1 || true
   info "Asked ArgoCD to refresh — watch it converge: ${ARGOCD_HOST_URL}"
+
+  # --- 5. Wait for convergence before the post-steps -----------------------------------
+  # post.sh scripts assume a converged platform (buckets need rustfs, the
+  # module-07 build needs the WorkflowTemplate synced, …), so block until every
+  # Application enabled above is Synced + Healthy. Generous timeout: first-time
+  # syncs pull manifests, boot databases and roll out operators.
+  step "Waiting for module ${MODULE} applications to converge (Synced + Healthy)"
+  for name in "${enabled[@]}"; do
+    app="${name%.yaml}"
+    timeout=600 waited=0 st=""
+    while (( waited < timeout )); do
+      kubectl annotate application "${app}" -n argocd \
+        argocd.argoproj.io/refresh=normal --overwrite >/dev/null 2>&1 || true
+      st="$(kubectl get application "${app}" -n argocd \
+        -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || true)"
+      [[ "${st}" == "Synced Healthy" ]] && break
+      echo "   … ${app}: ${st:-not created yet} (${waited}s / ${timeout}s)"
+      sleep 10
+      waited=$((waited + 10))
+    done
+    if [[ "${st}" == "Synced Healthy" ]]; then
+      ok "${app}: Synced/Healthy"
+    else
+      die "Application '${app}' is still '${st:-missing}' after $((timeout / 60)) minutes — inspect it at ${ARGOCD_HOST_URL}, then re-run this catch-up."
+    fi
+  done
 fi
 
-# --- 5. Module post-steps (imperative bits GitOps can't express) -----------------------
+# --- 6. Module post-steps (imperative bits GitOps can't express) -----------------------
 if [[ -x "${SOLUTION_DIR}/post.sh" ]]; then
   step "Running module ${MODULE} post-steps"
   "${SOLUTION_DIR}/post.sh"

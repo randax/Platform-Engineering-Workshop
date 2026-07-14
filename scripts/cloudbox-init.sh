@@ -70,6 +70,26 @@ if [[ "${ASSUME_YES}" != "true" ]]; then
   confirm "Continue?" || die "Aborted."
 fi
 
+# --- 0. Preflight: every ref must exist upstream ---------------------------------
+# `crane manifest` is a cheap API call per ref — a missing image should cost
+# seconds here, not surface 15 GB into a multi-hour pull.
+step "Preflight: checking that all ${total} refs exist upstream"
+missing=()
+for image in "${host_images[@]}" "${mirror_images[@]}"; do
+  crane manifest "${image}" >/dev/null 2>&1 || missing+=("${image}")
+done
+if [[ ${#missing[@]} -gt 0 ]]; then
+  fail "${#missing[@]} image(s) do not exist upstream:"
+  for image in "${missing[@]}"; do
+    case "${image}" in
+      ghcr.io/randax/*) echo "   ${image}   (not published yet — see issue #7)" ;;
+      *)                echo "   ${image}" ;;
+    esac
+  done
+  die "Nothing was downloaded. Fix scripts/images.txt (or publish the missing images) and re-run."
+fi
+ok "All ${total} refs resolve upstream"
+
 # --- 1. Host images -------------------------------------------------------------
 step "Pulling host images into Docker"
 i=0
@@ -110,6 +130,8 @@ curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 \
 # crane copies manifests byte-for-byte (digests preserved, all architectures),
 # which `docker pull && docker push` would break for digest-pinned images.
 step "Copying cluster images into the mirror (crane, digests preserved)"
+CRANE_LOG="$(mktemp)"
+trap 'rm -f "${CRANE_LOG}"' EXIT
 i=0
 failed=()
 for image in "${mirror_images[@]}"; do
@@ -118,8 +140,9 @@ for image in "${mirror_images[@]}"; do
   dest="localhost:${MIRROR_PORT}/${path%%@*}"   # crane derives no tag from digests;
   [[ "${path}" == *@sha256:* && "${path}" != *:*@* ]] && dest="${dest}:pinned"
   echo "  [${i}/${#mirror_images[@]}] ${image}"
-  if ! crane copy --insecure "${image}" "${dest}" >/dev/null 2>&1; then
+  if ! crane copy --insecure "${image}" "${dest}" >/dev/null 2>"${CRANE_LOG}"; then
     fail "      copy failed: ${image}"
+    tail -n 3 "${CRANE_LOG}" | sed 's/^/      | /'
     failed+=("${image}")
   fi
 done

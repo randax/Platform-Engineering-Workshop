@@ -10,11 +10,14 @@ REPO_ROOT="$(cd "$LAB_DIR/../.." && pwd)"
 source "$REPO_ROOT/lab/common.sh"
 
 CLONE="$(gitops_clone)"
-# portal.yaml is module 08's; re-copying is a no-op when it's already enabled,
-# and makes this module solvable standalone (the upload goes through the portal).
-enable_catalog "$CLONE" portal.yaml knative-eventing.yaml picture-pipeline.yaml
+# knative-serving.yaml (module 06) and portal.yaml (module 08) are earlier
+# modules' apps; re-copying is a no-op when they're already enabled, and makes
+# this module solvable standalone (the ksvcs need Serving, the upload goes
+# through the portal).
+enable_catalog "$CLONE" knative-serving.yaml portal.yaml knative-eventing.yaml picture-pipeline.yaml
 gitops_push "$CLONE" "module 09: knative-eventing + picture pipeline"
 
+wait_app knative-serving 600
 wait_app knative-eventing 600
 wait_app portal
 wait_app picture-pipeline 600

@@ -23,8 +23,9 @@ done
    requests: eventing-controller 50m/50Mi, job-sink 62m/32Mi,
    pingsource-mt-adapter 62m/32Mi, eventing-webhook 50m/25Mi,
    mt-broker-filter + mt-broker-ingress + mt-broker-controller 50m/50Mi.
-   `in-memory-channel.yaml` ships no requests upstream (imc-controller,
-   imc-dispatcher) — left as-is. `request-reply` ships no requests either.
+   `in-memory-channel.yaml` ships no requests upstream — **added 25m/32Mi
+   requests to imc-controller and imc-dispatcher** (no limits) so the
+   scheduler accounts for them. `request-reply` ships no requests either.
 
 That is the only curation: no images repointed, no services exposed —
 eventing is control-plane + in-cluster data-plane only (the Broker ingress

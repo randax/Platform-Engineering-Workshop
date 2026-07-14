@@ -49,8 +49,11 @@ order* — the hard dependencies are **backstage → cnpg-operator** (its
 database is a CNPG `Cluster`) and **picture-pipeline → knative-serving +
 knative-eventing** (module 09: enable serving and eventing before the
 pipeline). The **portal** (module 08) is independent, but its gallery page
-needs the `images` bucket that picture-pipeline's Job creates, and its
-self-service page needs the `demo` namespace from module 04.
+needs the `images` bucket that picture-pipeline's Job creates, and XR
+self-service (the Databases page) requires the module-08 Role in
+`gitops/components/demo/` — it ships together with the `demo` namespace so
+the portal component never references a namespace from a later wave; until
+that Role lands, the Databases page shows a friendly forbidden error.
 
 ## Sync waves
 
@@ -70,7 +73,7 @@ Applications (`argocd.argoproj.io/sync-wave`).
 | 2 | knative-eventing | knative-eventing | broker/trigger mesh for the pipeline |
 | 2 | argo-workflows | argo (pods in builds) | pushes to zot |
 | 3 | backstage | backstage | heaviest; scaffolds against everything else |
-| 3 | portal | portal (+ Role in demo) | Cloudbox Console; reads everything below it |
+| 3 | portal | portal | Cloudbox Console; reads everything below it |
 | 3 | picture-pipeline | pipeline | ksvcs + Broker/Trigger need waves 1–2 (rustfs, serving, eventing) |
 
 Note: wave gating between Applications requires the Application health check
@@ -102,8 +105,11 @@ mirrored by the cluster scripts instead:
 - container images (pinned tags/digests — the pre-pull list is derived from
   these manifests),
 - the Crossplane Function package (fetched by Crossplane's package manager,
-  which bypasses the node image cache — see `components/crossplane/VENDOR.md`
-  for the Zot-mirror alternative).
+  which bypasses the node image cache and every mirror — **the one component
+  that requires internet at enable time**; enable crossplane while online.
+  Mirroring the package into Zot is the rehearsal fix, tracked in issue #8 —
+  see `components/crossplane/config/functions.yaml` and
+  `components/crossplane/VENDOR.md`).
 
 ## Conventions
 

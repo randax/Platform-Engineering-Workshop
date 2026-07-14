@@ -8,10 +8,17 @@ GITEA_HOST="${GITEA_HOST:-localhost:30300}"
 GITEA_REPO_URL="${GITEA_REPO_URL:-http://gitea_admin:cloudbox123@${GITEA_HOST}/cloudbox/platform.git}"
 
 # Clone the platform repo from in-cluster Gitea into a temp dir; prints the path.
+# On failure: cleans up the temp dir and fails with a friendly pointer (callers
+# run under `set -e`, so the non-zero return stops their script).
 gitops_clone() {
   local dir
   dir="$(mktemp -d)"
-  git clone -q "$GITEA_REPO_URL" "$dir/platform"
+  if ! git clone -q "$GITEA_REPO_URL" "$dir/platform" 2>/dev/null; then
+    rm -rf "$dir"
+    echo "ERROR: could not clone http://${GITEA_HOST}/cloudbox/platform.git —" \
+      "is Gitea up and seeded? (./scripts/bootstrap-gitops.sh, then ./scripts/seed-gitea.sh)" >&2
+    return 1
+  fi
   echo "$dir/platform"
 }
 

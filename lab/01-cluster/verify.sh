@@ -7,11 +7,13 @@ ok()   { echo "✅ $1"; }
 fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 
 # --- Docker containers -----------------------------------------------------
-CONTAINERS="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c '^cloudbox-' || true)"
+# Filter on the talosctl-applied label — a name prefix would also match the
+# cloudbox-mirror registry container.
+CONTAINERS="$(docker ps -q --filter "label=talos.cluster.name=cloudbox" 2>/dev/null | wc -l | tr -d ' ')"
 if [ "${CONTAINERS:-0}" -ge 2 ]; then
-  ok "cloudbox Talos containers are running (${CONTAINERS})"
+  ok "cloudbox Talos node containers are running (${CONTAINERS})"
 else
-  fail "expected 2+ running cloudbox-* containers, found ${CONTAINERS:-0} — run ./scripts/create-cluster.sh"
+  fail "expected 2 running Talos node containers, found ${CONTAINERS:-0} — run ./scripts/create-cluster.sh"
 fi
 
 # --- kubectl reachability --------------------------------------------------

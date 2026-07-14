@@ -35,7 +35,9 @@ else
 fi
 
 # --- Cold start / serving through Kourier ---------------------------------------
-HOST="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' 2>/dev/null | sed 's|^https\?://||')"
+# Strip the scheme in pure bash — BSD sed has no \? in basic regex.
+URL="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' 2>/dev/null || true)"
+HOST="${URL#http://}"; HOST="${HOST#https://}"
 if [ -n "$HOST" ]; then
   BODY="$(curl -fsS --max-time 30 -H "Host: $HOST" http://localhost:31080/ 2>/dev/null || true)"
   if echo "$BODY" | grep -qi hello; then

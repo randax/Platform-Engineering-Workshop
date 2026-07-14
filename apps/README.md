@@ -10,7 +10,10 @@ actually needs:
 | [`uploader/`](uploader/) | Capstone pipeline, front half: accepts an image upload, stores it in the `images` bucket, announces it as a CloudEvent. | A binary-mode CloudEvent is an HTTP POST with five `ce-*` headers — no SDK. |
 | [`resizer/`](resizer/) | Capstone pipeline, back half: receives the CloudEvent from the broker, writes a 320px thumbnail to `thumbs/` and an analysis JSON to `meta/`. | Event-driven autoscaling: watch its pod appear from zero when an upload lands. |
 
-Prebuilt images (multi-arch, amd64 + arm64) are on GHCR and pre-pulled by
+Images (multi-arch, amd64 + arm64) are published to GHCR by
+[`build-images.yaml`](../.github/workflows/build-images.yaml) — **run it once
+before the workshop** (push an `apps-v*` tag to publish the pinned version;
+see the PENDING note in `scripts/images.txt`) — and pre-pulled by
 `cloudbox-init.sh`:
 
 ```
@@ -92,8 +95,9 @@ cd resizer  && go vet ./... && go test ./...
 ## How the images are built
 
 - **GitHub Actions** ([`.github/workflows/build-images.yaml`](../.github/workflows/build-images.yaml)):
-  vet + test, then buildx multi-arch builds pushed to GHCR on pushes to `main`
-  touching `apps/**` (and on `apps-v*` tags).
+  vet + test on every PR touching `apps/**`; buildx multi-arch builds pushed
+  to GHCR on pushes to `main` (SHA tag only) and on `apps-v*` tags (SHA tag
+  plus the pinned version tag — the only way the pinned tag moves).
 - **In-cluster CI (module 07):** the same Dockerfiles build with the rootless
   BuildKit + Zot registry running inside your cluster — point the module 07
   workflow at any of these directories and push the result to
@@ -102,3 +106,10 @@ cd resizer  && go vet ./... && go test ./...
 
 All three Dockerfiles are the same shape: `golang:1.24-alpine` build stage,
 static `CGO_ENABLED=0` binary, `FROM scratch` final image, non-root UID.
+
+## Vendored assets
+
+The portal embeds [htmx](https://htmx.org) v2.0.4
+(`portal/static/htmx.min.js`), © Big Sky Software, licensed under the
+Zero-Clause BSD license (0BSD) — vendored so the portal serves everything
+itself (offline rule).

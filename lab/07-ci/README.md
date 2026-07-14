@@ -26,13 +26,24 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    ns `builds` — a namespace labeled PSA-privileged because rootless BuildKit needs an
    unconfined seccomp profile; find that label and understand why it's there).
 2. Look at [`app/`](app/) — a Dockerfile and one HTML file. Your Gitea repo already
-   contains it (it was seeded with the whole workshop repo).
-3. Submit a build with [`workflow-run.yaml`](workflow-run.yaml) and follow it to
+   contains it (it was seeded with the whole workshop repo). Notice the `FROM` line:
+   it pulls the base image from *your* Zot, not from Docker Hub — your platform builds
+   FROM your own registry, fully offline.
+3. **Seed the base image**: copy the pre-pulled busybox from your machine into YOUR
+   registry (host-side, against Zot's NodePort):
+
+   ```bash
+   mise x crane@0.21.7 -- crane copy --insecure \
+     docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
+   ```
+
+   That's the platform-team move: you decide what base images exist in your cloud.
+4. Submit a build with [`workflow-run.yaml`](workflow-run.yaml) and follow it to
    `Succeeded`. Then prove the artifact is real: ask Zot's API what's in the registry
    (NodePort 30500, standard OCI `/v2/` endpoints).
-4. Run the image: deliver [`hello-site.yaml`](hello-site.yaml) via GitOps, then curl the
+5. Run the image: deliver [`hello-site.yaml`](hello-site.yaml) via GitOps, then curl the
    page it serves.
-5. Run `./verify.sh`.
+6. Run `./verify.sh`.
 
 ## Hints
 
@@ -49,6 +60,10 @@ kubectl -n builds logs <pod> -f
 
 If it fails immediately with a parameter error, the template's inputs may differ — read
 them: `kubectl -n builds get workflowtemplate build-and-push -o yaml | head -40`.
+
+If the *build step* fails resolving `zot.zot.svc.cluster.local:5000/library/busybox` —
+did you seed the base image (task step 3)? Check with
+`curl -s http://localhost:30500/v2/library/busybox/tags/list`.
 </details>
 
 <details>
@@ -85,6 +100,10 @@ cp gitops/catalog/zot.yaml            gitops/apps/
 cp gitops/catalog/argo-workflows.yaml gitops/apps/
 git add . && git commit -m "module 07: zot + argo-workflows" && git push
 # wait for both apps Healthy in ArgoCD
+
+# seed YOUR registry with the pre-pulled base image (host → Zot NodePort)
+mise x crane@0.21.7 -- crane copy --insecure \
+  docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
 
 kubectl create -f "$WORKSHOP/lab/07-ci/workflow-run.yaml"
 kubectl -n builds get workflows -w              # until Succeeded

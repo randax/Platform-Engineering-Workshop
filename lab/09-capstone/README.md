@@ -8,6 +8,10 @@ wakes from zero, makes a thumbnail and a metadata file, and goes back to sleep. 
 it three ways: pods appearing in a `-w` watch, the thumbnail landing in the gallery and
 in S3, and — the flourish — the whole chain as a single trace in Grafana.
 
+**Prerequisites:** this capstone builds on modules 03 (RustFS), 06 (Knative Serving)
+and 08 (the portal) — have them green, or jump straight here with
+`./scripts/catch-up.sh 8`.
+
 ## Why this matters
 
 This is the capstone because it uses *everything you built today*, at once: GitOps

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
@@ -69,7 +70,9 @@ func main() {
 		uploaderURL: envOr("UPLOADER_URL", "http://uploader.pipeline.svc.cluster.local"),
 		// otelhttp's transport adds a client span AND a `traceparent` header
 		// to the forwarded upload, so the uploader's spans join our trace.
-		httpClient: &http.Client{Transport: otelhttp.NewTransport(nil)},
+		// 60s timeout: generous, because the first upload wakes the uploader
+		// ksvc from zero — but no request may hang forever.
+		httpClient: &http.Client{Timeout: 60 * time.Second, Transport: otelhttp.NewTransport(nil)},
 	}
 
 	mux := http.NewServeMux()
@@ -86,11 +89,13 @@ func main() {
 	mux.HandleFunc("GET /workshop/list", srv.handleWorkshopList) // polled by htmx
 	mux.HandleFunc("GET /databases", srv.handleDatabases)
 	mux.HandleFunc("GET /databases/list", srv.handleDatabasesList) // polled by htmx
+	// Mutating routes. No CSRF token on these: single-user disposable lab —
+	// don't copy this into a real portal.
 	mux.HandleFunc("POST /databases", srv.handleCreateDatabase)
 	mux.HandleFunc("DELETE /databases/{name}", srv.handleDeleteDatabase)
+	mux.HandleFunc("POST /gallery/upload", srv.handleUpload)
 	mux.HandleFunc("GET /gallery", srv.handleGallery)
 	mux.HandleFunc("GET /gallery/grid", srv.handleGalleryGrid)
-	mux.HandleFunc("POST /gallery/upload", srv.handleUpload)
 	mux.HandleFunc("GET /services", srv.handleServices)
 
 	// One server span per page request; health probes and static assets

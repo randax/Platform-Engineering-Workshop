@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -122,10 +123,14 @@ func (s *s3Client) listGallery(ctx context.Context) ([]galleryItem, error) {
 
 		if u, err := s.presign.PresignedGetObject(ctx, s.bucket, obj.Key, presignTTL, nil); err == nil {
 			item.URL = u.String()
+		} else {
+			log.Printf("presigning %s: %v", obj.Key, err)
 		}
 		if thumbKey := "thumbs/" + base + ".jpg"; thumbs[thumbKey] {
 			if u, err := s.presign.PresignedGetObject(ctx, s.bucket, thumbKey, presignTTL, nil); err == nil {
 				item.ThumbURL = u.String()
+			} else {
+				log.Printf("presigning %s: %v", thumbKey, err)
 			}
 		}
 		if metaKey := "meta/" + base + ".json"; metas[metaKey] {

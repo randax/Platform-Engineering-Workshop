@@ -252,6 +252,12 @@ spec:
                 - ALL
             seccompProfile:
               type: RuntimeDefault
+          # Workshop curation: small requests (upstream ships none for the
+          # in-memory channel) — small-cluster convention, limits untouched.
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
           ports:
             - name: metrics
               containerPort: 9090
@@ -459,6 +465,12 @@ spec:
                 - ALL
             seccompProfile:
               type: RuntimeDefault
+          # Workshop curation: small requests (upstream ships none for the
+          # in-memory channel) — small-cluster convention, limits untouched.
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
 
 ---
 # Copyright 2019 The Knative Authors

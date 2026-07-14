@@ -20,6 +20,8 @@ In `namespace-install.yaml` (both Deployments):
 - `workflow-controller` args: added `--managed-namespace builds`
 - `argo-server` args: added `--managed-namespace builds` and
   `--auth-mode server` (no SSO/client tokens in a 4-hour lab)
+- added container resource requests **50m/64Mi** to both (upstream ships
+  none; small-cluster requests convention, no limits)
 
 Why managed-namespace: workflow pods run rootless BuildKit, which needs
 seccomp/AppArmor `Unconfined`. Talos enforces PSA `baseline` cluster-wide, so
@@ -33,7 +35,15 @@ executor Role (`workflowtaskresults` create/patch) for the `default` SA.
 `workflowtemplate-build-and-push.yaml` modernizes the official
 buildkit-template example: git input artifact from the in-cluster Gitea →
 `moby/buildkit:v0.31.1-rootless` (tag verified on Docker Hub 2026-07-13,
-multi-arch) → anonymous push to Zot with `registry.insecure=true`.
+multi-arch) → anonymous push to Zot with `registry.insecure=true`. It also
+ships a `buildkitd-config` ConfigMap (`builds` namespace) marking
+`zot.zot.svc.cluster.local:5000` as plain-HTTP, mounted at
+`/home/user/.config/buildkit/buildkitd.toml` — rootless buildkitd's default
+config path (`~/.config/buildkit/buildkitd.toml`, uid 1000, home
+`/home/user`; per moby/buildkit docs/buildkitd.toml.md). BuildKit does its
+own FROM pulls and pushes inside the pod (the node registry mirror does not
+apply), so with Dockerfiles whose FROM points at Zot the whole build is
+in-cluster and offline-safe.
 
 Images used:
 - `quay.io/argoproj/workflow-controller:v4.0.7`

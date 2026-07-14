@@ -26,9 +26,12 @@ curl -sL -o kourier.yaml \
    webhook 50m/50Mi, kourier controller+gateway 100m/100Mi.
 2. **`config-network`**: `ingress-class: "kourier.ingress.networking.knative.dev"`.
 3. **`config-deployment`**: `registries-skipping-tag-resolving:
-   "zot.zot.svc.cluster.local:5000,localhost:30500,127.0.0.1:30500"` — the
-   controller must not try to digest-resolve images in the in-cluster
-   registry / its NodePort aliases.
+   "zot.zot.svc.cluster.local:5000,localhost:30500,127.0.0.1:30500,ghcr.io"`
+   — the controller must not try to digest-resolve images in the in-cluster
+   registry / its NodePort aliases. `ghcr.io` is on the list because tag
+   resolution runs from the controller pod, bypassing the node registry
+   mirror (offline-breaking at the venue); drop it once the first-party
+   images are published and digest-pinned (issue #7).
 4. **Service `kourier` (kourier-system)**: `LoadBalancer` → `NodePort` with
    `nodePort: 31080` on port 80 (no LB implementation in Talos-in-Docker).
 5. **Pinned Envoy**: `docker.io/envoyproxy/envoy:v1.37-latest` (floating!) →

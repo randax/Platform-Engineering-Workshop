@@ -1,10 +1,14 @@
 # Cloudbox Console — bespoke workshop portal (module 08). First-party app:
 # source lives in apps/portal of this repo, image built by CI on GitHub.
 # It reads platform state via the Kubernetes API (read-only ClusterRole),
-# manages WorkshopDatabase XRs in the `demo` namespace (Role there — the
-# namespace comes from module 04's demo component, so enable in module
-# order), shows the picture gallery straight from RustFS and hands uploads
-# to the uploader Knative Service from picture-pipeline.
+# shows the picture gallery straight from RustFS and hands uploads to the
+# uploader Knative Service from picture-pipeline.
+#
+# XR self-service (the Databases page) requires the module-08 Role in
+# gitops/components/demo/ — it ships alongside the `demo` namespace so this
+# component never references a namespace from a later sync wave (module 08
+# teaches pushing that Role as a one-file change). Until it lands, the
+# Databases page shows a friendly forbidden error.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -49,35 +53,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: portal-read
-subjects:
-  - kind: ServiceAccount
-    name: portal
-    namespace: portal
----
-# The self-service page: full lifecycle of WorkshopDatabase XRs
-# (Crossplane v2 namespaced XR, see lab/04-self-service/platform/xrd.yaml —
-# group platform.cloudbox.io, plural workshopdatabases), scoped to the
-# `demo` namespace only. Requires the demo namespace to exist (module 04);
-# ArgoCD retries the sync until it does.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: portal-workshopdatabases
-  namespace: demo
-rules:
-  - apiGroups: [platform.cloudbox.io]
-    resources: [workshopdatabases]
-    verbs: [create, get, list, delete]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: portal-workshopdatabases
-  namespace: demo
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: portal-workshopdatabases
 subjects:
   - kind: ServiceAccount
     name: portal

@@ -106,6 +106,12 @@ spec:
                   fieldPath: metadata.namespace
             - name: CONFIG_MOUNT_PATH
               value: /etc/config/
+          # Workshop curation: small requests (upstream ships none) so the
+          # scheduler accounts for the provisioner on the small lab cluster.
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
       volumes:
         - name: config-volume
           configMap:

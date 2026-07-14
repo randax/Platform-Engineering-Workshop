@@ -21,8 +21,10 @@
   the CNPG-generated `backstage-db-superuser` secret.
 - **Integrations point at the in-cluster services**: Gitea
   `http://gitea-http.gitea.svc.cluster.local:3000`, ArgoCD
-  `https://argocd-server.argocd.svc.cluster.local`
-  (`NODE_TLS_REJECT_UNAUTHORIZED=0` for its self-signed cert, as in CNOE).
+  `http://argocd-server.argocd.svc.cluster.local` — plain HTTP because the
+  bootstrap runs argocd-server with `server.insecure=true` (no TLS behind
+  the Service). `NODE_TLS_REJECT_UNAUTHORIZED=0` is kept from CNOE but is
+  no longer load-bearing.
 - **Service is NodePort 30700**; app/backend baseUrl `http://localhost:30700`.
 - Workshop-grade credential Secrets `gitea-credentials` /
   `argocd-credentials` are committed in-line — they MUST match what the

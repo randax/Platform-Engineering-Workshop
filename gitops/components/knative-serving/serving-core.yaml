@@ -7626,8 +7626,11 @@ data:
   # Workshop curation: don't try to resolve tags to digests for the in-cluster
   # Zot registry (and its NodePort/mirror aliases) — the controller can't
   # necessarily reach them the way the kubelet does, and the lab pushes
-  # non-digest tags.
-  registries-skipping-tag-resolving: "zot.zot.svc.cluster.local:5000,localhost:30500,127.0.0.1:30500"
+  # non-digest tags. ghcr.io is included because digest resolution happens
+  # from the controller pod, which bypasses the node registry mirror and
+  # would need the internet at the venue; first-party v0.1.0 tags can't be
+  # digest-pinned until published — revisit after publishing (issue #7).
+  registries-skipping-tag-resolving: "zot.zot.svc.cluster.local:5000,localhost:30500,127.0.0.1:30500,ghcr.io"
   _example: |-
     ################################
     #                              #

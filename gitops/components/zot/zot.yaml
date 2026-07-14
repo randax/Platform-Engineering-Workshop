@@ -148,8 +148,12 @@ spec:
               path: /startupz
               port: 5000
               scheme: HTTP
+          # Workshop curation: small requests so the scheduler accounts for
+          # the registry on the 2-node lab cluster (chart default is none).
           resources:
-            null
+            requests:
+              cpu: 50m
+              memory: 128Mi
       volumes:
         - name: zot-config
           configMap:

@@ -15,7 +15,7 @@ Everything you built so far is APIs and YAML — perfect for platform engineers,
 to everyone else. A portal is how a platform gets *adopted*: one place that answers "what
 exists?" and "how do I get one?". The industry reflex is "portal = Backstage", and
 sometimes that's right (we'll be honest about when, below). But a portal is not magic:
-this one is ~730 lines of Go and htmx that read the Kubernetes API with a ServiceAccount
+this one is ~1,300 lines of Go and htmx that read the Kubernetes API with a ServiceAccount
 token. The entire source is in this repo under [`apps/portal/`](../../apps/portal/) —
 after today you can read every line of your platform's front door. Try saying that about
 most portals.
@@ -24,34 +24,48 @@ most portals.
 
 1. Enable `portal.yaml` from the catalog. It lands in ns `portal` and takes seconds — it's
    one small Go binary (compare that to what module 08 used to be…).
-2. Open **http://localhost:30600** and explore. The overview, Databases, and Services
-   pages aren't a mock — every row is a live read from your cluster. For each page, answer:
-   *which Kubernetes API is this?* (You installed all of them today.)
-3. **The star task.** On the Databases page, use the **New database** form: name it
+2. Open **http://localhost:30600** and explore. Six pages — Overview, Components,
+   Workshop, Databases, Services, Gallery — and none of them is a mock: every row is a
+   live read from your cluster (the Workshop page even tracks your module progress, live).
+   For each page, answer: *which Kubernetes API is this?* (You installed all of them today.)
+3. **Hand your portal the keys.** The console can *read* everything, but creating
+   databases needs a write grant it deliberately doesn't ship with: grant your portal
+   access to the self-service API — copy [`portal-access.yaml`](portal-access.yaml)
+   (in this lab directory) to `gitops/components/demo/` in your Gitea clone and push.
+   Read it first: one Role (create/get/list/delete `workshopdatabases` in ns `demo`) and
+   one RoleBinding to the portal's ServiceAccount. The platform owner grants access —
+   the portal can't grant itself anything.
+4. **The star task.** On the Databases page, use the **New database** form: name it
    `console-db`, size `small`. Then prove it's real, the module-04 way:
    - `kubectl -n demo get workshopdatabase console-db` — the XR the form created
    - `kubectl -n demo get cluster console-db-pg -w` — the composed CNPG cluster booting
 
    This is *exactly* the self-service loop you built in module 04 — same XRD, same
    Composition, same controllers — with a form in front of it. The portal didn't gain any
-   new powers; your platform already had the API. That's the lesson.
-4. Spot the difference: your module-04 database went through git; this one didn't. Find
+   new powers; your platform already had the API (and you just granted the portal the
+   right to use it). That's the lesson.
+5. Spot the difference: your module-04 database went through git; this one didn't. Find
    the evidence (`kubectl -n demo get workshopdatabase console-db -o yaml` — who created
    it? Is it in your Gitea repo?). Keep that thought for the explain-back.
-5. Run `./verify.sh`.
+6. Run `./verify.sh`.
 
 ## How it works (read the source!)
 
-The whole portal is five Go files and four HTML templates in
+The whole portal is eight Go files and seven HTML templates in
 [`apps/portal/`](../../apps/portal/):
 
 - **`kube.go`** — talks to the Kubernetes API from inside the pod: the ServiceAccount
   token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/` is all the auth it
   has. Check what it's *allowed* to do: `kubectl describe clusterrole portal-read` —
-  read-only on exactly the four things it renders, plus one namespaced Role in `demo`
-  for `workshopdatabases`. No admin token, no magic.
+  read-only on exactly the surfaces it renders, plus the one namespaced Role in `demo`
+  for `workshopdatabases` that *you* granted in step 3. No admin token, no magic.
 - **`resources.go`** — the "platform model": list ArgoCD `Applications`, CNPG `Clusters`,
   Knative `Services` as dynamic/unstructured resources.
+- **`components.go`** — the Components status page: your platform's own status page,
+  built from Deployment/StatefulSet/DaemonSet readiness per component.
+- **`workshop.go`** — the Workshop page: live module progress inferred from cluster
+  state, one simple rule per module. A hint, not a judge — each lab's `verify.sh`
+  stays the authoritative check.
 - **`handlers.go`** — the form POST builds a `WorkshopDatabase` object and creates it via
   the API — 20 lines that replace a whole portal product's scaffolder, because module 04
   already did the hard part.
@@ -124,8 +138,10 @@ kubectl -n demo get cluster,job,pods                  # the composed stack
 Each page is one API call — the error names the resource it couldn't read.
 
 1. `kubectl -n portal logs deploy/portal --tail=20` — RBAC denials and API errors land here.
-2. A `workshopdatabases.platform.cloudbox.io is forbidden` or `not found` error means
-   module 04 isn't in place — the portal is a *view* on the platform API; it can't invent one.
+2. A `workshopdatabases.platform.cloudbox.io not found` error means module 04 isn't in
+   place — the portal is a *view* on the platform API; it can't invent one. A
+   `... is forbidden` error means the grant from step 3 is missing: is
+   `portal-access.yaml` in `gitops/components/demo/` and the `demo` app synced?
 3. The Gallery page needs RustFS (module 03) and shows an empty grid until module 09
    creates the `images` bucket — empty is fine, an error is not.
 </details>
@@ -138,7 +154,8 @@ WORKSHOP="$(git rev-parse --show-toplevel)"
 cd ~/cloudbox-platform   # your Gitea clone
 
 cp gitops/catalog/portal.yaml gitops/apps/
-git add . && git commit -m "module 08: enable the cloudbox console" && git push
+cp "$WORKSHOP/lab/08-portal/portal-access.yaml" gitops/components/demo/
+git add . && git commit -m "module 08: enable the cloudbox console + grant it demo access" && git push
 
 kubectl -n portal rollout status deploy/portal --timeout=300s
 open http://localhost:30600            # explore, then: Databases → New database

@@ -4,7 +4,10 @@ You are going to build a small but real cloud platform on your own laptop: an im
 Kubernetes OS, eBPF networking, GitOps delivery, database- and storage-as-a-service,
 a self-service platform API, and (if you're fast) serverless, in-cluster CI, a developer
 portal, and an event-driven picture pipeline that ties it all together. Everything keeps
-working when you leave the building — that's the point.
+working when you leave the building — that's the point. (From module 08 on, your platform
+even shows its own progress: the Cloudbox Console's **Workshop** page at
+http://localhost:30600/workshop is a live dashboard of which modules your cluster has
+reached.)
 
 ## Module overview
 
@@ -21,7 +24,9 @@ working when you leave the building — that's the point.
 | 08 | [Portal: the Cloudbox Console](08-portal/) | stretch | self-paced + demo | Create a database through a portal *you can read the source of* — plus a Backstage presenter demo |
 | 09 | [Capstone: the picture pipeline](09-capstone/) | stretch | self-paced finale | Upload a photo → a resizer that didn't exist scales from zero → thumbnail, metadata, and the whole chain as one trace |
 
-Core = 00–05. Stretch modules are for the fast 20% and for home; nothing later depends on them.
+Core = 00–05. Stretch modules are for the fast 20% and for home; the core path never
+depends on them — but they build on each other: 09 (capstone) needs 06 and 08, and 08's
+star task needs 04's platform API. `./scripts/catch-up.sh <module>` bridges any gap.
 
 ## How every module works
 
@@ -41,8 +46,9 @@ Each module directory contains:
   It performs many small checks against your *running cluster* (never against your files),
   prints ✅ per passing check and `❌ FAIL: <what's wrong and where to look>` per failing
   one, and exits 0 only when the module's outcome is fully true. Green verify = module done.
-- **`solve.sh`** — the exact full-solution commands, runnable end-to-end. Used by CI to
-  regression-test `verify.sh`, and by you if you want to fast-forward.
+- **`solve.sh`** — the exact full-solution commands, runnable end-to-end. Designed for
+  CI regression against `verify.sh` (job tracked in issue #10), and for you if you want
+  to fast-forward.
 
 Fallen behind? `./scripts/catch-up.sh <module>` force-pushes the canonical end-state of
 that module to your in-cluster Gitea and lets ArgoCD converge (see [`solutions/`](../solutions/)).

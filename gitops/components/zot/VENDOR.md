@@ -62,3 +62,8 @@ Config rationale:
 - Reachable as `zot.zot.svc.cluster.local:5000` in-cluster (BuildKit pushes
   with `registry.insecure=true`; Talos machine config must mirror/allow this
   registry as insecure for kubelet pulls — cluster-script side).
+
+Workshop curation applied after rendering (re-apply after re-vendoring):
+- **Added container resource requests 50m/128Mi** (the chart renders
+  `resources: null`) — same small-cluster requests convention as the other
+  components, so the scheduler accounts for the registry.

@@ -52,7 +52,13 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
+    # Both keep-annotations on purpose: helm.sh/resource-policy is what the
+    # chart ships (honored by Helm, ignored by ArgoCD); the ArgoCD one below
+    # is the workshop curation that actually protects the volume — without
+    # it, disabling the rustfs app (git rm + push, prune: true) would delete
+    # the PVC and every uploaded image with it.
     helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false
   name: rustfs-data
   namespace: rustfs
   labels:

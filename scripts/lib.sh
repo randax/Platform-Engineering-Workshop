@@ -44,7 +44,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 # need <cmd> [hint] — die with a friendly message if a tool is missing.
 need() {
-  have "$1" || die "'$1' not found. ${2:-Run ./scripts/dev-setup.sh first.}"
+  have "$1" || die "'$1' not found. ${2:-Run ./scripts/dev-setup.sh first, or restart your shell so mise activation takes effect.}"
 }
 
 # confirm "question" — interactive yes/no, defaults to no. Returns 0 on yes.

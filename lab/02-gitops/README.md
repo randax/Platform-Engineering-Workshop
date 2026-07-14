@@ -140,8 +140,12 @@ being in-cluster a sovereignty feature and not just a demo trick?
 
 - Wave-0 installed observability for you. Find Grafana (`kubectl -n observability get svc`),
   port-forward to it, and look at what your cluster is already reporting.
-- Delete `gitops/apps/demo.yaml` from the repo, push, and watch prune remove the namespace.
-  Then revert the commit — GitOps rollback is `git revert`. (Re-run `./verify.sh` after!)
+- Delete `gitops/apps/demo.yaml` from the repo, push, and watch prune remove the `demo`
+  *Application object* — then look again: the namespace and ConfigMap are still there,
+  **orphaned**. Deleting an Application doesn't cascade to its resources unless the
+  Application carries the `resources-finalizer.argocd.argoproj.io` finalizer. Then revert
+  the commit — GitOps rollback is `git revert`, and the orphans get re-adopted.
+  (Re-run `./verify.sh` after!)
 - Read the root app's manifest: `kubectl -n argocd get app platform -o yaml`. Find the
   sync-wave annotations on the children. What orders what?
 

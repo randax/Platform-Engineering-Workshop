@@ -3,6 +3,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Published minimums (MIN_DISK_FREE_GB, …) come from the single pin source.
+# shellcheck source=../../scripts/versions.env
+source "$REPO_ROOT/scripts/versions.env"
 FAILED=0
 
 ok()   { echo "✅ $1"; }
@@ -36,10 +39,10 @@ fi
 
 # --- Free disk -------------------------------------------------------------
 FREE_GB="$(df -Pk "$REPO_ROOT" | awk 'NR==2 {print int($4/1024/1024)}')"
-if [ "${FREE_GB:-0}" -ge 20 ]; then
-  ok "${FREE_GB} GB free disk (need >= 20, 40 recommended)"
+if [ "${FREE_GB:-0}" -ge "$MIN_DISK_FREE_GB" ]; then
+  ok "${FREE_GB} GB free disk (need >= ${MIN_DISK_FREE_GB})"
 else
-  fail "Only ${FREE_GB:-0} GB free disk — free up space, the image cache alone needs ~15 GB"
+  fail "Only ${FREE_GB:-0} GB free disk — need >= ${MIN_DISK_FREE_GB} GB (the image cache alone needs ~15 GB)"
 fi
 
 # --- Required CLIs ---------------------------------------------------------

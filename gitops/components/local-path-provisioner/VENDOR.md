@@ -24,6 +24,9 @@ curl -sL -o local-path-storage.yaml \
 3. **Pinned the helper pod image** `docker.io/library/busybox` →
    `docker.io/library/busybox:1.37.0` (upstream ships it unpinned; an
    unpinned tag silently defeats image pre-pulling).
+4. **Added container resource requests 25m/32Mi** to the provisioner
+   Deployment (upstream ships none) — same small-cluster requests
+   convention as the other components, no limits.
 
 Images used (all pinned, verified pullable 2026-07-13):
 - `docker.io/rancher/local-path-provisioner:v0.0.36`
