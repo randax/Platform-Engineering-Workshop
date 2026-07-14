@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+          image: docker.io/library/postgres:18-alpine
           env:
             - name: POSTGRES_PASSWORD
               value: inventory123
@@ -101,7 +101,7 @@ spec:
     spec:
       containers:
         - name: client
-          image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+          image: docker.io/library/postgres:18-alpine
           command: ["/bin/sh", "-c"]
           args:
             - |
