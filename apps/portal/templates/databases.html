@@ -1,5 +1,5 @@
 {{define "databases"}}
-{{template "head" .}}
+{{template "head" "databases"}}
 <h1>Databases</h1>
 <p class="lede">Below: the running CNPG Postgres clusters, and the platform's self-service
 API from module 04 — a <code>WorkshopDatabase</code> composite resource. The form POSTs a
@@ -22,27 +22,31 @@ API from module 04 — a <code>WorkshopDatabase</code> composite resource. The f
 {{template "foot" .}}
 {{end}}
 
-{{/* The fragment htmx swaps after create/delete. */}}
+{{/* The self-updating tables. Three htmx attributes make this fragment poll:
+     hx-get says where to fetch itself from, hx-trigger="every 5s" makes that
+     happen on a timer, hx-swap="outerHTML" replaces the whole div with the
+     response. That's live updates with zero JavaScript — the create/delete
+     buttons target the same fragment, so every path renders the same markup. */}}
 {{define "db-list"}}
-<div id="db-list">
+<div id="db-list" hx-get="/databases/list" hx-trigger="every 5s" hx-swap="outerHTML">
   {{template "flash" .Flash}}
 
-  <h2>WorkshopDatabases <small>(namespace {{.Namespace}})</small></h2>
+  <h2>WorkshopDatabases <small>(namespace {{.Namespace}} · auto-refreshes every 5 s)</small></h2>
   <table>
-    <thead><tr><th>Name</th><th>Size</th><th>Storage</th><th>Ready</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Size</th><th>Storage</th><th>Status</th><th></th></tr></thead>
     <tbody>
     {{range .Databases}}
       <tr>
         <td>{{.Metadata.Name}}</td>
         <td>{{.Spec.Size}}</td>
         <td>{{.Spec.StorageGB}} GiB</td>
-        <td>{{template "badge" .Ready}}</td>
+        <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
         <td><button class="danger" hx-delete="/databases/{{.Metadata.Name}}"
                     hx-target="#db-list" hx-swap="outerHTML"
-                    hx-confirm="Delete {{.Metadata.Name}} and everything Crossplane composed for it?">Delete</button></td>
+                    hx-confirm="Delete database {{.Metadata.Name}}? This removes the Postgres cluster and its data.">Delete</button></td>
       </tr>
     {{else}}
-      <tr><td colspan="5" class="empty">None yet — create one below, or check that the XRD from module 04 is installed.</td></tr>
+      <tr><td colspan="5" class="empty">No databases yet — create one below. (Requires module 04's XRD.)</td></tr>
     {{end}}
     </tbody>
   </table>
@@ -59,7 +63,7 @@ API from module 04 — a <code>WorkshopDatabase</code> composite resource. The f
         <td>{{.Status.Phase}}</td>
       </tr>
     {{else}}
-      <tr><td colspan="4" class="empty">No CNPG clusters found.</td></tr>
+      <tr><td colspan="4" class="empty">No CNPG clusters yet — creating a WorkshopDatabase below composes one.</td></tr>
     {{end}}
     </tbody>
   </table>

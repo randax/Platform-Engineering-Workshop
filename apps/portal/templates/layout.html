@@ -1,5 +1,10 @@
 {{/* Shared page chrome. Every page starts with "head" and ends with "foot".
-     htmx is served from the binary itself — view-source and check: no CDN. */}}
+     htmx is served from the binary itself — view-source and check: no CDN.
+
+     "head" receives the active page's name so the nav can mark the current
+     link with aria-current — the accessible way to say "you are here". The
+     nav is a fixed left rail (ArgoCD/Grafana-style) that collapses to a
+     wrapping top bar on narrow screens — pure CSS, see .rail in style.css. */}}
 
 {{define "head"}}
 <!doctype html>
@@ -12,35 +17,52 @@
   <script src="/static/htmx.min.js"></script>
 </head>
 <body>
-<header>
+<div class="shell">
+<aside class="rail">
   <span class="logo">⬢ Cloudbox Console</span>
   <nav>
-    <a href="/">Overview</a>
-    <a href="/databases">Databases</a>
-    <a href="/gallery">Gallery</a>
-    <a href="/services">Services</a>
+    <div class="nav-group">
+      <span class="nav-label">Platform</span>
+      <a href="/" {{if eq . "overview"}}aria-current="page"{{end}}>Overview</a>
+      <a href="/components" {{if eq . "components"}}aria-current="page"{{end}}>Components</a>
+      <a href="/workshop" {{if eq . "workshop"}}aria-current="page"{{end}}>Workshop</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Self-service</span>
+      <a href="/databases" {{if eq . "databases"}}aria-current="page"{{end}}>Databases</a>
+      <a href="/services" {{if eq . "services"}}aria-current="page"{{end}}>Services</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Capstone</span>
+      <a href="/gallery" {{if eq . "gallery"}}aria-current="page"{{end}}>Gallery</a>
+    </div>
   </nav>
-</header>
+</aside>
+<div class="content">
 <main>
 {{end}}
 
 {{define "foot"}}
 </main>
 <footer>your platform, your laptop — JavaZone 2026</footer>
+</div>
+</div>
 </body>
 </html>
 {{end}}
 
 {{define "error"}}
-{{template "head" .}}
+{{template "head" ""}}
 <h1>Something answered with an error</h1>
 <p>That is normal in this workshop — read it, it usually says exactly what is missing:</p>
 <pre class="error">{{.}}</pre>
 {{template "foot" .}}
 {{end}}
 
-{{define "flash"}}{{if .}}<p class="flash">{{.}}</p>{{end}}{{end}}
+{{/* A one-shot notice; .Error flips it from info-blue to error-red so
+     failures can be triaged by color at a glance. */}}
+{{define "flash"}}{{if .Msg}}<p class="flash{{if .Error}} flash-error{{end}}">{{.Msg}}</p>{{end}}{{end}}
 
-{{define "badge"}}{{/* green for good states, gray otherwise */ -}}
-<span class="badge {{if or (eq . "Healthy") (eq . "Synced") (eq . "True")}}ok{{else if or (eq . "Degraded") (eq . "False")}}bad{{else}}meh{{end}}">{{.}}</span>
+{{define "badge"}}{{/* ArgoCD vocabulary: green for good, red for broken, amber for in-between */ -}}
+<span class="badge {{if or (eq . "Healthy") (eq . "Synced")}}ok{{else if or (eq . "Degraded") (eq . "Missing")}}bad{{else}}meh{{end}}">{{.}}</span>
 {{- end}}

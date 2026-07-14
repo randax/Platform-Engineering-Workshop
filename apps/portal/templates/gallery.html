@@ -1,5 +1,5 @@
 {{define "gallery"}}
-{{template "head" .}}
+{{template "head" "gallery"}}
 <h1>Gallery</h1>
 <p class="lede">The capstone pipeline, seen from the outside: upload an image here → the
 portal forwards it to the <b>uploader</b> → the uploader stores it in RustFS and emits a
@@ -17,27 +17,32 @@ Image links are presigned S3 URLs, valid 15 minutes.</p>
 {{template "foot" .}}
 {{end}}
 
+{{/* The self-updating grid — same polling trio as db-list (hx-get +
+     hx-trigger="every 5s" + hx-swap). Only this div re-fetches itself; the
+     upload form above stays outside the fragment, so a file you have picked
+     is never clobbered by a poll. */}}
 {{define "gallery-grid"}}
-<div id="gallery">
+<div id="gallery" hx-get="/gallery/grid" hx-trigger="every 5s" hx-swap="outerHTML">
   {{template "flash" .Flash}}
+  <p class="hint">auto-refreshes every 5 s — watch the thumbnail and analysis pop in after an upload</p>
   <div class="grid">
   {{range .Items}}
     <figure class="card">
       {{if .ThumbURL}}
-        <a href="{{.URL}}" target="_blank"><img src="{{.ThumbURL}}" alt="{{.Name}}"></a>
+        <a href="{{.URL}}" target="_blank"><img src="{{.ThumbURL}}" alt="Thumbnail of {{.Name}}"></a>
       {{else}}
         <a href="{{.URL}}" target="_blank" class="pending">original uploaded,<br>waiting for the resizer…</a>
       {{end}}
       <figcaption>
         <b>{{.Name}}</b>
-        {{with .Meta}}
-          <br>{{.Width}}×{{.Height}} {{.Format}}, {{.Bytes}} bytes
+        {{with .Meta}}{{/* the resizer's analysis JSON from meta/ */}}
+          <br>{{.Width}}×{{.Height}} · {{.Format}} · {{.HumanBytes}}
           <br>dominant <span class="swatch" style="background:{{.DominantColor}}"></span> <code>{{.DominantColor}}</code>
         {{end}}
       </figcaption>
     </figure>
   {{else}}
-    <p class="empty">Bucket is empty — upload something!</p>
+    <p class="empty">Nothing here yet — upload the first image.</p>
   {{end}}
   </div>
 </div>

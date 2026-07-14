@@ -12,6 +12,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -72,6 +73,18 @@ type imageMeta struct {
 	DominantColor string `json:"dominantColor"`
 }
 
+// HumanBytes renders the original's size the way a file manager would.
+func (m imageMeta) HumanBytes() string {
+	switch {
+	case m.Bytes >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(m.Bytes)/(1<<20))
+	case m.Bytes >= 1<<10:
+		return fmt.Sprintf("%.0f KB", float64(m.Bytes)/(1<<10))
+	default:
+		return fmt.Sprintf("%d B", m.Bytes)
+	}
+}
+
 const presignTTL = 15 * time.Minute
 
 // listGallery lists originals/ and joins them with thumbs/ and meta/ by base
@@ -127,6 +140,19 @@ func (s *s3Client) listGallery(ctx context.Context) ([]galleryItem, error) {
 		items = items[:100]
 	}
 	return items, nil
+}
+
+// countPrefix counts objects under a prefix — the workshop checklist uses it
+// to answer "has the resizer produced a thumbnail yet?".
+func (s *s3Client) countPrefix(ctx context.Context, prefix string) (int, error) {
+	n := 0
+	for obj := range s.api.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
+		if obj.Err != nil {
+			return n, obj.Err
+		}
+		n++
+	}
+	return n, nil
 }
 
 func (s *s3Client) readMeta(ctx context.Context, key string) *imageMeta {

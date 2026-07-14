@@ -1,5 +1,5 @@
 {{define "overview"}}
-{{template "head" .}}
+{{template "head" "overview"}}
 <h1>Overview</h1>
 <p class="lede">Everything on this page is read straight from the Kubernetes API with the
 portal's ServiceAccount token — no client-go, no ArgoCD API server, just
@@ -8,7 +8,8 @@ portal's ServiceAccount token — no client-go, no ArgoCD API server, just
 <p class="stats">
   <b>{{.Summary.Namespaces}}</b> namespaces ·
   <b>{{.Summary.PodsRunning}}</b>/<b>{{.Summary.Pods}}</b> pods running ·
-  <b>{{len .Apps}}</b> ArgoCD applications
+  <b>{{len .Apps}}</b> ArgoCD applications ·
+  <a href="/components">component health →</a>
 </p>
 
 <table>
