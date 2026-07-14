@@ -6,8 +6,9 @@ metadata:
   labels:
     workshop/fault: "03"
 ---
-# A plain postgres for this scenario (the CNPG image is a standard postgres
-# image underneath, and it's already pre-pulled).
+# A plain standalone postgres for this scenario — the official image (its
+# docker-entrypoint honors POSTGRES_PASSWORD; the CNPG image does NOT, it's
+# meant to be driven by the operator).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,7 +26,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+          image: docker.io/library/postgres:18-alpine
           env:
             - name: POSTGRES_PASSWORD
               value: inventory123
@@ -76,7 +77,7 @@ spec:
     spec:
       containers:
         - name: client
-          image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+          image: docker.io/library/postgres:18-alpine
           command: ["/bin/sh", "-c"]
           args:
             - |

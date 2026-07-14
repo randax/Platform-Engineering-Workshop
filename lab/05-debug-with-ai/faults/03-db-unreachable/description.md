@@ -35,10 +35,3 @@ pod and Service look perfect. When healthy things can't talk and connections tim
 
 **Verify the fix:** `kubectl -n faultlab-03 exec deploy/orders-api -- pg_isready -h inventory-db -t 3`
 and the logs flip to `OK: database reachable`.
-
-> **Rehearsal flag:** `issue.yaml` runs the CNPG image
-> (`ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie`) *standalone* with a plain
-> `POSTGRES_PASSWORD`, assuming the `system` variant boots like the stock postgres image
-> outside the operator. Verify at rehearsal that the pod actually reaches Ready and
-> answers `pg_isready`; if not, swap in a stock pinned `postgres` image here (and add it
-> to `scripts/images.txt`).
