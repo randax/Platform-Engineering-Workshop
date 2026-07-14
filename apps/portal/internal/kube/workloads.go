@@ -17,8 +17,13 @@ type NSHealth struct {
 // pair decodes as zero, so max() picks the right one either way.
 type workload struct {
 	Metadata ObjMeta `json:"metadata"`
-	Status   struct {
-		Replicas               int `json:"replicas"`               // deploy + sts
+	Spec     struct {
+		// desired replicas for deploy + sts. status.replicas is the CURRENT
+		// pod count, which can transiently equal readyReplicas mid-scale-up
+		// and report a namespace healthy before the scale-up finishes.
+		Replicas int `json:"replicas"`
+	} `json:"spec"`
+	Status struct {
 		ReadyReplicas          int `json:"readyReplicas"`          // deploy + sts
 		DesiredNumberScheduled int `json:"desiredNumberScheduled"` // daemonset
 		NumberReady            int `json:"numberReady"`            // daemonset
@@ -39,7 +44,7 @@ func (k *Client) NamespaceWorkloads(ctx context.Context) (map[string]NSHealth, e
 			return nil, err
 		}
 		for _, w := range list.Items {
-			desired := max(w.Status.Replicas, w.Status.DesiredNumberScheduled)
+			desired := max(w.Spec.Replicas, w.Status.DesiredNumberScheduled)
 			ready := max(w.Status.ReadyReplicas, w.Status.NumberReady)
 			h := health[w.Metadata.Namespace]
 			h.Total++

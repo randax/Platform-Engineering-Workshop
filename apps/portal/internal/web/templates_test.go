@@ -140,9 +140,10 @@ func TestTemplatesRender(t *testing.T) {
 		"database-detail": {
 			data: dbDetailData{
 				Name: "my-db", DB: &db, ClusterName: "my-db-pg",
-				Secret: "my-db-pg-app",
-				Psql:   "kubectl -n demo exec -it my-db-pg-1 -- psql -U app app",
-				Events: []kube.Event{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
+				Cluster: &kube.CNPGClusterDetail{}, // composed: the Connect section shows
+				Secret:  "my-db-pg-app",
+				Psql:    "kubectl -n demo exec -it my-db-pg-1 -- psql -U app app",
+				Events:  []kube.Event{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
 			},
 			want: []string{
 				`hx-confirm`, `Delete this database`, // destructive action lives HERE now

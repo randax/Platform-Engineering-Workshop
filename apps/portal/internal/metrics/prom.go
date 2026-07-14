@@ -33,12 +33,15 @@ func New(promURL string) *Client {
 // exports an OTLP histogram named "http.server.duration" (milliseconds);
 // Prometheus normalizes that on ingest to
 //
-//	http_server_duration_milliseconds_count
+//	http_server_request_duration_seconds_count
 //
-// with the OTel service.name ("cloudbox-uploader", ...) arriving as the
-// `job` label. rate() of a histogram's _count series = requests per second.
+// (otelhttp v0.61 follows HTTP semconv v1.26: server duration is
+// `http.server.request.duration` in seconds, which Prometheus OTLP ingest
+// normalizes to the name above.) The OTel service.name ("cloudbox-uploader",
+// ...) arrives as the `job` label; rate() of the _count series = req/s.
+// If sparklines stay empty at rehearsal, confirm this name (issue #8).
 func RequestRateQuery(job string) string {
-	return fmt.Sprintf(`sum(rate(http_server_duration_milliseconds_count{job=%q}[5m]))`, job)
+	return fmt.Sprintf(`sum(rate(http_server_request_duration_seconds_count{job=%q}[5m]))`, job)
 }
 
 // QueryRange fetches the last 30 minutes of a PromQL expression at 60s
