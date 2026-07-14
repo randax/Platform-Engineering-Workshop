@@ -37,6 +37,9 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - SkipDryRunOnMissingResource=true
+      # Without this, automated sync reverts the ignored fields every cycle
+      # and fights Knative's webhook controller → permanent OutOfSync.
+      - RespectIgnoreDifferences=true
   # Knative's webhook injects the caBundle into its own webhook configs at
   # runtime, so git (empty) never matches live → the app flaps OutOfSync
   # forever and the health gate stalls app-of-apps. Ignore just that field.
@@ -45,8 +48,8 @@ spec:
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
       jqPathExpressions:
-        - '.webhooks[]?.clientConfig.caBundle'
+        - '.webhooks'
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
       jqPathExpressions:
-        - '.webhooks[]?.clientConfig.caBundle'
+        - '.webhooks'
