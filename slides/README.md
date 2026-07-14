@@ -48,5 +48,5 @@ slides/
 
 ## Deploy
 
-`netlify.toml` / `vercel.json` are set up to build `dist/` — point either service at
-this directory, or host the `npm run build` output anywhere static.
+Deployed automatically to GitHub Pages on every `slides/` change on `main`
+(`.github/workflows/slides.yaml`): https://randax.github.io/Platform-Engineering-Workshop/
