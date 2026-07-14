@@ -46,6 +46,10 @@ cluster:
   proxy:
     disabled: true
 machine:
+  # Every cloud region had to start somewhere.
+  nodeLabels:
+    cloudbox.io/region: eu-laptop-1
+    cloudbox.io/zone: under-desk-a
   kubelet:
     extraMounts:
       # local-path-provisioner writes PV data here; without this bind mount
