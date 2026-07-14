@@ -1,7 +1,8 @@
 # =============================================================================
 # Weekly full-bootstrap test — the complete attendee venue flow on a runner.
 #
-# ⚠️  RUNNER SIZING IS UNVERIFIED ⚠️
+# Runner sizing PROVEN: the full core path (create → bootstrap → seed →
+# modules 01-05 solve+verify) runs green on ubuntu-latest (4 vCPU/16 GB).
 # ubuntu-latest for public repos is 4 vCPU / 16 GB RAM. The cluster asks for
 # 4 GB (controlplane) + 6 GB (worker) container memory limits plus Cilium,
 # Gitea and ArgoCD on top — this *should* fit, but nobody has proven it.
@@ -26,7 +27,6 @@ jobs:
   full-bootstrap:
     name: create-cluster → bootstrap-gitops → seed-gitea
     runs-on: ubuntu-latest
-    continue-on-error: true   # see header — remove once proven on this runner size
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
