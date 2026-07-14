@@ -115,6 +115,7 @@ strip_registry() {
 git_as_gitea_admin() {
   local askpass rc=0
   askpass="$(mktemp)"
+  # shellcheck disable=SC2016  # $1 is for the generated script, not this shell
   printf '#!/bin/sh\ncase "$1" in\n  Username*) echo "%s" ;;\n  *) echo "%s" ;;\nesac\n' \
     "${GITEA_ADMIN_USER}" "${GITEA_ADMIN_PASSWORD}" > "${askpass}"
   chmod 700 "${askpass}"
