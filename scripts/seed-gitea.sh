@@ -57,6 +57,10 @@ fi
 
 # --- 3. Push -----------------------------------------------------------------------
 cd "${REPO_ROOT}"
+# Gitea rejects pushes from shallow clones ("shallow update not allowed").
+if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+  die "This clone is shallow — run 'git fetch --unshallow' first, then re-run."
+fi
 if ! git diff --quiet || ! git diff --cached --quiet; then
   warn "You have uncommitted changes — they will NOT be pushed (commit them first if intended)."
 fi
