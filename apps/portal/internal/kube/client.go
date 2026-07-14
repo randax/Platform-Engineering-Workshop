@@ -1,6 +1,6 @@
-package main
+package kube
 
-// This file is the portal's entire "Kubernetes client" — on purpose.
+// Package kube is the portal's entire Kubernetes access layer — on purpose.
 //
 // Portals and dashboards are often assumed to need client-go, informers and
 // code generation. For *reading* a handful of resources they don't: the
@@ -35,20 +35,20 @@ import (
 
 const saDir = "/var/run/secrets/kubernetes.io/serviceaccount"
 
-type kubeClient struct {
+type Client struct {
 	baseURL string // e.g. https://10.96.0.1:443
 	token   string // ServiceAccount bearer token ("" when going via kubectl proxy)
 	client  *http.Client
 }
 
-// newKubeClient wires up in-cluster API access. For local development run
-// `kubectl proxy` and set KUBE_API_URL=http://127.0.0.1:8001 — the proxy
+// NewClient wires up in-cluster API access. For local development run
+// `kubectl proxy` and pass its URL (config: KUBE_API_URL) — the proxy
 // injects your own credentials, so no token is needed.
-func newKubeClient() (*kubeClient, error) {
-	if url := os.Getenv("KUBE_API_URL"); url != "" {
-		return &kubeClient{
-			baseURL: strings.TrimSuffix(url, "/"),
-			token:   os.Getenv("KUBE_TOKEN"),
+func NewClient(apiURL, token string) (*Client, error) {
+	if apiURL != "" {
+		return &Client{
+			baseURL: strings.TrimSuffix(apiURL, "/"),
+			token:   token,
 			client: &http.Client{
 				Timeout:   10 * time.Second,
 				Transport: otelhttp.NewTransport(nil), // child span per API call
@@ -60,10 +60,6 @@ func newKubeClient() (*kubeClient, error) {
 	if host == "" {
 		return nil, fmt.Errorf("KUBERNETES_SERVICE_HOST not set: not running in a cluster")
 	}
-	token, err := os.ReadFile(saDir + "/token")
-	if err != nil {
-		return nil, fmt.Errorf("reading serviceaccount token: %w", err)
-	}
 	caPEM, err := os.ReadFile(saDir + "/ca.crt")
 	if err != nil {
 		return nil, fmt.Errorf("reading cluster CA: %w", err)
@@ -71,9 +67,13 @@ func newKubeClient() (*kubeClient, error) {
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(caPEM)
 
-	return &kubeClient{
+	saToken, err := os.ReadFile(saDir + "/token")
+	if err != nil {
+		return nil, fmt.Errorf("reading serviceaccount token: %w", err)
+	}
+	return &Client{
 		baseURL: "https://" + net.JoinHostPort(host, port),
-		token:   strings.TrimSpace(string(token)),
+		token:   strings.TrimSpace(string(saToken)),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 			// otelhttp wraps the real transport so every API call shows up
@@ -87,7 +87,7 @@ func newKubeClient() (*kubeClient, error) {
 // do performs one API request. path is a full API path such as
 // "/apis/argoproj.io/v1alpha1/applications"; out, when non-nil, receives the
 // decoded JSON response. The context carries the caller's trace span.
-func (k *kubeClient) do(ctx context.Context, method, path string, body io.Reader, out any) error {
+func (k *Client) do(ctx context.Context, method, path string, body io.Reader, out any) error {
 	req, err := http.NewRequestWithContext(ctx, method, k.baseURL+path, body)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func (k *kubeClient) do(ctx context.Context, method, path string, body io.Reader
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-func (k *kubeClient) get(ctx context.Context, path string, out any) error {
+func (k *Client) get(ctx context.Context, path string, out any) error {
 	return k.do(ctx, http.MethodGet, path, nil, out)
 }
 

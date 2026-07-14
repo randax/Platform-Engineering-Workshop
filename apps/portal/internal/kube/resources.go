@@ -1,4 +1,4 @@
-package main
+package kube
 
 // The resources the console reads and writes, with just enough of each
 // object's schema to render a page. Every accessor below is one GET against a
@@ -15,14 +15,14 @@ import (
 )
 
 // objMeta is the tiny slice of ObjectMeta we care about.
-type objMeta struct {
+type ObjMeta struct {
 	Name              string `json:"name"`
 	Namespace         string `json:"namespace"`
 	CreationTimestamp string `json:"creationTimestamp"`
 }
 
 // condition is the standard Kubernetes status condition shape.
-type condition struct {
+type Condition struct {
 	Type    string `json:"type"`
 	Status  string `json:"status"`
 	Reason  string `json:"reason"`
@@ -34,30 +34,30 @@ type condition struct {
 // its own progress word ("Creating", "Deploying", ...) in amber. A resource
 // that is 10 seconds old is not *failing*, it is *becoming*; a red badge
 // would tell the wrong story.
-type readiness struct {
+type Readiness struct {
 	Label string
 	Class string // CSS badge class: "ok" (green) or "meh" (amber)
 }
 
-func readinessOf(conds []condition) readiness {
+func ReadinessOf(conds []Condition) Readiness {
 	for _, c := range conds {
 		if c.Type != "Ready" {
 			continue
 		}
 		if c.Status == "True" {
-			return readiness{Label: "Ready", Class: "ok"}
+			return Readiness{Label: "Ready", Class: "ok"}
 		}
 		if c.Reason != "" {
-			return readiness{Label: c.Reason, Class: "meh"}
+			return Readiness{Label: c.Reason, Class: "meh"}
 		}
 	}
-	return readiness{Label: "Not ready", Class: "meh"}
+	return Readiness{Label: "Not ready", Class: "meh"}
 }
 
 // ---------------------------------------------------------------- ArgoCD
 
-type argoApp struct {
-	Metadata objMeta `json:"metadata"`
+type ArgoApp struct {
+	Metadata ObjMeta `json:"metadata"`
 	Status   struct {
 		Sync struct {
 			Status string `json:"status"`
@@ -68,9 +68,9 @@ type argoApp struct {
 	} `json:"status"`
 }
 
-func (k *kubeClient) listArgoApps(ctx context.Context) ([]argoApp, error) {
+func (k *Client) ListArgoApps(ctx context.Context) ([]ArgoApp, error) {
 	var list struct {
-		Items []argoApp `json:"items"`
+		Items []ArgoApp `json:"items"`
 	}
 	err := k.get(ctx, "/apis/argoproj.io/v1alpha1/applications", &list)
 	return list.Items, err
@@ -80,14 +80,14 @@ func (k *kubeClient) listArgoApps(ctx context.Context) ([]argoApp, error) {
 
 // clusterSummary is a taste of the core ("legacy") API group, which lives
 // under /api/v1 rather than /apis/<group>/<version>.
-type clusterSummary struct {
+type ClusterSummary struct {
 	Namespaces  int
 	Pods        int
 	PodsRunning int
 }
 
-func (k *kubeClient) summarize(ctx context.Context) (clusterSummary, error) {
-	var s clusterSummary
+func (k *Client) Summarize(ctx context.Context) (ClusterSummary, error) {
+	var s ClusterSummary
 	var nsList struct {
 		Items []struct{} `json:"items"`
 	}
@@ -116,8 +116,8 @@ func (k *kubeClient) summarize(ctx context.Context) (clusterSummary, error) {
 
 // ---------------------------------------------------------------- CNPG
 
-type cnpgCluster struct {
-	Metadata objMeta `json:"metadata"`
+type CNPGCluster struct {
+	Metadata ObjMeta `json:"metadata"`
 	Spec     struct {
 		Instances int `json:"instances"`
 	} `json:"spec"`
@@ -127,9 +127,9 @@ type cnpgCluster struct {
 	} `json:"status"`
 }
 
-func (k *kubeClient) listCNPGClusters(ctx context.Context) ([]cnpgCluster, error) {
+func (k *Client) ListCNPGClusters(ctx context.Context) ([]CNPGCluster, error) {
 	var list struct {
-		Items []cnpgCluster `json:"items"`
+		Items []CNPGCluster `json:"items"`
 	}
 	err := k.get(ctx, "/apis/postgresql.cnpg.io/v1/clusters", &list)
 	return list.Items, err
@@ -137,19 +137,19 @@ func (k *kubeClient) listCNPGClusters(ctx context.Context) ([]cnpgCluster, error
 
 // ---------------------------------------------------------------- Knative
 
-type knativeService struct {
-	Metadata objMeta `json:"metadata"`
+type KnativeService struct {
+	Metadata ObjMeta `json:"metadata"`
 	Status   struct {
 		URL        string      `json:"url"`
-		Conditions []condition `json:"conditions"`
+		Conditions []Condition `json:"conditions"`
 	} `json:"status"`
 }
 
-func (s knativeService) Readiness() readiness { return readinessOf(s.Status.Conditions) }
+func (s KnativeService) Readiness() Readiness { return ReadinessOf(s.Status.Conditions) }
 
-func (k *kubeClient) listKnativeServices(ctx context.Context) ([]knativeService, error) {
+func (k *Client) ListKnativeServices(ctx context.Context) ([]KnativeService, error) {
 	var list struct {
-		Items []knativeService `json:"items"`
+		Items []KnativeService `json:"items"`
 	}
 	err := k.get(ctx, "/apis/serving.knative.dev/v1/services", &list)
 	return list.Items, err
@@ -166,26 +166,26 @@ const (
 	xrKind = "WorkshopDatabase"
 	// The namespace the console provisions databases into. Crossplane v2 XRs
 	// are namespaced — no cluster-scoped claims anymore.
-	xrNamespace = "demo"
-	xrPath      = "/apis/platform.cloudbox.io/v1alpha1/namespaces/" + xrNamespace + "/workshopdatabases"
+	XRNamespace = "demo"
+	xrPath      = "/apis/platform.cloudbox.io/v1alpha1/namespaces/" + XRNamespace + "/workshopdatabases"
 )
 
-type workshopDB struct {
-	Metadata objMeta `json:"metadata"`
+type WorkshopDB struct {
+	Metadata ObjMeta `json:"metadata"`
 	Spec     struct {
 		Size      string `json:"size"`
 		StorageGB int    `json:"storageGB"`
 	} `json:"spec"`
 	Status struct {
-		Conditions []condition `json:"conditions"`
+		Conditions []Condition `json:"conditions"`
 	} `json:"status"`
 }
 
-func (d workshopDB) Readiness() readiness { return readinessOf(d.Status.Conditions) }
+func (d WorkshopDB) Readiness() Readiness { return ReadinessOf(d.Status.Conditions) }
 
-func (k *kubeClient) listWorkshopDatabases(ctx context.Context) ([]workshopDB, error) {
+func (k *Client) ListWorkshopDatabases(ctx context.Context) ([]WorkshopDB, error) {
 	var list struct {
-		Items []workshopDB `json:"items"`
+		Items []WorkshopDB `json:"items"`
 	}
 	err := k.get(ctx, xrPath, &list)
 	return list.Items, err
@@ -195,12 +195,15 @@ func (k *kubeClient) listWorkshopDatabases(ctx context.Context) ([]workshopDB, e
 // metadata.name, checked here so users get a friendly error instead of a 422.
 var dnsName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$`)
 
-// buildWorkshopDatabase constructs the XR document by hand. This is the whole
+// ValidName reports whether s is a name we are willing to put in a URL path.
+func ValidName(s string) bool { return dnsName.MatchString(s) }
+
+// BuildWorkshopDatabase constructs the XR document by hand. This is the whole
 // trick behind "self-service platform APIs": creating a database is one POST
 // of ~10 lines of JSON, which Crossplane then expands into a CNPG Postgres
 // cluster and an S3 bucket (see lab/04's Composition).
-func buildWorkshopDatabase(name, size string, storageGB int) ([]byte, error) {
-	if !dnsName.MatchString(name) {
+func BuildWorkshopDatabase(name, size string, storageGB int) ([]byte, error) {
+	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
 	if size != "small" && size != "medium" {
@@ -212,22 +215,22 @@ func buildWorkshopDatabase(name, size string, storageGB int) ([]byte, error) {
 	xr := map[string]any{
 		"apiVersion": xrAPI,
 		"kind":       xrKind,
-		"metadata":   map[string]any{"name": name, "namespace": xrNamespace},
+		"metadata":   map[string]any{"name": name, "namespace": XRNamespace},
 		"spec":       map[string]any{"size": size, "storageGB": storageGB},
 	}
 	return json.Marshal(xr)
 }
 
-func (k *kubeClient) createWorkshopDatabase(ctx context.Context, name, size string, storageGB int) error {
-	body, err := buildWorkshopDatabase(name, size, storageGB)
+func (k *Client) CreateWorkshopDatabase(ctx context.Context, name, size string, storageGB int) error {
+	body, err := BuildWorkshopDatabase(name, size, storageGB)
 	if err != nil {
 		return err
 	}
 	return k.do(ctx, http.MethodPost, xrPath, bytes.NewReader(body), nil)
 }
 
-func (k *kubeClient) deleteWorkshopDatabase(ctx context.Context, name string) error {
-	if !dnsName.MatchString(name) {
+func (k *Client) DeleteWorkshopDatabase(ctx context.Context, name string) error {
+	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
 	return k.do(ctx, http.MethodDelete, xrPath+"/"+name, nil, nil)

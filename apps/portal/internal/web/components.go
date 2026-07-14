@@ -1,18 +1,28 @@
-package main
+package web
 
-// The Components page: statuspage-style health for every platform capability.
-//
-// The idea is dead simple — each capability lives in its own namespace (one
-// namespace per component is a repo convention), so "is Gitea healthy?"
-// reduces to "are the workloads in namespace gitea ready?". We fetch three
-// cluster-wide lists (Deployments, StatefulSets, DaemonSets) and group them
-// by namespace. That is 3 GETs per page load — a real controller would open
-// a WATCH, but a portal polling every 10 seconds has no need to.
+// The Components page: statuspage-style platform health. Each capability
+// lives in its own namespace (a repo convention), so "is Gitea healthy?"
+// reduces to "are the workloads in namespace gitea ready?".
 
 import (
 	"context"
 	"net/http"
+
+	"cloudbox.io/portal/internal/kube"
 )
+
+func init() {
+	register(Page{
+		Weight:     20,
+		NavSection: "Platform",
+		NavTitle:   "Components",
+		Path:       "/components",
+		Handler:    handleComponents,
+		Extra: []Route{
+			{"GET /components/list", handleComponentsList}, // polled by htmx
+		},
+	})
+}
 
 // component is one row on the page. The list is fixed and ordered the way
 // the workshop builds the platform up; Catalog names the file to copy into
@@ -46,53 +56,6 @@ var componentCatalog = []component{
 	{"Demo workloads", "demo", "your WorkshopDatabases and experiments live here", ""},
 }
 
-// nsHealth counts the workloads in one namespace and how many of them are
-// fully ready. A workload scaled to zero (Knative between requests!) counts
-// as ready — wanting zero and having zero is success, not failure.
-type nsHealth struct {
-	Ready, Total int
-}
-
-// workload is the tiny slice of Deployment/StatefulSet/DaemonSet status we
-// need. The three kinds spell "desired" and "ready" differently; the unused
-// pair decodes as zero, so max() picks the right one either way.
-type workload struct {
-	Metadata objMeta `json:"metadata"`
-	Status   struct {
-		Replicas               int `json:"replicas"`               // deploy + sts
-		ReadyReplicas          int `json:"readyReplicas"`          // deploy + sts
-		DesiredNumberScheduled int `json:"desiredNumberScheduled"` // daemonset
-		NumberReady            int `json:"numberReady"`            // daemonset
-	} `json:"status"`
-}
-
-func (k *kubeClient) namespaceWorkloads(ctx context.Context) (map[string]nsHealth, error) {
-	health := map[string]nsHealth{}
-	for _, path := range []string{
-		"/apis/apps/v1/deployments",
-		"/apis/apps/v1/statefulsets",
-		"/apis/apps/v1/daemonsets",
-	} {
-		var list struct {
-			Items []workload `json:"items"`
-		}
-		if err := k.get(ctx, path, &list); err != nil {
-			return nil, err
-		}
-		for _, w := range list.Items {
-			desired := max(w.Status.Replicas, w.Status.DesiredNumberScheduled)
-			ready := max(w.Status.ReadyReplicas, w.Status.NumberReady)
-			h := health[w.Metadata.Namespace]
-			h.Total++
-			if ready >= desired {
-				h.Ready++
-			}
-			health[w.Metadata.Namespace] = h
-		}
-	}
-	return health, nil
-}
-
 // componentRow is a component joined with the live state of its namespace.
 type componentRow struct {
 	component
@@ -102,7 +65,7 @@ type componentRow struct {
 	Hint         string // shown muted after the description
 }
 
-func componentRows(health map[string]nsHealth) []componentRow {
+func componentRows(health map[string]kube.NSHealth) []componentRow {
 	rows := make([]componentRow, 0, len(componentCatalog))
 	for _, c := range componentCatalog {
 		h := health[c.Namespace]
@@ -125,8 +88,6 @@ func componentRows(health map[string]nsHealth) []componentRow {
 	return rows
 }
 
-// ---------------------------------------------------------------- handlers
-
 type componentsData struct {
 	Running     []componentRow // installed, whatever their health
 	Marketplace []componentRow // not installed — each one catalog file away
@@ -148,23 +109,38 @@ func splitRows(rows []componentRow) componentsData {
 	return d
 }
 
-func (s *server) handleComponents(w http.ResponseWriter, r *http.Request) {
-	health, err := s.kube.namespaceWorkloads(r.Context())
+// workloadLister is the one slice of the kube client this page consumes —
+// a consumer-side interface, so its logic can be tested with a fake map
+// source instead of an HTTP server.
+type workloadLister interface {
+	NamespaceWorkloads(ctx context.Context) (map[string]kube.NSHealth, error)
+}
+
+func fetchComponents(ctx context.Context, l workloadLister) (componentsData, error) {
+	health, err := l.NamespaceWorkloads(ctx)
+	if err != nil {
+		return componentsData{}, err
+	}
+	return splitRows(componentRows(health)), nil
+}
+
+func handleComponents(s *Server, w http.ResponseWriter, r *http.Request) {
+	data, err := fetchComponents(r.Context(), s.Kube)
 	if err != nil {
 		s.renderError(w, err)
 		return
 	}
-	s.render(w, "components", splitRows(componentRows(health)))
+	s.render(w, "components", data)
 }
 
 // handleComponentsList is the fragment htmx polls every 10s — same
 // self-healing pattern as the databases list: errors become a flash, the
 // polling attributes stay in the DOM.
-func (s *server) handleComponentsList(w http.ResponseWriter, r *http.Request) {
-	health, err := s.kube.namespaceWorkloads(r.Context())
+func handleComponentsList(s *Server, w http.ResponseWriter, r *http.Request) {
+	data, err := fetchComponents(r.Context(), s.Kube)
 	if err != nil {
 		s.render(w, "components-list", componentsData{Flash: errorFlash("API error: " + err.Error())})
 		return
 	}
-	s.render(w, "components-list", splitRows(componentRows(health)))
+	s.render(w, "components-list", data)
 }

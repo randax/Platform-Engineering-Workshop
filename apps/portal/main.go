@@ -7,113 +7,86 @@
 // server-side HTML sprinkled with htmx. No client-go, no React build, no CDN
 // — everything it serves is compiled into the binary (offline rule!).
 //
-// Pages:
-//
-//	/           Overview  — ArgoCD Applications, health + sync status
-//	/databases  Databases — CNPG Clusters + WorkshopDatabase XRs (create/delete)
-//	/gallery    Gallery   — the capstone image pipeline's bucket
-//	/services   Services  — Knative Services with URLs
+// This file is wiring only. The pages live in internal/web — one file per
+// page, each registering itself in the page registry (see
+// internal/web/registry.go, the console's extension point). Config is
+// gathered in config.go; the API clients live in internal/kube,
+// internal/store and internal/metrics.
 package main
 
 import (
-	"embed"
-	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel/metric"
+
+	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
+	"cloudbox.io/portal/internal/store"
+	"cloudbox.io/portal/internal/web"
 )
 
-//go:embed templates/*.html
-var templateFS embed.FS
-
-// static/ holds htmx.min.js (vendored, v2.0.4) and the stylesheet. Embedding
-// them means the portal has zero runtime dependencies on the internet.
-//
-//go:embed static
-var staticFS embed.FS
-
-type server struct {
-	kube        *kubeClient
-	s3          *s3Client
-	prom        *promClient
-	tmpl        *template.Template
-	uploaderURL string              // cluster-internal URL of the uploader Knative Service
-	httpClient  *http.Client        // traced client for forwarding uploads
-	pages       metric.Int64Counter // OTLP: cloudbox.pages.rendered → prom cloudbox_pages_rendered_total
-}
-
-// parseTemplates registers the one template function the layout needs
-// (the Grafana link in the sidebar footer) and parses everything embedded.
-func parseTemplates() (*template.Template, error) {
-	return template.New("portal").
-		Funcs(template.FuncMap{"grafanaURL": grafanaBase}).
-		ParseFS(templateFS, "templates/*.html")
-}
-
 func main() {
-	shutdown := initTelemetry("cloudbox-portal")
+	cfg := loadConfig()
+
+	shutdown := initTelemetry(cfg.OTLPEndpoint, cfg.ServiceName)
 	defer shutdown()
 
-	tmpl, err := parseTemplates()
+	tmpl, err := web.ParseTemplates(cfg.GrafanaURL)
 	if err != nil {
 		log.Fatalf("parsing templates: %v", err)
 	}
-
-	kube, err := newKubeClient()
+	kubeClient, err := kube.NewClient(cfg.KubeAPIURL, cfg.KubeToken)
 	if err != nil {
 		log.Fatalf("kubernetes client: %v (set KUBE_API_URL when running outside a cluster, e.g. via `kubectl proxy`)", err)
 	}
-
-	s3, err := newS3Client()
+	s3, err := store.New(store.Config{
+		Endpoint:       cfg.S3Endpoint,
+		PublicEndpoint: cfg.S3PublicEndpoint,
+		AccessKey:      cfg.S3AccessKey,
+		SecretKey:      cfg.S3SecretKey,
+		Bucket:         cfg.S3Bucket,
+	})
 	if err != nil {
 		log.Fatalf("s3 client: %v", err)
 	}
 
-	srv := &server{
-		kube:        kube,
-		s3:          s3,
-		prom:        newPromClient(),
-		tmpl:        tmpl,
-		pages:       counter("cloudbox.pages.rendered", "pages and fragments rendered by the console"),
-		uploaderURL: envOr("UPLOADER_URL", "http://uploader.pipeline.svc.cluster.local"),
+	srv := &web.Server{
+		Kube:        kubeClient,
+		Store:       s3,
+		Prom:        metrics.New(cfg.PromURL),
+		Tmpl:        tmpl,
+		UploaderURL: cfg.UploaderURL,
+		GrafanaURL:  cfg.GrafanaURL,
 		// otelhttp's transport adds a client span AND a `traceparent` header
 		// to the forwarded upload, so the uploader's spans join our trace.
 		// 60s timeout: generous, because the first upload wakes the uploader
 		// ksvc from zero — but no request may hang forever.
-		httpClient: &http.Client{Timeout: 60 * time.Second, Transport: otelhttp.NewTransport(nil)},
+		HTTPClient: &http.Client{Timeout: 60 * time.Second, Transport: otelhttp.NewTransport(nil)},
+		Pages:      counter("cloudbox.pages.rendered", "pages and fragments rendered by the console"),
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /static/", http.FileServerFS(staticFS))
+	mux.Handle("GET /static/", web.Static())
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
 
-	mux.HandleFunc("GET /{$}", srv.handleOverview)
-	mux.HandleFunc("GET /components", srv.handleComponents)
-	mux.HandleFunc("GET /components/list", srv.handleComponentsList) // polled by htmx
-	mux.HandleFunc("GET /workshop", srv.handleWorkshop)
-	mux.HandleFunc("GET /workshop/list", srv.handleWorkshopList) // polled by htmx
-	mux.HandleFunc("GET /activity", srv.handleActivity)
-	mux.HandleFunc("GET /activity/list", srv.handleActivityList) // polled by htmx
-	mux.HandleFunc("GET /billing", srv.handleBilling)
-	mux.HandleFunc("GET /databases", srv.handleDatabases)
-	mux.HandleFunc("GET /databases/list", srv.handleDatabasesList) // polled by htmx
-	mux.HandleFunc("GET /databases/{name}", srv.handleDatabaseDetail)
-	// Mutating routes. No CSRF token on these: single-user disposable lab —
-	// don't copy this into a real portal.
-	mux.HandleFunc("POST /databases", srv.handleCreateDatabase)
-	mux.HandleFunc("DELETE /databases/{name}", srv.handleDeleteDatabase)
-	mux.HandleFunc("POST /gallery/upload", srv.handleUpload)
-	mux.HandleFunc("GET /gallery", srv.handleGallery)
-	mux.HandleFunc("GET /gallery/grid", srv.handleGalleryGrid)
-	mux.HandleFunc("GET /services", srv.handleServices)
+	// Every page mounts itself via the registry — adding a page never
+	// touches this file (see internal/web/registry.go).
+	for _, p := range web.Pages() {
+		pattern := "GET " + p.Path
+		if p.Path == "/" {
+			pattern = "GET /{$}" // exact match, or "/" would swallow every 404
+		}
+		mux.HandleFunc(pattern, bind(srv, p.Handler))
+		for _, extra := range p.Extra {
+			mux.HandleFunc(extra.Pattern, bind(srv, extra.Handler))
+		}
+	}
 
 	// One server span per page request; health probes and static assets
 	// would only be noise in Grafana.
@@ -126,15 +99,13 @@ func main() {
 		}),
 	)
 
-	addr := ":" + envOr("PORT", "8080")
+	addr := ":" + cfg.Port
 	log.Printf("cloudbox console listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
 
-// envOr returns the value of the environment variable key, or def when unset.
-func envOr(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
+// bind turns a page handler into a plain http.HandlerFunc with the server's
+// dependencies applied.
+func bind(s *web.Server, h web.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) { h(s, w, r) }
 }

@@ -1,9 +1,14 @@
-package main
+package web
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"cloudbox.io/portal/internal/kube"
+)
 
 func TestComponentRows(t *testing.T) {
-	rows := componentRows(map[string]nsHealth{
+	rows := componentRows(map[string]kube.NSHealth{
 		"kube-system": {Ready: 3, Total: 3}, // everything ready
 		"pipeline":    {Ready: 1, Total: 2}, // partially ready
 		"rustfs":      {Ready: 0, Total: 1}, // present but dead
@@ -40,13 +45,23 @@ func TestComponentRows(t *testing.T) {
 	}
 }
 
-// A Knative deployment scaled to zero (desired 0, ready 0) counts as ready:
-// wanting zero and having zero is success.
-func TestScaleToZeroCountsAsReady(t *testing.T) {
-	w := workload{} // all-zero status = scaled to zero
-	desired := max(w.Status.Replicas, w.Status.DesiredNumberScheduled)
-	ready := max(w.Status.ReadyReplicas, w.Status.NumberReady)
-	if ready < desired {
-		t.Fatal("zero-desired workload must count as ready")
+// fakeLister satisfies workloadLister with a canned map — the payoff of the
+// consumer-side interface: component logic tests need no HTTP server.
+type fakeLister map[string]kube.NSHealth
+
+func (f fakeLister) NamespaceWorkloads(context.Context) (map[string]kube.NSHealth, error) {
+	return f, nil
+}
+
+func TestFetchComponentsViaFake(t *testing.T) {
+	data, err := fetchComponents(t.Context(), fakeLister{"gitea": {Ready: 1, Total: 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Running) != 1 || data.Running[0].Namespace != "gitea" {
+		t.Errorf("running = %+v", data.Running)
+	}
+	if len(data.Marketplace) != len(componentCatalog)-1 {
+		t.Errorf("marketplace = %d, want %d", len(data.Marketplace), len(componentCatalog)-1)
 	}
 }

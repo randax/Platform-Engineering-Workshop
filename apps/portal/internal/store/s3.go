@@ -1,6 +1,7 @@
-package main
+package store
 
-// Gallery backing store: the capstone pipeline's `images` bucket on RustFS.
+// Package store is the gallery's backing store: the capstone pipeline's
+// `images` bucket on RustFS.
 //
 // One subtlety worth understanding: presigned URLs embed the *host* they were
 // signed for. The portal talks to RustFS on its cluster-internal Service
@@ -23,30 +24,33 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-type s3Client struct {
+type Client struct {
 	api     *minio.Client // cluster-internal endpoint, used for ListObjects/GetObject
 	presign *minio.Client // browser-reachable endpoint, used only to sign URLs
 	bucket  string
 }
 
-func newS3Client() (*s3Client, error) {
-	endpoint := envOr("S3_ENDPOINT", "rustfs-svc.rustfs.svc.cluster.local:9000")
-	public := envOr("S3_PUBLIC_ENDPOINT", "localhost:30900") // RustFS NodePort
-	creds := credentials.NewStaticV4(
-		envOr("S3_ACCESS_KEY", "cloudbox"),
-		envOr("S3_SECRET_KEY", "cloudbox123"),
-		"",
-	)
+// Config carries the S3 settings in from main — this package never reads
+// the environment itself.
+type Config struct {
+	Endpoint       string // cluster-internal S3 API
+	PublicEndpoint string // what the browser can reach (presigned URLs)
+	AccessKey      string
+	SecretKey      string
+	Bucket         string
+}
 
-	api, err := minio.New(trimScheme(endpoint), &minio.Options{Creds: creds, Secure: false})
+func New(cfg Config) (*Client, error) {
+	creds := credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, "")
+	api, err := minio.New(trimScheme(cfg.Endpoint), &minio.Options{Creds: creds, Secure: false})
 	if err != nil {
 		return nil, err
 	}
-	pre, err := minio.New(trimScheme(public), &minio.Options{Creds: creds, Secure: false})
+	pre, err := minio.New(trimScheme(cfg.PublicEndpoint), &minio.Options{Creds: creds, Secure: false})
 	if err != nil {
 		return nil, err
 	}
-	return &s3Client{api: api, presign: pre, bucket: envOr("S3_BUCKET", "images")}, nil
+	return &Client{api: api, presign: pre, bucket: cfg.Bucket}, nil
 }
 
 func trimScheme(ep string) string {
@@ -54,19 +58,19 @@ func trimScheme(ep string) string {
 	return strings.TrimPrefix(ep, "https://")
 }
 
-// galleryItem pairs an original with the artifacts the resizer derives from
+// Item pairs an original with the artifacts the resizer derives from
 // it. ThumbURL and Meta stay empty until the pipeline has processed the image
 // — refreshing the gallery while that happens is half the fun.
-type galleryItem struct {
+type Item struct {
 	Key      string     // originals/<timestamp>-<name>
 	Name     string     // <timestamp>-<name>, the shared base key
 	URL      string     // presigned GET for the original
 	ThumbURL string     // presigned GET for thumbs/<base>.jpg, if it exists
-	Meta     *imageMeta // parsed meta/<base>.json, if it exists
+	Meta     *ImageMeta // parsed meta/<base>.json, if it exists
 }
 
-// imageMeta mirrors the JSON the resizer writes to meta/.
-type imageMeta struct {
+// ImageMeta mirrors the JSON the resizer writes to meta/.
+type ImageMeta struct {
 	Width         int    `json:"width"`
 	Height        int    `json:"height"`
 	Format        string `json:"format"`
@@ -75,7 +79,7 @@ type imageMeta struct {
 }
 
 // HumanBytes renders the original's size the way a file manager would.
-func (m imageMeta) HumanBytes() string {
+func (m ImageMeta) HumanBytes() string {
 	switch {
 	case m.Bytes >= 1<<20:
 		return fmt.Sprintf("%.1f MB", float64(m.Bytes)/(1<<20))
@@ -88,10 +92,10 @@ func (m imageMeta) HumanBytes() string {
 
 const presignTTL = 15 * time.Minute
 
-// listGallery lists originals/ and joins them with thumbs/ and meta/ by base
+// ListGallery lists originals/ and joins them with thumbs/ and meta/ by base
 // key. Three prefix listings + one tiny GET per meta file. The manual span
 // makes the S3 round-trips visible as one block inside the page's trace.
-func (s *s3Client) listGallery(ctx context.Context) ([]galleryItem, error) {
+func (s *Client) ListGallery(ctx context.Context) ([]Item, error) {
 	ctx, span := otel.Tracer("portal").Start(ctx, "s3 list gallery")
 	defer span.End()
 	exists := func(prefix string) (map[string]bool, error) {
@@ -113,13 +117,13 @@ func (s *s3Client) listGallery(ctx context.Context) ([]galleryItem, error) {
 		return nil, err
 	}
 
-	var items []galleryItem
+	var items []Item
 	for obj := range s.api.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: "originals/", Recursive: true}) {
 		if obj.Err != nil {
 			return nil, obj.Err
 		}
 		base := strings.TrimPrefix(obj.Key, "originals/")
-		item := galleryItem{Key: obj.Key, Name: base}
+		item := Item{Key: obj.Key, Name: base}
 
 		if u, err := s.presign.PresignedGetObject(ctx, s.bucket, obj.Key, presignTTL, nil); err == nil {
 			item.URL = u.String()
@@ -147,9 +151,9 @@ func (s *s3Client) listGallery(ctx context.Context) ([]galleryItem, error) {
 	return items, nil
 }
 
-// countPrefix counts objects under a prefix — the workshop checklist uses it
+// CountPrefix counts objects under a prefix — the workshop checklist uses it
 // to answer "has the resizer produced a thumbnail yet?".
-func (s *s3Client) countPrefix(ctx context.Context, prefix string) (int, error) {
+func (s *Client) CountPrefix(ctx context.Context, prefix string) (int, error) {
 	n := 0
 	for obj := range s.api.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
 		if obj.Err != nil {
@@ -160,13 +164,13 @@ func (s *s3Client) countPrefix(ctx context.Context, prefix string) (int, error) 
 	return n, nil
 }
 
-func (s *s3Client) readMeta(ctx context.Context, key string) *imageMeta {
+func (s *Client) readMeta(ctx context.Context, key string) *ImageMeta {
 	obj, err := s.api.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		return nil
 	}
 	defer obj.Close()
-	var m imageMeta
+	var m ImageMeta
 	if err := json.NewDecoder(obj).Decode(&m); err != nil {
 		return nil
 	}
