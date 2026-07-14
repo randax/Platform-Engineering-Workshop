@@ -1,0 +1,35 @@
+{{define "activity"}}
+{{template "head" "activity"}}
+<h1>Activity</h1>
+<p class="lede">CloudTrail-lite: the cluster already keeps an activity log — Kubernetes
+Events — so this page is one <code>GET /api/v1/events</code>, filtered to the platform's
+namespaces. Warnings are tinted; everything else is the platform quietly working.</p>
+
+{{template "activity-list" .}}
+{{template "foot" .}}
+{{end}}
+
+{{/* Self-refreshing fragment, 10s — same self-healing pattern as the rest. */}}
+{{define "activity-list"}}
+<div id="activity" hx-get="/activity/list" hx-trigger="every 10s" hx-swap="outerHTML">
+  {{template "flash" .Flash}}
+  <p class="hint">auto-refreshes every 10 s · newest first · 50 max</p>
+  <table>
+    <thead><tr><th>Age</th><th>Namespace</th><th>Type</th><th>Reason</th><th>Object</th><th>Message</th></tr></thead>
+    <tbody>
+    {{range .Events}}
+      <tr {{if eq .Type "Warning"}}class="evwarn"{{end}}>
+        <td>{{.Age}}</td>
+        <td>{{.Metadata.Namespace}}</td>
+        <td>{{.Type}}</td>
+        <td>{{.Reason}}</td>
+        <td><code>{{.InvolvedObject.Kind}}/{{.InvolvedObject.Name}}</code></td>
+        <td class="wrap">{{.Message}}{{if gt .Count 1}} <small>×{{.Count}}</small>{{end}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="6" class="empty">No recent events — a quiet cluster is a happy cluster.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

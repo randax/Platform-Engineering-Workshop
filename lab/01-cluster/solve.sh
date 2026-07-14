@@ -5,7 +5,14 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-"$REPO_ROOT/scripts/create-cluster.sh"
+# Idempotent: solve.sh's contract is "produce the module's end state", and it
+# may already exist (re-runs, CI, catch-up) — create-cluster.sh itself refuses
+# to run against an existing cluster. Found by rehearsal-in-CI run 5.
+if [[ -n "$(docker ps -q --filter "label=talos.cluster.name=cloudbox" 2>/dev/null)" ]]; then
+  echo "cloudbox cluster already running — skipping creation."
+else
+  "$REPO_ROOT/scripts/create-cluster.sh"
+fi
 
 # Wait for both nodes to be Ready (Cilium needs a moment after bootstrap).
 kubectl wait --for=condition=Ready nodes --all --timeout=300s

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/metric"
 )
 
 //go:embed templates/*.html
@@ -39,16 +40,26 @@ var staticFS embed.FS
 type server struct {
 	kube        *kubeClient
 	s3          *s3Client
+	prom        *promClient
 	tmpl        *template.Template
-	uploaderURL string       // cluster-internal URL of the uploader Knative Service
-	httpClient  *http.Client // traced client for forwarding uploads
+	uploaderURL string              // cluster-internal URL of the uploader Knative Service
+	httpClient  *http.Client        // traced client for forwarding uploads
+	pages       metric.Int64Counter // OTLP: cloudbox.pages.rendered → prom cloudbox_pages_rendered_total
+}
+
+// parseTemplates registers the one template function the layout needs
+// (the Grafana link in the sidebar footer) and parses everything embedded.
+func parseTemplates() (*template.Template, error) {
+	return template.New("portal").
+		Funcs(template.FuncMap{"grafanaURL": grafanaBase}).
+		ParseFS(templateFS, "templates/*.html")
 }
 
 func main() {
-	shutdown := initTracing("cloudbox-portal")
+	shutdown := initTelemetry("cloudbox-portal")
 	defer shutdown()
 
-	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
+	tmpl, err := parseTemplates()
 	if err != nil {
 		log.Fatalf("parsing templates: %v", err)
 	}
@@ -66,7 +77,9 @@ func main() {
 	srv := &server{
 		kube:        kube,
 		s3:          s3,
+		prom:        newPromClient(),
 		tmpl:        tmpl,
+		pages:       counter("cloudbox.pages.rendered", "pages and fragments rendered by the console"),
 		uploaderURL: envOr("UPLOADER_URL", "http://uploader.pipeline.svc.cluster.local"),
 		// otelhttp's transport adds a client span AND a `traceparent` header
 		// to the forwarded upload, so the uploader's spans join our trace.
@@ -87,8 +100,12 @@ func main() {
 	mux.HandleFunc("GET /components/list", srv.handleComponentsList) // polled by htmx
 	mux.HandleFunc("GET /workshop", srv.handleWorkshop)
 	mux.HandleFunc("GET /workshop/list", srv.handleWorkshopList) // polled by htmx
+	mux.HandleFunc("GET /activity", srv.handleActivity)
+	mux.HandleFunc("GET /activity/list", srv.handleActivityList) // polled by htmx
+	mux.HandleFunc("GET /billing", srv.handleBilling)
 	mux.HandleFunc("GET /databases", srv.handleDatabases)
 	mux.HandleFunc("GET /databases/list", srv.handleDatabasesList) // polled by htmx
+	mux.HandleFunc("GET /databases/{name}", srv.handleDatabaseDetail)
 	// Mutating routes. No CSRF token on these: single-user disposable lab —
 	// don't copy this into a real portal.
 	mux.HandleFunc("POST /databases", srv.handleCreateDatabase)

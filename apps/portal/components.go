@@ -128,8 +128,24 @@ func componentRows(health map[string]nsHealth) []componentRow {
 // ---------------------------------------------------------------- handlers
 
 type componentsData struct {
-	Rows  []componentRow
-	Flash flash
+	Running     []componentRow // installed, whatever their health
+	Marketplace []componentRow // not installed — each one catalog file away
+	Flash       flash
+}
+
+// splitRows separates what runs from what is still on the shelf — the
+// "marketplace" framing every cloud console uses, except this marketplace
+// is a directory of YAML files and everything in it costs kr 0,00.
+func splitRows(rows []componentRow) componentsData {
+	var d componentsData
+	for _, row := range rows {
+		if row.Total > 0 {
+			d.Running = append(d.Running, row)
+		} else {
+			d.Marketplace = append(d.Marketplace, row)
+		}
+	}
+	return d
 }
 
 func (s *server) handleComponents(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +154,7 @@ func (s *server) handleComponents(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, err)
 		return
 	}
-	s.render(w, "components", componentsData{Rows: componentRows(health)})
+	s.render(w, "components", splitRows(componentRows(health)))
 }
 
 // handleComponentsList is the fragment htmx polls every 10s — same
@@ -150,5 +166,5 @@ func (s *server) handleComponentsList(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "components-list", componentsData{Flash: errorFlash("API error: " + err.Error())})
 		return
 	}
-	s.render(w, "components-list", componentsData{Rows: componentRows(health)})
+	s.render(w, "components-list", splitRows(componentRows(health)))
 }

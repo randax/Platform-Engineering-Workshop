@@ -29,6 +29,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 )
 
 type uploader struct {
@@ -36,10 +37,11 @@ type uploader struct {
 	bucket    string
 	brokerURL string
 	http      *http.Client
+	uploads   metric.Int64Counter // OTLP: cloudbox.uploads.accepted → prom cloudbox_uploads_accepted_total
 }
 
 func main() {
-	shutdown := initTracing("cloudbox-uploader")
+	shutdown := initTelemetry("cloudbox-uploader")
 	defer shutdown()
 
 	endpoint := strings.TrimPrefix(envOr("S3_ENDPOINT", "rustfs-svc.rustfs.svc.cluster.local:9000"), "http://")
@@ -62,7 +64,8 @@ func main() {
 		// otelhttp's transport adds a `traceparent` header to the CloudEvent
 		// POST. Knative's broker forwards it along with the ce-* headers, so
 		// the resizer's spans land in the SAME trace as this upload.
-		http: &http.Client{Timeout: 10 * time.Second, Transport: otelhttp.NewTransport(nil)},
+		http:    &http.Client{Timeout: 10 * time.Second, Transport: otelhttp.NewTransport(nil)},
+		uploads: counter("cloudbox.uploads.accepted", "images accepted and stored by the uploader"),
 	}
 	// In the background so a slow or still-converging RustFS can never block
 	// the listener — Knative needs the port open to consider the pod ready.
@@ -150,6 +153,7 @@ func (u *uploader) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("stored %s (%d bytes, %s)", key, info.Size, contentType)
+	u.uploads.Add(r.Context(), 1)
 
 	eventErr := u.emitEvent(r.Context(), key)
 	if eventErr != nil {

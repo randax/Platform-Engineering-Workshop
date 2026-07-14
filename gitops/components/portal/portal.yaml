@@ -38,7 +38,7 @@ rules:
     resources: [services]
     verbs: [get, list, watch]
   - apiGroups: [""]
-    resources: [pods, namespaces, nodes]
+    resources: [pods, namespaces, nodes, events]
     verbs: [get, list, watch]
   # Workload readiness for the /components status page and /workshop checklist.
   - apiGroups: [apps]
@@ -101,6 +101,10 @@ spec:
             # as seen from the attendee's machine). Matches NODEPORT_RUSTFS_S3.
             - name: S3_PUBLIC_ENDPOINT
               value: localhost:30900
+            # Browser-facing Grafana (NodePort on the lgtm Service) — used
+            # for the portal's observability deep-links.
+            - name: GRAFANA_URL
+              value: http://localhost:30030
           ports:
             - containerPort: 8080
               name: http

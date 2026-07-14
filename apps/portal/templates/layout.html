@@ -26,6 +26,8 @@
       <a href="/" {{if eq . "overview"}}aria-current="page"{{end}}>Overview</a>
       <a href="/components" {{if eq . "components"}}aria-current="page"{{end}}>Components</a>
       <a href="/workshop" {{if eq . "workshop"}}aria-current="page"{{end}}>Workshop</a>
+      <a href="/activity" {{if eq . "activity"}}aria-current="page"{{end}}>Activity</a>
+      <a href="/billing" {{if eq . "billing"}}aria-current="page"{{end}}>Billing</a>
     </div>
     <div class="nav-group">
       <span class="nav-label">Self-service</span>
@@ -37,6 +39,8 @@
       <a href="/gallery" {{if eq . "gallery"}}aria-current="page"{{end}}>Gallery</a>
     </div>
   </nav>
+  {{/* plain link, browser-facing NodePort — never an iframe */}}
+  <a class="rail-foot" href="{{grafanaURL}}" target="_blank">Grafana →</a>
 </aside>
 <div class="content">
 <main>

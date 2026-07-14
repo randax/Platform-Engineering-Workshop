@@ -5,7 +5,7 @@
 with zero pods is normal — that is scale-to-zero doing its job.</p>
 
 <table>
-  <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th></tr></thead>
+  <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th><th>Requests (30 min)</th><th></th></tr></thead>
   <tbody>
   {{range .}}
     <tr>
@@ -13,9 +13,12 @@ with zero pods is normal — that is scale-to-zero doing its job.</p>
       <td>{{.Metadata.Namespace}}</td>
       <td><code>{{.Status.URL}}</code></td>
       <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
+      {{/* server-rendered SVG straight from a Prometheus range query */}}
+      <td>{{if .Spark}}{{.Spark}}{{else}}<span class="nodata">— no metrics yet</span>{{end}}</td>
+      <td><a href="{{.Grafana}}" target="_blank">traces →</a></td>
     </tr>
   {{else}}
-    <tr><td colspan="4" class="empty">No Knative Services yet — enable knative-serving from the catalog (module 06).</td></tr>
+    <tr><td colspan="6" class="empty">No Knative Services yet — enable knative-serving from the catalog (module 06).</td></tr>
   {{end}}
   </tbody>
 </table>

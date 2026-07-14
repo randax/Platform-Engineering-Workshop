@@ -11,11 +11,15 @@ metadata:
 spec:
   selector:
     app: lgtm
+  # NodePort so the browser can reach Grafana directly (portal deep-links,
+  # module 09's trace hunt). Anonymous auth is on — workshop-grade.
+  type: NodePort
   ports:
     - name: grafana
       protocol: TCP
       port: 3000
       targetPort: 3000
+      nodePort: 30030
     - name: otlp-grpc
       protocol: TCP
       port: 4317

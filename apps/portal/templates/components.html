@@ -15,21 +15,39 @@ DaemonSets) grouped by namespace — <code>kubectl get deploy -A</code> with a c
 <div id="components" hx-get="/components/list" hx-trigger="every 10s" hx-swap="outerHTML">
   {{template "flash" .Flash}}
   <p class="hint">auto-refreshes every 10 s</p>
+
+  <h2>Running</h2>
   <ul class="statuslist">
-  {{range .Rows}}
+  {{range .Running}}
     <li>
       <span class="dot {{.Class}}" title="{{.Status}}"></span>
       <div class="statusbody">
         <span class="statustitle">{{.Title}}
-          {{if .Total}}<small>{{.Ready}}/{{.Total}} workloads ready · ns {{.Namespace}}</small>{{end}}
+          <small>{{.Ready}}/{{.Total}} workloads ready · ns {{.Namespace}}</small>
         </span>
-        <span class="statusdesc">{{.Description}}{{if .Hint}} — <code>{{.Hint}}</code>{{end}}</span>
+        <span class="statusdesc">{{.Description}}</span>
       </div>
       <span class="badge {{.Class}}">{{.Status}}</span>
     </li>
   {{else}}
-    <li class="empty">Nothing to show — could not list workloads.</li>
+    <li class="empty">Nothing running yet — could not list workloads.</li>
   {{end}}
   </ul>
+
+  {{if .Marketplace}}
+  <h2>Marketplace <small>— one file away</small></h2>
+  <ul class="statuslist">
+  {{range .Marketplace}}
+    <li>
+      <span class="dot {{.Class}}" title="{{.Status}}"></span>
+      <div class="statusbody">
+        <span class="statustitle">{{.Title}}</span>
+        <span class="statusdesc">{{.Description}}{{if .Hint}} — <code>{{.Hint}}</code>{{end}}</span>
+      </div>
+      <span class="badge {{.Class}}">{{.Status}}</span>
+    </li>
+  {{end}}
+  </ul>
+  {{end}}
 </div>
 {{end}}

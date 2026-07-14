@@ -32,6 +32,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 	"golang.org/x/image/draw"
 )
 
@@ -52,12 +53,13 @@ func permanent(err error) error  { return permanentError{err} }
 func isPermanent(err error) bool { var p permanentError; return errors.As(err, &p) }
 
 type resizer struct {
-	s3     *minio.Client
-	bucket string
+	s3        *minio.Client
+	bucket    string
+	processed metric.Int64Counter // OTLP: cloudbox.images.processed → prom cloudbox_images_processed_total
 }
 
 func main() {
-	shutdown := initTracing("cloudbox-resizer")
+	shutdown := initTelemetry("cloudbox-resizer")
 	defer shutdown()
 
 	endpoint := strings.TrimPrefix(envOr("S3_ENDPOINT", "rustfs-svc.rustfs.svc.cluster.local:9000"), "http://")
@@ -72,7 +74,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("s3 client: %v", err)
 	}
-	rz := &resizer{s3: s3, bucket: envOr("S3_BUCKET", "images")}
+	rz := &resizer{
+		s3:        s3,
+		bucket:    envOr("S3_BUCKET", "images"),
+		processed: counter("cloudbox.images.processed", "images successfully thumbnailed and analyzed"),
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /{$}", rz.handleEvent)
@@ -139,6 +145,7 @@ func (rz *resizer) handleEvent(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	rz.processed.Add(r.Context(), 1)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("processed " + data.Key))
 }

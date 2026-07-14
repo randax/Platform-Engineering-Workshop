@@ -33,20 +33,18 @@ API from module 04 — a <code>WorkshopDatabase</code> composite resource. The f
 
   <h2>WorkshopDatabases <small>(namespace {{.Namespace}} · auto-refreshes every 5 s)</small></h2>
   <table>
-    <thead><tr><th>Name</th><th>Size</th><th>Storage</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Size</th><th>Storage</th><th>Status</th></tr></thead>
     <tbody>
     {{range .Databases}}
       <tr>
-        <td>{{.Metadata.Name}}</td>
+        {{/* rows link to the detail page — that is also where Delete lives now */}}
+        <td><a href="/databases/{{.Metadata.Name}}">{{.Metadata.Name}}</a></td>
         <td>{{.Spec.Size}}</td>
         <td>{{.Spec.StorageGB}} GiB</td>
         <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
-        <td><button class="danger" hx-delete="/databases/{{.Metadata.Name}}"
-                    hx-target="#db-list" hx-swap="outerHTML"
-                    hx-confirm="Delete database {{.Metadata.Name}}? This removes the Postgres cluster and its data.">Delete</button></td>
       </tr>
     {{else}}
-      <tr><td colspan="5" class="empty">No databases yet — create one below. (Requires module 04's XRD.)</td></tr>
+      <tr><td colspan="4" class="empty">No databases yet — create one below. (Requires module 04's XRD.)</td></tr>
     {{end}}
     </tbody>
   </table>

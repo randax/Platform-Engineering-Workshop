@@ -20,7 +20,7 @@ import (
 // same distributed trace once the broker forwards the event.
 func TestEmitEventCarriesTraceparent(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:1") // no collector needed
-	shutdown := initTracing("test-uploader")
+	shutdown := initTelemetry("test-uploader")
 	defer shutdown()
 
 	var traceparent, ceType, ceSource string
@@ -36,6 +36,7 @@ func TestEmitEventCarriesTraceparent(t *testing.T) {
 		bucket:    "images",
 		brokerURL: broker.URL,
 		http:      &http.Client{Timeout: 5 * time.Second, Transport: otelhttp.NewTransport(nil)},
+		uploads:   counter("cloudbox.uploads.accepted", "test"),
 	}
 
 	// Simulate being inside a request span, like handleUpload is.

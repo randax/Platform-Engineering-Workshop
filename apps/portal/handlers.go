@@ -10,10 +10,14 @@ package main
 import (
 	"context"
 	"errors"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 // flash is a one-shot notice rendered at the top of a fragment. Error flips
@@ -26,6 +30,9 @@ type flash struct {
 func errorFlash(msg string) flash { return flash{Msg: msg, Error: true} }
 
 func (s *server) render(w http.ResponseWriter, name string, data any) {
+	if s.pages != nil {
+		s.pages.Add(context.Background(), 1, metric.WithAttributes(attribute.String("page", name)))
+	}
 	if err := s.tmpl.ExecuteTemplate(w, name, data); err != nil {
 		log.Printf("render %s: %v", name, err)
 	}
@@ -115,18 +122,17 @@ func (s *server) handleCreateDatabase(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "db-list", data)
 }
 
+// handleDeleteDatabase is wired to the detail page (real-console
+// convention: destructive actions live next to full context, not on list
+// rows). On success an HX-Redirect header sends the browser back to the
+// list; on failure the error lands in the detail page's #delete-result slot.
 func (s *server) handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	fl := flash{Msg: "Deleted " + name + " (composed resources are garbage-collected with it)."}
 	if err := s.kube.deleteWorkshopDatabase(r.Context(), name); err != nil {
-		fl = errorFlash("Delete failed: " + err.Error())
+		s.render(w, "flash", errorFlash("Delete failed: "+err.Error()))
+		return
 	}
-	// Fragment even on failure — see handleCreateDatabase.
-	data, err := s.databasesData(r.Context(), fl)
-	if err != nil {
-		data = databasesData{Namespace: xrNamespace, Flash: errorFlash("API error: " + err.Error())}
-	}
-	s.render(w, "db-list", data)
+	w.Header().Set("HX-Redirect", "/databases")
 }
 
 // ----------------------------------------------------------------- gallery
@@ -202,11 +208,32 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 // ---------------------------------------------------------------- services
 
+// serviceRow decorates a Knative Service with its request-rate sparkline
+// and a Grafana trace-search link. Instrumented services report to
+// Prometheus under job = OTEL_SERVICE_NAME = "cloudbox-<name>"; anything
+// uninstrumented simply has no series and renders the empty-state dash.
+type serviceRow struct {
+	knativeService
+	Spark   template.HTML
+	Grafana string
+}
+
 func (s *server) handleServices(w http.ResponseWriter, r *http.Request) {
 	svcs, err := s.kube.listKnativeServices(r.Context())
 	if err != nil {
 		s.renderError(w, err)
 		return
 	}
-	s.render(w, "services", svcs)
+	rows := make([]serviceRow, 0, len(svcs))
+	for _, k := range svcs {
+		job := "cloudbox-" + k.Metadata.Name
+		row := serviceRow{knativeService: k, Grafana: grafanaTraces(job)}
+		// Sparkline is best-effort: a prom error means the same thing as no
+		// data — the dash renders, the page never fails over decoration.
+		if vals, err := s.prom.queryRange(r.Context(), requestRateQuery(job)); err == nil {
+			row.Spark = sparkline(vals)
+		}
+		rows = append(rows, row)
+	}
+	s.render(w, "services", rows)
 }

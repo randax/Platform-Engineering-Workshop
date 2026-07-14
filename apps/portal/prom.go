@@ -1,0 +1,117 @@
+package main
+
+// Sparklines without a charting stack. The teaching beat of this file: a
+// metrics chart is one HTTP GET (Prometheus's /api/v1/query_range) and some
+// SVG — that is what every real console does behind much more machinery.
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type promClient struct {
+	base string
+	http *http.Client
+}
+
+func newPromClient() *promClient {
+	return &promClient{
+		base: strings.TrimSuffix(envOr("PROM_URL", "http://lgtm.observability.svc.cluster.local:9090"), "/"),
+		// Short timeout: a sparkline is decoration, never worth a slow page.
+		http: &http.Client{Timeout: 3 * time.Second},
+	}
+}
+
+// requestRateQuery builds the PromQL for a service's request rate. otelhttp
+// exports an OTLP histogram named "http.server.duration" (milliseconds);
+// Prometheus normalizes that on ingest to
+//
+//	http_server_duration_milliseconds_count
+//
+// with the OTel service.name ("cloudbox-uploader", ...) arriving as the
+// `job` label. rate() of a histogram's _count series = requests per second.
+func requestRateQuery(job string) string {
+	return fmt.Sprintf(`sum(rate(http_server_duration_milliseconds_count{job=%q}[5m]))`, job)
+}
+
+// queryRange fetches the last 30 minutes of a PromQL expression at 60s
+// resolution and returns just the values. No matching series is a normal
+// state (component disabled, no traffic yet) and returns nil, nil — the
+// caller renders a "no metrics yet" dash, never an error.
+func (p *promClient) queryRange(ctx context.Context, query string) ([]float64, error) {
+	end := time.Now()
+	params := url.Values{
+		"query": {query},
+		"start": {strconv.FormatInt(end.Add(-30*time.Minute).Unix(), 10)},
+		"end":   {strconv.FormatInt(end.Unix(), 10)},
+		"step":  {"60"},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		p.base+"/api/v1/query_range?"+params.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := p.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var body struct {
+		Status string `json:"status"`
+		Data   struct {
+			Result []struct {
+				Values [][2]any `json:"values"` // pairs of [unix-time, "value"]
+			} `json:"result"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, err
+	}
+	if body.Status != "success" || len(body.Data.Result) == 0 {
+		return nil, nil // no series: not an error, just nothing to draw
+	}
+	var vals []float64
+	for _, pair := range body.Data.Result[0].Values {
+		s, _ := pair[1].(string)
+		v, _ := strconv.ParseFloat(s, 64)
+		vals = append(vals, v)
+	}
+	return vals, nil
+}
+
+// sparkline turns a series into one inline SVG <polyline> — hand-rolled,
+// ~25 lines, zero dependencies. Returns "" for missing data so templates
+// can show their empty-state dash instead.
+func sparkline(vals []float64) template.HTML {
+	if len(vals) < 2 {
+		return ""
+	}
+	const w, h, pad = 120.0, 28.0, 2.0
+	maxV := 0.0
+	for _, v := range vals {
+		if v > maxV {
+			maxV = v
+		}
+	}
+	if maxV == 0 {
+		maxV = 1 // an idle service still gets its flat line
+	}
+	var pts strings.Builder
+	for i, v := range vals {
+		x := pad + float64(i)*(w-2*pad)/float64(len(vals)-1)
+		y := h - pad - (v/maxV)*(h-2*pad)
+		fmt.Fprintf(&pts, "%.1f,%.1f ", x, y)
+	}
+	svg := fmt.Sprintf(
+		`<svg class="spark" viewBox="0 0 %.0f %.0f" width="%.0f" height="%.0f" role="img" aria-label="request rate, last 30 minutes"><polyline points="%s" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`,
+		w, h, w, h, strings.TrimSpace(pts.String()))
+	return template.HTML(svg) // safe: built entirely from numbers we computed
+}
