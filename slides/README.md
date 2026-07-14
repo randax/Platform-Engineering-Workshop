@@ -1,122 +1,52 @@
-# JavaZone 2025 Workshop Slides
+# Workshop slides — JavaZone 2026
 
-This directory contains the Slidev presentation for the "Cloud on Your Terms: Building Your Own Cloud-Native Platform" workshop.
+The [Slidev](https://sli.dev) deck for **Cloud on Your Terms: Building Your Own
+Cloud-Native Platform** (JavaZone 2026). The deck frames the hands-on labs in
+[`../lab/`](../lab/) — it never competes with them: short framing per module, a GO slide
+with the verify command, and the spoken narrative in presenter notes.
 
-## 🎯 Quick Start
-
-```bash
-# Start presentation in development mode
-mise run slides:dev
-
-# Or directly with npm
-cd slides && npm run dev
-```
-
-Then open http://localhost:3030 to view the slides.
-
-## 📊 Presenter Mode
-
-For workshop delivery, use presenter mode to see notes and upcoming slides:
+## Run it
 
 ```bash
-# Start presenter mode
-mise run slides:presenter
+cd slides && npm install
 
-# Or directly
-cd slides && npm run dev -- --presenter
+npm run dev                  # develop at http://localhost:3030
+npm run dev -- --presenter   # presenter mode (notes + next slide)
+npm run build                # static site in dist/
+npm run export               # PDF (needs: npx playwright install chromium)
 ```
 
-## 📄 Export Options
+Or via mise from the repo root: `mise run slides:dev`, `slides:presenter`,
+`slides:build`, `slides:export`.
 
-```bash
-# Export to PDF
-mise run slides:export
-
-# Build for deployment
-mise run slides:build
-```
-
-## 🎨 Customization
-
-The slides are built with:
-- **Slidev** - Modern slide framework for developers
-- **Vue.js** - Interactive components and animations
-- **Mermaid** - Diagrams and flowcharts
-- **Shiki** - Code highlighting with magic transitions
-
-### Key Features Used
-
-- **Magic Move** - Smooth code transitions between examples
-- **Click Animations** - Progressive disclosure of content
-- **Mermaid Diagrams** - Architecture and flow diagrams
-- **Code Highlighting** - Kubernetes YAML, bash scripts, SQL
-- **Interactive Elements** - Vue components for engagement
-
-## 📂 Structure
+## Structure
 
 ```
 slides/
-├── slides.md              # Main presentation content
-├── components/             # Custom Vue components
-├── pages/                  # Additional slide pages
-├── public/                 # Static assets (images, etc.)
-└── package.json           # Dependencies and scripts
+├── slides.md            # headmatter + cover, imports pages/ in order
+├── pages/
+│   ├── why.md           # the sovereignty hook + architecture diagram
+│   ├── how.md           # module map, lab contract, help, AI policy
+│   ├── module-00.md …   # per-module: section divider → concept → GO slide
+│   │   module-09.md     # (03: MinIO/RustFS interlude · 08: build-vs-buy + Backstage demo)
+│   └── closing.md       # what you built, take it home, thanks
+└── styles/index.css     # gradient backgrounds, accent color, badges
 ```
 
-## 🎤 Workshop Flow
+## Conventions (keep them when editing)
 
-The presentation is structured to align with the hands-on labs:
+- **Presenter notes carry the words.** Every content slide ends with an HTML comment —
+  that's what the speakers rehearse from. Slides stay sparse: ≤5 bullets, short lines.
+- **Offline-safe.** No external images, fonts, or CDN assets (`fonts.provider: none`;
+  backgrounds are CSS gradients in `styles/index.css`). The deck must render without
+  internet, like everything else in this workshop.
+- **Diagrams are Mermaid** code blocks — no image files.
+- **Layouts** come from the seriph theme: `cover`, `section` (module dividers), `fact`
+  (big statements/breaks), `two-cols`, and default.
+- **Ecosystem accuracy matters** (see `../docs/PRINCIPLES.md`, rule 15) — e.g. the
+  MinIO/RustFS wording in module 03 is deliberate; don't "simplify" it.
 
-1. **Introduction** - Workshop overview and objectives
-2. **Foundation** - Talos Kubernetes setup (Lab 1)
-3. **Database Platform** - CloudNativePG demo (Lab 2)
-4. **Event Streaming** - Kafka implementation (Lab 3)
-5. **Platform Complete** - Final architecture overview
+## Deploy
 
-## 💡 Tips for Presenters
-
-- Use **Space** or **Arrow Keys** to navigate
-- **Click animations** reveal content progressively
-- **Presenter mode** shows notes and next slide
-- **Drawing mode** available for annotations
-- **Export to PDF** for offline backup
-
-## 🔧 Troubleshooting
-
-### Development Server Issues
-
-```bash
-# Clear cache and restart
-rm -rf node_modules/.cache
-npm run dev
-```
-
-### Export Problems
-
-```bash
-# Install Playwright for PDF export
-npx playwright install chromium
-npm run export
-```
-
-### Port Conflicts
-
-```bash
-# Use different port
-npm run dev -- --port 3031
-```
-
-## 🌐 Deployment
-
-For hosting the slides online:
-
-```bash
-# Build static site
-npm run build
-
-# Deploy dist/ folder to:
-# - Netlify, Vercel, GitHub Pages
-# - Or any static hosting service
-```
-
-The slides integrate perfectly with the workshop repository structure and can be updated alongside lab content using Git workflows.
+`netlify.toml` / `vercel.json` are set up to build `dist/` — point either service at
+this directory, or host the `npm run build` output anywhere static.
