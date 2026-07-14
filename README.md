@@ -59,9 +59,9 @@ Conference WiFi carries keystrokes, not gigabytes. The setup downloads 15–20 G
 container images. **Run all three steps at home, on a network you trust:**
 
 ```bash
-git clone https://github.com/randax/jz-2025-platform-engineering.git
+git clone https://github.com/randax/Platform-Engineering-Workshop.git
 # (will be renamed to jz-2026-platform-engineering — the old URL will redirect)
-cd jz-2025-platform-engineering
+cd Platform-Engineering-Workshop
 
 ./scripts/dev-setup.sh        # 1. install the pinned CLI tools (via mise)
 ./scripts/cloudbox-init.sh    # 2. pre-pull all pinned images (15–20 GB — be patient)
