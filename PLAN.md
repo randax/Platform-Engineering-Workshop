@@ -100,14 +100,14 @@ docs/             RESEARCH.md · PRINCIPLES.md
 ## 4. Work phases (re-dated; ~7 weeks left)
 
 ### Phase 0 — Stop the bleeding (week of July 13) ⚠️ already late
-- [ ] Fix the three published scripts (minimal honest versions) + pin mise.toml (no `latest`)
-- [ ] README → 2026: real lab list, honest specs (16/32 GB), supported-platform matrix,
+- [x] Fix the three published scripts (minimal honest versions) + pin mise.toml (no `latest`)
+- [x] README → 2026: real lab list, honest specs (16/32 GB), supported-platform matrix,
       corrected MinIO/RustFS wording
-- [ ] Commit PLAN.md + docs/; remove dead scripts (Strimzi, MinIO, Tekton, duplicate CNPG)
-- [ ] Email JavaZone organizers: workshop day/venue/seat cap/tables/power/wired network/SSH
-- [ ] Rename repo to `jz-2026-platform-engineering` (decision 4; old URL redirects)
+- [x] Commit PLAN.md + docs/; remove dead scripts (Strimzi, MinIO, Tekton, duplicate CNPG)
+- [ ] Email JavaZone organizers: workshop day/venue/seat cap/tables/power/wired network/SSH (issue #11)
+- [ ] Rename repo to `jz-2026-platform-engineering` — GATED behind the publish sequence, issue #7
 
-### Phase 1 — Spike the unknowns (rest of July)
+### Phase 1 — Spike the unknowns (July → rehearsal; the full matrix is issue #8)
 - [ ] One-evening RustFS spike (standalone chart, presigned URLs) — else flip to SeaweedFS now
 - [ ] BuildKit-rootless on Talos (PSA-privileged namespace) — the unrehearsed combo
 - [ ] Knative + Kourier on Talos+Cilium smoke test
@@ -116,22 +116,22 @@ docs/             RESEARCH.md · PRINCIPLES.md
 - [ ] Gitea seed + force-push catch-up mechanism prototype
 
 ### Phase 2 — Platform tree + prereqs final (early August)
-- [ ] `gitops/` app-of-apps with sync waves, Application health check in argocd-cm,
+- [x] `gitops/` app-of-apps with sync waves, Application health check in argocd-cm,
       ServerSideApply/SkipDryRun where needed
-- [ ] `cloudbox-init.sh` final image list (GHCR-hosted, pinned tags, nothing from Docker Hub)
-- [ ] CI: shellcheck + weekly full-bootstrap run (verify runner fits; else self-hosted/nightly local)
-- [ ] Announce updated prereqs to JavaZone (their page must match reality)
+- [x] `cloudbox-init.sh` final image list (pinned; preflight-verified via crane before download)
+- [x] CI: shellcheck + yaml + kubeconform + consistency + Go tests on PR; weekly bootstrap
+      workflow exists but is gated `continue-on-error` until first green run (issue #10)
+- [ ] Announce updated prereqs to JavaZone (their page must match reality; after issue #7)
 
 ### Phase 3 — Labs (August)
-- [ ] Modules 1–5 to the outcome/verify/hints/solve pattern; refactor existing Lab 01/02
-      content into it (Lab 01 must actually install Cilium; Lab 02's storageClass must exist)
-- [ ] Fault library for module 5 (incl. one "AI's obvious answer is wrong" fault)
-- [ ] Stretch modules S1–S3 (depth per decision 2)
-- [ ] Catch-up scripts per module; git tags per module
+- [x] Modules 00–09 in the outcome/verify/hints/solve pattern (05 = fault library incl. the
+      AI-trap; 08 = bespoke Cloudbox Console; 09 = picture-pipeline capstone)
+- [x] Catch-up flow per module (replace-not-overlay, convergence wait, chained post-steps)
+- [ ] Git tags per module (nice-to-have; solutions/ + catch-up.sh already cover recovery)
 
 ### Phase 4 — Slides + helpers (mid-August)
-- [ ] Slidev rewrite: sovereignty narrative, architecture diagram, one framing section per
-      module, accurate MinIO/RustFS story, "keep tinkering" wrap-up
+- [x] Slidev rewrite: 55 slides, per-module framing, presenter notes, offline-safe,
+      visually reviewed via PNG export (publish to Pages: issue #13)
 - [ ] Recruit 4–8 helpers (CNCF/GDG networks); helper cheat-sheet of known failure modes
 
 ### Phase 5 — Rehearse + harden (last 2 weeks of August)
