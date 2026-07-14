@@ -100,13 +100,20 @@ jobs:
       - name: "Full-stack resource snapshot (issue #8 — RAM measurement)"
         if: always()
         run: |
-          echo "== host =="; free -h; echo
-          echo "== docker containers (Talos nodes) =="
-          docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}' || true
-          echo "== node allocatable vs pod requests =="
-          kubectl describe nodes | grep -A6 "Allocated resources" || true
-          echo "== pods by namespace =="
-          kubectl get pods -A --no-headers | awk '{print $1}' | sort | uniq -c | sort -rn || true
+          echo "== TRUE working set per node (kubelet summary API — excludes reclaimable cache) =="
+          for n in $(kubectl get nodes -o name | sed 's|node/||'); do
+            kubectl get --raw "/api/v1/nodes/$n/proxy/stats/summary" 2>/dev/null \
+              | jq -r --arg n "$n" '"  \($n): workingSet \(.node.memory.workingSetBytes/1048576|floor) MiB   usage-incl-cache \(.node.memory.usageBytes/1048576|floor) MiB"' \
+              || echo "  summary unavailable for $n"
+          done
+          echo "== top 15 pods by working set =="
+          for n in $(kubectl get nodes -o name | sed 's|node/||'); do
+            kubectl get --raw "/api/v1/nodes/$n/proxy/stats/summary" 2>/dev/null \
+              | jq -r '.pods[] | "\(.memory.workingSetBytes // 0) \(.podRef.namespace)/\(.podRef.name)"'
+          done | sort -rn | head -15 | awk '{printf "  %6.0f MiB  %s\n", $1/1048576, $2}'
+          echo "== docker stats (MemUsage INCLUDES reclaimable page cache — NOT the real floor) =="
+          docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' || true
+          echo "== host =="; free -h
 
       - name: Collect diagnostics
         if: always()
