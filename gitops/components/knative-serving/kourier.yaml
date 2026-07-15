@@ -661,7 +661,7 @@ spec:
     # Workshop curation: NodePort instead of LoadBalancer (no LB implementation
     # in the Talos-in-Docker cluster). Knative Services answer on
     # http://localhost:31080 with a Host header, e.g.
-    #   curl -H 'Host: hello.default.svc.cluster.local' http://localhost:31080
+    #   curl -H 'Host: hello.demo.127.0.0.1.sslip.io' http://localhost:31080
     - name: http2
       port: 80
       protocol: TCP
