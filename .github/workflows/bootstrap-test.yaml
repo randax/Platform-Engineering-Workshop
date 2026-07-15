@@ -220,10 +220,13 @@ jobs:
           # series come ONLY from kubeletstats + k8s_cluster (platform infra,
           # not the 3 first-party apps) — their presence IS the gap closing.
           # Poll: first scrape (30s) + batch (10s) + export need a moment.
+          # k8s[._] tolerates either VM naming mode: default keeps OTLP dots
+          # (k8s.pod...), -opentelemetry.usePrometheusNaming maps them to
+          # underscores (k8s_pod...). Match both so the proof is naming-agnostic.
           metrics=0
           for _ in $(seq 1 24); do
             metrics=$(curl -fsS -G http://localhost:18428/api/v1/query \
-              --data-urlencode 'query=count({__name__=~"k8s_.+"})' \
+              --data-urlencode 'query=count({__name__=~"k8s[._].+"})' \
               | jq -r '.data.result[0].value[1] // "0"')
             [ "${metrics:-0}" -gt 0 ] 2>/dev/null && break
             sleep 5
