@@ -150,6 +150,30 @@ jobs:
             echo "Enabled from the catalog and reached Ready (readiness gates on JetStream). ✅"
           } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify golden-path Application XR (PRD-0003)
+        run: |
+          set -euo pipefail
+          # shellcheck source=../../lab/common.sh
+          source lab/common.sh
+          CLONE="$(gitops_clone)"
+          enable_catalog "$CLONE" application-xr.yaml
+          gitops_push "$CLONE" "verify: enable application-xr"
+          wait_app application-xr
+          # One manifest → a whole app: create it in ns demo (where Crossplane
+          # composes), then prove the XR reaches Ready — which means the composed
+          # Knative Service + WorkshopDatabase (composition-of-compositions) +
+          # bucket all came up and the secret wiring resolved.
+          kubectl -n demo apply -f lab/04-self-service/examples/my-application.yaml
+          kubectl -n demo wait --for=condition=Ready \
+            application.platform.cloudbox.io/my-app --timeout=600s
+          kubectl -n demo get ksvc my-app
+          echo "✅ golden-path Application XR composed a running app + DB + bucket"
+          {
+            echo ""
+            echo "### Golden-path Application XR (PRD-0003)"
+            echo "One \`Application\` manifest composed a Knative workload + CNPG database + bucket. ✅"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |
