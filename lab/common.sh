@@ -65,3 +65,21 @@ wait_app() { # <app-name> [timeout-seconds]
   echo "ERROR: timed out after ${timeout}s waiting for app '$name' (last: ${st:-missing})" >&2
   return 1
 }
+
+# wait_for_cr <ns> <resource> [crd] — the demo app can report Synced while
+# SKIPPING a custom resource whose CRD wasn't Established yet
+# (SkipDryRunOnMissingResource), leaving the CR "not found" when a solve script
+# immediately waits on it. This closes that race: optionally wait for the CRD
+# Established, nudge the demo app to re-apply, then poll for the CR to appear.
+# (Recurring finding across modules 03/04/06 in rehearsal-in-CI.)
+wait_for_cr() {
+  ns="$1"; resource="$2"; crd="${3:-}"
+  [ -n "$crd" ] && kubectl wait --for=condition=Established "crd/$crd" --timeout=180s
+  kubectl -n argocd annotate application demo argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+  for _ in $(seq 1 60); do
+    kubectl -n "$ns" get "$resource" >/dev/null 2>&1 && return 0
+    sleep 5
+  done
+  echo "ERROR: $resource never appeared in ns $ns" >&2
+  return 1
+}
