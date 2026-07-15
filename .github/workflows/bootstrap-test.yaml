@@ -195,6 +195,60 @@ jobs:
             echo "VictoriaMetrics + VictoriaLogs + Grafana enabled from the catalog and reached Ready. ✅"
           } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify observability v2 collection (OTel Collector → VM/VLogs, #57 Stage 2)
+        run: |
+          set -euo pipefail
+          # shellcheck source=../../lab/common.sh
+          source lab/common.sh
+          CLONE="$(gitops_clone)"
+          enable_catalog "$CLONE" otel-collector.yaml
+          gitops_push "$CLONE" "verify: enable otel-collector"
+          wait_app otel-collector
+          kubectl -n observability rollout status deploy/otel-collector-gateway --timeout=180s
+          kubectl -n observability rollout status ds/otel-collector-agent --timeout=180s
+
+          # Reach the ClusterIP backends from the runner via port-forward.
+          kubectl -n observability port-forward svc/victoria-metrics 18428:8428 >/dev/null 2>&1 &
+          vmpf=$!
+          kubectl -n observability port-forward svc/victoria-logs 19428:9428 >/dev/null 2>&1 &
+          vlpf=$!
+          trap 'kill $vmpf $vlpf 2>/dev/null || true' EXIT
+          for _ in $(seq 1 15); do curl -fsS http://localhost:18428/health >/dev/null 2>&1 && break; sleep 1; done
+          for _ in $(seq 1 15); do curl -fsS http://localhost:19428/health >/dev/null 2>&1 && break; sleep 1; done
+
+          # --- metrics proof: a non-app COMPONENT metric must reach VM. k8s_*
+          # series come ONLY from kubeletstats + k8s_cluster (platform infra,
+          # not the 3 first-party apps) — their presence IS the gap closing.
+          # Poll: first scrape (30s) + batch (10s) + export need a moment.
+          metrics=0
+          for _ in $(seq 1 24); do
+            metrics=$(curl -fsS -G http://localhost:18428/api/v1/query \
+              --data-urlencode 'query=count({__name__=~"k8s_.+"})' \
+              | jq -r '.data.result[0].value[1] // "0"')
+            [ "${metrics:-0}" -gt 0 ] 2>/dev/null && break
+            sleep 5
+          done
+          echo "VM k8s_* series = ${metrics}"
+          [ "${metrics:-0}" -gt 0 ] 2>/dev/null || { echo "❌ no component metrics in VM"; exit 1; }
+
+          # --- logs proof: a non-app pod's logs must reach VLogs. kube-system
+          # (cilium et al.) is never a first-party app, so its presence in the
+          # recent log stream proves filelog is collecting platform components.
+          found=""
+          for _ in $(seq 1 24); do
+            logs=$(curl -fsS -G http://localhost:19428/select/logsql/query \
+              --data-urlencode 'query=_time:10m' --data-urlencode 'limit=500' 2>/dev/null || true)
+            if printf '%s' "$logs" | grep -q 'kube-system'; then found=1; break; fi
+            sleep 5
+          done
+          [ -n "$found" ] || { echo "❌ no component logs in VLogs"; exit 1; }
+          echo "✅ OTel Collector: component metrics in VM + component logs in VLogs"
+          {
+            echo ""
+            echo "### Observability v2 — collection (#57, Stage 2)"
+            echo "OTel Collector (agent DaemonSet + gateway Deployment) enabled; **component** metrics landed in VictoriaMetrics (\`k8s_*\` = ${metrics} series) and **component** logs (kube-system) landed in VictoriaLogs. The collection gap is closed. ✅"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |
@@ -250,7 +304,8 @@ jobs:
           kubectl -n argocd get applications -o yaml > /tmp/diag/applications.yaml 2>&1 || true
           kubectl get clusters.postgresql.cnpg.io,workshopdatabases,ksvc,broker,trigger -A > /tmp/diag/custom-resources.txt 2>&1 || true
           for ns in argocd gitea cnpg-system rustfs crossplane-system demo \
-                    knative-serving knative-eventing zot argo builds portal pipeline nats; do
+                    knative-serving knative-eventing zot argo builds portal pipeline nats \
+                    observability; do
             kubectl -n "$ns" get pods -o wide > "/tmp/diag/pods-$ns.txt" 2>&1 || true
             kubectl -n "$ns" logs --tail=200 -l app --prefix > "/tmp/diag/logs-$ns.txt" 2>&1 || true
           done
