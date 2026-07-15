@@ -31,12 +31,13 @@ data:
           prometheusType: Prometheus
       # VictoriaLogs exposes a Loki-compatible query API, so we use the built-in
       # Loki datasource (offline rule: no internet-fetched plugin at boot).
-      # See VENDOR.md for why Loki type + this URL, and the caveat.
+      # The Loki datasource appends /loki/api/v1/... to the URL, and VLogs serves
+      # those under /select/ — hence the /select suffix. See VENDOR.md.
       - name: VictoriaLogs
         uid: victorialogs
         type: loki
         access: proxy
-        url: http://victoria-logs.observability.svc.cluster.local:9428
+        url: http://victoria-logs.observability.svc.cluster.local:9428/select
 ---
 apiVersion: v1
 kind: Service
