@@ -1,23 +1,46 @@
 # Dependency update policy (issue #16).
 #
-# Several apps/ Go dependencies are DELIBERATELY held back so the
-# golang:1.24-alpine in-cluster builds keep working — newer releases demand
-# a go1.25 toolchain (see apps/README.md "Dependency pins"):
-#   minio-go v7.0.95 · x/image v0.28.0 · OTel SDK v1.36.0 / otelhttp v0.61.0
-# Dependabot must not propose those; everything else updates weekly.
+# Grouping: minor + patch updates are batched into ONE PR per ecosystem per
+# week (less noise, easy to merge); MAJOR updates come as individual PRs so
+# they get a proper look before merging.
+#
+# Protected pins: several apps/ Go deps are held back deliberately — newer
+# releases demand a go1.25 toolchain and break the golang:1.24-alpine in-cluster
+# builds (see apps/README.md "Dependency pins"). Dependabot must not touch them.
 version: 2
 updates:
+  # --- Go: the three first-party apps ---
   - package-ecosystem: gomod
     directories: ["/apps/portal", "/apps/uploader", "/apps/resizer"]
-    schedule: {interval: weekly}
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      go-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
     ignore:
       - dependency-name: "github.com/minio/minio-go/v7"
       - dependency-name: "golang.org/x/image"
       - dependency-name: "go.opentelemetry.io/otel*"
       - dependency-name: "go.opentelemetry.io/contrib/*"
+
+  # --- npm: the Slidev deck ---
   - package-ecosystem: npm
     directory: "/slides"
-    schedule: {interval: monthly}
+    schedule:
+      interval: weekly
+    groups:
+      slides-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # --- GitHub Actions used by the workflows ---
   - package-ecosystem: github-actions
     directory: "/"
-    schedule: {interval: monthly}
+    schedule:
+      interval: weekly
+    groups:
+      ci-actions-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
