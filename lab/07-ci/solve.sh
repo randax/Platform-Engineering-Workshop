@@ -45,5 +45,10 @@ mkdir -p "$CLONE/gitops/components/demo"
 cp "$LAB_DIR/hello-site.yaml" "$CLONE/gitops/components/demo/hello-site.yaml"
 gitops_push "$CLONE" "module 07: deploy hello-site from zot"
 
-wait_app demo
+# The demo app already exists and is Synced/Healthy from module 06, so a bare
+# `wait_app demo` returns immediately on the PREVIOUS revision — before ArgoCD
+# reconciles this hello-site commit — and the Deployment isn't there yet. Poll
+# for it to actually appear (hard-refresh + wait), then gate on its rollout.
+# (Same stale-revision race the wait_for_cr helper was built for, modules 03/04/06.)
+wait_for_cr demo deploy/hello-site
 kubectl -n demo rollout status deploy/hello-site --timeout=300s
