@@ -33,9 +33,22 @@ spec:
       # Some manifests we add later (module 04) use CRDs that are installed by
       # other Applications — don't fail the sync while those are still coming up.
       - SkipDryRunOnMissingResource=true
+      # ...and honor ignoreDifferences below during sync, not just in the diff.
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
         duration: 10s
         factor: 2
         maxDuration: 2m
+  # Knative heavily defaults a Service's template + traffic after you apply it
+  # (container name, probes, concurrency, timeouts, 100%-latest traffic), so
+  # git never matches live and this app flaps OutOfSync forever. Ignore the
+  # fields Knative owns for Knative Services only (CNPG Clusters / Crossplane
+  # XRs in this same app are unaffected). Found by rehearsal-in-CI, module 06.
+  ignoreDifferences:
+    - group: serving.knative.dev
+      kind: Service
+      jqPathExpressions:
+        - '.spec.template'
+        - '.spec.traffic'
