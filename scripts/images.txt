@@ -48,10 +48,9 @@ quay.io/argoproj/argocd:v3.4.5
 ghcr.io/dexidp/dex:v2.45.0
 public.ecr.aws/docker/library/redis:8.2.3-alpine
 
-# --- Wave 0: storage + observability
+# --- Wave 0: storage
 docker.io/rancher/local-path-provisioner:v0.0.36
 docker.io/library/busybox:1.37.0
-docker.io/grafana/otel-lgtm:0.29.0
 
 # --- Wave 1: data services
 ghcr.io/cloudnative-pg/cloudnative-pg:1.28.4
@@ -94,10 +93,12 @@ docker.io/moby/buildkit:v0.31.1-rootless
 # NATS 2.12.12 + JetStream — durable messaging (PRD-0001)
 docker.io/library/nats:2.12.12-alpine@sha256:2ca98656a279b2d88cfdf2b8c3f0d5d7f3941ae9dc2ab12ebaa92d83e0f4ccdb
 
-# --- Observability v2 (Victoria stack, issue #57)
-# Coexists with otel-lgtm (Wave 0) during the migration; retires it later.
+# --- Observability v2 (Victoria stack, issue #57) — the on-demand observability
+# capability that REPLACED otel-lgtm: metrics + logs + traces + Grafana, fed by
+# the OTel Collector below.
 docker.io/victoriametrics/victoria-metrics:v1.147.0@sha256:40ea45a6d14b6ad9f2f1fff597309d456ff9885d77d8d1da5fd559b251db9987
 docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs@sha256:1ec31ddccc39dc9ead2607cddbf2829be1eb5ad39890e72bba26b359be20801d
+docker.io/victoriametrics/victoria-traces:v0.9.4@sha256:de1f0ce3916692236a711b58e48c65cc4138bfaa4e36324cfa25206e5485b187
 docker.io/grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd
 # OTel Collector (contrib) — the collection layer: agent DaemonSet + gateway
 # Deployment. Contrib build for the filelog/kubeletstats/k8s_cluster receivers.

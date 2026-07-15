@@ -38,7 +38,7 @@ type component struct {
 var componentCatalog = []component{
 	{"Cilium & cluster core", "kube-system", "CNI, DNS, and the control plane's helpers", ""},
 	{"Storage", "local-path-storage", "local-path-provisioner — every PVC lands on your disk", ""},
-	{"Observability", "observability", "grafana/otel-lgtm — traces, metrics, logs, one pod", ""},
+	{"Observability", "observability", "VictoriaMetrics + VictoriaLogs + VictoriaTraces + Grafana, fed by the OTel Collector", ""},
 	{"Gitea", "gitea", "the in-cluster git server ArgoCD deploys from", ""},
 	{"ArgoCD", "argocd", "GitOps engine — syncs this very platform", ""},
 	{"CloudNativePG", "cnpg-system", "Postgres operator behind the database self-service", "cnpg-operator.yaml"},

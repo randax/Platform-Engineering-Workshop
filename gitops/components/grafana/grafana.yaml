@@ -1,11 +1,13 @@
 ---
 # Grafana 12.4.5 — dashboards for the Victoria stack (observability rework,
-# issue #57). Pre-wired with two provisioned datasources:
+# issue #57). Pre-wired with three provisioned datasources, all built-in types
+# (no plugins — offline rule):
 #   - VictoriaMetrics (Prometheus type, default) → PromQL/metrics
-#   - VictoriaLogs    (Loki type)                → logs (see VENDOR.md caveat)
-# Anonymous read (Viewer) is on — workshop-grade, matching otel-lgtm's Grafana.
-# NodePort 30031 (service-nodeport.yaml) so the browser reaches it at
-# http://localhost:30031 while otel-lgtm still holds 30030.
+#   - VictoriaLogs    (Loki type)                → logs   (see VENDOR.md caveat)
+#   - VictoriaTraces  (Jaeger type)              → traces (see VENDOR.md caveat)
+# Anonymous read (Viewer) is on — workshop-grade. NodePort 30030
+# (service-nodeport.yaml), the canonical observability port freed when otel-lgtm
+# was retired; the portal's deep-links point here.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -38,6 +40,14 @@ data:
         type: loki
         access: proxy
         url: http://victoria-logs.observability.svc.cluster.local:9428/select
+      # VictoriaTraces exposes a Jaeger-compatible query API, so we use the
+      # built-in Jaeger datasource (offline rule: no plugin at boot) pointed at
+      # its /select/jaeger base. Replaces otel-lgtm's Tempo. See VENDOR.md.
+      - name: VictoriaTraces
+        uid: victoriatraces
+        type: jaeger
+        access: proxy
+        url: http://victoria-traces.observability.svc.cluster.local:10428/select/jaeger
 ---
 apiVersion: v1
 kind: Service

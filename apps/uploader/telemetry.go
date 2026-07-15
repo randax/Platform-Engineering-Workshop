@@ -32,7 +32,7 @@ import (
 // background exporters keep dropping data while everything else works — the
 // observability stack being off is a normal state in this workshop.
 func initTelemetry(serviceName string) (shutdown func()) {
-	endpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "http://lgtm.observability.svc.cluster.local:4318")
+	endpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector.observability.svc.cluster.local:4318")
 	if v := os.Getenv("OTEL_SERVICE_NAME"); v != "" {
 		serviceName = v
 	}

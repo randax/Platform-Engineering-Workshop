@@ -1,10 +1,14 @@
-# Single-pod observability stack (OTel Collector + Prometheus + Loki +
-# Tempo + Grafana). Wave 0 so every later module has "look at what you
-# built" moments. Grafana: kubectl -n observability port-forward svc/lgtm 3000
+# VictoriaTraces 0.9.4 — single-node trace database (observability rework, #57).
+# Traces backend for the Victoria stack: OTLP ingest at :10428
+# /insert/opentelemetry/v1/traces, Jaeger query API at /select/jaeger.
+# In-cluster: victoria-traces.observability.svc:10428. Replaces otel-lgtm's Tempo.
+# Sync-wave 0 (a storage backend, like victoria-metrics / victoria-logs).
+#
+# Enable with:  cp gitops/catalog/victoria-traces.yaml gitops/apps/ && git add . && git commit -m 'enable victoria-traces' && git push
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: otel-lgtm
+  name: victoria-traces
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
@@ -13,7 +17,7 @@ spec:
   source:
     repoURL: http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/platform.git
     targetRevision: main
-    path: gitops/components/otel-lgtm
+    path: gitops/components/victoria-traces
   destination:
     server: https://kubernetes.default.svc
     namespace: observability

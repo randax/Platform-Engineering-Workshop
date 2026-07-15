@@ -2,7 +2,7 @@
 # Metrics backend for the Victoria stack: OTLP ingest at :8428
 # /opentelemetry/v1/metrics, Prometheus remote-write /api/v1/write, PromQL
 # /api/v1/query. In-cluster: victoria-metrics.observability.svc:8428.
-# Wave 0 (alongside otel-lgtm, which it will replace); the two coexist for now.
+# Sync-wave 0 (a storage backend). Part of the on-demand observability capability.
 #
 # Enable with:  cp gitops/catalog/victoria-metrics.yaml gitops/apps/ && git add . && git commit -m 'enable victoria-metrics' && git push
 apiVersion: argoproj.io/v1alpha1

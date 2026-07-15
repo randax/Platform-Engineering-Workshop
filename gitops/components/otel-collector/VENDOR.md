@@ -44,8 +44,8 @@ Two collectors, split by what each signal needs:
     honouring `prometheus.io/port` + `prometheus.io/path`). NB: literal relabel
     replacement refs are written `$$1`/`$$2` because the collector expands `$…`
     as env vars — `$$` escapes to a literal `$`.
-  - `otlp` (4317/4318) — **staged** for the Stage 3 app + Knative cut-over; apps
-    still push to `lgtm:4318` today, so nothing hits it yet. Exposed via the
+  - `otlp` (4317/4318) — the apps (portal/uploader/resizer) push their OTLP
+    traces + metrics here; it replaced otel-lgtm's OTLP endpoint. Exposed via the
     `otel-collector` Service.
   - Exports: metrics → VM, logs → VLogs.
 
@@ -68,8 +68,8 @@ equivalent).
   `readOnlyRootFilesystem`, seccomp `RuntimeDefault`. The agent must be root to
   read host pod logs but is otherwise identically locked down (read-only mount,
   caps dropped, seccomp).
-- **Coexists with otel-lgtm** during the migration; Stage 3 repoints apps +
-  Knative at the `otel-collector` Service and retires lgtm.
+- **Replaced otel-lgtm**: the apps + the Victoria stack now route all telemetry
+  through this collector; the single otel-lgtm pod is gone (#57).
 
 ## Re-vendor
 

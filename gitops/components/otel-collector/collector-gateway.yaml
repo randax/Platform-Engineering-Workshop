@@ -7,9 +7,10 @@
 #   - prometheus  → scrape component /metrics via annotation-based pod discovery
 #                   (any pod with prometheus.io/scrape: "true") → VictoriaMetrics.
 #                   This is what finally collects CNPG / Knative / etc. metrics.
-#   - otlp        → 4317/4318 receiver, STAGED for the app + Knative cut-over in
-#                   Stage 3. Apps still push to lgtm today, so nothing hits this
-#                   yet; wiring it now means Stage 3 is just an endpoint swap.
+#   - otlp        → 4317/4318 receiver — the apps (portal/uploader/resizer) push
+#                   their OTLP traces + metrics here (it replaced otel-lgtm's
+#                   OTLP endpoint); fanned out to VM (metrics) + VictoriaTraces
+#                   (traces) + VLogs (logs).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -84,6 +85,10 @@ data:
         logs_endpoint: http://victoria-logs.observability.svc.cluster.local:9428/insert/opentelemetry/v1/logs
         headers:
           VL-Stream-Fields: service.name,k8s.namespace.name
+      # App traces → VictoriaTraces (replaces otel-lgtm's Tempo). VT's OTLP/HTTP
+      # trace ingest is /insert/opentelemetry/v1/traces on :10428.
+      otlphttp/traces:
+        traces_endpoint: http://victoria-traces.observability.svc.cluster.local:10428/insert/opentelemetry/v1/traces
 
     service:
       extensions: [ health_check ]
@@ -96,6 +101,10 @@ data:
           receivers: [ otlp ]
           processors: [ memory_limiter, batch ]
           exporters: [ otlphttp/logs ]
+        traces:
+          receivers: [ otlp ]
+          processors: [ memory_limiter, batch ]
+          exporters: [ otlphttp/traces ]
 ---
 apiVersion: v1
 kind: Service

@@ -20,7 +20,6 @@ fi
 
 wait_app platform
 wait_app local-path-provisioner
-wait_app otel-lgtm
 
 # 2. The GitOps change: demo Application + welcome ConfigMap, via git push.
 CLONE="$(gitops_clone)"
