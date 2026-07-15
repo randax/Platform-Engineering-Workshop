@@ -1,0 +1,46 @@
+{{define "streams"}}
+{{template "head" "streams"}}
+<h1>Streams</h1>
+<p class="lede">JetStream streams on your NATS server — durable messaging you can inspect. The
+capstone's in-memory broker forgets everything on restart; a <em>stream</em> persists messages
+to disk, and each <em>consumer</em> tracks its own position through them. This is a read-only
+view straight off the NATS monitoring endpoint — one <code>GET /jsz</code>, no client library.</p>
+
+{{template "streams-list" .}}
+{{template "foot" .}}
+{{end}}
+
+{{/* The self-updating table. Three htmx attributes make this fragment poll:
+     hx-get says where to fetch itself from, hx-trigger="every 5s" fires that on
+     a timer, hx-swap="outerHTML" replaces the whole div with the response —
+     live updates with zero JavaScript. */}}
+{{define "streams-list"}}
+<div id="streams-list" hx-get="/streams/list" hx-trigger="every 5s" hx-swap="outerHTML">
+  {{template "flash" .Flash}}
+
+  <h2>JetStream streams <small>(auto-refreshes every 5 s)</small></h2>
+  <table>
+    <thead><tr><th>Name</th><th>Messages</th><th>Bytes</th><th>Consumers</th></tr></thead>
+    <tbody>
+    {{range .Streams}}
+      <tr>
+        <td><code>{{.Name}}</code></td>
+        <td>{{.Messages}}</td>
+        <td>{{.HumanBytes}}</td>
+        <td>{{.Consumers}}</td>
+      </tr>
+    {{else}}
+      {{if .Flash.Error}}
+      {{/* An error already rendered as a flash above — don't also claim the
+           stream set is empty (a poll failure isn't "no streams"). */}}
+      <tr><td colspan="4" class="empty">Couldn't load streams — see the error above.</td></tr>
+      {{else}}
+      {{/* JetStream enabled but empty is a normal, healthy state — not an
+           error. Publish to a stream and it appears here on the next poll. */}}
+      <tr><td colspan="4" class="empty">JetStream is empty — no streams yet. Create one (or publish to a subject a stream captures) and it shows up here.</td></tr>
+      {{end}}
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
