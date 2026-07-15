@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"time"
 )
 
 // objMeta is the tiny slice of ObjectMeta we care about.
@@ -234,4 +235,75 @@ func (k *Client) DeleteWorkshopDatabase(ctx context.Context, name string) error 
 		return fmt.Errorf("invalid name %q", name)
 	}
 	return k.do(ctx, http.MethodDelete, xrPath+"/"+name, nil, nil)
+}
+
+// ------------------------------------------------- Argo Workflows (CI)
+
+// A Workflow is one Argo Workflows run — the in-cluster CI object from module
+// 07. Nothing new happens here: a Workflow is an argoproj.io CRD just like an
+// Application, so listing runs is the exact same authenticated GET-a-list the
+// portal already does everywhere else, with the same token and the same helper.
+const (
+	// The build *pods* run in the PSA-privileged `builds` namespace (the
+	// controller's --managed-namespace); the controller itself lives in ns
+	// `argo`. The Workflow objects we list live in `builds`.
+	WorkflowNamespace = "builds"
+	workflowsPath     = "/apis/argoproj.io/v1alpha1/namespaces/" + WorkflowNamespace + "/workflows"
+)
+
+type Workflow struct {
+	Metadata ObjMeta `json:"metadata"`
+	Status   struct {
+		Phase      string `json:"phase"`      // Pending | Running | Succeeded | Failed | Error
+		StartedAt  string `json:"startedAt"`  // RFC3339, set once the controller starts the run
+		FinishedAt string `json:"finishedAt"` // RFC3339, empty while the run is still going
+	} `json:"status"`
+}
+
+func (k *Client) ListArgoWorkflows(ctx context.Context) ([]Workflow, error) {
+	var list struct {
+		Items []Workflow `json:"items"`
+	}
+	err := k.get(ctx, workflowsPath, &list)
+	return list.Items, err
+}
+
+// PhaseClass maps an Argo Workflows phase onto the console's badge colors —
+// the same green / amber / red vocabulary ArgoCD health uses elsewhere.
+func (w Workflow) PhaseClass() string {
+	switch w.Status.Phase {
+	case "Succeeded":
+		return "ok"
+	case "Failed", "Error":
+		return "bad"
+	default: // Pending, Running, or not-yet-set: in-between, amber.
+		return "meh"
+	}
+}
+
+// Duration is the run's wall-clock time: finished − started for a completed
+// run, or elapsed-so-far for one still going. The API hands back RFC3339
+// strings; parsing them here keeps the template logic-free. A run the
+// controller hasn't started yet renders a dash.
+func (w Workflow) Duration() string {
+	start, err := time.Parse(time.RFC3339, w.Status.StartedAt)
+	if err != nil {
+		return "—"
+	}
+	end := time.Now()
+	if w.Status.FinishedAt != "" {
+		// Finished, so the duration is fixed — but if the timestamp is malformed
+		// don't fall back to now(), which would render an ever-growing duration
+		// as if the run were still going.
+		t, err := time.Parse(time.RFC3339, w.Status.FinishedAt)
+		if err != nil {
+			return "—"
+		}
+		end = t
+	}
+	d := end.Sub(start).Round(time.Second)
+	if d < 0 {
+		return "—"
+	}
+	return d.String()
 }

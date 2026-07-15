@@ -1,0 +1,56 @@
+{{define "builds"}}
+{{template "head" "builds"}}
+<h1>Builds</h1>
+<p class="lede">Module 07's in-cluster CI, read-only. The runs below come from
+<code>Argo Workflows</code> — the portal lists the <code>Workflow</code> CRD the same way it lists any
+other resource. The catalog is your <code>Zot</code> registry over the OCI <code>/v2/</code> API: the
+images your pipeline built and pushed. Nothing here is built or dispatched from the console.</p>
+
+{{template "builds-runs" .}}
+{{template "foot" .}}
+{{end}}
+
+{{/* The self-updating fragment. Three htmx attributes make it poll: hx-get says
+     where to re-fetch itself from, hx-trigger="every 5s" fires that on a timer,
+     hx-swap="outerHTML" replaces the whole div with the response — live CI
+     status, zero JavaScript. Both sections live in one fragment so a single
+     poll refreshes them together, and each carries its own flash so one dead
+     source never blanks the other. */}}
+{{define "builds-runs"}}
+<div id="builds-runs" hx-get="/builds/runs" hx-trigger="every 5s" hx-swap="outerHTML">
+  <h2>Workflow runs <small>(namespace builds · auto-refreshes every 5 s)</small></h2>
+  {{template "flash" .WFFlash}}
+  <table>
+    <thead><tr><th>Run</th><th>Phase</th><th>Started</th><th>Duration</th></tr></thead>
+    <tbody>
+    {{range .Workflows}}
+      <tr>
+        <td>{{.Metadata.Name}}</td>
+        {{/* phase badge, green/amber/red like ArgoCD health */}}
+        <td><span class="badge {{.PhaseClass}}">{{if .Status.Phase}}{{.Status.Phase}}{{else}}Pending{{end}}</span></td>
+        <td>{{if .Status.StartedAt}}<code>{{.Status.StartedAt}}</code>{{else}}<span class="nodata">—</span>{{end}}</td>
+        <td>{{.Duration}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="4" class="empty">No workflow runs yet — trigger a build (module 07) and it appears here.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+
+  <h2>Registry catalog <small>(Zot · OCI /v2/_catalog)</small></h2>
+  {{template "flash" .RepoFlash}}
+  <table>
+    <thead><tr><th>Repository</th><th>Tags</th></tr></thead>
+    <tbody>
+    {{range .Repos}}
+      <tr>
+        <td><code>{{.Name}}</code></td>
+        <td>{{if .Tags}}{{range .Tags}}<code>{{.}}</code> {{end}}{{else}}<span class="nodata">— no tags</span>{{end}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="2" class="empty">No repositories yet — your first build pushes an image here.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

@@ -25,6 +25,7 @@ type config struct {
 	PromURL        string // Prometheus API for the sparklines
 	GrafanaURL     string // browser-facing Grafana for deep links
 	NATSMonitorURL string // NATS monitoring endpoint for the JetStream browser
+	ZotURL         string // cluster-internal Zot registry, read by the Builds page
 
 	OTLPEndpoint string // where traces + metrics are pushed
 	ServiceName  string // service.name in traces/metrics
@@ -44,6 +45,7 @@ func loadConfig() config {
 		PromURL:          envOr("PROM_URL", "http://lgtm.observability.svc.cluster.local:9090"),
 		GrafanaURL:       envOr("GRAFANA_URL", "http://localhost:30030"),
 		NATSMonitorURL:   envOr("NATS_MONITOR_URL", "http://nats.nats.svc.cluster.local:8222"),
+		ZotURL:           envOr("ZOT_URL", "http://zot.zot.svc.cluster.local:5000"),
 		OTLPEndpoint:     envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "http://lgtm.observability.svc.cluster.local:4318"),
 		ServiceName:      envOr("OTEL_SERVICE_NAME", "cloudbox-portal"),
 	}
