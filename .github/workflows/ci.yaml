@@ -18,7 +18,7 @@ jobs:
     name: Shell scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: bash -n (syntax) on every script
         run: |
@@ -45,7 +45,7 @@ jobs:
     name: YAML syntax (gitops/, lab/, solutions/)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate all YAML parses (multi-document aware)
         run: |
@@ -77,7 +77,7 @@ jobs:
     name: Cross-file consistency (no drift)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Everything that must agree, agrees
         # solutions↔catalog copies, deployed images ⊆ images.txt,
@@ -91,7 +91,7 @@ jobs:
     env:
       KUBECONFORM_VERSION: v0.8.0   # pinned — bump deliberately
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install kubeconform ${{ env.KUBECONFORM_VERSION }}
         run: |
