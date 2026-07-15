@@ -40,3 +40,14 @@ enrich without crowding the 4-hour core:
 Neither is promised in the published abstract, so both are honestly "extra."
 Build only if the core path + stretch 06–09 are rock-solid first (they're in
 active rehearsal — see issue #8).
+
+## Beyond the evaluation — the golden path
+
+[PRD-0003](0003-golden-path-application-xr.md) proposes the platform's **headline
+abstraction**: a single `Application` XR (build-your-own-Nais) that composes a
+URL-addressable workload with its declared dependencies — **CNPG Postgres, an S3
+bucket, a NATS queue, and ingress** — reusing every composition the workshop
+already teaches. NATS (PRD-0001) is built first and then absorbed as `spec.queue`.
+It's woven across the platform, the console ("New Application" form + templates),
+and the slides, and it's dogfooded by redeploying the picture-pipeline capstone as
+`Application`s. This is the apex of the self-service arc, not a side stretch.
