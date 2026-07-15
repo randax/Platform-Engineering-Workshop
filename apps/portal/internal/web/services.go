@@ -18,6 +18,11 @@ func init() {
 		NavTitle:   "Services",
 		Path:       "/services",
 		Handler:    handleServices,
+		// Serverless (module 06): nothing to list until Knative Serving is
+		// installed and Healthy — the ksvc CRD doesn't even exist before then.
+		Unlock:     func(s kube.Snapshot) bool { _, h := s.AppHealthy("knative-serving"); return h },
+		LockedHint: "Complete Module 06 · Serverless",
+		Teaser:     "Deploy serverless workloads that scale to zero and back — request-rate sparklines and one-click Grafana trace links included.",
 	})
 }
 

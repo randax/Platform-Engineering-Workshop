@@ -21,11 +21,17 @@ var staticFS embed.FS
 // ParseTemplates registers the two functions the layout needs — the sidebar
 // (built from the page registry) and the Grafana footer link — then parses
 // everything embedded.
-func ParseTemplates(grafanaURL string) (*template.Template, error) {
+//
+// It takes the *Server so the "nav" func can close over it and rebuild the
+// sidebar from the live unlock cache on every request: the closure runs at
+// render time, not parse time, so it sees the current cluster state (which
+// pages have unlocked) rather than a stale snapshot. Callers must build the
+// Server first and assign its Tmpl after — see main.go.
+func ParseTemplates(s *Server) (*template.Template, error) {
 	return template.New("portal").
 		Funcs(template.FuncMap{
-			"nav":        navGroups,
-			"grafanaURL": func() string { return grafanaURL },
+			"nav":        func() []navGroup { return navGroups(s.currentSnapshot()) },
+			"grafanaURL": func() string { return s.GrafanaURL },
 		}).
 		ParseFS(templateFS, "templates/*.html")
 }

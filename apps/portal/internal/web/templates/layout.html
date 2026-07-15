@@ -27,7 +27,13 @@
     <div class="nav-group">
       <span class="nav-label">{{.Label}}</span>
       {{- range .Items}}
+      {{- if .Locked}}
+      {{/* capability not present yet: a non-link, greyed, with the module that
+           unlocks it as a tooltip — see .nav-locked in style.css */}}
+      <span class="nav-locked" title="{{.Hint}}">🔒 {{.Title}}</span>
+      {{- else}}
       <a href="{{.Href}}" {{if eq $ .Key}}aria-current="page"{{end}}>{{.Title}}</a>
+      {{- end}}
       {{- end}}
     </div>
     {{- end}}
@@ -52,6 +58,17 @@
 {{template "head" ""}}
 <h1>This page scaled to zero.</h1>
 <p>It may cold-start if you retry. (It will not.)</p>
+{{template "foot" .}}
+{{end}}
+
+{{/* A gated page before its capability lands: instead of a feature whose API
+     isn't there yet (which would only error), show what it will do and which
+     module unlocks it. The sidebar shows the same 🔒 next to the page. */}}
+{{define "locked"}}
+{{template "head" .Key}}
+<h1>🔒 {{.Title}}</h1>
+<p class="lede">{{.Teaser}}</p>
+<p class="hint">{{.Hint}} to unlock this page.</p>
 {{template "foot" .}}
 {{end}}
 

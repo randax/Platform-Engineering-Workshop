@@ -24,7 +24,10 @@ func fixtureApp(name, health string) kube.ArgoApp {
 // For the interactive fragments it also asserts the UX-critical markup:
 // delete confirmation, the htmx polling attributes, and the analysis output.
 func TestTemplatesRender(t *testing.T) {
-	tmpl, err := ParseTemplates("http://localhost:30030") // same constructor main uses (FuncMap!)
+	// Same constructor main uses (FuncMap!). A bare Server with just the
+	// Grafana URL is enough: with no Kube client currentSnapshot returns the
+	// zero snapshot, so the nav renders with every gated page simply locked.
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
 	if err != nil {
 		t.Fatalf("parsing templates: %v", err)
 	}
@@ -179,6 +182,19 @@ func TestTemplatesRender(t *testing.T) {
 				`width: 37%`,    // 1500/4000 requests bar
 				`1500m of 4000m requested`,
 				`fineprint`, `which on kr 0,00 is kr 0,00`, // egg
+			},
+		},
+		"locked": {
+			data: lockedData{
+				Title:  "Services",
+				Key:    "services",
+				Hint:   "Complete Module 06 · Serverless",
+				Teaser: "Deploy serverless workloads that scale to zero.",
+			},
+			want: []string{
+				`🔒 Services`,
+				`Deploy serverless workloads that scale to zero.`, // teaser
+				`Complete Module 06 · Serverless`,                 // unlock hint
 			},
 		},
 		"notfound": {data: nil, want: []string{"This page scaled to zero.", `class="rail"`}},
