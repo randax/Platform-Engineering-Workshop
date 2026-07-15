@@ -4,7 +4,8 @@
 <p class="lede">Who is this console, really? It reads a handful of Kubernetes resources with a
 read-only ServiceAccount — no special powers, no admin backdoor. Below is the API server's
 own answer to <em>"what am I allowed to do?"</em>, from a
-<code>SelfSubjectRulesReview</code> — the same list <code>kubectl auth can-i --list</code> prints.</p>
+<code>SelfSubjectRulesReview</code> — the <strong>resource</strong> permissions it holds.
+(<code>kubectl auth can-i --list</code> prints these too, alongside any non-resource URL rules, which this view omits.)</p>
 
 {{template "flash" .Flash}}
 

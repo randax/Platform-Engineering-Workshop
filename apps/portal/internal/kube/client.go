@@ -45,7 +45,12 @@ type Client struct {
 // Namespace is the namespace the console itself runs in, read from the same
 // ServiceAccount mount as the token. Empty when running outside a cluster (via
 // kubectl proxy), so callers should fall back to a sensible default.
-func (k *Client) Namespace() string { return k.namespace }
+func (k *Client) Namespace() string {
+	if k == nil {
+		return ""
+	}
+	return k.namespace
+}
 
 // NewClient wires up in-cluster API access. For local development run
 // `kubectl proxy` and pass its URL (config: KUBE_API_URL) — the proxy
