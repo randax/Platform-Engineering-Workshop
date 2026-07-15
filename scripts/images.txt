@@ -91,6 +91,8 @@ quay.io/argoproj/argoexec:v4.0.7
 quay.io/argoproj/argocli:v4.0.7
 # Rootless BuildKit (in-cluster image builds)
 docker.io/moby/buildkit:v0.31.1-rootless
+# NATS 2.12.12 + JetStream — durable messaging (PRD-0001)
+docker.io/library/nats:2.12.12-alpine
 
 # --- Lab workload images (modules 3, 4, 6)
 # aws-cli: bucket tooling in modules 03/04 (public.ecr.aws is in the mirror map)
