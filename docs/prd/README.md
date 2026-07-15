@@ -7,6 +7,15 @@ constraints: the **4-hour clock**, the **~16 GB laptop / 6 GiB worker container*
 and the workshop's **focus** (assembling a platform, not teaching messaging or
 authz theory). The workshop already carries ~10 tools.
 
+> **New PRDs now live as GitHub issues**, not files here — labelled
+> [`prd`](https://github.com/randax/Platform-Engineering-Workshop/issues?q=label%3Aprd),
+> which gives status, threaded discussion, and `closes #N` linking from the
+> implementing PRs without a doc-PR just to record an idea. The documents in this
+> folder (0001–0003) are the original historical set and stay as reference; newer
+> proposals are issues — e.g. **Progressive console →
+> [#48](https://github.com/randax/Platform-Engineering-Workshop/issues/48)**. This file remains the
+> thin roadmap index tying the two together.
+
 ## Verdicts at a glance
 
 | Candidate | Verdict | Why |
