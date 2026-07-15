@@ -1,0 +1,88 @@
+package web
+
+// The Streams page: a read-only JetStream browser. Module 09's capstone runs
+// on an in-memory broker — restart it and the backlog is gone. JetStream is the
+// durable counterpart: streams persist messages to disk, consumers track their
+// own position, and nothing is lost across a restart. This page inspects that
+// durability from the outside, the same way Buckets inspects object storage —
+// no NATS client library, just the monitoring endpoint's JSON (see
+// internal/nats). "Durable messaging you can inspect."
+
+import (
+	"context"
+	"log"
+	"net/http"
+
+	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/nats"
+)
+
+func init() {
+	register(Page{
+		// Weight 35 slots Streams right after Workshop (30) and before Activity
+		// (40), keeping it in the Platform section with the other read-only
+		// cluster views.
+		Weight:     35,
+		NavSection: "Platform",
+		NavTitle:   "Streams",
+		Path:       "/streams",
+		Handler:    handleStreams,
+		// Messaging: JetStream only answers once the NATS app is deployed and
+		// Healthy — before that there is no monitoring endpoint to read, only a
+		// connection error. Gate on the same ArgoCD-health signal every other
+		// page uses.
+		Unlock:     func(s kube.Snapshot) bool { _, h := s.AppHealthy("nats"); return h },
+		LockedHint: "Enable NATS · durable messaging",
+		Teaser:     "Browse JetStream streams — message counts, bytes on disk, and consumers — the durable messaging backbone you can inspect.",
+		Extra: []Route{
+			{"GET /streams/list", handleStreamsList}, // polled by htmx
+		},
+	})
+}
+
+// streamsSource is the one slice of NATS this page consumes — a consumer-side
+// interface, so the table's rendering is testable with an in-memory fake
+// instead of a live monitoring endpoint. *nats.Client satisfies it in
+// production (mirrors gallery.go's galleryStore and buckets.go's bucketStore).
+type streamsSource interface {
+	ListStreams(ctx context.Context) ([]nats.Stream, error)
+}
+
+type streamsData struct {
+	Streams []nats.Stream
+	Flash   flash
+}
+
+// fetchStreams lists the streams and wraps them for the template. Kept separate
+// from the HTTP handler so a fake streamsSource can drive it in tests. An empty
+// list is not an error — it renders the friendly "JetStream is empty" state.
+func fetchStreams(ctx context.Context, src streamsSource, fl flash) (streamsData, error) {
+	streams, err := src.ListStreams(ctx)
+	if err != nil {
+		return streamsData{}, err
+	}
+	return streamsData{Streams: streams, Flash: fl}, nil
+}
+
+func handleStreams(s *Server, w http.ResponseWriter, r *http.Request) {
+	data, err := fetchStreams(r.Context(), s.Streams, flash{})
+	if err != nil {
+		s.renderError(w, err)
+		return
+	}
+	s.render(w, "streams", data)
+}
+
+// handleStreamsList serves the 5s-polled table fragment. Like the databases and
+// gallery fragments, a read error becomes a flash inside the fragment rather
+// than a full error page — that keeps the polling attributes in the DOM, so the
+// table heals itself the moment NATS answers again.
+func handleStreamsList(s *Server, w http.ResponseWriter, r *http.Request) {
+	data, err := fetchStreams(r.Context(), s.Streams, flash{})
+	if err != nil {
+		log.Printf("poll error: %v", err)
+		s.render(w, "streams-list", streamsData{Flash: errorFlash("NATS error: " + err.Error())})
+		return
+	}
+	s.render(w, "streams-list", data)
+}

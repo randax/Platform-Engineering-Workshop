@@ -21,9 +21,10 @@ type config struct {
 	S3SecretKey      string
 	S3Bucket         string
 
-	UploaderURL string // cluster-internal ksvc the upload form proxies to
-	PromURL     string // Prometheus API for the sparklines
-	GrafanaURL  string // browser-facing Grafana for deep links
+	UploaderURL    string // cluster-internal ksvc the upload form proxies to
+	PromURL        string // Prometheus API for the sparklines
+	GrafanaURL     string // browser-facing Grafana for deep links
+	NATSMonitorURL string // NATS monitoring endpoint for the JetStream browser
 
 	OTLPEndpoint string // where traces + metrics are pushed
 	ServiceName  string // service.name in traces/metrics
@@ -42,6 +43,7 @@ func loadConfig() config {
 		UploaderURL:      envOr("UPLOADER_URL", "http://uploader.pipeline.svc.cluster.local"),
 		PromURL:          envOr("PROM_URL", "http://lgtm.observability.svc.cluster.local:9090"),
 		GrafanaURL:       envOr("GRAFANA_URL", "http://localhost:30030"),
+		NATSMonitorURL:   envOr("NATS_MONITOR_URL", "http://nats.nats.svc.cluster.local:8222"),
 		OTLPEndpoint:     envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "http://lgtm.observability.svc.cluster.local:4318"),
 		ServiceName:      envOr("OTEL_SERVICE_NAME", "cloudbox-portal"),
 	}

@@ -16,6 +16,7 @@ import (
 
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/metrics"
+	"cloudbox.io/portal/internal/nats"
 	"cloudbox.io/portal/internal/store"
 )
 
@@ -23,6 +24,7 @@ type Server struct {
 	Kube        *kube.Client
 	Store       *store.Client
 	Prom        *metrics.Client
+	Streams     *nats.Client
 	Tmpl        *template.Template
 	UploaderURL string              // cluster-internal URL of the uploader Knative Service
 	GrafanaURL  string              // browser-facing Grafana base for deep links
