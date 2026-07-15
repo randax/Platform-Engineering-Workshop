@@ -68,10 +68,12 @@ data:
                   target_label: pod
 
     processors:
+      # Explicit MiB (not percentage) for deterministic behaviour across cgroup
+      # setups — ~80% of the gateway's 512Mi container limit.
       memory_limiter:
         check_interval: 5s
-        limit_percentage: 80
-        spike_limit_percentage: 25
+        limit_mib: 400
+        spike_limit_mib: 100
       batch:
         timeout: 10s
 
