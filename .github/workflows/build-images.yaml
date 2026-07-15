@@ -11,12 +11,22 @@
 #
 # Tagging discipline (deliberately no `latest` anywhere):
 #   - every build pushes the git SHA tag (traceable, immutable);
-#   - the pinned APP_VERSION tag is published ONLY from `apps-v*` tag builds —
-#     a branch push must never silently move a tag the manifests pin.
+#   - the pinned :v<version> tag is published only for a real release — normally
+#     driven by release-please via workflow_call (see release-please.yaml), with
+#     a manual `apps-v*` tag push kept as an escape hatch. A plain branch push
+#     builds but does NOT push a version tag the manifests pin.
 # =============================================================================
 name: Build app images
 
 on:
+  # Primary release path: release-please calls this after cutting a release,
+  # passing the version to publish as the pinned :v<version> tag.
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version without the v (e.g. 0.1.0) — publishes :v<version>"
+        type: string
+        required: true
   push:
     branches: [main, master]
     tags: ["apps-v*"]
@@ -37,10 +47,6 @@ on:
 concurrency:
   group: build-images-${{ github.ref }}
   cancel-in-progress: false
-
-env:
-  # Bump together with the image tags referenced in the gitops manifests.
-  APP_VERSION: v0.1.0
 
 permissions:
   contents: read
@@ -106,20 +112,31 @@ jobs:
 
       - name: Compute image tags
         id: tags
+        env:
+          # release-please passes 0.1.0; a manual apps-v0.1.0 tag yields the same.
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          TAGS="ghcr.io/randax/cloudbox-${{ matrix.app }}:${{ github.sha }}"
-          # Only a deliberate `git tag apps-v* && git push --tags` may move
-          # the pinned version tag.
-          if [[ "${GITHUB_REF}" == refs/tags/apps-v* ]]; then
-            TAGS="${TAGS},ghcr.io/randax/cloudbox-${{ matrix.app }}:${APP_VERSION}"
+          IMG="ghcr.io/randax/cloudbox-${{ matrix.app }}"
+          TAGS="${IMG}:${{ github.sha }}"
+          VERSION=""
+          if [[ -n "${INPUT_VERSION}" ]]; then
+            VERSION="v${INPUT_VERSION}"                 # release-please (workflow_call)
+          elif [[ "${GITHUB_REF}" == refs/tags/apps-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/apps-}"      # manual tag escape hatch → vX.Y.Z
+          fi
+          # A version tag is published only for a real release; a plain branch
+          # push builds (validates the Dockerfile) but pushes nothing.
+          if [[ -n "${VERSION}" ]]; then
+            TAGS="${TAGS},${IMG}:${VERSION}"
           fi
           echo "tags=${TAGS}" >> "${GITHUB_OUTPUT}"
+          echo "publish=$([[ -n "${VERSION}" ]] && echo true || echo false)" >> "${GITHUB_OUTPUT}"
 
       - uses: docker/build-push-action@v7
         with:
           context: apps/${{ matrix.app }}
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ steps.tags.outputs.publish }}
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,scope=${{ matrix.app }},mode=max
