@@ -144,15 +144,12 @@ spec:
                     string:
                       type: Format
                       fmt: "%d"
-              # Append the developer's extra env to the platform-injected env.
-              # appendSlice keeps env[0..4] above and adds spec.env after them.
-              # If spec.env is unset the patch is a no-op.
-              - type: FromCompositeFieldPath
-                fromFieldPath: spec.env
-                toFieldPath: spec.template.spec.containers[0].env
-                policy:
-                  mergeOptions:
-                    appendSlice: true
+              # NOTE (v2): appending the developer's spec.env to the platform-
+              # injected env is deferred. function-patch-and-transform's
+              # PatchPolicy has no `mergeOptions.appendSlice` (that was the
+              # classic Composition syntax); the modern array-append needs the
+              # right toFieldPath policy, verified on a cluster. v1 ships the
+              # platform-injected DB/S3 env only.
             readinessChecks:
               - type: MatchCondition
                 matchCondition:
