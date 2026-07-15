@@ -17,15 +17,25 @@ cp "$LAB_DIR/platform-api-app.yaml"     "$CLONE/gitops/apps/platform-api.yaml"
 cp "$LAB_DIR/examples/my-database.yaml" "$CLONE/gitops/components/demo/"
 gitops_push "$CLONE" "module 04: crossplane + WorkshopDatabase API + my-db"
 
-# 2. Wait for the machinery.
+# 2. Wait for the machinery. The XRD must be Established before the my-db XR
+# can be applied — the demo app can otherwise report Synced having SKIPPED the
+# XR (SkipDryRunOnMissingResource), leaving it "not found". Same race as
+# module 03; found by rehearsal-in-CI.
 wait_app crossplane
+kubectl wait --for=condition=Established \
+  xrd/workshopdatabases.platform.cloudbox.io --timeout=180s
 wait_app platform-api
 wait_app demo
 
-kubectl wait --for=condition=Established \
-  xrd/workshopdatabases.platform.cloudbox.io --timeout=180s
+# 3. Nudge the demo app in case it first-synced before the XRD existed, then
+# wait for the XR object to appear before waiting on its readiness.
+kubectl -n argocd annotate application demo argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+for _ in $(seq 1 60); do
+  kubectl -n demo get workshopdatabase/my-db >/dev/null 2>&1 && break
+  sleep 5
+done
 
-# 3. Wait for the developer's stack to be fully Ready (DB boot takes minutes).
+# Wait for the developer's stack to be fully Ready (DB boot takes minutes).
 kubectl -n demo wait --for=condition=Ready \
   workshopdatabase/my-db --timeout=600s
 
