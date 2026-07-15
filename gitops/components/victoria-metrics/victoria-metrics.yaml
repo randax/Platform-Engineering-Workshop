@@ -122,7 +122,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /victoria-metrics-data
+            # VM writes merge parts + query buffers to /tmp; readOnlyRootFilesystem
+            # blocks that under load (not at boot), so give it a writable emptyDir.
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: victoria-metrics-data
+        - name: tmp
+          emptyDir: {}
