@@ -30,9 +30,15 @@ view straight off the NATS monitoring endpoint — one <code>GET /jsz</code>, no
         <td>{{.Consumers}}</td>
       </tr>
     {{else}}
+      {{if .Flash.Error}}
+      {{/* An error already rendered as a flash above — don't also claim the
+           stream set is empty (a poll failure isn't "no streams"). */}}
+      <tr><td colspan="4" class="empty">Couldn't load streams — see the error above.</td></tr>
+      {{else}}
       {{/* JetStream enabled but empty is a normal, healthy state — not an
            error. Publish to a stream and it appears here on the next poll. */}}
       <tr><td colspan="4" class="empty">JetStream is empty — no streams yet. Create one (or publish to a subject a stream captures) and it shows up here.</td></tr>
+      {{end}}
     {{end}}
     </tbody>
   </table>
