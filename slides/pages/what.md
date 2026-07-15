@@ -97,18 +97,20 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 | Cloud primitive | What you'd rent | What you'll run today |
 |---|---|---|
 | Serverless | Lambda · Cloud Run · Functions | Knative |
+| Messaging / queues | SQS · SNS · Pub/Sub · EventBridge | NATS JetStream |
 | CI / image builds | CodeBuild · Cloud Build | Argo Workflows + BuildKit |
 | Container registry | ECR · Artifact Registry · ACR | Zot |
 | Cloud console | AWS/Azure/GCP Console | Cloudbox Console |
 
 </div>
 
-<div class="mt-4 text-sm opacity-70">Modules 06–09 — the stretch. Same idea, all the way up the stack.</div>
+<div class="mt-4 text-sm opacity-70">The stretch tier — same idea, all the way up the stack.</div>
 
 <!--
 The stretch tier, framed as "the cloud doesn't stop at databases":
 
 - Serverless: scale-to-zero request-driven containers. Knative is the open engine underneath a lot of what you'd recognize — it's literally what Google Cloud Run is built on.
+- Messaging: durable queues and streams — what makes async reliable. NATS JetStream is the lightweight open answer (≈ SQS/SNS/EventBridge/Pub-Sub): it's the durable counterpart to module 09's in-memory broker, and the queue the golden-path Application XR requests with `spec.queue`.
 - CI + registry: the build-and-ship half of a cloud. You'll build a container INSIDE your cluster with Argo Workflows + BuildKit and push it to your own Zot registry — no Docker Hub, no cloud build minutes.
 - Console: even the web console is just software reading an API. The Cloudbox Console is ~100 lines of Go over the Kubernetes API — and you'll read its source in module 08.
 

@@ -35,6 +35,7 @@ your laptop
         ├── Crossplane v2 (self-service compositions)      │ ArgoCD apps from
         ├── Knative Serving + Kourier          (stretch)   │ the in-cluster
         ├── Argo Workflows + BuildKit + Zot    (stretch)   │ Gitea
+        ├── NATS JetStream (durable messaging) (stretch)   │
         ├── Backstage (CNOE image)             (stretch)   │
         └── grafana/otel-lgtm (observability)  ────────────┘
 ```

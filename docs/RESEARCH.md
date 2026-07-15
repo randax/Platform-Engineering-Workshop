@@ -118,7 +118,8 @@ in late August before the final pin.
 
 In-cluster total ≈ **7.5–8 GB** (Talos 2-node ~1.7, Cilium no-Hubble ~0.85, ArgoCD core ~0.5,
 Workflows ~0.2, CNPG+1 PG ~0.3, RustFS ~0.1–0.2, Knative ~0.6, Crossplane ~0.7,
-Backstage ~1.5–2, otel-lgtm ~1) + Docker VM overhead + OS/browser/IDE ⇒ landing zone
+NATS+JetStream ~0.15 (stretch), Backstage ~1.5–2, otel-lgtm ~1) + Docker VM overhead
++ OS/browser/IDE ⇒ landing zone
 **13–17 GB**. Publish: **16 GB RAM absolute minimum (≥10 GB allocatable to Docker;
 OrbStack or tuned WSL2 strongly advised), 32 GB recommended, 4+ cores, 40 GB free disk.**
 Hubble UI: presenter demo only (+0.3 GB per attendee otherwise).

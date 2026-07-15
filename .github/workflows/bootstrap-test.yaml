@@ -132,6 +132,24 @@ jobs:
           fi
           exit "$overall"
 
+      - name: Verify NATS (PRD-0001) enables + JetStream boots
+        run: |
+          set -euo pipefail
+          # shellcheck source=../../lab/common.sh
+          source lab/common.sh
+          CLONE="$(gitops_clone)"
+          enable_catalog "$CLONE" nats.yaml
+          gitops_push "$CLONE" "verify: enable nats"
+          wait_app nats
+          # Readiness gates on /healthz?js-enabled-only=true, so Ready == JetStream up.
+          kubectl -n nats rollout status deploy/nats --timeout=180s
+          echo "✅ NATS + JetStream reached Ready — durable messaging boots offline"
+          {
+            echo ""
+            echo "### NATS + JetStream (PRD-0001)"
+            echo "Enabled from the catalog and reached Ready (readiness gates on JetStream). ✅"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |
@@ -159,7 +177,7 @@ jobs:
           kubectl -n argocd get applications -o yaml > /tmp/diag/applications.yaml 2>&1 || true
           kubectl get clusters.postgresql.cnpg.io,workshopdatabases,ksvc,broker,trigger -A > /tmp/diag/custom-resources.txt 2>&1 || true
           for ns in argocd gitea cnpg-system rustfs crossplane-system demo \
-                    knative-serving knative-eventing zot argo builds portal pipeline; do
+                    knative-serving knative-eventing zot argo builds portal pipeline nats; do
             kubectl -n "$ns" get pods -o wide > "/tmp/diag/pods-$ns.txt" 2>&1 || true
             kubectl -n "$ns" logs --tail=200 -l app --prefix > "/tmp/diag/logs-$ns.txt" 2>&1 || true
           done
