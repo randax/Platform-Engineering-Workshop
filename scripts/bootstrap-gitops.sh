@@ -144,12 +144,16 @@ stringData:
 EOF
 
 info "Exposing the ArgoCD UI on NodePort ${NODEPORT_ARGOCD} (plain http for the lab)"
+# server.insecure: plain http for the lab.
+# reposerver.max.combined... : the vendored Argo Workflows install is ~11 MB
+# (huge CEL-validated CRDs) and exceeds the 10M default → the app never syncs
+# ("exceeded max combined manifest file size"). Raise it. Found by rehearsal-in-CI.
 kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge \
-  -p '{"data":{"server.insecure":"true"}}'
+  -p '{"data":{"server.insecure":"true","reposerver.max.combined.directory.manifests.size":"50M"}}'
 kubectl patch service argocd-server -n argocd \
   -p "{\"spec\":{\"type\":\"NodePort\",\"ports\":[{\"port\":80,\"nodePort\":${NODEPORT_ARGOCD}}]}}"
-# Restart so the server picks up server.insecure
-kubectl -n argocd rollout restart deployment argocd-server >/dev/null
+# Restart both: server picks up server.insecure, repo-server the size limit.
+kubectl -n argocd rollout restart deployment argocd-server argocd-repo-server >/dev/null
 
 # --- 4. Wait for everything --------------------------------------------------------------
 step "Waiting for Gitea and ArgoCD to become ready"
