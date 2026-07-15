@@ -1,0 +1,140 @@
+package web
+
+// The Buckets page: a read-only S3 object browser over RustFS. There's no
+// magic here — it's the module-03 payoff seen from outside. ListBuckets and
+// ListObjects are the same S3 API the attendee stood up in module 03, and the
+// "Download" link is a presigned URL signed by the browser-facing endpoint, so
+// the file downloads straight from RustFS with zero AWS and zero credentials.
+
+import (
+	"context"
+	"log"
+	"net/http"
+
+	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/store"
+)
+
+func init() {
+	register(Page{
+		// Weight 65 puts Buckets between Databases (60) and Services (70), so it
+		// sits right after Databases inside the same Self-service section.
+		Weight:     65,
+		NavSection: "Self-service",
+		NavTitle:   "Buckets",
+		Path:       "/buckets",
+		Handler:    handleBuckets,
+		// Data (module 03): the S3 API only answers once RustFS is deployed and
+		// Healthy — before that there are no buckets to browse, only errors.
+		Unlock:     func(s kube.Snapshot) bool { _, h := s.AppHealthy("rustfs"); return h },
+		LockedHint: "Complete Module 03 · Data",
+		Teaser:     "Browse your object storage and hand out presigned download links — the S3 API you stood up, no AWS required.",
+		Extra: []Route{
+			{"GET /buckets/objects", handleBucketObjects}, // htmx-loaded object list
+		},
+	})
+}
+
+// maxObjects caps a single object listing. A bucket can hold millions of keys;
+// this browser is a teaching aid, not a file manager, so 200 rows is plenty and
+// keeps a fat bucket from hanging the page.
+const maxObjects = 200
+
+// bucketStore is the slice of object storage this page consumes — a
+// consumer-side interface, so the rendering is testable with an in-memory fake
+// instead of a real S3. *store.Client satisfies it in production.
+type bucketStore interface {
+	ListBuckets(ctx context.Context) ([]store.BucketInfo, error)
+	ListObjectsIn(ctx context.Context, bucket string, max int) ([]store.ObjectInfo, error)
+	PresignGet(ctx context.Context, bucket, key string) (string, error)
+}
+
+// objectRow is one object plus the presigned link the browser follows to
+// download it. The URL is minted at render time — presigned GETs are cheap and
+// short-lived (15 min), so there's nothing to cache or invalidate.
+type objectRow struct {
+	store.ObjectInfo
+	DownloadURL string
+}
+
+// objectsData backs the object-list fragment for one selected bucket.
+type objectsData struct {
+	Bucket  string
+	Objects []objectRow
+	Flash   flash
+}
+
+// bucketsData backs the full page: the bucket list, plus the selected bucket's
+// objects when one is chosen (via ?b= on load). Objects.Bucket == "" means no
+// selection yet — the fragment slot shows a prompt instead.
+type bucketsData struct {
+	Buckets []store.BucketInfo
+	Objects objectsData
+	Flash   flash
+}
+
+// bucketObjects lists one bucket's objects and pairs each with a presigned
+// download URL. Kept separate from the HTTP handler so a fake bucketStore can
+// drive it in tests.
+func bucketObjects(ctx context.Context, st bucketStore, bucket string, fl flash) (objectsData, error) {
+	objs, err := st.ListObjectsIn(ctx, bucket, maxObjects)
+	if err != nil {
+		return objectsData{}, err
+	}
+	rows := make([]objectRow, 0, len(objs))
+	for _, o := range objs {
+		row := objectRow{ObjectInfo: o}
+		// Sign each object with the browser-facing endpoint. A signing failure
+		// only costs that one download link, so log it and keep the row.
+		if u, err := st.PresignGet(ctx, bucket, o.Key); err == nil {
+			row.DownloadURL = u
+		} else {
+			log.Printf("presigning %s/%s: %v", bucket, o.Key, err)
+		}
+		rows = append(rows, row)
+	}
+	return objectsData{Bucket: bucket, Objects: rows, Flash: fl}, nil
+}
+
+// bucketsPage builds the full-page payload: always the bucket list, plus the
+// selected bucket's objects when ?b= names one (so the selection is
+// bookmarkable and works without JavaScript).
+func bucketsPage(ctx context.Context, st bucketStore, selected string) (bucketsData, error) {
+	buckets, err := st.ListBuckets(ctx)
+	if err != nil {
+		return bucketsData{}, err
+	}
+	data := bucketsData{Buckets: buckets}
+	if selected != "" {
+		objs, err := bucketObjects(ctx, st, selected, flash{})
+		if err != nil {
+			return bucketsData{}, err
+		}
+		data.Objects = objs
+	}
+	return data, nil
+}
+
+func handleBuckets(s *Server, w http.ResponseWriter, r *http.Request) {
+	data, err := bucketsPage(r.Context(), s.Store, r.URL.Query().Get("b"))
+	if err != nil {
+		s.renderError(w, err)
+		return
+	}
+	s.render(w, "buckets", data)
+}
+
+// handleBucketObjects serves the object-list fragment htmx swaps in when a
+// bucket is clicked. Like the databases/gallery fragments, an error becomes a
+// flash inside the fragment rather than a full error page, so the surrounding
+// page stays intact.
+func handleBucketObjects(s *Server, w http.ResponseWriter, r *http.Request) {
+	bucket := r.URL.Query().Get("b")
+	data, err := bucketObjects(r.Context(), s.Store, bucket, flash{})
+	if err != nil {
+		log.Printf("list objects in %s: %v", bucket, err)
+		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("S3 error: " + err.Error())})
+		return
+	}
+	s.render(w, "bucket-objects", data)
+}
