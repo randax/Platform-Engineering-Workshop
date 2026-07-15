@@ -25,6 +25,20 @@ metadata:
   namespace: pipeline
   annotations:
     eventing.knative.dev/broker.class: MTChannelBasedBroker
+spec:
+  # Point the broker AT the channel-template ConfigMap explicitly instead of
+  # relying on the cluster default (config-br-defaults). The mt-broker-controller
+  # resolves the cluster default once at startup into its config-store; if
+  # config-br-default-channel wasn't applied yet (ArgoCD races the eventing
+  # install), that cache stays empty and every reconcile fails
+  # "ChannelTemplateFailed: failed to find channelTemplate" forever. With an
+  # explicit spec.config the controller reads this ConfigMap via the live lister
+  # on each reconcile, so it recovers as soon as the ConfigMap exists.
+  config:
+    apiVersion: v1
+    kind: ConfigMap
+    name: config-br-default-channel
+    namespace: knative-eventing
 ---
 # The uploader: receives a picture (from the portal), stores the original
 # in RustFS, emits a dev.cloudbox.image.uploaded CloudEvent to the Broker.
