@@ -12,7 +12,8 @@ authz theory). The workshop already carries ~10 tools.
 > which gives status, threaded discussion, and `closes #N` linking from the
 > implementing PRs without a doc-PR just to record an idea. The documents in this
 > folder (0001–0003) are the original historical set and stay as reference; newer
-> proposals are issues — e.g. **Progressive console → #48**. This file remains the
+> proposals are issues — e.g. **Progressive console →
+> [#48](https://github.com/randax/Platform-Engineering-Workshop/issues/48)**. This file remains the
 > thin roadmap index tying the two together.
 
 ## Verdicts at a glance
