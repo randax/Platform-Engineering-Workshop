@@ -42,7 +42,8 @@ slides/      Slidev deck
   Crossplane **v2**, CloudNativePG, RustFS (standalone, beta — SeaweedFS is Plan B),
   Knative + Kourier (stretch), Argo Workflows + BuildKit + Zot (stretch),
   NATS JetStream (durable messaging, stretch), Backstage CNOE image (stretch),
-  grafana/otel-lgtm (observability).
+  Victoria stack — VictoriaMetrics/Logs/Traces + Grafana — with the OTel Collector
+  (observability, enabled on-demand from the catalog, not wave-0).
 - Cluster: `talosctl cluster create docker`, 1 CP + 1 worker, raised memory limits,
   `cni: none` + Helm-installed Cilium.
 - GitOps write path: ArgoCD points **only at the in-cluster Gitea** (single-pod SQLite,

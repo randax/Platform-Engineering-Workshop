@@ -16,7 +16,8 @@ and 08 (the portal) — have them green, or jump straight here with
 
 This is the capstone because it uses *everything you built today*, at once: GitOps
 delivers it (02), RustFS stores it (03), Knative scales it from zero (06), the portal
-fronts it (08), and observability watches it (woven through). The one new piece is
+fronts it (08), and the observability stack you enable on-demand right here — the
+Victoria stack + OTel Collector — watches it end to end. The one new piece is
 **Knative Eventing**: a Broker and Triggers — the open-source shape of S3 events → SQS →
 Lambda. The uploader doesn't know the resizer exists; it emits a fact
 (`dev.cloudbox.image.uploaded`, as a CloudEvent) and the Broker routes it to whoever
@@ -46,8 +47,10 @@ runs on your laptop, readable end to end.
    Trigger filters on. Then read the resizer's logs and find the `ce-type`, `ce-source`,
    `ce-id` headers: a CloudEvent is just an HTTP POST with five headers. Where did your
    image bytes go, and what actually traveled through the Broker?
-5. **The flourish.** Find the upload's trace in Grafana (ns `observability`) and see the
-   chain — portal → uploader → broker → resizer — as one waterfall. Hint 5 if Tempo is
+5. **The flourish.** Observability is an on-demand capability — enable the Victoria stack +
+   OTel Collector from the catalog first (hint 5 has the files), then find the upload's trace
+   in Grafana at **http://localhost:30030** → Explore → **VictoriaTraces** and see the chain —
+   portal → uploader → broker → resizer — as one waterfall. Hint 5 if the Jaeger trace view is
    new to you.
 6. Run `./verify.sh`.
 
@@ -114,13 +117,21 @@ and why this one deliberately doesn't; it's a lab.)
 </details>
 
 <details>
-<summary>Hint 5: Finding the trace in Grafana</summary>
+<summary>Hint 5: Enabling observability, then finding the trace in Grafana</summary>
+
+The Victoria observability stack is an on-demand capability — enable it from the catalog
+first (all five Applications go in one push):
 
 ```bash
-kubectl -n observability port-forward svc/lgtm 3000:3000
+cp gitops/catalog/victoria-metrics.yaml gitops/catalog/victoria-logs.yaml \
+   gitops/catalog/victoria-traces.yaml gitops/catalog/grafana.yaml \
+   gitops/catalog/otel-collector.yaml gitops/apps/
+git add . && git commit -m "module 09: enable observability" && git push
+kubectl -n observability get pods   # victoria-metrics/-logs/-traces, grafana, otel-collector (agents + gateway)
 ```
 
-Open http://localhost:3000 → Explore → data source **Tempo** → Search. Upload a fresh
+Then open Grafana at **http://localhost:30030** (NodePort — no port-forward needed) →
+Explore → data source **VictoriaTraces** (the Jaeger datasource) → Search. Upload a fresh
 image (traces are easiest to find seconds after you make them), then look for the
 uploader/resizer service names and open the newest trace: one waterfall, portal to
 thumbnail, with the Broker hop in the middle.

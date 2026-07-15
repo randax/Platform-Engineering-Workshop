@@ -2,7 +2,7 @@
 # Logs backend for the Victoria stack: OTLP logs ingest at :9428
 # /insert/opentelemetry/v1/logs, LogsQL /select/logsql/query, Loki-compatible
 # query API for Grafana. In-cluster: victoria-logs.observability.svc:9428.
-# Wave 0 (alongside otel-lgtm, which it will replace); the two coexist for now.
+# Sync-wave 0 (a storage backend). Part of the on-demand observability capability.
 #
 # Enable with:  cp gitops/catalog/victoria-logs.yaml gitops/apps/ && git add . && git commit -m 'enable victoria-logs' && git push
 apiVersion: argoproj.io/v1alpha1

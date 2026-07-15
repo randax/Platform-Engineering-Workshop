@@ -1,7 +1,7 @@
 package main
 
 // Telemetry setup: traces AND metrics, both pushed over OTLP/HTTP to the
-// platform's grafana/otel-lgtm pod. W3C `traceparent` propagation on every
+// platform's OTel Collector. W3C `traceparent` propagation on every
 // HTTP hop is what stitches the capstone chain — portal → uploader → broker
 // → resizer — into ONE distributed trace in Grafana; the metrics feed the
 // sparklines the portal renders itself.
@@ -32,7 +32,7 @@ import (
 // background exporters keep dropping data while everything else works — the
 // observability stack being off is a normal state in this workshop.
 func initTelemetry(serviceName string) (shutdown func()) {
-	endpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "http://lgtm.observability.svc.cluster.local:4318")
+	endpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector.observability.svc.cluster.local:4318")
 	if v := os.Getenv("OTEL_SERVICE_NAME"); v != "" {
 		serviceName = v
 	}
@@ -75,7 +75,7 @@ func initTelemetry(serviceName string) (shutdown func()) {
 	// Export failures repeat every interval; one log line is enough.
 	var once sync.Once
 	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
-		once.Do(func() { log.Printf("WARN: telemetry export failing (is otel-lgtm running?): %v", err) })
+		once.Do(func() { log.Printf("WARN: telemetry export failing (is the otel-collector running?): %v", err) })
 	}))
 
 	log.Printf("telemetry: OTLP traces+metrics to %s as service %q", endpoint, serviceName)

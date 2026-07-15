@@ -1,11 +1,11 @@
 ---
 # VictoriaMetrics 1.147.0 — single-node TSDB (observability rework, issue #57).
-# The metrics half of the Victoria stack that will replace otel-lgtm's
-# Prometheus. Listens on :8428 for everything:
+# The metrics store of the Victoria stack that replaced otel-lgtm's Prometheus.
+# Listens on :8428 for everything:
 #   - OTLP metrics ingest  → POST /opentelemetry/v1/metrics
 #   - Prometheus remote-write → POST /api/v1/write
 #   - PromQL query        → GET  /api/v1/query
-# Coexists with otel-lgtm during the migration (both in namespace observability).
+# Part of the on-demand observability capability (namespace observability).
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

@@ -54,7 +54,6 @@ fi
 
 check_app platform
 check_app local-path-provisioner
-check_app otel-lgtm
 
 # --- Wave-0 side effects -------------------------------------------------------
 if kubectl get storageclass local-path >/dev/null 2>&1; then
@@ -63,12 +62,10 @@ else
   fail "storageclass 'local-path' missing — is the local-path-provisioner app synced?"
 fi
 
-OBS_RUNNING="$(kubectl -n observability get pods --no-headers 2>/dev/null | awk '$3 == "Running"' | wc -l | tr -d ' ')"
-if [ "${OBS_RUNNING:-0}" -ge 1 ]; then
-  ok "observability stack running in ns 'observability'"
-else
-  fail "no running pods in ns 'observability' — kubectl -n observability get pods; check the otel-lgtm app in ArgoCD"
-fi
+# Observability is no longer wave-0: the Victoria stack (metrics/logs/traces +
+# Grafana + OTel Collector) is an on-demand capability enabled later (it replaced
+# the always-on otel-lgtm pod in the #57 rework), so module 02 no longer checks
+# for a running observability namespace.
 
 # --- Your GitOps change --------------------------------------------------------
 check_app demo

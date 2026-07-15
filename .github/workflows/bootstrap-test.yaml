@@ -118,6 +118,18 @@ jobs:
             echo "::endgroup::"
             dt=$(( $(date +%s) - t0 ))
             printf '| %s | %s | %s | %ds |\n' "$name" "$sres" "$vres" "$dt" >> "$sum"
+            # Rehearsal hygiene: module 05's fault namespaces are spent once 05
+            # passes — restore.sh 'all' FIXES the faults in place but leaves them
+            # RUNNING (only 'clean' deletes them). On a single-worker runner
+            # their ~1 GiB piles onto the module-09 full-stack peak and tips the
+            # node into NodeNotReady. Tear them down here (the workshop keeps its
+            # own 'restore.sh clean' path) so module 09 has headroom.
+            if [ "$sres" = "✅" ] && [ "$vres" = "✅" ] && [[ "$name" == 05-* ]]; then
+              echo "::group::teardown spent faultlab namespaces"
+              kubectl delete ns faultlab-01 faultlab-02 faultlab-03 faultlab-04 \
+                --ignore-not-found --wait=true --timeout=150s || true
+              echo "::endgroup::"
+            fi
             if [ "$sres" != "✅" ] || [ "$vres" != "✅" ]; then
               overall=1
               echo "| _remaining modules skipped (state is cumulative)_ | | | |" >> "$sum"
@@ -180,19 +192,96 @@ jobs:
           # shellcheck source=../../lab/common.sh
           source lab/common.sh
           CLONE="$(gitops_clone)"
-          enable_catalog "$CLONE" victoria-metrics.yaml victoria-logs.yaml grafana.yaml
+          enable_catalog "$CLONE" victoria-metrics.yaml victoria-logs.yaml victoria-traces.yaml grafana.yaml
           gitops_push "$CLONE" "verify: enable victoria stack"
           wait_app victoria-metrics
           wait_app victoria-logs
+          wait_app victoria-traces
           wait_app grafana
-          for d in victoria-metrics victoria-logs grafana; do
+          for d in victoria-metrics victoria-logs victoria-traces grafana; do
             kubectl -n observability rollout status "deploy/$d" --timeout=180s
           done
-          echo "✅ Victoria stack + Grafana booted (Stage 1 — backend + dashboards)"
+          echo "✅ Victoria stack + Grafana booted (metrics + logs + traces backends + dashboards)"
           {
             echo ""
-            echo "### Observability v2 — Victoria stack (#57, Stage 1)"
-            echo "VictoriaMetrics + VictoriaLogs + Grafana enabled from the catalog and reached Ready. ✅"
+            echo "### Observability v2 — Victoria stack (#57)"
+            echo "VictoriaMetrics + VictoriaLogs + VictoriaTraces + Grafana enabled from the catalog and reached Ready. ✅"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Verify observability v2 collection (OTel Collector → VM/VLogs/VTraces, #57)
+        run: |
+          set -euo pipefail
+          # shellcheck source=../../lab/common.sh
+          source lab/common.sh
+          CLONE="$(gitops_clone)"
+          enable_catalog "$CLONE" otel-collector.yaml
+          gitops_push "$CLONE" "verify: enable otel-collector"
+          wait_app otel-collector
+          kubectl -n observability rollout status deploy/otel-collector-gateway --timeout=180s
+          kubectl -n observability rollout status ds/otel-collector-agent --timeout=180s
+
+          # Reach the ClusterIP backends from the runner via port-forward.
+          kubectl -n observability port-forward svc/victoria-metrics 18428:8428 >/dev/null 2>&1 &
+          vmpf=$!
+          kubectl -n observability port-forward svc/victoria-logs 19428:9428 >/dev/null 2>&1 &
+          vlpf=$!
+          kubectl -n observability port-forward svc/victoria-traces 10428:10428 >/dev/null 2>&1 &
+          vtpf=$!
+          trap 'kill $vmpf $vlpf $vtpf 2>/dev/null || true' EXIT
+          for _ in $(seq 1 15); do curl -fsS http://localhost:18428/health >/dev/null 2>&1 && break; sleep 1; done
+          for _ in $(seq 1 15); do curl -fsS http://localhost:19428/health >/dev/null 2>&1 && break; sleep 1; done
+          for _ in $(seq 1 15); do curl -fsS http://localhost:10428/health >/dev/null 2>&1 && break; sleep 1; done
+
+          # --- metrics proof: a non-app COMPONENT metric must reach VM. k8s_*
+          # series come ONLY from kubeletstats + k8s_cluster (platform infra,
+          # not the 3 first-party apps) — their presence IS the gap closing.
+          # Poll: first scrape (30s) + batch (10s) + export need a moment.
+          # k8s[._] tolerates either VM naming mode: default keeps OTLP dots
+          # (k8s.pod...), -opentelemetry.usePrometheusNaming maps them to
+          # underscores (k8s_pod...). Match both so the proof is naming-agnostic.
+          metrics=0
+          for _ in $(seq 1 24); do
+            metrics=$(curl -fsS -G http://localhost:18428/api/v1/query \
+              --data-urlencode 'query=count({__name__=~"k8s[._].+"})' \
+              | jq -r '.data.result[0].value[1] // "0"')
+            [ "${metrics:-0}" -gt 0 ] 2>/dev/null && break
+            sleep 5
+          done
+          echo "VM k8s_* series = ${metrics}"
+          [ "${metrics:-0}" -gt 0 ] 2>/dev/null || { echo "❌ no component metrics in VM"; exit 1; }
+
+          # --- logs proof: a non-app pod's logs must reach VLogs. kube-system
+          # (cilium et al.) is never a first-party app, so its presence in the
+          # recent log stream proves filelog is collecting platform components.
+          found=""
+          for _ in $(seq 1 24); do
+            logs=$(curl -fsS -G http://localhost:19428/select/logsql/query \
+              --data-urlencode 'query=_time:10m' --data-urlencode 'limit=500' 2>/dev/null || true)
+            if printf '%s' "$logs" | grep -q 'kube-system'; then found=1; break; fi
+            sleep 5
+          done
+          [ -n "$found" ] || { echo "❌ no component logs in VLogs"; exit 1; }
+
+          # --- traces proof: an APP trace must reach VictoriaTraces via the
+          # collector's OTLP receiver. The portal (NodePort 30600) is OTel-
+          # instrumented and now points OTEL_EXPORTER_OTLP_ENDPOINT at the
+          # collector — hit it to emit server spans, then query VictoriaTraces'
+          # Jaeger API for the service. This proves the app→collector→VT path
+          # that replaced otel-lgtm's Tempo.
+          for _ in $(seq 1 10); do curl -fsS -o /dev/null "http://localhost:30600/" 2>/dev/null || true; sleep 1; done
+          traced=""
+          for _ in $(seq 1 24); do
+            svcs=$(curl -fsS "http://localhost:10428/select/jaeger/api/services" 2>/dev/null || true)
+            if printf '%s' "$svcs" | grep -q 'cloudbox-portal'; then traced=1; break; fi
+            curl -fsS -o /dev/null "http://localhost:30600/" 2>/dev/null || true
+            sleep 5
+          done
+          [ -n "$traced" ] || { echo "❌ no app traces in VictoriaTraces (services: ${svcs:-none})"; exit 1; }
+          echo "✅ OTel Collector: component metrics in VM + component logs in VLogs + app traces in VictoriaTraces"
+          {
+            echo ""
+            echo "### Observability v2 — full collection (#57, lgtm-free)"
+            echo "OTel Collector (agent DaemonSet + gateway Deployment) enabled; **component** metrics landed in VictoriaMetrics (\`k8s_*\` = ${metrics} series), **component** logs (kube-system) in VictoriaLogs, and **app traces** (cloudbox-portal) in VictoriaTraces. otel-lgtm is gone; the Victoria stack is the whole observability capability. ✅"
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Resource snapshot → run summary (issue #8 RAM)
@@ -250,9 +339,21 @@ jobs:
           kubectl -n argocd get applications -o yaml > /tmp/diag/applications.yaml 2>&1 || true
           kubectl get clusters.postgresql.cnpg.io,workshopdatabases,ksvc,broker,trigger -A > /tmp/diag/custom-resources.txt 2>&1 || true
           for ns in argocd gitea cnpg-system rustfs crossplane-system demo \
-                    knative-serving knative-eventing zot argo builds portal pipeline nats; do
+                    knative-serving knative-eventing zot argo builds portal pipeline nats \
+                    observability; do
             kubectl -n "$ns" get pods -o wide > "/tmp/diag/pods-$ns.txt" 2>&1 || true
             kubectl -n "$ns" logs --tail=200 -l app --prefix > "/tmp/diag/logs-$ns.txt" 2>&1 || true
+          done
+          # The observability workloads label with app.kubernetes.io/name (not
+          # 'app'), so the loop above misses them — capture the collector's
+          # current + previous logs (previous catches a CrashLoopBackOff) and a
+          # describe, by name.
+          for p in $(kubectl -n observability get pods \
+                       -l app.kubernetes.io/name=otel-collector -o name 2>/dev/null); do
+            n="${p##*/}"
+            kubectl -n observability logs "$p" --all-containers --tail=150 > "/tmp/diag/logs-$n.txt" 2>&1 || true
+            kubectl -n observability logs "$p" --all-containers --previous --tail=150 >> "/tmp/diag/logs-$n.txt" 2>&1 || true
+            kubectl -n observability describe "$p" > "/tmp/diag/describe-$n.txt" 2>&1 || true
           done
 
       - name: Upload diagnostics artifact

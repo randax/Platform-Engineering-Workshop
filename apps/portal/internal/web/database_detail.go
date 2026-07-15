@@ -61,7 +61,7 @@ func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 
 	data.Secret = clusterName + "-app"
 	data.Psql = fmt.Sprintf("kubectl -n demo exec -it %s-1 -- psql -U app app", clusterName)
-	data.GrafanaURL = grafanaExplore(s.GrafanaURL, "prometheus",
+	data.GrafanaURL = grafanaExplore(s.GrafanaURL, "victoriametrics",
 		fmt.Sprintf(`cnpg_backends_total{cluster=%q, namespace="demo"}`, clusterName))
 
 	s.render(w, "database-detail", data)

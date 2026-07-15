@@ -101,8 +101,8 @@ spec:
             # as seen from the attendee's machine). Matches NODEPORT_RUSTFS_S3.
             - name: S3_PUBLIC_ENDPOINT
               value: localhost:30900
-            # Browser-facing Grafana (NodePort on the lgtm Service) — used
-            # for the portal's observability deep-links.
+            # Browser-facing Grafana (NodePort 30030, the Victoria-stack
+            # Grafana) — used for the portal's observability deep-links.
             - name: GRAFANA_URL
               value: http://localhost:30030
           ports:

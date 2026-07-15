@@ -110,15 +110,22 @@ in late August before the final pin.
   default requests (official k0s blog pattern) → ~0.6 GiB. Set
   `registries-skipping-tag-resolving` for the local registry. Avoid Gateway API mode with
   Cilium (not in conformance matrix). No published Talos+Knative report — smoke-test.
-- **Observability: `grafana/otel-lgtm`** (v0.29.0) — one pod: Collector + Prometheus + Loki +
-  Tempo + Grafana, preconfigured, 512Mi–2Gi. The de-facto 2026 workshop backend. Skip
-  kube-prometheus-stack (heavy, no traces) and the OTel Demo (~6 GB).
+- **Observability: the Victoria stack + OTel Collector**, enabled on-demand from the catalog
+  (not wave-0). Stores: **VictoriaMetrics** (:8428, Prometheus query API — replaces Prometheus),
+  **VictoriaLogs** (:9428, Loki-compatible API — replaces Loki), **VictoriaTraces** (:10428,
+  **Jaeger**-compatible API — replaces Tempo). **Grafana** (:30030 NodePort) wires all three as
+  built-in datasources (Prometheus/Loki/Jaeger types, no plugins — offline rule). The collection
+  layer otel-lgtm never had: an **OTel Collector** agent DaemonSet (filelog → VictoriaLogs,
+  kubeletstats → VictoriaMetrics) plus a gateway Deployment (k8s_cluster + prometheus scrape →
+  VictoriaMetrics; OTLP receiver on :4317/:4318). Skip kube-prometheus-stack (heavy, no traces),
+  the single-pod otel-lgtm (no real Collector), and the OTel Demo (~6 GB).
 
 ## 6. RAM budget and published spec
 
 In-cluster total ≈ **7.5–8 GB** (Talos 2-node ~1.7, Cilium no-Hubble ~0.85, ArgoCD core ~0.5,
 Workflows ~0.2, CNPG+1 PG ~0.3, RustFS ~0.1–0.2, Knative ~0.6, Crossplane ~0.7,
-NATS+JetStream ~0.15 (stretch), Backstage ~1.5–2, otel-lgtm ~1) + Docker VM overhead
+NATS+JetStream ~0.15 (stretch), Backstage ~1.5–2, Victoria stack + OTel Collector ~1
+(on-demand, not part of the always-on baseline)) + Docker VM overhead
 + OS/browser/IDE ⇒ landing zone
 **13–17 GB**. Publish: **16 GB RAM absolute minimum (≥10 GB allocatable to Docker;
 OrbStack or tuned WSL2 strongly advised), 32 GB recommended, 4+ cores, 40 GB free disk.**
