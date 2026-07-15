@@ -1,0 +1,32 @@
+{{define "access"}}
+{{template "head" "access"}}
+<h1>Access</h1>
+<p class="lede">Who is this console, really? It reads a handful of Kubernetes resources with a
+read-only ServiceAccount — no special powers, no admin backdoor. Below is the API server's
+own answer to <em>"what am I allowed to do?"</em>, from a
+<code>SelfSubjectRulesReview</code> — the same list <code>kubectl auth can-i --list</code> prints.</p>
+
+{{template "flash" .Flash}}
+
+<p class="hint">Reviewed in namespace <code>{{.Namespace}}</code> — the namespace this console runs in.</p>
+
+<table>
+  <thead><tr><th>API groups</th><th>Resources</th><th>Verbs</th></tr></thead>
+  <tbody>
+  {{range .Rules}}
+    <tr><td><code>{{.APIGroups}}</code></td><td><code>{{.Resources}}</code></td><td>{{.Verbs}}</td></tr>
+  {{else}}
+    <tr><td colspan="3" class="empty">No rules returned — either RBAC grants this ServiceAccount nothing, or the review could not be read.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+
+{{if .Incomplete}}
+<p class="hint">The API server reported this list is <strong>incomplete</strong> — some rules could not be enumerated.</p>
+{{end}}
+
+<p class="hint">Notice the verbs: <code>get</code>, <code>list</code>, <code>watch</code> — reading, not writing.
+That is the whole point of module 08: a portal is just an authenticated client, and this one was
+handed a deliberately small, read-only surface.</p>
+{{template "foot" .}}
+{{end}}

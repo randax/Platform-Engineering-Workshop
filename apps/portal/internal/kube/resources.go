@@ -307,3 +307,64 @@ func (w Workflow) Duration() string {
 	}
 	return d.String()
 }
+
+// ------------------------------------------- SelfSubjectRulesReview
+
+// ResourceRule is one entry of what a ServiceAccount may do: a set of verbs
+// over a set of resources in some apiGroups — the exact shape the API server
+// returns in a SelfSubjectRulesReview's status.
+type ResourceRule struct {
+	Verbs         []string `json:"verbs"`
+	APIGroups     []string `json:"apiGroups"`
+	Resources     []string `json:"resources"`
+	ResourceNames []string `json:"resourceNames"`
+}
+
+// SelfRules is the console's own effective permissions in one namespace — read
+// with the very same ServiceAccount token every other page authenticates with.
+type SelfRules struct {
+	Namespace     string
+	ResourceRules []ResourceRule
+	Incomplete    bool // the API server couldn't enumerate every rule
+}
+
+// selfRulesReview is the request/response envelope for a
+// SelfSubjectRulesReview. The request carries only spec.namespace; the reply
+// fills in status.
+type selfRulesReview struct {
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Spec       struct {
+		Namespace string `json:"namespace"`
+	} `json:"spec"`
+	Status struct {
+		ResourceRules []ResourceRule `json:"resourceRules"`
+		Incomplete    bool           `json:"incomplete"`
+	} `json:"status"`
+}
+
+// SelfRules asks the API server what THIS ServiceAccount is allowed to do in
+// namespace ns — a SelfSubjectRulesReview. Unlike most authorization checks,
+// this one needs no special RBAC: a token may always ask about its own powers,
+// so the review is self-scoped and effectively always permitted. The answer is
+// exactly what `kubectl auth can-i --list -n ns` prints, and for this console
+// it should be a deliberately small, read-only surface.
+func (k *Client) SelfRules(ctx context.Context, ns string) (SelfRules, error) {
+	review := selfRulesReview{APIVersion: "authorization.k8s.io/v1", Kind: "SelfSubjectRulesReview"}
+	review.Spec.Namespace = ns
+	body, err := json.Marshal(review)
+	if err != nil {
+		return SelfRules{}, err
+	}
+	var out selfRulesReview
+	if err := k.do(ctx, http.MethodPost,
+		"/apis/authorization.k8s.io/v1/selfsubjectrulesreviews",
+		bytes.NewReader(body), &out); err != nil {
+		return SelfRules{}, err
+	}
+	return SelfRules{
+		Namespace:     ns,
+		ResourceRules: out.Status.ResourceRules,
+		Incomplete:    out.Status.Incomplete,
+	}, nil
+}
