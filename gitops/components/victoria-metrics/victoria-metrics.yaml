@@ -87,6 +87,13 @@ spec:
             - -httpListenAddr=:8428
             # Workshop-sized retention (a 4-hour lab, not prod).
             - -retentionPeriod=1
+            # Normalise OTLP metric names to Prometheus style on ingest:
+            # dots→underscores + unit suffixes, so k8s.pod.memory.working_set →
+            # k8s_pod_memory_working_set_bytes and http.server.request.duration →
+            # http_server_request_duration_seconds. Without this VM keeps the
+            # dotted OTLP names, which are awkward in PromQL and don't match the
+            # console's queries (internal/metrics) or Grafana dashboards (#56).
+            - -opentelemetry.usePrometheusNaming=true
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
