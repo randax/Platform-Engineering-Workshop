@@ -53,3 +53,29 @@ spec:
       kind: ValidatingWebhookConfiguration
       jqPathExpressions:
         - '.webhooks'
+    # Knative's five *aggregated* ClusterRoles ship with empty rules; Kubernetes'
+    # ClusterRole aggregation controller fills .rules at runtime from every role
+    # matching their aggregationRule labels, so git (empty) never matches live →
+    # permanent OutOfSync on .rules and the 600s health gate times out. Ignore
+    # .rules on exactly these five (NOT all ClusterRoles — the rest must sync).
+    # (Found by rehearsal-in-CI: knative-eventing stuck OutOfSync Healthy at module 09.)
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: addressable-resolver
+      jqPathExpressions: ['.rules']
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: channelable-manipulator
+      jqPathExpressions: ['.rules']
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: crossnamespace-subscriber
+      jqPathExpressions: ['.rules']
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: podspecable-binding
+      jqPathExpressions: ['.rules']
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: source-observer
+      jqPathExpressions: ['.rules']
