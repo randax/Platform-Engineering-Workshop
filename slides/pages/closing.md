@@ -38,6 +38,31 @@ The mental model is the real takeaway: cloud products are software plus an API, 
 
 ---
 
+# Remember the table? All yours now.
+
+<div class="allgreen">
+
+| Cloud primitive | You're running |
+|---|---|
+| Kubernetes / compute | ✅ Talos + Cilium |
+| Managed Postgres | ✅ CloudNativePG |
+| Object storage (S3) | ✅ RustFS |
+| Self-service infra | ✅ Crossplane |
+| Serverless · CI · registry | ✅ Knative · Argo Workflows · Zot |
+| Cloud console | ✅ Cloudbox Console |
+
+</div>
+
+<div class="mt-6 text-xl opacity-80">No account. No bill. No permission.</div>
+
+<!--
+The bookend: this is the exact comparison table from the opening "What is a cloud" section — the left column was what you'd rent from a hyperscaler. Now the right column is running on the laptop in front of you, every row green.
+
+Say it plainly: "Four hours ago this was a shopping list of things you pay for. Now it's a list of things you own." Then hand to the sovereignty line one more time before the take-home logistics.
+-->
+
+---
+
 # Take it home
 
 - Everything is public, pinned, Apache-2.0

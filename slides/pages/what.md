@@ -14,6 +14,13 @@ If cloudbox-init is still downloading for some people, say so now: "This next bi
 layout: fact
 ---
 
+<div class="flex justify-center mb-2">
+<svg width="210" height="150" viewBox="0 0 640 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M537 179c44 0 79 36 79 80s-35 80-79 80H152c-66 0-120-54-120-120s54-120 120-120c8 0 16 1 23 3 21-47 68-80 122-80 74 0 134 60 134 134 0 5 0 10-1 15 8-4 17-6 27-6z" stroke="#7dd3fc" stroke-width="15"/>
+  <line x1="96" y1="452" x2="548" y2="70" stroke="#fb7185" stroke-width="22" stroke-linecap="round"/>
+</svg>
+</div>
+
 # There is no cloud.
 
 It's just **someone else's computer.**
@@ -56,14 +63,18 @@ Now the punchline that sets up the table: Kubernetes is a control plane. Operato
 
 # The core primitives are all open source
 
-| Cloud primitive | What you'd rent | What you'll **run today** |
+<div class="compare">
+
+| Cloud primitive | What you'd rent | What you'll run today |
 |---|---|---|
-| Kubernetes / compute | EKS · AKS · GKE | **Talos + Cilium** |
-| GitOps delivery | *the mechanic itself* | **Gitea + ArgoCD** |
-| Managed Postgres | RDS · Cloud SQL · Azure DB | **CloudNativePG** |
-| Object storage (S3) | S3 · GCS · Blob | **RustFS** |
-| Self-service infra | Service Catalog · CloudFormation | **Crossplane** |
-| Observability | CloudWatch · Cloud Ops | **Grafana + OpenTelemetry** |
+| Kubernetes / compute | EKS · AKS · GKE | Talos + Cilium |
+| GitOps delivery | *the mechanic itself* | Gitea + ArgoCD |
+| Managed Postgres | RDS · Cloud SQL · Azure DB | CloudNativePG |
+| Object storage (S3) | S3 · GCS · Blob | RustFS |
+| Self-service infra | Service Catalog · CloudFormation | Crossplane |
+| Observability | CloudWatch · Cloud Ops | Grafana + OpenTelemetry |
+
+</div>
 
 <div class="mt-4 text-sm opacity-70">Modules 01–05 — the core. One row each.</div>
 
@@ -81,12 +92,16 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 
 # ...and so is everything above it
 
-| Cloud primitive | What you'd rent | What you'll **run today** |
+<div class="compare">
+
+| Cloud primitive | What you'd rent | What you'll run today |
 |---|---|---|
-| Serverless | Lambda · Cloud Run · Functions | **Knative** |
-| CI / image builds | CodeBuild · Cloud Build | **Argo Workflows + BuildKit** |
-| Container registry | ECR · Artifact Registry · ACR | **Zot** |
-| Cloud console | AWS/Azure/GCP Console | **Cloudbox Console** |
+| Serverless | Lambda · Cloud Run · Functions | Knative |
+| CI / image builds | CodeBuild · Cloud Build | Argo Workflows + BuildKit |
+| Container registry | ECR · Artifact Registry · ACR | Zot |
+| Cloud console | AWS/Azure/GCP Console | Cloudbox Console |
+
+</div>
 
 <div class="mt-4 text-sm opacity-70">Modules 06–09 — the stretch. Same idea, all the way up the stack.</div>
 
@@ -98,6 +113,44 @@ The stretch tier, framed as "the cloud doesn't stop at databases":
 - Console: even the web console is just software reading an API. The Cloudbox Console is ~100 lines of Go over the Kubernetes API — and you'll read its source in module 08.
 
 Say the tiering honestly: "Core is 00–05 and it's a complete cloud on its own. Everything on this second table is for the fast 20% and for your couch tonight — it's all public and nothing later depends on it."
+-->
+
+---
+
+# It runs on *practices*, not just tools
+
+<div class="grid grid-cols-2 gap-4 mt-2">
+  <div class="practice">
+    <strong>GitOps</strong><br>
+    Git is the only way anything changes — every change a reviewable commit.
+    <div class="mod">module 02 · the loop you'll use all day</div>
+  </div>
+  <div class="practice">
+    <strong>Immutable infrastructure</strong><br>
+    No SSH, no drift. The whole machine is one declarative document.
+    <div class="mod">module 01 · Talos + Cilium</div>
+  </div>
+  <div class="practice">
+    <strong>Self-service</strong><br>
+    Declare what you want; the platform makes it real. Nobody files a ticket.
+    <div class="mod">module 04 · Crossplane</div>
+  </div>
+  <div class="practice">
+    <strong>Operators as control loops</strong><br>
+    The "managed service" is just software that reconciles toward your intent.
+    <div class="mod">module 03 · CloudNativePG</div>
+  </div>
+</div>
+
+<!--
+The bridge from "what" to "how": a cloud isn't a pile of tools, it's a handful of practices, and the tools are just how you embody them. Name each one and tie it to the module where they'll feel it in their hands:
+
+- GitOps — the single control plane. You'll do nothing today by clicking; everything is a commit ArgoCD converges. (module 02)
+- Immutable infrastructure — Talos has no shell to log into. The node is cattle described by one config; you never pet it. (module 01)
+- Self-service — the 2008 magic: ask for a database, get one, no human in the loop. Crossplane turns one YAML into a whole stack. (module 04)
+- Operators as control loops — the insight that demystifies "managed": behind RDS is a control loop, and CloudNativePG is that same loop in your cluster. (module 03)
+
+These four are the transferable skills — the thing they take to work on Monday even if they never run Talos-in-Docker again. The tools change; the practices don't.
 -->
 
 ---
