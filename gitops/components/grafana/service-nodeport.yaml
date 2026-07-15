@@ -1,0 +1,23 @@
+# Workshop addition (not upstream): expose Grafana on a stable NodePort so the
+# browser reaches it without a port-forward: http://localhost:30031
+# Temporary port: otel-lgtm's Grafana still holds 30030 until it is retired in a
+# later stage of the observability rework (issue #57) — don't collide.
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-nodeport
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: grafana
+    app.kubernetes.io/component: http-nodeport
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      nodePort: 30031
+  selector:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: grafana
