@@ -1,0 +1,49 @@
+# =============================================================================
+# Release Please — automated, conventional-commit-driven releases for the three
+# first-party apps (apps/portal, apps/uploader, apps/resizer), versioned as one
+# bundle. No more hand-cut `git tag apps-v* && git push`:
+#
+#   1. Every push to main, release-please maintains a "release PR" that bumps the
+#      version + writes apps/CHANGELOG.md from the conventional commits since the
+#      last release. Nothing publishes until a human merges that PR.
+#   2. Merging it creates the `apps-v<version>` tag + GitHub Release.
+#   3. Because a GITHUB_TOKEN-created tag does NOT trigger other workflows, we
+#      don't rely on the tag push — this job calls build-images.yaml directly
+#      (workflow_call) to build+push the pinned :v<version> images.
+# =============================================================================
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  release-please:
+    name: Maintain release PR / cut release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # create the tag + GitHub Release
+      pull-requests: write    # open/update the release PR
+    outputs:
+      released: ${{ steps.rp.outputs['apps--release_created'] }}
+      version: ${{ steps.rp.outputs['apps--version'] }}
+      tag: ${{ steps.rp.outputs['apps--tag_name'] }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-images:
+    name: Publish pinned images for the release
+    needs: release-please
+    if: needs.release-please.outputs.released == 'true'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-images.yaml
+    with:
+      version: ${{ needs.release-please.outputs.version }}
+    secrets: inherit
