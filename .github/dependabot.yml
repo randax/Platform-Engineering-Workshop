@@ -4,9 +4,12 @@
 # week (less noise, easy to merge); MAJOR updates come as individual PRs so
 # they get a proper look before merging.
 #
-# Protected pins: several apps/ Go deps are held back deliberately — newer
-# releases demand a go1.25 toolchain and break the golang:1.24-alpine in-cluster
-# builds (see apps/README.md "Dependency pins"). Dependabot must not touch them.
+# Toolchain floor: the apps build on go 1.25 (golang:1.25-alpine, matched by
+# build-images.yaml's GOTOOLCHAIN=local test job — so any dep bump that raises a
+# go.mod `go` directive past 1.25 fails that PR's CI loudly instead of silently
+# downloading a newer toolchain). The pins below are held for a different reason:
+# these deps churn fast and we freeze them until the late-August re-verify to
+# keep the pre-workshop image stable. Revisit (and likely drop) after the event.
 version: 2
 updates:
   # --- Go: the three first-party apps ---
