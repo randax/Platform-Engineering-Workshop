@@ -58,7 +58,7 @@ that fits in one readable file should stay one file.
 
 ## Running locally
 
-Each app is its own Go module (Go 1.24). Dependencies are deliberately
+Each app is its own Go module (Go 1.25). Dependencies are deliberately
 minimal: `minio-go` for S3, `x/image` for scaling, stdlib for everything else.
 
 ```bash
@@ -146,7 +146,7 @@ cd resizer  && go vet ./... && go test ./...
   `zot.zot.svc.cluster.local:5000`, then flip the image in the gitops repo.
   Nothing about these builds requires GitHub: that is the point of that module.
 
-All three Dockerfiles are the same shape: `golang:1.24-alpine` build stage,
+All three Dockerfiles are the same shape: `golang:1.25-alpine` build stage,
 static `CGO_ENABLED=0` binary, `FROM scratch` final image, non-root UID.
 
 ## Vendored assets

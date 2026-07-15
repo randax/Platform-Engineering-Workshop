@@ -60,7 +60,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version-file: apps/${{ matrix.app }}/go.mod
           cache-dependency-path: apps/${{ matrix.app }}/go.sum
 
       - name: go vet
