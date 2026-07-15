@@ -292,9 +292,14 @@ func (w Workflow) Duration() string {
 	}
 	end := time.Now()
 	if w.Status.FinishedAt != "" {
-		if t, err := time.Parse(time.RFC3339, w.Status.FinishedAt); err == nil {
-			end = t
+		// Finished, so the duration is fixed — but if the timestamp is malformed
+		// don't fall back to now(), which would render an ever-growing duration
+		// as if the run were still going.
+		t, err := time.Parse(time.RFC3339, w.Status.FinishedAt)
+		if err != nil {
+			return "—"
 		}
+		end = t
 	}
 	d := end.Sub(start).Round(time.Second)
 	if d < 0 {
