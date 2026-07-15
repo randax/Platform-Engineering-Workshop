@@ -22,9 +22,19 @@ gitops_push "$CLONE" "module 04: crossplane + WorkshopDatabase API + my-db"
 # XR (SkipDryRunOnMissingResource), leaving it "not found". Same race as
 # module 03; found by rehearsal-in-CI.
 wait_app crossplane
+# platform-api is the app that ships the XRD — wait for ArgoCD to sync it FIRST,
+# otherwise `kubectl wait --for=condition=Established` below hits the XRD before
+# it exists and fails IMMEDIATELY with NotFound (the --timeout only applies once
+# the object exists, not while waiting for it to appear). Then poll until the
+# API server actually serves the XRD, closing the gap between "ArgoCD applied
+# it" and "it's queryable", before waiting on the Established condition.
+wait_app platform-api
+for _ in $(seq 1 60); do
+  kubectl get xrd/workshopdatabases.platform.cloudbox.io >/dev/null 2>&1 && break
+  sleep 2
+done
 kubectl wait --for=condition=Established \
   xrd/workshopdatabases.platform.cloudbox.io --timeout=180s
-wait_app platform-api
 wait_app demo
 
 # 3. Nudge the demo app in case it first-synced before the XRD existed, then
