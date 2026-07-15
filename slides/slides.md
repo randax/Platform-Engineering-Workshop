@@ -42,7 +42,7 @@ layout: cover
 </div>
 
 <div class="abs-br m-6 text-sm opacity-60">
-  github.com/randax/jz-2025-platform-engineering
+  github.com/randax/Platform-Engineering-Workshop
 </div>
 
 <!--
@@ -50,7 +50,7 @@ Welcome! While people trickle in, this slide does the most important job of the 
 
 - Introduce yourselves briefly: Øyvind (NextGenTel, GDG Bergen) and Hans (platform engineer in the Norwegian Government, CNCF Ambassador, co-host of Plattformpodden).
 - Point at the callout: "If you haven't run the three prework scripts, start `./scripts/cloudbox-init.sh` RIGHT NOW — it pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
-- Repo URL is at the bottom — it's public, everything (labs, solutions, slides) lives there, and it will keep working after today. (Repo is being renamed to jz-2026; the old URL redirects.)
+- Repo URL is at the bottom — it's public, everything (labs, solutions, slides) lives there, and it will keep working after today.
 - Helpers: point them out, explain the sticky notes briefly (more on that in a few slides).
 
 Timing: keep the cover + "why" section to ~15 minutes total. Hands on keyboards within the first 10 minutes is the goal — module 00 is running in the background for anyone who skipped the prework.
@@ -58,6 +58,10 @@ Timing: keep the cover + "why" section to ~15 minutes total. Hands on keyboards 
 
 ---
 src: ./pages/why.md
+---
+
+---
+src: ./pages/what.md
 ---
 
 ---

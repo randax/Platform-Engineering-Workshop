@@ -1,22 +1,52 @@
 /* Global styles for the JavaZone 2026 deck.
-   No external assets — gradients instead of background images (offline rule). */
+   No external assets — gradients + inline SVG data-URIs instead of remote
+   images (offline rule). Bold/graphic layer added 2026-07. */
 
 :root {
   --jz-accent: #38bdf8;
   --jz-accent-dim: #0ea5e9;
+  --jz-ink: #0f172a;
+  --jz-rent: #64748b;      /* "the old way" — muted slate */
+  --jz-run: #059669;       /* "you run today" — confident emerald */
 }
 
-/* Cover and section dividers: solid gradient instead of the old Unsplash photo */
+/* ============================================================================
+   Cover & section dividers: bold gradient + a large, faint cloud watermark.
+   ========================================================================== */
 .slidev-layout.cover,
-.slidev-layout.section {
+.slidev-layout.section,
+.slidev-layout.fact {
   background-image: linear-gradient(135deg, #0f172a 0%, #164e63 100%) !important;
   background-color: #0f172a !important;
   color: #f1f5f9 !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Faint cloud glyph, bottom-right — self-contained SVG data-URI */
+.slidev-layout.cover::after,
+.slidev-layout.section::after,
+.slidev-layout.fact::after {
+  content: "";
+  position: absolute;
+  right: -6%;
+  bottom: -22%;
+  width: 58%;
+  height: 90%;
+  background-repeat: no-repeat;
+  background-position: bottom right;
+  background-size: contain;
+  opacity: 0.06;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 512'%3E%3Cpath fill='%2338bdf8' d='M537 179c44 0 79 36 79 80s-35 80-79 80H152c-66 0-120-54-120-120s54-120 120-120c8 0 16 1 23 3 21-47 68-80 122-80 74 0 134 60 134 134 0 5 0 10-1 15 8-4 17-6 27-6z'/%3E%3C/svg%3E");
 }
 
 .slidev-layout.cover h1,
-.slidev-layout.section h1 {
+.slidev-layout.section h1,
+.slidev-layout.fact h1 {
   color: #f8fafc;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .slidev-layout.cover h2,
@@ -24,13 +54,53 @@
   color: #bae6fd;
 }
 
-/* Consistent accent for inline code on dark slides */
+/* An accent bar under section titles for graphic weight */
+.slidev-layout.section h1::after {
+  content: "";
+  display: block;
+  width: 3.5rem;
+  height: 5px;
+  margin-top: 0.9rem;
+  border-radius: 3px;
+  background: var(--jz-accent);
+}
+
 .slidev-layout.cover code,
-.slidev-layout.section code {
+.slidev-layout.section code,
+.slidev-layout.fact code {
   color: #7dd3fc;
 }
 
-/* The "did you run the prework?" style callout box */
+/* ============================================================================
+   Content (default) slides: bolder headings with an accent underline.
+   ========================================================================== */
+.slidev-layout.default {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+.slidev-layout.default h1 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  padding-bottom: 0.35rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 4px solid var(--jz-accent);
+  display: table;         /* underline hugs the text, not the full width */
+}
+
+/* Bullets get a touch more air and a branded marker */
+.slidev-layout.default ul > li {
+  margin: 0.28em 0;
+}
+.slidev-layout.default ul > li::marker {
+  color: var(--jz-accent);
+}
+
+/* ============================================================================
+   Callout + badge (existing components, kept bold).
+   ========================================================================== */
 .callout {
   border: 2px solid var(--jz-accent);
   border-radius: 0.5rem;
@@ -38,7 +108,6 @@
   background: rgba(56, 189, 248, 0.08);
 }
 
-/* Module time-budget badge used on section slides */
 .badge {
   display: inline-block;
   border: 1px solid var(--jz-accent);
@@ -48,17 +117,9 @@
   color: #7dd3fc;
 }
 
-/* Default-layout content slides: vertically center the content column so
-   sparse slides don't leave a dead bottom half on the projector, and bump
-   the base content size one step. (Cover/section/fact center themselves.) */
-.slidev-layout.default {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  font-size: 1.1em;
-}
-
-/* Slightly tighter tables so the module overview fits on one slide */
+/* ============================================================================
+   Default tables (e.g. the module map) — a bit tighter.
+   ========================================================================== */
 .slidev-layout table {
   font-size: 0.82rem;
 }
@@ -66,3 +127,90 @@
 .slidev-layout th {
   padding: 0.3rem 0.6rem;
 }
+
+/* ============================================================================
+   Comparison table — the graphic centrepiece of the "What" section.
+   Wrap a markdown table in <div class="compare"> ... </div> to get:
+     · a branded header row
+     · the "what you'd rent" column muted (the old way)
+     · the "what you run today" column as a bold emerald hero
+   ========================================================================== */
+.compare table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 0.45rem;
+  font-size: 1.05rem;
+}
+.compare thead th {
+  background: linear-gradient(135deg, var(--jz-accent) 0%, var(--jz-accent-dim) 100%);
+  color: #042536;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  padding: 0.55rem 1.1rem;
+  border: none;
+  text-align: left;
+}
+.compare thead th:first-child { border-radius: 10px 0 0 10px; }
+.compare thead th:last-child { border-radius: 0 10px 10px 0; }
+
+.compare tbody tr { background: #f1f5f9; }
+.compare tbody td {
+  border: none;
+  padding: 0.6rem 1.1rem;
+  vertical-align: middle;
+}
+.compare tbody td:first-child {
+  border-radius: 10px 0 0 10px;
+  font-weight: 700;
+  color: var(--jz-ink);
+}
+/* middle column — what you'd rent: muted, understated */
+.compare tbody td:nth-child(2) {
+  color: var(--jz-rent);
+}
+/* last column — what you run today: the hero */
+.compare tbody td:last-child {
+  border-radius: 0 10px 10px 0;
+  font-weight: 800;
+  color: var(--jz-run);
+  background: rgba(5, 150, 105, 0.10);
+  box-shadow: inset 3px 0 0 var(--jz-run);
+}
+
+/* A subtle "→" the eye can follow from rent to run */
+.compare tbody td:nth-child(2)::after {
+  content: " →";
+  color: var(--jz-accent);
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+/* ============================================================================
+   Practice cards — bold 2x2 grid on the "practices" slide.
+   ========================================================================== */
+.practice {
+  border-left: 5px solid var(--jz-accent);
+  border-radius: 0 10px 10px 0;
+  background: rgba(56, 189, 248, 0.07);
+  padding: 0.85rem 1.1rem;
+  line-height: 1.35;
+}
+.practice strong {
+  color: var(--jz-accent-dim);
+  font-size: 1.12rem;
+  font-weight: 800;
+}
+.practice .mod {
+  font-size: 0.78rem;
+  color: var(--jz-rent);
+}
+
+/* ============================================================================
+   "All green" callback table (closing) — same shape, both sides emerald.
+   ========================================================================== */
+.allgreen table { width: 100%; border-collapse: separate; border-spacing: 0 0.4rem; font-size: 1.05rem; }
+.allgreen tbody tr { background: rgba(5, 150, 105, 0.10); }
+.allgreen tbody td { border: none; padding: 0.55rem 1.1rem; font-weight: 700; color: var(--jz-run); }
+.allgreen tbody td:first-child { color: var(--jz-ink); font-weight: 700; }

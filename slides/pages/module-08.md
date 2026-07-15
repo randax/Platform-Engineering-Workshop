@@ -20,6 +20,10 @@ The portal module — and the second honest-ecosystem interlude of the day (buil
 - The DB form? Creates a `WorkshopDatabase`
 - Module 04 already did the hard part
 
+<div class="mt-6 text-sm opacity-75">
+☁️ <strong>Cloud parallel:</strong> the AWS · Azure · GCP Console — except this one is ~730 lines you can read end to end, not a product you log into.
+</div>
+
 <!--
 Demystification slide. The industry reflex is "portal = Backstage = big adoption project". But mechanically, a portal is a web app making REST calls to the Kubernetes API — and the Cloudbox Console proves it in ~730 lines of Go and htmx (one vendored .js file, no build step).
 
