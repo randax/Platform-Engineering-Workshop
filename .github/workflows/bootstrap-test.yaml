@@ -344,6 +344,17 @@ jobs:
             kubectl -n "$ns" get pods -o wide > "/tmp/diag/pods-$ns.txt" 2>&1 || true
             kubectl -n "$ns" logs --tail=200 -l app --prefix > "/tmp/diag/logs-$ns.txt" 2>&1 || true
           done
+          # The observability workloads label with app.kubernetes.io/name (not
+          # 'app'), so the loop above misses them — capture the collector's
+          # current + previous logs (previous catches a CrashLoopBackOff) and a
+          # describe, by name.
+          for p in $(kubectl -n observability get pods \
+                       -l app.kubernetes.io/name=otel-collector -o name 2>/dev/null); do
+            n="${p##*/}"
+            kubectl -n observability logs "$p" --all-containers --tail=150 > "/tmp/diag/logs-$n.txt" 2>&1 || true
+            kubectl -n observability logs "$p" --all-containers --previous --tail=150 >> "/tmp/diag/logs-$n.txt" 2>&1 || true
+            kubectl -n observability describe "$p" > "/tmp/diag/describe-$n.txt" 2>&1 || true
+          done
 
       - name: Upload diagnostics artifact
         if: always()

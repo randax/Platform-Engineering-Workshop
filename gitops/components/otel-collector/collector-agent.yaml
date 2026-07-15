@@ -26,10 +26,10 @@ data:
         directory: /var/lib/otelcol
 
     receivers:
-      # Tail container logs. Talos runs containerd, so the on-disk format is
-      # CRI; the `container` operator parses it and derives k8s.namespace.name /
-      # k8s.pod.name / k8s.container.name from the file path — no k8sattributes
-      # processor (and its extra RBAC) needed for logs to be stream-labelled.
+      # Tail container logs. The `container` operator parses the runtime log
+      # format and derives k8s.namespace.name / k8s.pod.name / k8s.container.name
+      # from the file path — no k8sattributes processor (and its extra RBAC)
+      # needed for logs to be stream-labelled.
       filelog:
         # persist read offsets in the file_storage extension (below) so a pod
         # restart resumes where it left off instead of re-reading or skipping.
@@ -46,8 +46,9 @@ data:
         retry_on_failure:
           enabled: true
         operators:
+          # auto-detect the runtime log format (containerd on Talos) — the valid
+          # explicit values are containerd/crio/docker; omitting lets it detect.
           - type: container
-            format: cri
       # Scrape the local kubelet's /stats/summary. auth_type: serviceAccount
       # sends our SA token; the kubelet authorizes it against nodes/stats (see
       # rbac.yaml). insecure_skip_verify because the kubelet's serving cert
