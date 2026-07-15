@@ -123,7 +123,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /victoria-logs-data
+            # VLogs writes search/sort buffers to /tmp; readOnlyRootFilesystem
+            # blocks that under load (not at boot), so give it a writable emptyDir.
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: victoria-logs-data
+        - name: tmp
+          emptyDir: {}
