@@ -79,18 +79,88 @@ type ImageMeta struct {
 }
 
 // HumanBytes renders the original's size the way a file manager would.
-func (m ImageMeta) HumanBytes() string {
+func (m ImageMeta) HumanBytes() string { return humanBytes(m.Bytes) }
+
+// humanBytes formats a byte count the way a file manager would — shared by
+// ImageMeta (the resizer's analysis) and ObjectInfo (the bucket browser).
+func humanBytes(b int64) string {
 	switch {
-	case m.Bytes >= 1<<20:
-		return fmt.Sprintf("%.1f MB", float64(m.Bytes)/(1<<20))
-	case m.Bytes >= 1<<10:
-		return fmt.Sprintf("%.0f KB", float64(m.Bytes)/(1<<10))
+	case b >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(b)/(1<<20))
+	case b >= 1<<10:
+		return fmt.Sprintf("%.0f KB", float64(b)/(1<<10))
 	default:
-		return fmt.Sprintf("%d B", m.Bytes)
+		return fmt.Sprintf("%d B", b)
 	}
 }
 
 const presignTTL = 15 * time.Minute
+
+// BucketInfo is one row of the bucket browser: the name and when it was
+// created. This is the whole payload of an S3 ListBuckets call — the same API
+// the attendee stood up in module 03.
+type BucketInfo struct {
+	Name    string
+	Created time.Time
+}
+
+// ObjectInfo is one object inside a bucket. Deliberately just the three columns
+// a browser needs — key, size, mtime — not minio's full metadata struct, so the
+// web layer never imports the S3 client.
+type ObjectInfo struct {
+	Key          string
+	Size         int64
+	LastModified time.Time
+}
+
+// HumanBytes renders the object's size the way a file manager would.
+func (o ObjectInfo) HumanBytes() string { return humanBytes(o.Size) }
+
+// ListBuckets returns every bucket on the API endpoint — the read half of the
+// module-03 "you have object storage now" win. One S3 round-trip, no prefixes.
+func (s *Client) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
+	found, err := s.api.ListBuckets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	buckets := make([]BucketInfo, 0, len(found))
+	for _, b := range found {
+		buckets = append(buckets, BucketInfo{Name: b.Name, Created: b.CreationDate})
+	}
+	return buckets, nil
+}
+
+// ListObjectsIn lists a bucket's objects, capped at max. The cap matters: a
+// bucket can hold millions of keys, and ListObjects streams them one by one —
+// without a ceiling a fat bucket would hang the page rendering it. The manual
+// span makes the S3 walk visible as one block inside the request's trace.
+func (s *Client) ListObjectsIn(ctx context.Context, bucket string, max int) ([]ObjectInfo, error) {
+	ctx, span := otel.Tracer("portal").Start(ctx, "s3 list objects")
+	defer span.End()
+	var objects []ObjectInfo
+	for obj := range s.api.ListObjects(ctx, bucket, minio.ListObjectsOptions{Recursive: true}) {
+		if obj.Err != nil {
+			return nil, obj.Err
+		}
+		objects = append(objects, ObjectInfo{Key: obj.Key, Size: obj.Size, LastModified: obj.LastModified})
+		if len(objects) >= max {
+			break // stop draining the channel — the deferred cancel unwinds the listing
+		}
+	}
+	return objects, nil
+}
+
+// PresignGet mints a time-limited download URL for one object, signed by the
+// browser-facing endpoint (see the package doc: presigned URLs embed the host
+// they were signed for, and only the presign client knows one your browser can
+// reach). The attendee gets a working link with zero AWS and zero credentials.
+func (s *Client) PresignGet(ctx context.Context, bucket, key string) (string, error) {
+	u, err := s.presign.PresignedGetObject(ctx, bucket, key, presignTTL, nil)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}
 
 // ListGallery lists originals/ and joins them with thumbs/ and meta/ by base
 // key. Three prefix listings + one tiny GET per meta file. The manual span

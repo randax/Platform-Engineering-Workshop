@@ -1,0 +1,54 @@
+{{define "buckets"}}
+{{template "head" "buckets"}}
+<h1>Buckets</h1>
+<p class="lede">Your object storage from module 03, seen from outside: this is just
+<code>ListBuckets</code> and <code>ListObjects</code> on the S3 API you stood up. Pick a bucket to
+browse its objects — each <b>Download</b> link is a presigned URL signed by the browser-facing
+endpoint, valid 15 minutes, so the file downloads straight from RustFS with zero AWS.</p>
+
+<table>
+  <thead><tr><th>Bucket</th><th>Created</th></tr></thead>
+  <tbody>
+  {{range .Buckets}}
+    <tr>
+      {{/* href keeps the selection bookmarkable + JS-free; hx-get swaps just
+           the object list in place, so browsing buckets never reloads the page. */}}
+      <td><a href="/buckets?b={{.Name}}" hx-get="/buckets/objects?b={{.Name}}"
+             hx-target="#bucket-objects" hx-swap="innerHTML">{{.Name}}</a></td>
+      <td>{{.Created.Format "2006-01-02 15:04"}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="2" class="empty">No buckets yet — module 03 creates the first one.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+
+<div id="bucket-objects">
+  {{if .Objects.Bucket}}{{template "bucket-objects" .Objects}}
+  {{else}}<p class="hint">Pick a bucket above to browse its objects.</p>{{end}}
+</div>
+{{template "foot" .}}
+{{end}}
+
+{{/* The object list for one selected bucket. Loaded on demand by htmx (the
+     bucket links target #bucket-objects) and also server-rendered on ?b= for a
+     bookmarkable, JavaScript-free path — same markup either way. */}}
+{{define "bucket-objects"}}
+{{template "flash" .Flash}}
+<h2>{{.Bucket}} <small>(showing up to 200 objects)</small></h2>
+<table>
+  <thead><tr><th>Key</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+  <tbody>
+  {{range .Objects}}
+    <tr>
+      <td><code>{{.Key}}</code></td>
+      <td>{{.HumanBytes}}</td>
+      <td>{{.LastModified.Format "2006-01-02 15:04"}}</td>
+      <td>{{if .DownloadURL}}<a href="{{.DownloadURL}}" target="_blank">Download ↗</a>{{end}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4" class="empty">This bucket is empty.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
