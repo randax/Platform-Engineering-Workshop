@@ -68,6 +68,12 @@ equivalent).
   `readOnlyRootFilesystem`, seccomp `RuntimeDefault`. The agent must be root to
   read host pod logs but is otherwise identically locked down (read-only mount,
   caps dropped, seccomp).
+- **PodSecurity**: the agent's hostPath log mount is forbidden under PSA
+  `baseline` (Talos's default for non-system namespaces), so `namespace.yaml`
+  labels the observability namespace `privileged` — the standard treatment for
+  a log-collector DaemonSet (fluent-bit/vector/promtail need the same). The
+  Namespace carries `Prune=false` since observability is shared with the
+  Victoria backends.
 - **Replaced otel-lgtm**: the apps + the Victoria stack now route all telemetry
   through this collector; the single otel-lgtm pod is gone (#57).
 
