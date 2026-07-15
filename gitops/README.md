@@ -12,9 +12,13 @@ cluster is a git push** — ArgoCD syncs automatically with prune + selfHeal.
 ```
 gitops/
 ├── apps/          # Application manifests ArgoCD is watching = what is DEPLOYED
-│   ├── local-path-provisioner.yaml   (wave 0)
-│   └── otel-lgtm.yaml                (wave 0)
+│   └── local-path-provisioner.yaml   (wave 0)
 ├── catalog/       # Application manifests you CAN deploy — the menu
+│   ├── victoria-metrics.yaml         (wave 0)  ┐ observability
+│   ├── victoria-logs.yaml            (wave 0)  │ capability
+│   ├── victoria-traces.yaml          (wave 0)  │ (on-demand,
+│   ├── grafana.yaml                  (wave 0)  │  module 09)
+│   ├── otel-collector.yaml           (wave 1)  ┘
 │   ├── cnpg-operator.yaml            (wave 1)
 │   ├── rustfs.yaml                   (wave 1)
 │   ├── zot.yaml                      (wave 1)
@@ -65,7 +69,8 @@ Applications (`argocd.argoproj.io/sync-wave`).
 | Wave | Component | Namespace | Why this wave |
 |-----:|-----------|-----------|---------------|
 | 0 | local-path-provisioner | local-path-storage | everything stateful needs the default StorageClass |
-| 0 | otel-lgtm | observability | observability from minute one |
+| 0 | victoria-metrics · -logs · -traces · grafana | observability | **on-demand** capability (module 09), not always-on; the metric/log/trace stores and Grafana come up first |
+| 1 | otel-collector | observability | on-demand; the collection layer waits for the Victoria stores it writes to |
 | 1 | cnpg-operator | cnpg-system | CRDs/operator before anything composes databases |
 | 1 | rustfs | rustfs | data services |
 | 1 | zot | zot | registry before anything builds/pushes |

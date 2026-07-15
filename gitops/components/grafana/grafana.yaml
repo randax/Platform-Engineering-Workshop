@@ -110,9 +110,9 @@ spec:
             # Grafana only writes /var/lib/grafana and /tmp (both emptyDir).
             readOnlyRootFilesystem: true
           env:
-            # Anonymous read access (Viewer) — the workshop Grafana is open, same
-            # posture as otel-lgtm. The login form stays available so an admin
-            # (default admin/admin, ephemeral lab) can still edit.
+            # Anonymous read access (Viewer) — the workshop Grafana is open by
+            # design. The login form stays available so an admin (default
+            # admin/admin, ephemeral lab) can still edit.
             - name: GF_AUTH_ANONYMOUS_ENABLED
               value: "true"
             - name: GF_AUTH_ANONYMOUS_ORG_ROLE

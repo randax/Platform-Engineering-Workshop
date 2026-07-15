@@ -170,7 +170,7 @@ flowchart TB
       argocd --> kn["Knative<br>serverless"]
       argocd --> ci["Workflows<br>BuildKit + Zot"]
       argocd --> portal["Cloudbox<br>Console"]
-      argocd --> obs["otel-lgtm<br>observability"]
+      argocd --> obs["Victoria stack<br>+ OTel Collector"]
     end
   end
 ```
@@ -184,7 +184,7 @@ The map of the whole day — the comparison table you just showed, now as one ru
 2. Talos Linux v1.13 nodes run as containers — an immutable, API-only OS purpose-built for Kubernetes (module 01). Cilium does networking in eBPF; there is no kube-proxy in this cluster at all.
 3. Gitea + ArgoCD are the heart (module 02): the git server lives IN the cluster, and ArgoCD delivers everything below it from that git repo. Nothing depends on GitHub or the venue WiFi.
 4. The platform services: CloudNativePG for managed Postgres, RustFS for S3-compatible object storage (module 03), Crossplane v2 for the self-service API (module 04).
-5. The stretch tier: Knative serverless (06), in-cluster CI with BuildKit and the Zot registry (07), the Cloudbox Console portal (08), and observability with grafana/otel-lgtm woven throughout.
+5. The stretch tier: Knative serverless (06), in-cluster CI with BuildKit and the Zot registry (07), the Cloudbox Console portal (08), and observability — the Victoria stack (VictoriaMetrics/Logs/Traces + Grafana) plus the OTel Collector — enabled on-demand as the module 09 capstone, not running from minute one.
 
 Key sentence to land before moving on: "Everything below ArgoCD arrives as a git commit. That's the mechanic you'll use all day."
 

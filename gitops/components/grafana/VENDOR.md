@@ -17,9 +17,10 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
 
 ## Config & curation
 
-- **Two provisioned datasources** (ConfigMap `grafana-datasources` mounted
+- **Three provisioned datasources** (ConfigMap `grafana-datasources` mounted
   read-only at `/etc/grafana/provisioning/datasources`, Grafana's file
-  provisioning path — no sidecar, no plugin):
+  provisioning path — no sidecar, no plugin) — one per store in the Victoria
+  stack:
   - **VictoriaMetrics** as a **Prometheus** datasource (`isDefault: true`) →
     `http://victoria-metrics.observability.svc.cluster.local:8428`. VM speaks the
     Prometheus query API, so the built-in Prometheus datasource just works.
@@ -29,20 +30,25 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
     dedicated VictoriaLogs plugin because that plugin would need an internet
     fetch at boot (offline rule). See `../victoria-logs/VENDOR.md` for the URL
     caveat (VLogs' Loki endpoints live under `/select/loki/api/v1/*`).
+  - **VictoriaTraces** as a **Jaeger** datasource →
+    `http://victoria-traces.observability.svc.cluster.local:10428/select/jaeger`.
+    VTraces exposes a Jaeger-compatible query API, so we use the **built-in
+    Jaeger type** (again no plugin, offline rule) — Jaeger-style trace search,
+    not Tempo/TraceQL. See `../victoria-traces/VENDOR.md`.
 - **Anonymous read access** (`GF_AUTH_ANONYMOUS_ENABLED=true`, org role
-  `Viewer`) — the workshop Grafana is open, matching otel-lgtm's posture. The
+  `Viewer`) — the workshop Grafana is open, workshop-grade on purpose. The
   login form is left available so an admin (default `admin`/`admin`, ephemeral
   lab) can still edit. Sign-up disabled; analytics/update checks disabled so
   nothing phones home at boot (offline rule); `GF_INSTALL_PLUGINS=""`.
-- **NodePort 30031** (`service-nodeport.yaml`, a workshop addition, not
-  upstream): browser reaches Grafana at `http://localhost:30031`. **Temporary
-  port** — otel-lgtm's Grafana holds **30030** until it's retired in a later
-  stage of issue #57, so this one uses 30031 to avoid a collision. Wired into
-  the host via `NODEPORT_GRAFANA_V2` in `scripts/versions.env` and the
-  `--exposed-ports` list in `scripts/create-cluster.sh`.
+- **NodePort 30030** (`service-nodeport.yaml`, a workshop addition, not
+  upstream): browser reaches Grafana at `http://localhost:30030`, the canonical
+  observability port (freed when the old single-pod stack was retired —
+  issue #57). Wired into the host via `NODEPORT_GRAFANA` in
+  `scripts/versions.env` and the `--exposed-ports` list in
+  `scripts/create-cluster.sh`.
 - **Ephemeral storage**: `/var/lib/grafana` and `/tmp` are `emptyDir` — the
-  datasources are provisioned from the ConfigMap and `grafana.db` needn't
-  survive a pod restart in a 4-hour lab (same rationale as otel-lgtm).
+  datasources are provisioned from the ConfigMap, so a fresh pod re-derives its
+  whole config and `grafana.db` needn't survive a restart in a 4-hour lab.
 - **Security**: non-root (grafana's built-in uid/gid 472), all caps dropped,
   `readOnlyRootFilesystem` (only the two emptyDirs are writable),
   `seccompProfile: RuntimeDefault` — passes PodSecurity `restricted`.

@@ -36,7 +36,7 @@ one `git clean` from oblivion.
 | In-cluster builds | Kaniko is dead → **rootless BuildKit** + Zot registry; needs PSA-privileged build namespace on Talos; unrehearsed combo — spike early |
 | Crossplane | **v2** (claims gone; compositions emit CNPG `Cluster` directly) — simpler to teach than v1 ever was |
 | Backstage | Hands-on **is** feasible via CNOE prebuilt image — but heaviest item (~2 GB); last module + presenter fallback |
-| Observability | Single `grafana/otel-lgtm` pod, not kube-prometheus-stack |
+| Observability | On-demand Victoria stack (VictoriaMetrics/Logs/Traces + Grafana) + OTel Collector, not kube-prometheus-stack or single-pod otel-lgtm |
 | RAM | Landing zone 13–17 GB → publish **16 GB min / 32 GB recommended** |
 | Laptops | JavaZone 2022 precedent lost half the room to local setup → pre-flight gate + fallback path required (see Decision 1) |
 
@@ -59,7 +59,7 @@ solution to re-sync.
 | S2 | Argo Workflows — in-cluster image build → Zot → deploy | stretch | presenter demo + self-paced lab | pipeline goes green |
 | S3 | Bespoke Cloudbox Console (hands-on) + Backstage (presenter demo) | stretch | self-paced + demo | create a database from a portal form; read the whole portal's source |
 | S4 | Capstone — picture pipeline: Knative Eventing + portal gallery | stretch | self-paced finale | upload → resizer scales from zero → thumbnail + trace in Grafana |
-| — | Observability | woven | otel-lgtm installed in module 2's tree; "look at what you built" moments in every module | |
+| — | Observability | on-demand | Victoria stack + OTel Collector enabled from the catalog, not wave-0; the module-09 capstone "now observe what you built" moment | |
 
 Core = 155 min + module 0 ⇒ fits with slack; stretch material absorbs the fast 20%.
 
@@ -80,7 +80,7 @@ attendee laptop
         ├── Cloudbox Console (bespoke portal)  (stretch)  │
         ├── Knative Eventing + picture pipeline (capstone)│
         ├── Backstage (CNOE image, presenter demo)        │
-        └── grafana/otel-lgtm                  ───────────┘
+        └── Victoria stack + OTel Collector (on-demand) ──┘
 ```
 
 Repo layout to build toward:

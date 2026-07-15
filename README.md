@@ -37,7 +37,7 @@ your laptop
         ├── Argo Workflows + BuildKit + Zot    (stretch)   │ Gitea
         ├── NATS JetStream (durable messaging) (stretch)   │
         ├── Backstage (CNOE image)             (stretch)   │
-        └── grafana/otel-lgtm (observability)  ────────────┘
+        └── Victoria stack + OTel Collector    (on-demand) ┘
 ```
 
 The mechanic you'll use all day: the platform capabilities live as a catalog of ArgoCD

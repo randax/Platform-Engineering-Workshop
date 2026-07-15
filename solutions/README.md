@@ -43,7 +43,7 @@ lab/03-data/verify.sh                 # confirm
 
 | Module | apps enabled |
 |---|---|
-| 02 | local-path-provisioner, otel-lgtm (wave 0) + demo |
+| 02 | local-path-provisioner (wave 0) + demo |
 | 03 | + cnpg-operator, rustfs |
 | 04 / 05 | + crossplane, platform-api |
 | 06 | + knative-serving |
