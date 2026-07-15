@@ -31,7 +31,7 @@ func TestNavUnlock(t *testing.T) {
 	}
 	// Pages with no Unlock predicate — these must be reachable from a bare
 	// cluster, or a workshop attendee could never get started.
-	alwaysOpen := []string{"overview", "workshop", "components", "billing", "activity"}
+	alwaysOpen := []string{"overview", "workshop", "components", "billing", "activity", "access"}
 
 	// An empty snapshot: no Application is Healthy, so every gated page locks.
 	empty := navGroups(kube.Snapshot{})

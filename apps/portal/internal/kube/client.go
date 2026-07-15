@@ -36,9 +36,20 @@ import (
 const saDir = "/var/run/secrets/kubernetes.io/serviceaccount"
 
 type Client struct {
-	baseURL string // e.g. https://10.96.0.1:443
-	token   string // ServiceAccount bearer token ("" when going via kubectl proxy)
-	client  *http.Client
+	baseURL   string // e.g. https://10.96.0.1:443
+	token     string // ServiceAccount bearer token ("" when going via kubectl proxy)
+	namespace string // the pod's own namespace, from the SA mount ("" via proxy)
+	client    *http.Client
+}
+
+// Namespace is the namespace the console itself runs in, read from the same
+// ServiceAccount mount as the token. Empty when running outside a cluster (via
+// kubectl proxy), so callers should fall back to a sensible default.
+func (k *Client) Namespace() string {
+	if k == nil {
+		return ""
+	}
+	return k.namespace
 }
 
 // NewClient wires up in-cluster API access. For local development run
@@ -71,9 +82,13 @@ func NewClient(apiURL, token string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading serviceaccount token: %w", err)
 	}
+	// The namespace is mounted next to the token; best-effort, so a read error
+	// just leaves it empty rather than failing to start.
+	nsBytes, _ := os.ReadFile(saDir + "/namespace")
 	return &Client{
-		baseURL: "https://" + net.JoinHostPort(host, port),
-		token:   strings.TrimSpace(string(saToken)),
+		baseURL:   "https://" + net.JoinHostPort(host, port),
+		token:     strings.TrimSpace(string(saToken)),
+		namespace: strings.TrimSpace(string(nsBytes)),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 			// otelhttp wraps the real transport so every API call shows up
