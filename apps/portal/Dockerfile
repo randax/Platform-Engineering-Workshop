@@ -2,7 +2,7 @@
 # Built the same way in GitHub Actions (buildx, multi-arch) and by the
 # in-cluster BuildKit from module 07.
 
-FROM golang:1.24-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 
 # Dependencies first, so BuildKit caches this layer across code changes.

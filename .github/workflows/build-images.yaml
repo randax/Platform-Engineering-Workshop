@@ -55,12 +55,20 @@ jobs:
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}
+    # GOTOOLCHAIN=local: build with EXACTLY this toolchain, never auto-download
+    # a newer one. This matches the golang:1.25-alpine Dockerfile, so if a dep
+    # bump raises a go.mod `go` directive past 1.25, THIS job fails loudly on the
+    # PR — instead of silently downloading the toolchain and green-lighting an
+    # image build that will then break (which is exactly how x/net 0.55 slipped
+    # the directive to 1.25 under a 1.24 base image).
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           cache-dependency-path: apps/${{ matrix.app }}/go.sum
 
       - name: go vet
