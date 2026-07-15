@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/logs"
 	"cloudbox.io/portal/internal/metrics"
 	"cloudbox.io/portal/internal/nats"
 	"cloudbox.io/portal/internal/registry"
@@ -55,6 +56,7 @@ func main() {
 		Kube:        kubeClient,
 		Store:       s3,
 		Prom:        metrics.New(cfg.PromURL),
+		Logs:        logs.New(cfg.VLogsURL),
 		Streams:     nats.New(cfg.NATSMonitorURL),
 		Registry:    registry.New(cfg.ZotURL),
 		UploaderURL: cfg.UploaderURL,

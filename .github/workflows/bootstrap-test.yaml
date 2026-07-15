@@ -278,6 +278,19 @@ jobs:
           done
           [ -n "$traced" ] || { echo "❌ no app traces in VictoriaTraces (services: ${svcs:-none})"; exit 1; }
           echo "✅ OTel Collector: component metrics in VM + component logs in VLogs + app traces in VictoriaTraces"
+
+          # Catalog the component/app metric names VM actually stores (now that
+          # -opentelemetry.usePrometheusNaming is on) — the console's Monitoring
+          # panels (#56) pin their PromQL to these exact names, so surface them.
+          {
+            echo ""
+            echo "### Metric catalog for console panels (#56)"
+            echo ""
+            echo '```'
+            curl -fsS "http://localhost:18428/api/v1/label/__name__/values" 2>/dev/null \
+              | jq -r '.data[]?' | grep -E '^(k8s_|container_|http_|cloudbox_)' | sort || echo "(query failed)"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
           {
             echo ""
             echo "### Observability v2 — full collection (#57, lgtm-free)"

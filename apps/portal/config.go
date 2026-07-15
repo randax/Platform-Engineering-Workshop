@@ -22,7 +22,8 @@ type config struct {
 	S3Bucket         string
 
 	UploaderURL    string // cluster-internal ksvc the upload form proxies to
-	PromURL        string // Prometheus API for the sparklines
+	PromURL        string // VictoriaMetrics Prometheus API for the sparklines
+	VLogsURL       string // VictoriaLogs query API for the per-component log tail
 	GrafanaURL     string // browser-facing Grafana for deep links
 	NATSMonitorURL string // NATS monitoring endpoint for the JetStream browser
 	ZotURL         string // cluster-internal Zot registry, read by the Builds page
@@ -43,6 +44,7 @@ func loadConfig() config {
 		S3Bucket:         envOr("S3_BUCKET", "images"),
 		UploaderURL:      envOr("UPLOADER_URL", "http://uploader.pipeline.svc.cluster.local"),
 		PromURL:          envOr("PROM_URL", "http://victoria-metrics.observability.svc.cluster.local:8428"),
+		VLogsURL:         envOr("VLOGS_URL", "http://victoria-logs.observability.svc.cluster.local:9428"),
 		GrafanaURL:       envOr("GRAFANA_URL", "http://localhost:30030"),
 		NATSMonitorURL:   envOr("NATS_MONITOR_URL", "http://nats.nats.svc.cluster.local:8222"),
 		ZotURL:           envOr("ZOT_URL", "http://zot.zot.svc.cluster.local:5000"),

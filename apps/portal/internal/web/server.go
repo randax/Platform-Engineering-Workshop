@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/logs"
 	"cloudbox.io/portal/internal/metrics"
 	"cloudbox.io/portal/internal/nats"
 	reg "cloudbox.io/portal/internal/registry" // aliased: the web package already has a `registry` var (the page registry)
@@ -25,6 +26,7 @@ type Server struct {
 	Kube        *kube.Client
 	Store       *store.Client
 	Prom        *metrics.Client
+	Logs        *logs.Client
 	Streams     *nats.Client
 	Registry    *reg.Client // Zot OCI registry, read by the Builds page
 	Tmpl        *template.Template
