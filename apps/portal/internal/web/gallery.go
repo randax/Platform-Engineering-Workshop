@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 
+	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/store"
 )
 
@@ -21,6 +22,12 @@ func init() {
 		NavTitle:   "Gallery",
 		Path:       "/gallery",
 		Handler:    handleGallery,
+		// Capstone (module 09): the gallery is the event-driven picture
+		// pipeline seen from outside — there's nothing to show or upload to
+		// until that pipeline is deployed and Healthy.
+		Unlock:     func(s kube.Snapshot) bool { _, h := s.AppHealthy("picture-pipeline"); return h },
+		LockedHint: "Complete Module 09 · Capstone",
+		Teaser:     "Upload an image and watch the event-driven pipeline resize and analyze it end to end.",
 		// POST is CSRF-token-free on purpose — see the databases page note.
 		Extra: []Route{
 			{"GET /gallery/grid", handleGalleryGrid}, // polled by htmx

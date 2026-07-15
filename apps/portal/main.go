@@ -34,10 +34,6 @@ func main() {
 	shutdown := initTelemetry(cfg.OTLPEndpoint, cfg.ServiceName)
 	defer shutdown()
 
-	tmpl, err := web.ParseTemplates(cfg.GrafanaURL)
-	if err != nil {
-		log.Fatalf("parsing templates: %v", err)
-	}
 	kubeClient, err := kube.NewClient(cfg.KubeAPIURL, cfg.KubeToken)
 	if err != nil {
 		log.Fatalf("kubernetes client: %v (set KUBE_API_URL when running outside a cluster, e.g. via `kubectl proxy`)", err)
@@ -57,7 +53,6 @@ func main() {
 		Kube:        kubeClient,
 		Store:       s3,
 		Prom:        metrics.New(cfg.PromURL),
-		Tmpl:        tmpl,
 		UploaderURL: cfg.UploaderURL,
 		GrafanaURL:  cfg.GrafanaURL,
 		// otelhttp's transport adds a client span AND a `traceparent` header
@@ -67,6 +62,14 @@ func main() {
 		HTTPClient: &http.Client{Timeout: 60 * time.Second, Transport: otelhttp.NewTransport(nil)},
 		Pages:      counter("cloudbox.pages.rendered", "pages and fragments rendered by the console"),
 	}
+
+	// Templates parse last: the sidebar's "nav" func closes over srv so it can
+	// rebuild from the live unlock cache per request, so srv must exist first.
+	tmpl, err := web.ParseTemplates(srv)
+	if err != nil {
+		log.Fatalf("parsing templates: %v", err)
+	}
+	srv.Tmpl = tmpl
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", web.Static())
@@ -87,9 +90,13 @@ func main() {
 		if p.Path == "/" {
 			pattern = "GET /{$}" // exact match, or "/" would swallow every 404
 		}
-		mux.HandleFunc(pattern, bind(srv, p.Handler))
+		// gated wraps the handler so a locked page serves its teaser instead
+		// of a feature whose API isn't there yet; unlocked pages pass through
+		// untouched. The Extra routes (polled fragments, form posts) are gated
+		// too, so a locked page can't be driven around the sidebar.
+		mux.HandleFunc(pattern, bind(srv, p.Gated(p.Handler)))
 		for _, extra := range p.Extra {
-			mux.HandleFunc(extra.Pattern, bind(srv, extra.Handler))
+			mux.HandleFunc(extra.Pattern, bind(srv, p.Gated(extra.Handler)))
 		}
 	}
 

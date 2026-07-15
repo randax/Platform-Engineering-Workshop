@@ -19,6 +19,11 @@ func init() {
 		NavTitle:   "Databases",
 		Path:       "/databases",
 		Handler:    handleDatabases,
+		// Self-service (module 04): the WorkshopDatabase XR and its form only
+		// mean anything once Crossplane is installed and Healthy to compose it.
+		Unlock:     func(s kube.Snapshot) bool { _, h := s.AppHealthy("crossplane"); return h },
+		LockedHint: "Complete Module 04 · Self-service",
+		Teaser:     "Provision a Postgres database and its bucket from one small form — Crossplane composes the real resources for you.",
 		// Mutating routes. No CSRF token on these: single-user disposable
 		// lab — don't copy this into a real portal.
 		Extra: []Route{

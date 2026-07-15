@@ -64,6 +64,20 @@ nav a[aria-current="page"] {
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* locked nav entry: a page whose capability hasn't landed yet. Deliberately
+   NOT a link — muted, dimmed, default cursor — so it reads as "coming, not
+   broken"; the title attribute names the module that unlocks it. Same box
+   metrics as nav a so the rail doesn't shift when a page unlocks. */
+.nav-locked {
+  display: block;
+  padding: 0.3rem 0.5rem;
+  color: #7b8794;
+  opacity: 0.6;
+  cursor: default;
+  border-left: 2px solid transparent;
+  border-radius: 0 4px 4px 0;
+}
+
 /* narrow screens: the rail becomes a wrapping bar on top — no JS, one query */
 @media (max-width: 900px) {
   .shell { flex-direction: column; }

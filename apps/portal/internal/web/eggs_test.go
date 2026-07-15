@@ -18,11 +18,12 @@ func TestTeapot(t *testing.T) {
 }
 
 func TestNotFoundStatus(t *testing.T) {
-	tmpl, err := ParseTemplates("http://localhost:30030")
+	s := &Server{GrafanaURL: "http://localhost:30030"}
+	tmpl, err := ParseTemplates(s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{Tmpl: tmpl}
+	s.Tmpl = tmpl
 	w := httptest.NewRecorder()
 	NotFound(s, w, httptest.NewRequest("GET", "/nonsense", nil))
 	if w.Code != http.StatusNotFound {
