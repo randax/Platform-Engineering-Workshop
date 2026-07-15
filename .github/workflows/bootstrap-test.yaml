@@ -257,7 +257,10 @@ jobs:
           for _ in $(seq 1 24); do
             logs=$(curl -fsS -G http://localhost:19428/select/logsql/query \
               --data-urlencode 'query=_time:10m' --data-urlencode 'limit=500' 2>/dev/null || true)
-            if printf '%s' "$logs" | grep -q 'kube-system'; then found=1; break; fi
+            # bash pattern match (not printf|grep -q): under `set -o pipefail`,
+            # grep -q exits early on a match and SIGPIPEs printf (141), which
+            # pipefail turns into a false negative — a real flake.
+            if [[ "$logs" == *kube-system* ]]; then found=1; break; fi
             sleep 5
           done
           [ -n "$found" ] || { echo "❌ no component logs in VLogs"; exit 1; }
@@ -272,7 +275,7 @@ jobs:
           traced=""
           for _ in $(seq 1 24); do
             svcs=$(curl -fsS "http://localhost:10428/select/jaeger/api/services" 2>/dev/null || true)
-            if printf '%s' "$svcs" | grep -q 'cloudbox-portal'; then traced=1; break; fi
+            if [[ "$svcs" == *cloudbox-portal* ]]; then traced=1; break; fi
             curl -fsS -o /dev/null "http://localhost:30600/" 2>/dev/null || true
             sleep 5
           done
