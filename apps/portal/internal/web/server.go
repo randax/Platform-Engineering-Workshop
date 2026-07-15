@@ -54,27 +54,42 @@ const snapshotTTL = 5 * time.Second
 // zero snapshot, which reads as "nothing unlocked yet", the honest default.
 func (s *Server) currentSnapshot() kube.Snapshot {
 	s.snapMu.Lock()
-	defer s.snapMu.Unlock()
 
 	// A Server with no Kube client (the template unit tests build a bare one)
 	// has nothing to read: hand back the zero snapshot so the nav still
 	// renders, with every gated page simply reading as locked.
 	if s.Kube == nil {
-		return s.snap
+		snap := s.snap
+		s.snapMu.Unlock()
+		return snap
 	}
 	if !s.snapAt.IsZero() && time.Since(s.snapAt) < snapshotTTL {
-		return s.snap
+		snap := s.snap
+		s.snapMu.Unlock()
+		return snap
 	}
 
-	// Stamp the attempt time before the read so a persistently failing API
-	// server is retried at most once per TTL, not on every single request.
+	// Claim the refresh, then release the lock BEFORE the network read. The
+	// sidebar calls this on every request, so holding the mutex across a slow
+	// API round-trip would stall every concurrent render. Stamping snapAt now
+	// means other requests during the read see "fresh" and return the
+	// last-known snapshot instead of piling up — a single-flight refresh.
 	s.snapAt = time.Now()
+	last := s.snap
+	s.snapMu.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if snap, err := workshopSnapshot(ctx, s); err == nil {
-		s.snap = snap
+	snap, err := workshopSnapshot(ctx, s)
+	if err != nil {
+		// Keep last-known; the next request after the TTL retries. A transient
+		// API blip must not relock a page the user already unlocked.
+		return last
 	}
-	return s.snap
+	s.snapMu.Lock()
+	s.snap = snap
+	s.snapMu.Unlock()
+	return snap
 }
 
 // flash is a one-shot notice rendered at the top of a fragment. Error flips
