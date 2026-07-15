@@ -137,6 +137,11 @@ func (s *Client) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
 func (s *Client) ListObjectsIn(ctx context.Context, bucket string, max int) ([]ObjectInfo, error) {
 	ctx, span := otel.Tracer("portal").Start(ctx, "s3 list objects")
 	defer span.End()
+	// Cancel on return so an early break (len >= max) tells minio's listing
+	// goroutine to stop — otherwise it blocks trying to send the next key and
+	// leaks until the request context ends.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	var objects []ObjectInfo
 	for obj := range s.api.ListObjects(ctx, bucket, minio.ListObjectsOptions{Recursive: true}) {
 		if obj.Err != nil {

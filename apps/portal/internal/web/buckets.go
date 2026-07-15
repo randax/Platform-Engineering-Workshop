@@ -106,11 +106,14 @@ func bucketsPage(ctx context.Context, st bucketStore, selected string) (bucketsD
 	}
 	data := bucketsData{Buckets: buckets}
 	if selected != "" {
-		objs, err := bucketObjects(ctx, st, selected, flash{})
-		if err != nil {
-			return bucketsData{}, err
+		// A failure listing the selected bucket must not take down the whole
+		// page — keep the bucket list and show the error in the objects panel,
+		// matching the htmx fragment's degrade-in-place behaviour.
+		if objs, err := bucketObjects(ctx, st, selected, flash{}); err != nil {
+			data.Objects = objectsData{Bucket: selected, Flash: errorFlash("S3 error: " + err.Error())}
+		} else {
+			data.Objects = objs
 		}
-		data.Objects = objs
 	}
 	return data, nil
 }
@@ -130,6 +133,12 @@ func handleBuckets(s *Server, w http.ResponseWriter, r *http.Request) {
 // page stays intact.
 func handleBucketObjects(s *Server, w http.ResponseWriter, r *http.Request) {
 	bucket := r.URL.Query().Get("b")
+	if bucket == "" {
+		// No bucket named — don't fire an S3 call with an empty name (which
+		// only errors and logs noise); ask for a selection instead.
+		s.render(w, "bucket-objects", objectsData{Flash: errorFlash("No bucket selected")})
+		return
+	}
 	data, err := bucketObjects(r.Context(), s.Store, bucket, flash{})
 	if err != nil {
 		log.Printf("list objects in %s: %v", bucket, err)

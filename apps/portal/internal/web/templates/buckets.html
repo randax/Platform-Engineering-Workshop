@@ -44,7 +44,7 @@ endpoint, valid 15 minutes, so the file downloads straight from RustFS with zero
       <td><code>{{.Key}}</code></td>
       <td>{{.HumanBytes}}</td>
       <td>{{.LastModified.Format "2006-01-02 15:04"}}</td>
-      <td>{{if .DownloadURL}}<a href="{{.DownloadURL}}" target="_blank">Download ↗</a>{{end}}</td>
+      <td>{{if .DownloadURL}}<a href="{{.DownloadURL}}" target="_blank" rel="noopener noreferrer">Download ↗</a>{{end}}</td>
     </tr>
   {{else}}
     <tr><td colspan="4" class="empty">This bucket is empty.</td></tr>
