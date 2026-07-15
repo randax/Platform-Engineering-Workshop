@@ -1,0 +1,161 @@
+---
+# Grafana 12.4.5 — dashboards for the Victoria stack (observability rework,
+# issue #57). Pre-wired with two provisioned datasources:
+#   - VictoriaMetrics (Prometheus type, default) → PromQL/metrics
+#   - VictoriaLogs    (Loki type)                → logs (see VENDOR.md caveat)
+# Anonymous read (Viewer) is on — workshop-grade, matching otel-lgtm's Grafana.
+# NodePort 30031 (service-nodeport.yaml) so the browser reaches it at
+# http://localhost:30031 while otel-lgtm still holds 30030.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: grafana
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      # VictoriaMetrics speaks the Prometheus query API, so Grafana talks to it
+      # with the built-in Prometheus datasource — no plugin, works offline.
+      - name: VictoriaMetrics
+        uid: victoriametrics
+        type: prometheus
+        access: proxy
+        url: http://victoria-metrics.observability.svc.cluster.local:8428
+        isDefault: true
+        jsonData:
+          httpMethod: POST
+          prometheusType: Prometheus
+      # VictoriaLogs exposes a Loki-compatible query API, so we use the built-in
+      # Loki datasource (offline rule: no internet-fetched plugin at boot).
+      # See VENDOR.md for why Loki type + this URL, and the caveat.
+      - name: VictoriaLogs
+        uid: victorialogs
+        type: loki
+        access: proxy
+        url: http://victoria-logs.observability.svc.cluster.local:9428
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: grafana
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+  selector:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: grafana
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: grafana
+    app.kubernetes.io/version: "12.4.5"
+spec:
+  replicas: 1
+  # Single writable state (grafana.db on emptyDir), no HA needed for a lab.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+      app.kubernetes.io/instance: grafana
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: grafana
+        app.kubernetes.io/instance: grafana
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # 472 is the grafana image's built-in user/group.
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: grafana
+          image: "docker.io/grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ ALL ]
+            # Grafana only writes /var/lib/grafana and /tmp (both emptyDir).
+            readOnlyRootFilesystem: true
+          env:
+            # Anonymous read access (Viewer) — the workshop Grafana is open, same
+            # posture as otel-lgtm. The login form stays available so an admin
+            # (default admin/admin, ephemeral lab) can still edit.
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: Viewer
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            # Offline rule: never phone home at boot.
+            - name: GF_ANALYTICS_REPORTING_ENABLED
+              value: "false"
+            - name: GF_ANALYTICS_CHECK_FOR_UPDATES
+              value: "false"
+            # No plugins that would need internet to install at boot.
+            - name: GF_INSTALL_PLUGINS
+              value: ""
+          ports:
+            - name: http
+              containerPort: 3000
+          resources:
+            limits:
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/grafana
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        # Ephemeral on purpose: dashboards are provisioned, and grafana.db does
+        # not need to survive a pod restart in a 4-hour workshop.
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

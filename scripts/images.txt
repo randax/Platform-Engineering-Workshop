@@ -94,6 +94,12 @@ docker.io/moby/buildkit:v0.31.1-rootless
 # NATS 2.12.12 + JetStream — durable messaging (PRD-0001)
 docker.io/library/nats:2.12.12-alpine@sha256:2ca98656a279b2d88cfdf2b8c3f0d5d7f3941ae9dc2ab12ebaa92d83e0f4ccdb
 
+# --- Observability v2 (Victoria stack, issue #57)
+# Coexists with otel-lgtm (Wave 0) during the migration; retires it later.
+docker.io/victoriametrics/victoria-metrics:v1.147.0@sha256:40ea45a6d14b6ad9f2f1fff597309d456ff9885d77d8d1da5fd559b251db9987
+docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs@sha256:1ec31ddccc39dc9ead2607cddbf2829be1eb5ad39890e72bba26b359be20801d
+docker.io/grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd
+
 # --- Lab workload images (modules 3, 4, 6)
 # aws-cli: bucket tooling in modules 03/04 (public.ecr.aws is in the mirror map)
 public.ecr.aws/aws-cli/aws-cli:2.27.49
