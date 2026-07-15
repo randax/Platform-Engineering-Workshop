@@ -17,6 +17,7 @@ import (
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/metrics"
 	"cloudbox.io/portal/internal/nats"
+	reg "cloudbox.io/portal/internal/registry" // aliased: the web package already has a `registry` var (the page registry)
 	"cloudbox.io/portal/internal/store"
 )
 
@@ -25,6 +26,7 @@ type Server struct {
 	Store       *store.Client
 	Prom        *metrics.Client
 	Streams     *nats.Client
+	Registry    *reg.Client // Zot OCI registry, read by the Builds page
 	Tmpl        *template.Template
 	UploaderURL string              // cluster-internal URL of the uploader Knative Service
 	GrafanaURL  string              // browser-facing Grafana base for deep links

@@ -25,6 +25,7 @@ import (
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/metrics"
 	"cloudbox.io/portal/internal/nats"
+	"cloudbox.io/portal/internal/registry"
 	"cloudbox.io/portal/internal/store"
 	"cloudbox.io/portal/internal/web"
 )
@@ -55,6 +56,7 @@ func main() {
 		Store:       s3,
 		Prom:        metrics.New(cfg.PromURL),
 		Streams:     nats.New(cfg.NATSMonitorURL),
+		Registry:    registry.New(cfg.ZotURL),
 		UploaderURL: cfg.UploaderURL,
 		GrafanaURL:  cfg.GrafanaURL,
 		// otelhttp's transport adds a client span AND a `traceparent` header
