@@ -7780,9 +7780,14 @@ metadata:
     app.kubernetes.io/name: knative-serving
     app.kubernetes.io/component: controller
     app.kubernetes.io/version: "1.22.1"
-  annotations:
-    knative.dev/example-checksum: "26c09de5"
 data:
+  # Externally-routable default domain via sslip.io magic DNS (resolves to
+  # 127.0.0.1). WITHOUT this, config-domain has only _example → Knative
+  # defaults to svc.cluster.local, which is cluster-local-only and NOT served
+  # by the external Kourier NodePort → curl/browser get 404. ksvc URLs become
+  # http://<name>.<ns>.127.0.0.1.sslip.io, reachable at :31080 with a Host
+  # header AND directly in a browser. (Found by rehearsal-in-CI: module 06.)
+  127.0.0.1.sslip.io: ""
   _example: |
     ################################
     #                              #
