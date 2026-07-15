@@ -23,6 +23,13 @@ wait_app portal
 wait_app picture-pipeline 600
 
 kubectl -n pipeline wait --for=condition=Ready broker/default --timeout=300s
+# The trigger latches "BrokerNotConfigured" if it first reconciled before the
+# broker was Ready (the broker itself races the eventing-config install). Now the
+# broker is up, poke the trigger to re-reconcile so it picks up the ready broker.
+# The timestamp guarantees the annotation actually changes (forcing a reconcile)
+# even on a re-run; ArgoCD selfHeal reverts the throwaway annotation afterwards.
+kubectl -n pipeline annotate trigger/resize-on-upload \
+  cloudbox.io/rereconcile="$(date +%s)" --overwrite >/dev/null 2>&1 || true
 kubectl -n pipeline wait --for=condition=Ready trigger/resize-on-upload --timeout=300s
 kubectl -n pipeline wait --for=condition=Ready ksvc/uploader ksvc/resizer --timeout=300s
 kubectl -n pipeline wait --for=condition=Complete job/create-images-bucket --timeout=300s
