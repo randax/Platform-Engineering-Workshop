@@ -96,23 +96,11 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-        # Ensure the store dir exists and is writable by the nats uid.
-        - name: init-store
-          image: "busybox:1.37.0"
-          imagePullPolicy: IfNotPresent
-          command: ["sh", "-c", "mkdir -p /data && chmod 0700 /data"]
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ ALL ]
-            readOnlyRootFilesystem: true
-          volumeMounts:
-            - name: data
-              mountPath: /data
+      # No initContainer: fsGroup:1000 makes Kubernetes chown the PVC to the nats
+      # gid on mount, so JetStream can create its store under /data directly.
       containers:
         - name: nats
-          image: "nats:2.12.12-alpine"
+          image: "nats:2.12.12-alpine@sha256:2ca98656a279b2d88cfdf2b8c3f0d5d7f3941ae9dc2ab12ebaa92d83e0f4ccdb"
           imagePullPolicy: IfNotPresent
           args: ["--config", "/etc/nats/nats.conf"]
           securityContext:
