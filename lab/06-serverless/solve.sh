@@ -16,6 +16,8 @@ gitops_push "$CLONE" "module 06: knative-serving + hello ksvc"
 wait_app knative-serving
 wait_app demo
 
+# The hello ksvc can be skipped if demo synced before Knative's CRD was ready.
+wait_for_cr demo ksvc/hello services.serving.knative.dev
 kubectl -n demo wait --for=condition=Ready ksvc/hello --timeout=300s
 
 # Strip the scheme in pure bash — BSD sed has no \? in basic regex.
