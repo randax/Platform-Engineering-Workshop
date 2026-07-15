@@ -51,3 +51,13 @@ already teaches. NATS (PRD-0001) is built first and then absorbed as `spec.queue
 It's woven across the platform, the console ("New Application" form + templates),
 and the slides, and it's dogfooded by redeploying the picture-pipeline capstone as
 `Application`s. This is the apex of the self-service arc, not a side stretch.
+
+## Progressive console
+
+[PRD-0004](0004-progressive-console.md) turns the Cloudbox Console into a **live
+progress mechanic**: features unlock as the attendee's cluster gains the capability
+behind them (Buckets after RustFS, Functions after Knative, Streams after NATS, New
+Application after the golden path…), with locked teasers and an unlock toast. It's
+honest gating — a page appears because its API now exists — reusing the console's
+existing `EvaluateModules` state inference. Built after the golden path (the New
+Application page is the shared hinge).
