@@ -41,7 +41,8 @@ slides/      Slidev deck
 - Pinned stack: Talos **v1.13.6** (never 1.12.x), Cilium **1.19.5**, ArgoCD **v3.4.5**,
   Crossplane **v2**, CloudNativePG, RustFS (standalone, beta — SeaweedFS is Plan B),
   Knative + Kourier (stretch), Argo Workflows + BuildKit + Zot (stretch),
-  Backstage CNOE image (stretch), grafana/otel-lgtm (observability).
+  NATS JetStream (durable messaging, stretch), Backstage CNOE image (stretch),
+  grafana/otel-lgtm (observability).
 - Cluster: `talosctl cluster create docker`, 1 CP + 1 worker, raised memory limits,
   `cni: none` + Helm-installed Cilium.
 - GitOps write path: ArgoCD points **only at the in-cluster Gitea** (single-pod SQLite,
