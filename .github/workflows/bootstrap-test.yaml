@@ -167,6 +167,34 @@ jobs:
               || echo "| $n | (unavailable) | |" >> "$sum"
           done
 
+          # Per-component RAM inventory (issue #8): pull every pod's workingSet
+          # from the kubelet summary across nodes, aggregate by namespace, and
+          # list the heaviest pods. Raw JSON saved for offline analysis.
+          mkdir -p /tmp/diag
+          pods=/tmp/diag/pods-memory.json
+          echo '[]' > "$pods"
+          for n in $(kubectl get nodes -o name 2>/dev/null | sed 's|node/||'); do
+            kubectl get --raw "/api/v1/nodes/$n/proxy/stats/summary" 2>/dev/null \
+              | jq '[.pods[] | {ns: .podRef.namespace, pod: .podRef.name, ws: (.memory.workingSetBytes // 0)}]' > /tmp/n.json 2>/dev/null || echo '[]' > /tmp/n.json
+            jq -s 'add' "$pods" /tmp/n.json > /tmp/m.json && mv /tmp/m.json "$pods"
+          done
+          {
+            echo ""
+            echo "### RAM by namespace (workingSet, module-09 full stack)"
+            echo ""
+            echo "| Namespace | workingSet |"
+            echo "|---|---|"
+            jq -r 'group_by(.ns)[] | {ns: .[0].ns, t: (map(.ws)|add)} | [.ns, ((.t/1048576)|floor)] | @tsv' "$pods" \
+              | sort -t$'\t' -k2 -rn | awk -F'\t' '{printf "| %s | %s MiB |\n", $1, $2}'
+            echo ""
+            echo "### Heaviest 25 pods"
+            echo ""
+            echo "| Namespace | Pod | workingSet |"
+            echo "|---|---|---|"
+            jq -r 'sort_by(-.ws)[:25][] | [.ns, .pod, ((.ws/1048576)|floor)] | @tsv' "$pods" \
+              | awk -F'\t' '{printf "| %s | %s | %s MiB |\n", $1, $2, $3}'
+          } >> "$sum"
+
       - name: Collect diagnostics
         if: always()
         run: |
