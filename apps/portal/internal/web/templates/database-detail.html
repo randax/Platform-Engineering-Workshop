@@ -6,9 +6,8 @@
 </h1>
 
 {{with .DB}}
-<p class="lede">A <code>WorkshopDatabase</code> — size <b>{{.Spec.Size}}</b>,
-storage <b>{{.Spec.StorageGB}} GiB</b>, composed by Crossplane into the CNPG
-cluster and bucket below.</p>
+<p class="lede">A <code>WorkshopDatabase</code> — T-shirt size <b>{{.Spec.Size}}</b>, composed by
+Crossplane into the CNPG cluster and bucket below (the size decides instances + storage).</p>
 {{else}}
 <p class="lede">No WorkshopDatabase named <code>{{.Name}}</code> exists (deleted, or this
 is an unmanaged CNPG cluster).</p>

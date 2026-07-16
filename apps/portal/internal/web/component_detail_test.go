@@ -275,7 +275,6 @@ func sampleDatabaseDetail() dbDetailData {
 	var wdb kube.WorkshopDB
 	wdb.Metadata = kube.ObjMeta{Name: "my-app", Namespace: "demo"}
 	wdb.Spec.Size = "small"
-	wdb.Spec.StorageGB = 1
 	wdb.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "True", Reason: "Available", Message: "Composed and ready"}}
 	d.DB = &wdb
 	var cl kube.CNPGClusterDetail

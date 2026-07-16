@@ -38,7 +38,6 @@ metadata:
   name: console-db
 spec:
   size: small
-  storageGB: 1
 EOF
 
 kubectl -n demo wait --for=condition=Ready workshopdatabase/console-db --timeout=600s

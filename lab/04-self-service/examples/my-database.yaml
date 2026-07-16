@@ -7,5 +7,5 @@ kind: WorkshopDatabase
 metadata:
   name: my-db
 spec:
+  # One knob — a T-shirt size. It bundles compute, storage and HA instances.
   size: small
-  storageGB: 1

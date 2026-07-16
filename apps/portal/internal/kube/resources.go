@@ -160,8 +160,9 @@ func (k *Client) ListKnativeServices(ctx context.Context) ([]KnativeService, err
 
 // The self-service database from module 04: a namespaced Crossplane v2
 // composite resource. The schema below mirrors the XRD
-// (workshopdatabases.platform.cloudbox.io): spec.size is "small" or "medium",
-// spec.storageGB is 1–10 GiB.
+// (workshopdatabases.platform.cloudbox.io): the ONLY knob is spec.size — a
+// T-shirt (small|medium|large) that bundles compute, storage and HA instances
+// (PRD-0006). No raw storage knob; the Composition owns what a size means.
 const (
 	xrAPI  = "platform.cloudbox.io/v1alpha1"
 	xrKind = "WorkshopDatabase"
@@ -174,8 +175,7 @@ const (
 type WorkshopDB struct {
 	Metadata ObjMeta `json:"metadata"`
 	Spec     struct {
-		Size      string `json:"size"`
-		StorageGB int    `json:"storageGB"`
+		Size string `json:"size"`
 	} `json:"spec"`
 	Status struct {
 		Conditions []Condition `json:"conditions"`
@@ -203,27 +203,24 @@ func ValidName(s string) bool { return dnsName.MatchString(s) }
 // trick behind "self-service platform APIs": creating a database is one POST
 // of ~10 lines of JSON, which Crossplane then expands into a CNPG Postgres
 // cluster and an S3 bucket (see lab/04's Composition).
-func BuildWorkshopDatabase(name, size string, storageGB int) ([]byte, error) {
+func BuildWorkshopDatabase(name, size string) ([]byte, error) {
 	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
-	if size != "small" && size != "medium" {
-		return nil, fmt.Errorf("size must be small or medium, got %q", size)
-	}
-	if storageGB < 1 || storageGB > 10 {
-		return nil, fmt.Errorf("storageGB must be 1-10, got %d", storageGB)
+	if size != "small" && size != "medium" && size != "large" {
+		return nil, fmt.Errorf("size must be small, medium or large, got %q", size)
 	}
 	xr := map[string]any{
 		"apiVersion": xrAPI,
 		"kind":       xrKind,
 		"metadata":   map[string]any{"name": name, "namespace": XRNamespace},
-		"spec":       map[string]any{"size": size, "storageGB": storageGB},
+		"spec":       map[string]any{"size": size},
 	}
 	return json.Marshal(xr)
 }
 
-func (k *Client) CreateWorkshopDatabase(ctx context.Context, name, size string, storageGB int) error {
-	body, err := BuildWorkshopDatabase(name, size, storageGB)
+func (k *Client) CreateWorkshopDatabase(ctx context.Context, name, size string) error {
+	body, err := BuildWorkshopDatabase(name, size)
 	if err != nil {
 		return err
 	}

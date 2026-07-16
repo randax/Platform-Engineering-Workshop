@@ -170,8 +170,9 @@ spec:
               apiVersion: platform.cloudbox.io/v1alpha1
               kind: WorkshopDatabase
               spec:
+                # The T-shirt is the only knob now (PRD-0006) — size bundles
+                # storage + HA. (A future tier cascades the app's own size here.)
                 size: small
-                storageGB: 1
             patches:
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name

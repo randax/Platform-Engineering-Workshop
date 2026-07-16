@@ -7,9 +7,9 @@ import (
 
 // The XR the portal creates must match the XRD in lab/04-self-service —
 // group platform.cloudbox.io, version v1alpha1, kind WorkshopDatabase,
-// namespaced, with spec.size and spec.storageGB.
+// namespaced, with a single knob: spec.size (the T-shirt, PRD-0006).
 func TestBuildWorkshopDatabase(t *testing.T) {
-	raw, err := BuildWorkshopDatabase("my-db", "medium", 5)
+	raw, err := BuildWorkshopDatabase("my-db", "large")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -23,7 +23,7 @@ func TestBuildWorkshopDatabase(t *testing.T) {
 		} `json:"metadata"`
 		Spec struct {
 			Size      string `json:"size"`
-			StorageGB int    `json:"storageGB"`
+			StorageGB int    `json:"storageGB"` // must be absent (0) — the leak is closed
 		} `json:"spec"`
 	}
 	if err := json.Unmarshal(raw, &xr); err != nil {
@@ -38,27 +38,28 @@ func TestBuildWorkshopDatabase(t *testing.T) {
 	if xr.Metadata.Name != "my-db" || xr.Metadata.Namespace != "demo" {
 		t.Errorf("metadata = %+v", xr.Metadata)
 	}
-	if xr.Spec.Size != "medium" || xr.Spec.StorageGB != 5 {
-		t.Errorf("spec = %+v", xr.Spec)
+	if xr.Spec.Size != "large" {
+		t.Errorf("spec.size = %q, want large", xr.Spec.Size)
+	}
+	if xr.Spec.StorageGB != 0 {
+		t.Errorf("spec.storageGB should be absent (T-shirt bundles storage), got %d", xr.Spec.StorageGB)
 	}
 }
 
 func TestBuildWorkshopDatabaseValidation(t *testing.T) {
 	cases := []struct {
-		name      string
-		size      string
-		storageGB int
+		name string
+		size string
 	}{
-		{"UPPER", "small", 1},     // not a DNS label
-		{"has space", "small", 1}, // not a DNS label
-		{"", "small", 1},          // empty name
-		{"ok", "xlarge", 1},       // size outside the XRD enum
-		{"ok", "small", 0},        // below XRD minimum
-		{"ok", "small", 11},       // above XRD maximum
+		{"UPPER", "small"},     // not a DNS label
+		{"has space", "small"}, // not a DNS label
+		{"", "small"},          // empty name
+		{"ok", "xlarge"},       // size outside the XRD enum
+		{"ok", ""},             // empty size
 	}
 	for _, c := range cases {
-		if _, err := BuildWorkshopDatabase(c.name, c.size, c.storageGB); err == nil {
-			t.Errorf("BuildWorkshopDatabase(%q, %q, %d): expected error, got none", c.name, c.size, c.storageGB)
+		if _, err := BuildWorkshopDatabase(c.name, c.size); err == nil {
+			t.Errorf("BuildWorkshopDatabase(%q, %q): expected error, got none", c.name, c.size)
 		}
 	}
 }

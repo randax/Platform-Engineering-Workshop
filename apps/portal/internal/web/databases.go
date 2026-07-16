@@ -7,7 +7,6 @@ package web
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"cloudbox.io/portal/internal/kube"
 )
@@ -81,10 +80,9 @@ func handleDatabasesList(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleCreateDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	size := r.FormValue("size")
-	storageGB, _ := strconv.Atoi(r.FormValue("storageGB"))
 
 	fl := flash{Msg: "Created " + name + " — Crossplane is composing a Postgres cluster and a bucket. Watch it turn Ready below."}
-	if err := s.Kube.CreateWorkshopDatabase(r.Context(), name, size, storageGB); err != nil {
+	if err := s.Kube.CreateWorkshopDatabase(r.Context(), name, size); err != nil {
 		fl = errorFlash("Create failed: " + err.Error())
 	}
 	// Always answer with the fragment htmx targeted — a full 500 error page

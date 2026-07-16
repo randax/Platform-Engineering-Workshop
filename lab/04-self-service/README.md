@@ -137,9 +137,11 @@ through this API?)
 
 ## Going deeper
 
-- Edit `my-database.yaml` to `size: medium` via git. What changes on the CNPG cluster,
-  and how fast? Then try `storageGB: 20` — where does the rejection come from? That's
-  your API doing policy.
+- Edit `my-database.yaml` to `size: medium` (or `large`) via git. Watch the **one knob**
+  ripple: the CNPG cluster gains replicas (2, then 3 — HA) and storage, all from one word.
+  Then try `size: xlarge` — where does the rejection come from? That's your API's T-shirt
+  enum doing policy. The developer never sees a CNPG field; the platform team owns what a
+  size *means* in the Composition. That's the facade (PRD-0006).
 - Delete `my-database.yaml` from the repo and push. Watch Crossplane tear down the whole
   composed stack (prune → XR deleted → composed resources garbage-collected). Re-add it.
 - Add a `status` field: patch the composed cluster's readiness or connection Service name

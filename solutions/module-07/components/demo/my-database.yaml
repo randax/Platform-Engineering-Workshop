@@ -8,4 +8,3 @@ metadata:
   name: my-db
 spec:
   size: small
-  storageGB: 1
