@@ -101,16 +101,14 @@ nav a[aria-current="page"] {
     border-radius: 4px;
   }
   .nav-burger:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
-  /* collapsed by default; the checked toggle reveals nav + foot */
+  /* Collapsed by default; the checked toggle reveals the drawer. The opened
+     nav is a clean VERTICAL list — it inherits the desktop rail's nav-group /
+     nav-label / link styles (no horizontal wrap, which read as chaotic). */
   .rail nav, .rail .rail-foot { display: none; }
-  .nav-toggle:checked ~ nav { display: flex; flex-wrap: wrap; gap: 0 1.5rem; margin-top: 0.9rem; }
+  .nav-toggle:checked ~ nav { display: block; margin-top: 1rem; }
   .nav-toggle:checked ~ .rail-foot { display: block; margin-top: 0.75rem; }
-  /* each section wraps its own items too — the Platform group has 8 links and
-     must not run off a phone's width (it did: horizontal scroll). */
-  .nav-group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.6rem; margin-bottom: 0.4rem; }
-  .nav-label { margin: 0 0.25rem 0 0; }
-  nav a { border-left: none; border-bottom: 2px solid transparent; border-radius: 0; }
-  nav a[aria-current="page"] { border-bottom-color: var(--accent); background: none; }
+  /* tighten the section rhythm a touch for the drawer (desktop uses 1.25rem) */
+  .nav-toggle:checked ~ nav .nav-group { margin-bottom: 0.9rem; }
 }
 
 main { width: 100%; max-width: 62rem; margin: 0 auto; padding: 1.5rem; }
