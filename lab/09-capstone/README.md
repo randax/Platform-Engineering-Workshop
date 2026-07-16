@@ -8,6 +8,12 @@ wakes from zero, makes a thumbnail and a metadata file, and goes back to sleep. 
 it three ways: pods appearing in a `-w` watch, the thumbnail landing in the gallery and
 in S3, and — the flourish — the whole chain as a single trace in Grafana.
 
+<p align="center">
+  <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console — a component's Monitoring page: CPU/memory sparklines and a live log tail from the OTel stack" width="80%" />
+</p>
+
+<p align="center"><em>Look at what you built: the Cloudbox Console surfaces per-component metrics and a live log tail straight from the OTel stack (VictoriaMetrics / VictoriaLogs / VictoriaTraces) — the same telemetry that renders your upload as one end-to-end trace in Grafana.</em></p>
+
 **Prerequisites:** this capstone builds on modules 03 (RustFS), 06 (Knative Serving)
 and 08 (the portal) — have them green, or jump straight here with
 `./scripts/catch-up.sh 8`.

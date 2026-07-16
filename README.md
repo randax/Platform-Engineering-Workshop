@@ -59,6 +59,29 @@ kubeadm, Cilium over kube-proxy, in-cluster Gitea over GitHub, Crossplane v2 ove
 the Victoria stack over kube-prometheus-stack. The full "what we chose, what we rejected,
 and the tradeoff" reference is in **[docs/STACK.md](docs/STACK.md)**.
 
+## The Cloudbox Console
+
+The platform's front door is a first-class thing, not an afterthought: a bespoke portal
+built in **Go + htmx**, server-rendered and fully **offline** (no CDN, one vendored `.js`
+file, no build step). It reads the Kubernetes API with a read-only ServiceAccount token
+and surfaces everything you built — ArgoCD apps, CNPG databases, Knative services — plus
+**per-component metrics, logs, and traces** pulled straight from the on-cluster OTel stack
+(VictoriaMetrics / VictoriaLogs / VictoriaTraces via the OTel Collector). Light and dark
+themes, responsive down to a phone. Small enough to read over coffee — the whole thing is
+in [`apps/portal/`](apps/portal/).
+
+<p align="center">
+  <img src="docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console — a component's Monitoring page: CPU/memory sparklines and a live log tail" width="49%" />
+  <img src="docs/screenshots/console-components-dark.png" alt="Cloudbox Console — the Components health page, per-namespace status" width="49%" />
+</p>
+
+<p align="center"><em>Left: a component's live Monitoring detail — CPU/memory sparklines and a log tail from the OTel stack. Right: the Components health page. Both shown in dark mode; the console ships light + dark.</em></p>
+
+You build it in [module 08](lab/08-portal) and it comes fully alive in the
+[capstone](lab/09-capstone). The full set of screenshots — desktop, mobile nav, the
+"enable observability" gated state, database metrics — is in
+[docs/screenshots/](docs/screenshots/README.md).
+
 ## Prerequisites — do this BEFORE the conference
 
 Conference WiFi carries keystrokes, not gigabytes. The setup downloads 15–20 GB of

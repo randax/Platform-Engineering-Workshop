@@ -11,6 +11,9 @@ The portal module — and the second honest-ecosystem interlude of the day (buil
 -->
 
 ---
+layout: image-right
+image: /console/monitoring-dark.png
+---
 
 # A portal is just REST calls
 
@@ -20,7 +23,11 @@ The portal module — and the second honest-ecosystem interlude of the day (buil
 - The DB form? Creates a `WorkshopDatabase`
 - Module 04 already did the hard part
 
-<div class="mt-6 text-sm opacity-75">
+<div class="mt-4 text-xs opacity-60">
+Shown → a component's live <strong>Monitoring</strong> page: per-component metrics, logs & traces from the OTel stack, server-rendered, offline, light + dark.
+</div>
+
+<div class="mt-4 text-sm opacity-75">
 ☁️ <strong>Cloud parallel:</strong> the AWS · Azure · GCP Console — except this one is ~730 lines you can read end to end, not a product you log into.
 </div>
 
