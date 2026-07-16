@@ -214,3 +214,29 @@
 .allgreen tbody tr { background: rgba(5, 150, 105, 0.10); }
 .allgreen tbody td { border: none; padding: 0.55rem 1.1rem; font-weight: 700; color: var(--jz-run); }
 .allgreen tbody td:first-child { color: var(--jz-ink); font-weight: 700; }
+
+/* ============================================================================
+   Bruktby story thread — the running example (a Norwegian second-hand
+   marketplace) woven through the deck. Warm emerald left-accent so it reads as
+   "our company's journey", distinct from the blue info callouts. Used as a
+   one-line beat at the top of each module + the opening/closing story slides.
+   ========================================================================== */
+.story {
+  border-left: 4px solid var(--jz-run);
+  border-radius: 0 0.4rem 0.4rem 0;
+  background: rgba(5, 150, 105, 0.10);
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.story strong { color: #34d399; font-weight: 800; }
+.story .tag { color: var(--jz-run); font-weight: 800; letter-spacing: 0.02em; }
+
+/* Bruktby before/after: two columns, rent-slate vs run-emerald. */
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+.ba > div { border-radius: 0.5rem; padding: 0.85rem 1.1rem; line-height: 1.4; }
+.ba .before { border: 1px solid var(--jz-rent); background: rgba(100, 116, 139, 0.10); }
+.ba .after  { border: 1px solid var(--jz-run);  background: rgba(5, 150, 105, 0.12); }
+.ba h3 { margin: 0 0 0.4rem; font-size: 1.05rem; font-weight: 800; }
+.ba .before h3 { color: var(--jz-rent); }
+.ba .after h3  { color: var(--jz-run); }

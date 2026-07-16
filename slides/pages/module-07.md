@@ -6,6 +6,8 @@ layout: section
 
 # CI on your terms: build inside the cluster
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;They build and ship their own images in-cluster — no Docker Hub, no cloud-build minutes. The pipeline never leaves their cloud.</div>
+
 <!--
 Presenter-demo-first module: rootless BuildKit on Talos is pioneer territory (nobody has published this combo), so the front of the room shows the golden path, and the lab stays available for the brave and for home.
 -->

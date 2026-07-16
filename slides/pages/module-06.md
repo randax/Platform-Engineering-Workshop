@@ -6,6 +6,8 @@ layout: section
 
 # Serverless: scale from zero, on your hardware
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their thumbnailer scales to zero — nothing running, nothing to pay, between uploads. Lambda's trick, on hardware they own.</div>
+
 <!--
 First stretch module. From here on the room is self-paced: give the 3-minute framing, show the GO slide, and let people choose their path. Helpers keep roaming.
 -->

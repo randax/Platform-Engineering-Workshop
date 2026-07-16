@@ -6,6 +6,8 @@ layout: section
 
 # The picture pipeline: everything, wired together
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their listing-photo pipeline goes live — upload → resize → gallery, event-driven and traced end to end. Their product, running on their cloud.</div>
+
 <!--
 The capstone. It earns the name because it uses everything built today at once: GitOps delivers it (02), RustFS stores it (03), Knative scales it from zero (06), the portal fronts it (08), and observability watches the whole chain. The one new concept is Knative Eventing.
 -->

@@ -6,6 +6,8 @@ layout: section
 
 # Data services: Postgres + S3, on your terms
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;They become their own RDS <em>and</em> S3 team — the listings database and the photo bucket, self-hosted. This module is the relicensing that forced the move.</div>
+
 <!--
 "Managed database" is the single most-bought cloud product — and the thing teams miss most when leaving a hyperscaler. This module makes each attendee the RDS team and the S3 team, for 35 minutes.
 -->

@@ -6,6 +6,8 @@ layout: section
 
 # The Cloudbox Console: a portal you can read
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their platform team gets a front door — a console they can read every line of, not a product they log into.</div>
+
 <!--
 The portal module — and the second honest-ecosystem interlude of the day (build vs. buy). Everything built so far is APIs and YAML: perfect for platform engineers, invisible to everyone else. A portal is how a platform gets adopted.
 -->

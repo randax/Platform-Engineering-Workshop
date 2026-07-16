@@ -6,6 +6,8 @@ layout: section
 
 # Self-service: your platform gets an API
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their app devs get self-service back — one YAML for a database, no ticket to the platform team. The 2008 magic, self-hosted.</div>
+
 <!--
 Module 03 made the attendee capable of provisioning databases. This module builds the abstraction so their developers never have to be: platform engineering in its purest form — you define an API, developers consume it.
 -->

@@ -6,6 +6,8 @@ layout: section
 
 # Your own cloud: Talos + Cilium
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their new datacenter is just Docker on this laptop — an immutable OS with no server to SSH into and pet.</div>
+
 <!--
 The first real module, and the biggest identity shift of the day: every cloud provider runs an operating system under your Kubernetes that you never get to see. For the next 35 minutes, attendees take ownership of that layer.
 -->

@@ -6,6 +6,8 @@ layout: section
 
 # Break it. Diagnose it. **Verify** the diagnosis.
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;A listing won't load. Debug their stack like an SRE — and fact-check the AI that hands you a confident, wrong fix.</div>
+
 <!--
 The last core module, and the one designed for 2026: debugging on a live system, with or without an AI agent — and treating every diagnosis as a hypothesis until the cluster confirms it.
 -->
