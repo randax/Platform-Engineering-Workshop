@@ -123,6 +123,10 @@ ghcr.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e
 ghcr.io/randax/cloudbox-portal:v0.1.0
 ghcr.io/randax/cloudbox-uploader:v0.1.0
 ghcr.io/randax/cloudbox-resizer:v0.1.0
+# Custom Grafana: stock Grafana + native VictoriaMetrics datasource plugins
+# baked in (apps/grafana/Dockerfile, #65). Built by the same build-images.yaml.
+# The base image (docker.io/grafana/grafana above) is now only a BUILD input.
+ghcr.io/randax/cloudbox-grafana:v0.1.0
 
 # --- Wave 3: Backstage (CNOE prebuilt image, tag pinned by gitops/catalog)
 # linux/amd64 only — Apple Silicon runs it emulated. Its database is a CNPG
