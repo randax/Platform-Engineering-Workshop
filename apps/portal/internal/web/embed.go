@@ -32,6 +32,7 @@ func ParseTemplates(s *Server) (*template.Template, error) {
 		Funcs(template.FuncMap{
 			"nav":        func() []navGroup { return navGroups(s.currentSnapshot()) },
 			"grafanaURL": func() string { return s.GrafanaURL },
+			"navicon":    navIcon,
 		}).
 		ParseFS(templateFS, "templates/*.html")
 }
