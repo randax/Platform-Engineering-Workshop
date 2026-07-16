@@ -21,16 +21,22 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
   read-only at `/etc/grafana/provisioning/datasources`, Grafana's file
   provisioning path — no sidecar, no plugin) — one per store in the Victoria
   stack:
-  - **VictoriaMetrics** as a **Prometheus** datasource (`isDefault: true`) →
-    `http://victoria-metrics.observability.svc.cluster.local:8428`. VM speaks the
-    Prometheus query API, so the built-in Prometheus datasource just works.
-  - **VictoriaLogs** as a **Loki** datasource →
-    `http://victoria-logs.observability.svc.cluster.local:9428`. VLogs exposes a
-    Loki-compatible query API; we use the **built-in Loki type** rather than the
-    dedicated VictoriaLogs plugin because that plugin would need an internet
-    fetch at boot (offline rule). See `../victoria-logs/VENDOR.md` for the URL
-    caveat (VLogs' Loki endpoints live under `/select/loki/api/v1/*`).
-  - **VictoriaTraces** as a **Jaeger** datasource →
+  - **VictoriaMetrics** via its **native datasource plugin**
+    (`victoriametrics-metrics-datasource`, `isDefault: true`) →
+    `http://victoria-metrics.observability.svc.cluster.local:8428` — the MetricsQL
+    query editor. The plugin is **baked into the image** (`apps/grafana/Dockerfile`,
+    #65), not fetched at boot (offline rule).
+  - **VictoriaLogs** via its **native datasource plugin**
+    (`victoriametrics-logs-datasource`) →
+    `http://victoria-logs.observability.svc.cluster.local:9428` — full LogsQL + the
+    VictoriaLogs Explore UX (the plugin takes the base URL and appends its own
+    `/select/logsql/*` paths, so no `/select` suffix, unlike the old Loki shim).
+    Also baked into the image.
+  - Both native plugins load from `/opt/grafana-plugins` via `GF_PATHS_PLUGINS`,
+    NOT the default `/var/lib/grafana/plugins` — the `data` emptyDir mounts over
+    `/var/lib/grafana` and would shadow anything there.
+  - **VictoriaTraces** as a **Jaeger** datasource (no signed native plugin exists
+    yet) →
     `http://victoria-traces.observability.svc.cluster.local:10428/select/jaeger`.
     VTraces exposes a Jaeger-compatible query API, so we use the **built-in
     Jaeger type** (again no plugin, offline rule) — Jaeger-style trace search,

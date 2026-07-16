@@ -94,7 +94,9 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [portal, uploader, resizer]
+        # grafana is a build-only image (stock Grafana + native VictoriaMetrics
+        # plugins baked in, #65) — no Go code, so it's not in the `test` matrix.
+        app: [portal, uploader, resizer, grafana]
     steps:
       - uses: actions/checkout@v7
 
