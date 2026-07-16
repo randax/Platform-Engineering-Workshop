@@ -250,6 +250,21 @@ jobs:
           echo "VM k8s_* series = ${metrics}"
           [ "${metrics:-0}" -gt 0 ] 2>/dev/null || { echo "❌ no component metrics in VM"; exit 1; }
 
+          # CNPG scrape (#56 Databases panel): the collector's `cnpg` scrape job
+          # must pull Postgres metrics from the app-db instance's :9187. cnpg_*
+          # series in VM prove the component-/metrics scraping path works.
+          cnpg=0
+          for _ in $(seq 1 24); do
+            cnpg=$(curl -fsS -G http://localhost:18428/api/v1/query \
+              --data-urlencode 'query=count({__name__=~"cnpg_.+"})' \
+              | jq -r '.data.result[0].value[1] // "0"')
+            [ "${cnpg:-0}" -gt 0 ] 2>/dev/null && break
+            sleep 5
+          done
+          echo "VM cnpg_* series = ${cnpg}"
+          [ "${cnpg:-0}" -gt 0 ] 2>/dev/null || { echo "❌ CNPG /metrics not scraped into VM"; exit 1; }
+          echo "✅ CNPG metrics scraped into VictoriaMetrics (Databases panel data source)"
+
           # --- logs proof: a non-app pod's logs must reach VLogs. kube-system
           # (cilium et al.) is never a first-party app, so its presence in the
           # recent log stream proves filelog is collecting platform components.
