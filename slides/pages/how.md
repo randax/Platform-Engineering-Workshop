@@ -34,11 +34,12 @@ Two 10-minute breaks: after module 03 and after module 05. The last 30 minutes a
 
 # The lab contract
 
-- README states an **outcome**, not steps
-- **Hints** are layered, free, collapsible
-- **`./verify.sh`** checks your live cluster
-- Green verify = module done
-- Behind? **`./scripts/catch-up.sh <module>`**
+<div class="grid grid-cols-2 gap-3 mt-4">
+  <div class="principle"><div class="ico">🎯</div><div class="name">Outcome, not steps</div><div class="tie">the README says <em>reach state X</em></div></div>
+  <div class="principle"><div class="ico">🪜</div><div class="name">Layered hints</div><div class="tie">free, collapsible — last one is the answer</div></div>
+  <div class="principle"><div class="ico">✅</div><div class="name"><code>./verify.sh</code></div><div class="tie">checks your live cluster → green = done</div></div>
+  <div class="principle"><div class="ico">⏩</div><div class="name"><code>catch-up.sh &lt;n&gt;</code></div><div class="tie">jump to any module's end-state</div></div>
+</div>
 
 <!--
 This is how every single module works, so learn it once:
