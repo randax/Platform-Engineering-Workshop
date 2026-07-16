@@ -30,12 +30,10 @@ spec:
               properties:
                 size:
                   type: string
-                  description: T-shirt size for compute resources.
-                  enum: ["small", "medium"]
+                  description: >-
+                    T-shirt size — the ONLY knob. Bundles compute, storage, and
+                    HA instances (small 1 · medium 2 · large 3) so a developer
+                    expresses intent, not implementation (PRD-0006). The platform
+                    team owns what each size means, in the Composition.
+                  enum: ["small", "medium", "large"]
                   default: small
-                storageGB:
-                  type: integer
-                  description: Database volume size in GiB.
-                  default: 1
-                  minimum: 1
-                  maximum: 10

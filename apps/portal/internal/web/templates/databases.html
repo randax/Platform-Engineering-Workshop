@@ -8,15 +8,18 @@ API from module 04 — a <code>WorkshopDatabase</code> composite resource. The f
 {{template "db-list" .}}
 
 <h2>New database</h2>
+<p class="hint">One knob: a <strong>T-shirt size</strong>. It bundles compute, storage and HA replicas
+(small · 1 &nbsp;/&nbsp; medium · 2 &nbsp;/&nbsp; large · 3 instances) — you pick intent, the platform
+decides the rest.</p>
 <form hx-post="/databases" hx-target="#db-list" hx-swap="outerHTML">
   <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-db"></label>
   <label>Size
     <select name="size">
-      <option value="small" selected>small</option>
-      <option value="medium">medium</option>
+      <option value="small" selected>small — 1 instance · 1Gi</option>
+      <option value="medium">medium — 2 instances · 5Gi</option>
+      <option value="large">large — 3 instances (HA) · 10Gi</option>
     </select>
   </label>
-  <label>Storage (GiB) <input name="storageGB" type="number" value="1" min="1" max="10"></label>
   <button type="submit">Create</button>
 </form>
 {{template "foot" .}}
@@ -33,18 +36,17 @@ API from module 04 — a <code>WorkshopDatabase</code> composite resource. The f
 
   <h2>WorkshopDatabases <small>(namespace {{.Namespace}} · auto-refreshes every 5 s)</small></h2>
   <table>
-    <thead><tr><th>Name</th><th>Size</th><th>Storage</th><th>Status</th></tr></thead>
+    <thead><tr><th>Name</th><th>Size</th><th>Status</th></tr></thead>
     <tbody>
     {{range .Databases}}
       <tr>
         {{/* rows link to the detail page — that is also where Delete lives now */}}
         <td><a href="/databases/{{.Metadata.Name}}">{{.Metadata.Name}}</a></td>
         <td>{{.Spec.Size}}</td>
-        <td>{{.Spec.StorageGB}} GiB</td>
         <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
       </tr>
     {{else}}
-      <tr><td colspan="4" class="empty">No databases yet — create one below. (Requires module 04's XRD.)</td></tr>
+      <tr><td colspan="3" class="empty">No databases yet — create one below. (Requires module 04's XRD.)</td></tr>
     {{end}}
     </tbody>
   </table>

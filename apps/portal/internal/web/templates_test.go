@@ -40,7 +40,6 @@ func TestTemplatesRender(t *testing.T) {
 	db := kube.WorkshopDB{}
 	db.Metadata.Name = "my-db"
 	db.Spec.Size = "small"
-	db.Spec.StorageGB = 1
 	db.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "False", Reason: "Creating"}}
 
 	pages := map[string]struct {

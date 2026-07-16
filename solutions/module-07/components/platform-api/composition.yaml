@@ -32,13 +32,13 @@ spec:
               apiVersion: postgresql.cnpg.io/v1
               kind: Cluster
               spec:
-                instances: 1
+                instances: 1 # patched from spec.size (small 1 / medium 2 / large 3)
                 bootstrap:
                   initdb:
                     database: app
                     owner: app
                 storage:
-                  size: 1Gi # patched from spec.storageGB
+                  size: 1Gi # patched from spec.size
                   storageClass: local-path
                 resources:
                   requests:
@@ -60,22 +60,35 @@ spec:
                     string:
                       type: Format
                       fmt: "%s-pg"
+              # The T-shirt facade (PRD-0006): ONE `size` bundles every knob —
+              # storage, HA instances, and memory. The developer expresses
+              # intent ("medium"), and the platform team's opinion (this map)
+              # decides what medium means. No raw storageGB to twiddle.
               - type: FromCompositeFieldPath
-                fromFieldPath: spec.storageGB
+                fromFieldPath: spec.size
                 toFieldPath: spec.storage.size
                 transforms:
-                  # storageGB arrives as a JSON number = float64, so "%d"
-                  # renders "%!d(float64=1)Gi" and CNPG rejects it. Convert to
-                  # int64 first. (Found by rehearsal-in-CI: module 04's XR
-                  # never went Ready — the composition YAML is valid, only the
-                  # rendered value was wrong.)
+                  - type: map
+                    map:
+                      small: 1Gi
+                      medium: 5Gi
+                      large: 10Gi
+              # Instances is where "size" teaches HA, not just resources: large
+              # gets replicas. The map yields strings; instances is an int, so
+              # convert (a plain "%d" on a float64 renders garbage — the same
+              # trap the old storageGB patch documented).
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.size
+                toFieldPath: spec.instances
+                transforms:
+                  - type: map
+                    map:
+                      small: "1"
+                      medium: "2"
+                      large: "3"
                   - type: convert
                     convert:
                       toType: int64
-                  - type: string
-                    string:
-                      type: Format
-                      fmt: "%dGi"
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.size
                 toFieldPath: spec.resources.requests.memory
@@ -84,6 +97,7 @@ spec:
                     map:
                       small: 256Mi
                       medium: 512Mi
+                      large: 1Gi
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.size
                 toFieldPath: spec.resources.limits.memory
@@ -92,6 +106,7 @@ spec:
                     map:
                       small: 512Mi
                       medium: 1Gi
+                      large: 2Gi
             readinessChecks:
               - type: MatchCondition
                 matchCondition:
