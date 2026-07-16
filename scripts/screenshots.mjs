@@ -21,12 +21,16 @@ const files = readdirSync(htmlDir).filter((f) => f.endsWith('.html'));
 const browser = await chromium.launch();
 for (const f of files) {
   const name = basename(f, '.html');
-  // Desktop, plus a narrow shot for the detail page to show the rail collapse.
-  const shots = [[1280, '']];
-  if (name.includes('monitoring')) shots.push([430, '-mobile']);
-  for (const [width, suffix] of shots) {
+  // Desktop, plus narrow shots for the detail page to show the mobile nav.
+  const shots = [[1280, '', false]];
+  if (name.includes('monitoring')) {
+    shots.push([430, '-mobile', false]); // collapsed: sticky bar + content
+    shots.push([430, '-mobile-nav', true]); // expanded: after tapping the burger
+  }
+  for (const [width, suffix, openNav] of shots) {
     const page = await browser.newPage({ viewport: { width, height: 900 }, deviceScaleFactor: 2 });
     await page.goto('file://' + join(htmlDir, f), { waitUntil: 'networkidle' });
+    if (openNav) await page.locator('.nav-burger').click();
     await page.screenshot({ path: join(outDir, name + suffix + '.png'), fullPage: true });
     await page.close();
   }

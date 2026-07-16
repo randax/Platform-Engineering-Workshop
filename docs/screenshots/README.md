@@ -7,7 +7,8 @@ faithful to the shipped UI), then screenshot the HTML with a headless browser.
 | File | What |
 |---|---|
 | `console-component-monitoring.png` | A component's **Monitoring** detail page — CPU + memory sparklines and a live log tail, sourced from the OTel stack (#56). |
-| `console-component-monitoring-mobile.png` | The same page at phone width — the rail collapses to a wrapping top bar. |
+| `console-component-monitoring-mobile.png` | The same page at phone width — the rail collapses to a sticky bar (logo + ☰) so content is immediately visible. |
+| `console-mobile-nav-open.png` | Phone width with the ☰ menu tapped open — the full nav revealed (CSS-only, no JS). |
 | `console-component-locked.png` | The Monitoring page when observability isn't enabled yet — degrade-in-place hint. |
 | `console-components.png` | The Components page — per-namespace health, each linking into its Monitoring detail. |
 

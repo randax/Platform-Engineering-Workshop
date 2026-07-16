@@ -20,7 +20,14 @@
 <body>
 <div class="shell">
 <aside class="rail">
-  <span class="logo" id="logo">⬢ Cloudbox Console</span>
+  {{/* CSS-only mobile nav: a hidden checkbox the burger label toggles. On a
+       phone the rail collapses to a sticky bar (logo + ☰) and the nav/foot
+       hide until tapped — no JS, works offline. Desktop ignores all of it. */}}
+  <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden>
+  <div class="rail-bar">
+    <span class="logo" id="logo">⬢ Cloudbox Console</span>
+    <label for="nav-toggle" class="nav-burger" aria-label="Toggle navigation" title="Menu">☰</label>
+  </div>
   <nav>
     {{/* built from the page registry — a new page file adds itself here */}}
     {{- range nav}}
