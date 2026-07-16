@@ -8,10 +8,13 @@ package web
 
 import (
 	"context"
+	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 
 	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
 	"cloudbox.io/portal/internal/store"
 )
 
@@ -71,6 +74,16 @@ type bucketsData struct {
 	Buckets []store.BucketInfo
 	Objects objectsData
 	Flash   flash
+
+	// Monitoring — RustFS exposes no Prometheus metrics, so this is the generic
+	// per-namespace signal (kubeletstats CPU/mem), the same fallback the
+	// component-detail page uses. Populated only on the full page, only when
+	// observability is collecting.
+	Telemetry bool
+	CPUSpark  template.HTML
+	CPUNow    string
+	MemSpark  template.HTML
+	MemNow    string
 }
 
 // bucketObjects lists one bucket's objects and pairs each with a presigned
@@ -123,6 +136,20 @@ func handleBuckets(s *Server, w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.renderError(w, err)
 		return
+	}
+	// Monitoring: RustFS has no /metrics, so fall back to the generic namespace
+	// resource signal (kubeletstats). Full page only, and only once
+	// observability is collecting.
+	if health, err := s.Kube.NamespaceWorkloads(r.Context()); err == nil && health["observability"].Ready > 0 && s.Prom != nil {
+		data.Telemetry = true
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.NamespaceCPUQuery("rustfs")); len(v) > 0 {
+			data.CPUSpark = metrics.Sparkline(v, "CPU usage")
+			data.CPUNow = fmt.Sprintf("%.3f cores", v[len(v)-1])
+		}
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.NamespaceMemQuery("rustfs")); len(v) > 0 {
+			data.MemSpark = metrics.Sparkline(v, "memory working set")
+			data.MemNow = humanBytes(v[len(v)-1])
+		}
 	}
 	s.render(w, "buckets", data)
 }

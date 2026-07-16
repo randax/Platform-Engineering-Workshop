@@ -336,6 +336,13 @@ jobs:
           done
           echo "✅ NATS exporter scraped into VictoriaMetrics (Streams panel data source: gnatsd_* + jetstream_*)"
 
+          # Buckets panel (#56): RustFS has no /metrics, so the panel uses the
+          # generic per-namespace kubeletstats signal (same names the console
+          # Monitoring panel already proves, just filtered to namespace rustfs).
+          # Soft report that the rustfs-scoped series exist so the panel has data.
+          rf=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=sum(k8s_pod_cpu_usage{k8s_namespace_name="rustfs"})' 2>/dev/null | jq -r '.data.result[0].value[1] // ""')
+          echo "  rustfs namespace CPU series → ${rf:-<none>} (Buckets panel data)"
+
           # --- logs proof: a non-app pod's logs must reach VLogs. kube-system
           # (cilium et al.) is never a first-party app, so its presence in the
           # recent log stream proves filelog is collecting platform components.
