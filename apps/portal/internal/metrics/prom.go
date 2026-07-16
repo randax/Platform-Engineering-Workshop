@@ -30,25 +30,22 @@ func New(promURL string) *Client {
 }
 
 // RequestRateQuery builds the PromQL for a service's request rate. otelhttp
-// exports an OTLP histogram named "http.server.duration" (milliseconds);
-// Prometheus normalizes that on ingest to
-//
-//	http_server_request_duration_seconds_count
-//
-// (otelhttp v0.61 follows HTTP semconv v1.26: server duration is
-// `http.server.request.duration` in seconds, which Prometheus OTLP ingest
-// normalizes to the name above.) The OTel service.name ("cloudbox-uploader",
-// ...) arrives as the `job` label; rate() of the _count series = req/s.
-// If sparklines stay empty at rehearsal, confirm this name (issue #8).
-func RequestRateQuery(job string) string {
-	return fmt.Sprintf(`sum(rate(http_server_request_duration_seconds_count{job=%q}[5m]))`, job)
+// (v0.61, HTTP semconv v1.26) exports the OTLP histogram
+// `http.server.request.duration` in seconds, which VictoriaMetrics stores (with
+// -opentelemetry.usePrometheusNaming) as http_server_request_duration_seconds_*.
+// The OTel service.name ("cloudbox-uploader", …) arrives as a *resource
+// attribute*, and VM maps those to underscore labels — so it's `service_name`,
+// NOT the Prometheus `job` (confirmed against VM: k8s.namespace.name likewise
+// lands as k8s_namespace_name). rate() of the _count series = req/s.
+func RequestRateQuery(service string) string {
+	return fmt.Sprintf(`sum(rate(http_server_request_duration_seconds_count{service_name=%q}[5m]))`, service)
 }
 
 // LatencyP95Query builds the PromQL for a service's p95 request latency, from
 // the SAME otelhttp histogram RequestRateQuery uses — histogram_quantile over
 // its _bucket series (the `le` labels), rate'd over 5m. Result is in seconds.
-func LatencyP95Query(job string) string {
-	return fmt.Sprintf(`histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=%q}[5m])))`, job)
+func LatencyP95Query(service string) string {
+	return fmt.Sprintf(`histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=%q}[5m])))`, service)
 }
 
 // NamespaceCPUQuery / NamespaceMemQuery sum a namespace's pod resource usage —
