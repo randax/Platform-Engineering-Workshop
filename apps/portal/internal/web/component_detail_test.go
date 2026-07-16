@@ -147,6 +147,7 @@ func TestGenerateScreenshots(t *testing.T) {
 		{"builds", "builds", sampleBuilds()},
 		{"streams", "streams", sampleStreams()},
 		{"buckets", "buckets", sampleBuckets()},
+		{"functions-new", "functions-new", functionsNewData{Samples: fnSamples}},
 	}
 	for _, p := range pages {
 		var buf bytes.Buffer

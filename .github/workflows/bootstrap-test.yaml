@@ -428,6 +428,53 @@ jobs:
             echo "OTel Collector (agent DaemonSet + gateway Deployment) enabled; **component** metrics landed in VictoriaMetrics (\`k8s_*\` = ${metrics} series), **component** logs (kube-system) in VictoriaLogs, and **app traces** (cloudbox-portal) in VictoriaTraces. otel-lgtm is gone; the Victoria stack is the whole observability capability. ✅"
           } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify New Function — build source → deploy Knative (#58)
+        run: |
+          set -euo pipefail
+          # #58 end to end: the console's "New Function" page must turn a source
+          # into a running, scale-to-zero function. Grant the portal its two
+          # write scopes (in the real workshop the attendee pushes this via git;
+          # here apply it directly — the Roles aren't in any ArgoCD-synced path,
+          # so nothing prunes them), then drive the page's POST and prove BOTH
+          # halves converge: the build Workflow Succeeds and the Knative Service
+          # serves through Kourier. This is the marquee create-flow, so it earns
+          # a real end-to-end assertion, not just a unit test.
+          kubectl apply -f lab/08-portal/portal-functions-access.yaml
+          fn=e2efn
+          # POST the form exactly as the browser would (page is unlocked: argo +
+          # knative went Healthy in modules 06/07).
+          code=$(curl -fsS -o /tmp/fn-resp.html -w '%{http_code}' -X POST \
+            --data-urlencode "name=${fn}" --data-urlencode "sample=hello-site" \
+            http://localhost:30600/functions 2>/dev/null || true)
+          echo "POST /functions → HTTP ${code}"; cat /tmp/fn-resp.html 2>/dev/null || true; echo
+          [ "${code}" = "200" ] || { echo "❌ New Function POST failed (HTTP ${code})"; exit 1; }
+          # Build half: a Workflow build-fn-e2efn-* appears in `builds` and
+          # Succeeds (git clone → BuildKit → push fn-e2efn:v1 to Zot).
+          wf=""
+          for _ in $(seq 1 30); do
+            wf=$(kubectl -n builds get wf -o name 2>/dev/null | grep "build-fn-${fn}-" | head -1 || true)
+            [ -n "$wf" ] && break; sleep 5
+          done
+          [ -n "$wf" ] || { echo "❌ no build-fn-${fn}-* Workflow created (RBAC missing, or page locked?)"; kubectl -n builds get wf; exit 1; }
+          echo "created ${wf}"
+          kubectl -n builds wait --for=jsonpath='{.status.phase}'=Succeeded "$wf" --timeout=240s \
+            || { echo "❌ build workflow did not Succeed"; kubectl -n builds get "$wf" -o yaml | tail -40; exit 1; }
+          echo "✅ build workflow Succeeded"
+          # Deploy half: the ksvc fn-e2efn converges from ImagePullBackOff to
+          # Ready once the image lands (localhost:30500 is in Knative's
+          # tag-resolution-skip list, so it was admitted immediately).
+          kubectl -n demo wait --for=condition=Ready "ksvc/fn-${fn}" --timeout=180s \
+            || { echo "❌ ksvc fn-${fn} not Ready"; kubectl -n demo describe ksvc "fn-${fn}" | tail -40; exit 1; }
+          echo "✅ ksvc fn-${fn} Ready"
+          # Serve it through Kourier (:31080, Host header), like module 06.
+          url=$(kubectl -n demo get ksvc "fn-${fn}" -o jsonpath='{.status.url}')
+          host="${url#http://}"; host="${host#https://}"
+          body=$(curl -fsS --max-time 30 -H "Host: ${host}" http://localhost:31080/ 2>/dev/null || true)
+          echo "curl fn (${host}) → $(echo "$body" | head -1)"
+          echo "$body" | grep -qi "hello-site" || { echo "❌ function did not serve the expected page"; exit 1; }
+          echo "✅ New Function (#58): the console built source in-cluster and served it as a scale-to-zero function"
+          { echo ""; echo "### New Function (#58) — build → deploy from the console ✅"; echo "POSTed the form; \`${wf##*/}\` Succeeded and \`fn-${fn}\` served through Kourier."; } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |

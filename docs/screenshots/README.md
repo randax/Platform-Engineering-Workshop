@@ -19,6 +19,7 @@ Every page has a light and a `-dark` variant (the console is theme-aware via
 | `console-builds-monitoring.png` | The Builds page — BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs (#56). |
 | `console-streams-monitoring.png` | The Streams page — JetStream messages/bytes + connections from the NATS exporter sidecar (#56). |
 | `console-buckets-monitoring.png` | The Buckets page — RustFS pod CPU/memory (generic fallback; RustFS has no Prometheus endpoint) (#56). |
+| `console-functions-new.png` | The **New Function** page — build source in-cluster (Argo + BuildKit) and deploy it as a scale-to-zero Knative Service, from one form (#58). |
 
 ## Regenerating
 
