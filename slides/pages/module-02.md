@@ -6,6 +6,8 @@ layout: section
 
 # GitOps: your cluster gets a git server
 
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Git becomes their only deploy button — every platform change a reviewable commit, nothing tied to GitHub or the venue WiFi.</div>
+
 <!--
 The architectural heart of the workshop. Everything from here to the end of the day — databases, platform APIs, serverless, the portal — arrives as a git commit that ArgoCD converges. Frame it that strongly.
 -->

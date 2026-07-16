@@ -76,7 +76,9 @@ Now the punchline that sets up the table: Kubernetes is a control plane. Operato
 
 </div>
 
-<div class="mt-4 text-sm opacity-70">Modules 01–05 — the core. One row each.</div>
+<div class="story mt-3"><span class="tag">BRUKTBY</span> &nbsp;The left column is everything Bruktby rented. The right column is what you'll run for them today — same primitive, minus the bill and the account.</div>
+
+<div class="mt-3 text-sm opacity-70">Modules 01–05 — the core. One row each.</div>
 
 <!--
 Don't read the table aloud row by row — let them scan it, then make three points:
@@ -175,7 +177,7 @@ flowchart TB
   end
 ```
 
-<div class="mt-2 text-sm opacity-70">The table, wired together — you'll see this again at the end, all green.</div>
+<div class="story mt-2"><span class="tag">BRUKTBY</span> &nbsp;This is the platform you're migrating them to. You'll see this exact diagram at the end — every box green, their photo pipeline live on top.</div>
 
 <!--
 The map of the whole day — the comparison table you just showed, now as one running system. You'll return to this exact diagram in the closing, when every box is up and green across the room. Walk it bottom-up, one layer per beat:
