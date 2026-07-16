@@ -91,6 +91,13 @@ func CNPGSizeQuery(cluster string) string {
 	return fmt.Sprintf(`sum(cnpg_pg_database_size_bytes{cnpg_cluster=%q})`, cluster)
 }
 
+// ArgoWorkflowsQuery is the count of workflows the Argo controller is tracking,
+// for the Builds Monitoring panel (#56) — a proxy for CI activity. From the
+// workflow-controller's :9090 metrics (scraped by the collector's `argo` job).
+func ArgoWorkflowsQuery() string {
+	return `sum(argo_workflows_count)`
+}
+
 // QueryRange fetches the last 30 minutes of a PromQL expression at 60s
 // resolution and returns just the values. No matching series is a normal
 // state (component disabled, no traffic yet) and returns nil, nil — the

@@ -6,6 +6,27 @@
 other resource. The catalog is your <code>Zot</code> registry over the OCI <code>/v2/</code> API: the
 images your pipeline built and pushed. Nothing here is built or dispatched from the console.</p>
 
+{{if .Telemetry}}
+<h2>Monitoring <small>last 30 min · Argo controller + kubeletstats</small></h2>
+<div class="monitor">
+  <div class="metric">
+    <span class="metric-label">Workflows <small>tracked</small></span>
+    {{if .WFSpark}}<span class="metric-spark">{{.WFSpark}}</span><span class="metric-now">{{.WFNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">CPU <small>namespace builds</small></span>
+    {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Memory <small>namespace builds</small></span>
+    {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+</div>
+{{end}}
+
 {{template "builds-runs" .}}
 {{template "foot" .}}
 {{end}}
