@@ -36,6 +36,7 @@ type serviceRow struct {
 	Spark      template.HTML // request rate, last 30 min
 	Latency    template.HTML // p95 request latency, last 30 min
 	LatencyNow string        // the latest p95, in ms
+	Scale      string        // current desired pods: "idle (0)" or "N running"
 	Grafana    string
 }
 
@@ -58,6 +59,16 @@ func handleServices(s *Server, w http.ResponseWriter, r *http.Request) {
 		if vals, err := s.Prom.QueryRange(r.Context(), metrics.LatencyAvgQuery(job)); err == nil && len(vals) > 0 {
 			row.Latency = metrics.Sparkline(vals, "avg latency")
 			row.LatencyNow = fmt.Sprintf("%.0f ms", vals[len(vals)-1]*1000)
+		}
+		// Scale-from-zero: the current desired pods (#65 Knative metrics, #58/#83).
+		// Keyed by the ksvc's own name, not the OTLP service name. 0 = scaled to
+		// zero (the serverless payoff made visible); best-effort like the rest.
+		if vals, err := s.Prom.QueryRange(r.Context(), metrics.KnativeDesiredPodsQuery(k.Metadata.Name)); err == nil && len(vals) > 0 {
+			if n := vals[len(vals)-1]; n < 0.5 {
+				row.Scale = "idle · 0 pods"
+			} else {
+				row.Scale = fmt.Sprintf("%.0f running", n)
+			}
 		}
 		rows = append(rows, row)
 	}

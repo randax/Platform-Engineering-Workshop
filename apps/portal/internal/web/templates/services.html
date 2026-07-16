@@ -5,7 +5,7 @@
 with zero pods is normal — that is scale-to-zero doing its job.</p>
 
 <table>
-  <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th><th>Requests (30 min)</th><th>avg latency (30 min)</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th><th>Scale</th><th>Requests (30 min)</th><th>avg latency (30 min)</th><th></th></tr></thead>
   <tbody>
   {{range .}}
     <tr>
@@ -13,13 +13,15 @@ with zero pods is normal — that is scale-to-zero doing its job.</p>
       <td>{{.Metadata.Namespace}}</td>
       <td><code>{{.Status.URL}}</code></td>
       <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
+      {{/* scale-from-zero: 0 pods when idle, N when serving — the serverless payoff */}}
+      <td>{{if .Scale}}<span class="metric-now">{{.Scale}}</span>{{else}}<span class="nodata">—</span>{{end}}</td>
       {{/* server-rendered SVG straight from a Prometheus range query */}}
       <td>{{if .Spark}}{{.Spark}}{{else}}<span class="nodata">— no metrics yet</span>{{end}}</td>
       <td>{{if .Latency}}{{.Latency}} <small>{{.LatencyNow}}</small>{{else}}<span class="nodata">—</span>{{end}}</td>
       <td><a href="{{.Grafana}}" target="_blank">traces →</a></td>
     </tr>
   {{else}}
-    <tr><td colspan="7" class="empty">No Knative Services yet — enable knative-serving from the catalog (module 06).</td></tr>
+    <tr><td colspan="8" class="empty">No Knative Services yet — enable knative-serving from the catalog (module 06).</td></tr>
   {{end}}
   </tbody>
 </table>

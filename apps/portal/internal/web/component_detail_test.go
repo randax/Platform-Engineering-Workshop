@@ -187,7 +187,7 @@ func sampleComponents() componentsData {
 // sampleServices mocks the Services page so the screenshot shows the request
 // rate + avg latency sparkline columns.
 func sampleServices() []serviceRow {
-	mk := func(name, url string, rate, lat []float64, latNow string) serviceRow {
+	mk := func(name, url string, rate, lat []float64, latNow, scale string) serviceRow {
 		var r serviceRow
 		r.Metadata = kube.ObjMeta{Name: name, Namespace: "pipeline"}
 		r.KnativeService.Status.URL = url
@@ -195,14 +195,15 @@ func sampleServices() []serviceRow {
 		r.Spark = metrics.Sparkline(rate, "request rate")
 		r.Latency = metrics.Sparkline(lat, "avg latency")
 		r.LatencyNow = latNow
+		r.Scale = scale
 		r.Grafana = "#"
 		return r
 	}
 	return []serviceRow{
 		mk("uploader", "http://uploader.pipeline.127.0.0.1.sslip.io",
-			[]float64{0, 1, 3, 2, 5, 4, 6, 5, 7, 6, 5, 6}, []float64{0.02, 0.03, 0.025, 0.04, 0.035, 0.05, 0.045, 0.06, 0.05, 0.055, 0.048, 0.052}, "52 ms"),
+			[]float64{0, 1, 3, 2, 5, 4, 6, 5, 7, 6, 5, 6}, []float64{0.02, 0.03, 0.025, 0.04, 0.035, 0.05, 0.045, 0.06, 0.05, 0.055, 0.048, 0.052}, "52 ms", "2 running"),
 		mk("resizer", "http://resizer.pipeline.127.0.0.1.sslip.io",
-			[]float64{0, 0, 1, 2, 1, 3, 2, 4, 3, 2, 3, 2}, []float64{0.1, 0.12, 0.11, 0.18, 0.15, 0.22, 0.19, 0.2, 0.17, 0.19, 0.16, 0.18}, "180 ms"),
+			[]float64{0, 0, 1, 2, 1, 3, 2, 4, 3, 2, 3, 2}, []float64{0.1, 0.12, 0.11, 0.18, 0.15, 0.22, 0.19, 0.2, 0.17, 0.19, 0.16, 0.18}, "180 ms", "idle · 0 pods"),
 	}
 }
 
