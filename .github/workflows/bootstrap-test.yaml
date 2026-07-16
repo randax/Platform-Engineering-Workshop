@@ -410,32 +410,62 @@ jobs:
           { [ -n "$lat" ] && [ "$lat" != "NaN" ]; } || { echo "❌ avg latency query returned no value (Functions panel)"; exit 1; }
           echo "✅ avg latency query resolves (Functions panel)"
 
-          # Telemetry depth (#65): the spanmetrics + servicegraph connectors turn
-          # the trace stream into derived metrics, and Knative now pushes its own
-          # traces + metrics to the collector. These are additive — dump what
-          # landed and soft-assert the span/service-graph series exist (they only
-          # need app spans, which the portal traffic above produced). Names are
-          # surfaced so a future dashboard can pin them; failures here don't sink
-          # the run (the hard collector-health checks above already did).
-          echo "--- jaeger services in VictoriaTraces (Knative components should now appear) ---"
-          curl -fsS "http://localhost:10428/select/jaeger/api/services" 2>/dev/null | jq -r '.data[]?' | sort || true
-          echo "--- span_* (spanmetrics) + traces_service_graph_* names in VM ---"
+          # Telemetry depth (#65). Two halves:
+          #  (1) spanmetrics + servicegraph connectors turn the trace stream into
+          #      RED metrics (span_*) and service-graph edge metrics; Knative now
+          #      pushes its own traces + metrics to the collector.
+          #  (2) The connected trace + populated service map only PROVE themselves
+          #      with a cross-service request — so drive one real upload through
+          #      the pipeline (portal → uploader → broker → resizer) AFTER the
+          #      collector is up, then assert the pipeline services + graph edges
+          #      appear. This is the actual proof that the Knative-tracing fix
+          #      connects the chain across the async broker hop.
+          echo "--- Knative-pushed metric names in VM (kn_* — component + scale-from-zero) ---"
           curl -fsS "http://localhost:18428/api/v1/label/__name__/values" 2>/dev/null \
-            | jq -r '.data[]?' | grep -E '^(span_|traces_service_graph_)' | sort || echo "(none yet)"
-          sm=0
-          for _ in $(seq 1 18); do
-            curl -fsS -o /dev/null "http://localhost:30600/" 2>/dev/null || true
-            sm=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"span_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
-            [ "${sm:-0}" -gt 0 ] 2>/dev/null && break
+            | jq -r '.data[]?' | grep -iE '^kn_' | sort | head -40 || echo "(none — Knative OTLP push may need a cycle)"
+          # RED metrics from portal traffic above.
+          sm=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"span_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
+          echo "VM span_* (spanmetrics RED) series = ${sm}"
+          [ "${sm:-0}" -gt 0 ] 2>/dev/null || { echo "❌ spanmetrics connector produced no series"; exit 1; }
+
+          # Drive one upload through the pipeline (the picture-pipeline ksvcs from
+          # module 09 still exist, scaled to zero). 1x1 PNG, same multipart POST
+          # the gallery form makes. Cold-starts uploader → CloudEvent → broker →
+          # resizer, all now traced into VictoriaTraces.
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' | base64 -d > /tmp/tel.png
+          for _ in $(seq 1 5); do
+            curl -fsS --max-time 60 -o /dev/null -F "file=@/tmp/tel.png;type=image/png;filename=tel.png" http://localhost:30600/gallery/upload 2>/dev/null && break
+            sleep 3
+          done
+          # Poll the Jaeger service list — the pipeline should now be traced end to
+          # end. cloudbox-uploader proves portal→uploader traced; cloudbox-resizer
+          # proves the chain survived the async broker hop (the headline fix).
+          up=""; rz=""
+          for _ in $(seq 1 30); do
+            svcs=$(curl -fsS "http://localhost:10428/select/jaeger/api/services" 2>/dev/null | jq -r '.data[]?' || true)
+            [[ "$svcs" == *cloudbox-uploader* ]] && up=1
+            [[ "$svcs" == *cloudbox-resizer* ]] && rz=1
+            [ -n "$up" ] && [ -n "$rz" ] && break
             sleep 5
           done
-          echo "VM span_* (spanmetrics RED) series = ${sm}$([ "${sm:-0}" -gt 0 ] 2>/dev/null || echo '  ⚠️ spanmetrics connector produced nothing — check collector logs')"
-          sg=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"traces_service_graph_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
-          echo "VM traces_service_graph_* (service map edges) series = ${sg} (needs paired client/server spans — sparse without an upload)"
-          echo "--- Knative-pushed metric names in VM (kn_/knative_/revision/activator) ---"
-          curl -fsS "http://localhost:18428/api/v1/label/__name__/values" 2>/dev/null \
-            | jq -r '.data[]?' | grep -iE '^(kn_|knative|.*revision|.*activator|.*autoscaler|.*queue_proxy|.*broker)' | sort | head -40 || echo "(none — Knative OTLP push may need a cycle)"
-          echo "✅ telemetry-depth signals surfaced (spanmetrics/servicegraph + Knative OTLP push)"
+          echo "--- jaeger services in VictoriaTraces after the upload ---"
+          curl -fsS "http://localhost:10428/select/jaeger/api/services" 2>/dev/null | jq -r '.data[]?' | sort || true
+          [ -n "$up" ] || { echo "❌ cloudbox-uploader never appeared in traces after an upload"; exit 1; }
+          [ -n "$rz" ] || { echo "❌ cloudbox-resizer not traced — the chain broke at the broker (tracing/propagation gap)"; exit 1; }
+          echo "✅ connected trace: portal → uploader → broker → resizer all in VictoriaTraces"
+          # Now the service-graph edges should have formed from the paired spans.
+          sg=0
+          for _ in $(seq 1 18); do
+            sg=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"traces_service_graph_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
+            [ "${sg:-0}" -gt 0 ] 2>/dev/null && break
+            sleep 5
+          done
+          echo "--- traces_service_graph_* names + a sample edge ---"
+          curl -fsS "http://localhost:18428/api/v1/label/__name__/values" 2>/dev/null | jq -r '.data[]?' | grep -E '^traces_service_graph_' | sort || true
+          curl -fsS -G "http://localhost:18428/api/v1/series" --data-urlencode 'match[]=traces_service_graph_request_total' 2>/dev/null | jq -c '.data[0] // "none"' || true
+          echo "VM traces_service_graph_* (service map edges) series = ${sg}"
+          [ "${sg:-0}" -gt 0 ] 2>/dev/null || { echo "❌ servicegraph connector formed no edges despite a cross-service upload"; exit 1; }
+          echo "✅ service map: servicegraph edges present in VM (aggregate topology data)"
 
           # Catalog the component/app metric names VM actually stores (now that
           # -opentelemetry.usePrometheusNaming is on) — the console's Monitoring
