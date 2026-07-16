@@ -68,6 +68,29 @@ func NamespaceMemQuery(namespace string) string {
 	return fmt.Sprintf(`sum(k8s_pod_memory_working_set_bytes{k8s_namespace_name=%q})`, namespace)
 }
 
+// CloudNativePG per-cluster metrics for the Databases Monitoring panel (#56).
+// These come from CNPG's in-pod exporter (scraped by the collector's `cnpg`
+// job, which tags every series with cnpg_cluster = the cluster name). Names are
+// the exporter's Prometheus names, preserved through the scrape→VM path.
+func CNPGConnectionsQuery(cluster string) string {
+	return fmt.Sprintf(`sum(cnpg_backends_total{cnpg_cluster=%q})`, cluster)
+}
+
+// CNPGCacheHitQuery is the buffer cache hit ratio (%), the classic Postgres
+// health metric: blks_hit / (blks_hit + blks_read). CNPG's default exporter has
+// no pg_stat_database.xact_commit, but it does expose cnpg_cache_hits/miss.
+// Cumulative (not rate) so it's a robust gauge; clamp_min avoids 0/0 on an idle
+// database (renders 0%, never NaN).
+func CNPGCacheHitQuery(cluster string) string {
+	return fmt.Sprintf(
+		`100 * sum(cnpg_cache_hits{cnpg_cluster=%q}) / clamp_min(sum(cnpg_cache_hits{cnpg_cluster=%q}) + sum(cnpg_cache_miss{cnpg_cluster=%q}), 1)`,
+		cluster, cluster, cluster)
+}
+
+func CNPGSizeQuery(cluster string) string {
+	return fmt.Sprintf(`sum(cnpg_pg_database_size_bytes{cnpg_cluster=%q})`, cluster)
+}
+
 // QueryRange fetches the last 30 minutes of a PromQL expression at 60s
 // resolution and returns just the values. No matching series is a normal
 // state (component disabled, no traffic yet) and returns nil, nil — the

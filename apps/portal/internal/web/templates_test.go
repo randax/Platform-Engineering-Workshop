@@ -143,17 +143,24 @@ func TestTemplatesRender(t *testing.T) {
 		"database-detail": {
 			data: dbDetailData{
 				Name: "my-db", DB: &db, ClusterName: "my-db-pg",
-				Cluster: &kube.CNPGClusterDetail{}, // composed: the Connect section shows
-				Secret:  "my-db-pg-app",
-				Psql:    "kubectl -n demo exec -it my-db-pg-1 -- psql -U app app",
-				Events:  []kube.Event{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
+				Cluster:    &kube.CNPGClusterDetail{}, // composed: Connect + Monitoring show
+				Secret:     "my-db-pg-app",
+				Psql:       "kubectl -n demo exec -it my-db-pg-1 -- psql -U app app",
+				Events:     []kube.Event{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
+				GrafanaURL: "http://localhost:30030/explore?x",
+				Telemetry:  true,
+				ConnSpark:  metrics.Sparkline([]float64{1, 3, 2, 4}, "connections"),
+				ConnNow:    "4",
+				CacheSpark: metrics.Sparkline([]float64{99.2, 99.5, 99.4, 99.7}, "cache hit ratio"),
+				CacheNow:   "99.7%",
+				SizeNow:    "12 MiB",
 			},
 			want: []string{
 				`hx-confirm`, `Delete this database`, // destructive action lives HERE now
 				`my-db-pg-app`,    // connection secret
 				`psql -U app app`, // paste-ready one-liner
 				`evwarn`,          // warning event tinted
-				`Explore metrics in Grafana`,
+				`Monitoring`, `Connections`, `Database size`, `Explore in Grafana`,
 			},
 		},
 		"activity": {

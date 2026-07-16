@@ -54,9 +54,32 @@ phase: {{.Status.Phase}} · storage {{.Spec.Storage.Size}}</p>
 <p>CNPG puts the credentials in the Secret <code>{{.Secret}}</code> (namespace demo).
 Ready to paste:</p>
 <pre class="code">{{.Psql}}</pre>
-<p><a href="{{.GrafanaURL}}" target="_blank">Explore metrics in Grafana →</a>
-<span class="hint">(PromQL placeholder prefilled — CNPG metrics scraping is a
-follow-up, issue #8)</span></p>
+{{end}}
+
+{{if .Cluster}}
+<h2>Monitoring <small>last 30 min · from CloudNativePG's exporter</small></h2>
+{{if .Telemetry}}
+<div class="monitor">
+  <div class="metric">
+    <span class="metric-label">Connections</span>
+    {{if .ConnSpark}}<span class="metric-spark">{{.ConnSpark}}</span><span class="metric-now">{{.ConnNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Cache hit <small>ratio</small></span>
+    {{if .CacheSpark}}<span class="metric-spark">{{.CacheSpark}}</span><span class="metric-now">{{.CacheNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Database size</span>
+    {{if .SizeNow}}<span class="metric-now">{{.SizeNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+</div>
+<p><a href="{{.GrafanaURL}}" target="_blank">Explore in Grafana →</a></p>
+{{else}}
+<p class="hint">🔒 Enable the observability stack to see this database's live connections, transactions, and size.</p>
+{{end}}
 {{end}}
 
 <h2>Recent events</h2>

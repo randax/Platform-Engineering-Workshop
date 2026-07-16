@@ -8,9 +8,11 @@ package web
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 
 	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
 )
 
 type dbDetailData struct {
@@ -22,6 +24,14 @@ type dbDetailData struct {
 	Secret      string // CNPG convention: <cluster>-app holds the credentials
 	Psql        string // ready-to-paste one-liner
 	GrafanaURL  string // Explore link with a PromQL placeholder prefilled
+
+	// Monitoring — CNPG metrics, populated only when observability is collecting.
+	Telemetry  bool
+	ConnSpark  template.HTML
+	ConnNow    string
+	CacheSpark template.HTML
+	CacheNow   string
+	SizeNow    string
 }
 
 func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
@@ -61,8 +71,24 @@ func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 
 	data.Secret = clusterName + "-app"
 	data.Psql = fmt.Sprintf("kubectl -n demo exec -it %s-1 -- psql -U app app", clusterName)
-	data.GrafanaURL = grafanaExplore(s.GrafanaURL, "victoriametrics",
-		fmt.Sprintf(`cnpg_backends_total{cluster=%q, namespace="demo"}`, clusterName))
+	data.GrafanaURL = grafanaExplore(s.GrafanaURL, "victoriametrics", metrics.CNPGConnectionsQuery(clusterName))
+
+	// Monitoring: CNPG's own metrics for this cluster, once the observability
+	// stack is collecting (the cnpg scrape tags every series cnpg_cluster=…).
+	if health, herr := s.Kube.NamespaceWorkloads(r.Context()); herr == nil && health["observability"].Ready > 0 && s.Prom != nil {
+		data.Telemetry = true
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.CNPGConnectionsQuery(clusterName)); len(v) > 0 {
+			data.ConnSpark = metrics.Sparkline(v, "connections")
+			data.ConnNow = fmt.Sprintf("%.0f", v[len(v)-1])
+		}
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.CNPGCacheHitQuery(clusterName)); len(v) > 0 {
+			data.CacheSpark = metrics.Sparkline(v, "cache hit ratio")
+			data.CacheNow = fmt.Sprintf("%.1f%%", v[len(v)-1])
+		}
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.CNPGSizeQuery(clusterName)); len(v) > 0 {
+			data.SizeNow = humanBytes(v[len(v)-1])
+		}
+	}
 
 	s.render(w, "database-detail", data)
 }
