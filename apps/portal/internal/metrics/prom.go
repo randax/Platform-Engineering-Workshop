@@ -44,6 +44,20 @@ func RequestRateQuery(job string) string {
 	return fmt.Sprintf(`sum(rate(http_server_request_duration_seconds_count{job=%q}[5m]))`, job)
 }
 
+// NamespaceCPUQuery / NamespaceMemQuery sum a namespace's pod resource usage —
+// the universal per-component Monitoring signal (#56). The source is the
+// kubeletstats receiver's k8s.pod.cpu.usage / k8s.pod.memory.working_set, which
+// VictoriaMetrics stores (with -opentelemetry.usePrometheusNaming) under the
+// names below, labelled by the k8s.namespace.name resource attribute →
+// k8s_namespace_name. sum() collapses the per-pod series into one line.
+func NamespaceCPUQuery(namespace string) string {
+	return fmt.Sprintf(`sum(k8s_pod_cpu_usage{k8s_namespace_name=%q})`, namespace)
+}
+
+func NamespaceMemQuery(namespace string) string {
+	return fmt.Sprintf(`sum(k8s_pod_memory_working_set_bytes{k8s_namespace_name=%q})`, namespace)
+}
+
 // QueryRange fetches the last 30 minutes of a PromQL expression at 60s
 // resolution and returns just the values. No matching series is a normal
 // state (component disabled, no traffic yet) and returns nil, nil — the
@@ -91,9 +105,11 @@ func (p *Client) QueryRange(ctx context.Context, query string) ([]float64, error
 }
 
 // Sparkline turns a series into one inline SVG <polyline> — hand-rolled,
-// ~25 lines, zero dependencies. Returns "" for missing data so templates
-// can show their empty-state dash instead.
-func Sparkline(vals []float64) template.HTML {
+// ~25 lines, zero dependencies. `label` is the accessible description (what the
+// line measures). Returns "" for missing data so templates can show their
+// empty-state dash instead. preserveAspectRatio="none" lets CSS stretch it to
+// fill its container (e.g. a full-width metric card) instead of letterboxing.
+func Sparkline(vals []float64, label string) template.HTML {
 	if len(vals) < 2 {
 		return ""
 	}
@@ -114,7 +130,7 @@ func Sparkline(vals []float64) template.HTML {
 		fmt.Fprintf(&pts, "%.1f,%.1f ", x, y)
 	}
 	svg := fmt.Sprintf(
-		`<svg class="spark" viewBox="0 0 %.0f %.0f" width="%.0f" height="%.0f" role="img" aria-label="request rate, last 30 minutes"><polyline points="%s" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`,
-		w, h, w, h, strings.TrimSpace(pts.String()))
-	return template.HTML(svg) // safe: built entirely from numbers we computed
+		`<svg class="spark" viewBox="0 0 %.0f %.0f" width="%.0f" height="%.0f" preserveAspectRatio="none" role="img" aria-label="%s, last 30 minutes"><polyline points="%s" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`,
+		w, h, w, h, template.HTMLEscapeString(label), strings.TrimSpace(pts.String()))
+	return template.HTML(svg) // safe: numbers we computed + an escaped label
 }

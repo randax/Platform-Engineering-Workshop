@@ -282,6 +282,21 @@ jobs:
           [ -n "$traced" ] || { echo "❌ no app traces in VictoriaTraces (services: ${svcs:-none})"; exit 1; }
           echo "✅ OTel Collector: component metrics in VM + component logs in VLogs + app traces in VictoriaTraces"
 
+          # Console Monitoring panel (#56): the per-component detail page must
+          # render a sparkline from VM using the pinned metric names
+          # (k8s_pod_cpu_usage / k8s_pod_memory_working_set_bytes). A rendered
+          # <polyline> proves the console→VictoriaMetrics query is correct end to
+          # end — not just guessed from the receiver docs. kube-system always has
+          # pods, so it always has kubeletstats series.
+          panel=""
+          for _ in $(seq 1 18); do
+            html=$(curl -fsS "http://localhost:30600/components/kube-system" 2>/dev/null || true)
+            if [[ "$html" == *"<polyline"* ]]; then panel=1; break; fi
+            sleep 5
+          done
+          [ -n "$panel" ] || { echo "❌ console Monitoring panel rendered no sparkline (metric name mismatch?)"; exit 1; }
+          echo "✅ console Monitoring panel renders live CPU/mem sparklines from VictoriaMetrics"
+
           # Catalog the component/app metric names VM actually stores (now that
           # -opentelemetry.usePrometheusNaming is on) — the console's Monitoring
           # panels (#56) pin their PromQL to these exact names, so surface them.

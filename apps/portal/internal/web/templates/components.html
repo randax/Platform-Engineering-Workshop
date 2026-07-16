@@ -22,7 +22,7 @@ DaemonSets) grouped by namespace — <code>kubectl get deploy -A</code> with a c
     <li>
       <span class="dot {{.Class}}" title="{{.Status}}"></span>
       <div class="statusbody">
-        <span class="statustitle">{{.Title}}
+        <span class="statustitle"><a href="/components/{{.Namespace}}">{{.Title}}</a>
           <small>{{.Ready}}/{{.Total}} workloads ready · ns {{.Namespace}}</small>
         </span>
         <span class="statusdesc">{{.Description}}</span>
