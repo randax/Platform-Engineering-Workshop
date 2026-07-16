@@ -91,6 +91,24 @@ func CNPGSizeQuery(cluster string) string {
 	return fmt.Sprintf(`sum(cnpg_pg_database_size_bytes{cnpg_cluster=%q})`, cluster)
 }
 
+// NATS metrics for the Streams Monitoring panel (#56). Source is the
+// prometheus-nats-exporter sidecar (:7777, scraped via the pod's
+// prometheus.io/scrape annotation): -jsz=all gives the jetstream_* server
+// gauges, -varz gives the gnatsd_varz_* server gauges. Names are the exporter's
+// (namespace gnatsd / jetstream), preserved through the scrape→VM path — the
+// rehearsal dumps the real names to catch any version drift.
+func NATSMessagesQuery() string {
+	return `sum(jetstream_server_total_messages)`
+}
+
+func NATSConnectionsQuery() string {
+	return `sum(gnatsd_varz_connections)`
+}
+
+func NATSBytesQuery() string {
+	return `sum(jetstream_server_total_message_bytes)`
+}
+
 // QueryRange fetches the last 30 minutes of a PromQL expression at 60s
 // resolution and returns just the values. No matching series is a normal
 // state (component disabled, no traffic yet) and returns nil, nil — the

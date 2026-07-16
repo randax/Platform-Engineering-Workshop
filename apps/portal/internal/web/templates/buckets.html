@@ -6,6 +6,23 @@
 browse its objects — each <b>Download</b> link is a presigned URL signed by the browser-facing
 endpoint, valid 15 minutes, so the file downloads straight from RustFS with zero AWS.</p>
 
+{{if .Telemetry}}
+<h2>Monitoring <small>last 30 min · RustFS pod resources</small></h2>
+<div class="monitor">
+  <div class="metric">
+    <span class="metric-label">CPU <small>namespace rustfs</small></span>
+    {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Memory <small>namespace rustfs</small></span>
+    {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+</div>
+<p class="hint"><small>RustFS exposes no Prometheus endpoint, so this is the generic pod resource signal — the same fallback the component detail pages use.</small></p>
+{{end}}
+
 <table>
   <thead><tr><th>Bucket</th><th>Created</th></tr></thead>
   <tbody>

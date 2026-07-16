@@ -15,10 +15,13 @@ package web
 
 import (
 	"context"
+	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 
 	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
 	reg "cloudbox.io/portal/internal/registry" // aliased: this package already has a `registry` var (the page registry)
 )
 
@@ -65,6 +68,19 @@ type buildsData struct {
 	Repos     []reg.Repo
 	WFFlash   flash // set when the Argo Workflows read fails
 	RepoFlash flash // set when the registry read fails
+
+	// Monitoring — populated only by the full-page handler (not the polled
+	// fragment, which would re-query VM every 5s), and only when observability
+	// is collecting. The builds namespace's resource use is BuildKit's, which
+	// spikes visibly during a build. (Argo v4's controller doesn't expose
+	// scrapeable Prometheus metrics, so — like Buckets/RustFS — this is the
+	// generic kubeletstats signal; the live runs table below carries the
+	// Argo-specific CI story.)
+	Telemetry bool
+	CPUSpark  template.HTML
+	CPUNow    string
+	MemSpark  template.HTML
+	MemNow    string
 }
 
 // gatherBuilds reads both sources independently. Neither error is fatal: a
@@ -88,7 +104,22 @@ func gatherBuilds(ctx context.Context, wl workflowLister, cl catalogLister) buil
 }
 
 func handleBuilds(s *Server, w http.ResponseWriter, r *http.Request) {
-	s.render(w, "builds", gatherBuilds(r.Context(), s.Kube, s.Registry))
+	data := gatherBuilds(r.Context(), s.Kube, s.Registry)
+	// Monitoring: the builds namespace's BuildKit resource use, once the
+	// observability stack is collecting. Only here (full page), never in the
+	// 5s-polled fragment.
+	if health, err := s.Kube.NamespaceWorkloads(r.Context()); err == nil && health["observability"].Ready > 0 && s.Prom != nil {
+		data.Telemetry = true
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.NamespaceCPUQuery("builds")); len(v) > 0 {
+			data.CPUSpark = metrics.Sparkline(v, "CPU usage")
+			data.CPUNow = fmt.Sprintf("%.3f cores", v[len(v)-1])
+		}
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.NamespaceMemQuery("builds")); len(v) > 0 {
+			data.MemSpark = metrics.Sparkline(v, "memory working set")
+			data.MemNow = humanBytes(v[len(v)-1])
+		}
+	}
+	s.render(w, "builds", data)
 }
 
 // handleBuildRuns serves the self-refreshing fragment htmx polls. Same

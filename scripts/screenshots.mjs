@@ -21,14 +21,19 @@ const files = readdirSync(htmlDir).filter((f) => f.endsWith('.html'));
 const browser = await chromium.launch();
 for (const f of files) {
   const name = basename(f, '.html');
-  // Desktop, plus narrow shots for the detail page to show the mobile nav.
-  const shots = [[1280, '', false]];
+  // Every page gets a light + dark desktop shot (the console is theme-aware via
+  // prefers-color-scheme, and the dark shots are the "wow" in the slides). The
+  // monitoring detail page also gets narrow shots to show the mobile nav.
+  const shots = [
+    [1280, '', false, 'light'],
+    [1280, '-dark', false, 'dark'],
+  ];
   if (name.includes('monitoring')) {
-    shots.push([430, '-mobile', false]); // collapsed: sticky bar + content
-    shots.push([430, '-mobile-nav', true]); // expanded: after tapping the burger
+    shots.push([430, '-mobile', false, 'light']); // collapsed: sticky bar + content
+    shots.push([430, '-mobile-nav', true, 'light']); // expanded: after tapping the burger
   }
-  for (const [width, suffix, openNav] of shots) {
-    const page = await browser.newPage({ viewport: { width, height: 900 }, deviceScaleFactor: 2 });
+  for (const [width, suffix, openNav, colorScheme] of shots) {
+    const page = await browser.newPage({ viewport: { width, height: 900 }, deviceScaleFactor: 2, colorScheme });
     await page.goto('file://' + join(htmlDir, f), { waitUntil: 'networkidle' });
     if (openNav) await page.locator('.nav-burger').click();
     await page.screenshot({ path: join(outDir, name + suffix + '.png'), fullPage: true });
