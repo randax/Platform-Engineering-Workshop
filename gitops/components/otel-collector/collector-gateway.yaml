@@ -67,6 +67,33 @@ data:
                 - source_labels: [__meta_kubernetes_pod_name]
                   action: replace
                   target_label: pod
+            # CloudNativePG instances expose Postgres metrics on :9187. They
+            # don't carry prometheus.io annotations, and annotating the Cluster
+            # specs would churn every solutions/ copy — so scrape them by their
+            # cnpg.io/cluster label instead. Gives cnpg_* series (connections,
+            # transactions, db size) for the Databases Monitoring panel (#56).
+            - job_name: cnpg
+              scrape_interval: 30s
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_pod_label_cnpg_io_cluster]
+                  action: keep
+                  regex: .+
+                - source_labels: [__address__]
+                  action: replace
+                  regex: ([^:]+)(?::\d+)?
+                  replacement: $$1:9187
+                  target_label: __address__
+                - source_labels: [__meta_kubernetes_namespace]
+                  action: replace
+                  target_label: namespace
+                - source_labels: [__meta_kubernetes_pod_name]
+                  action: replace
+                  target_label: pod
+                - source_labels: [__meta_kubernetes_pod_label_cnpg_io_cluster]
+                  action: replace
+                  target_label: cnpg_cluster
 
     processors:
       # Explicit MiB (not percentage) for deterministic behaviour across cgroup

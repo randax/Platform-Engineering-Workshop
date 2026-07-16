@@ -40,10 +40,13 @@ Two collectors, split by what each signal needs:
   - Exports: metrics → VM, logs → VLogs.
 - **gateway (Deployment, replicas: 1)** — cluster singletons:
   - `k8s_cluster` — object-state metrics (must be singleton or it double-counts).
-  - `prometheus` — annotation-based pod scrape (`prometheus.io/scrape: "true"`,
-    honouring `prometheus.io/port` + `prometheus.io/path`). NB: literal relabel
-    replacement refs are written `$$1`/`$$2` because the collector expands `$…`
-    as env vars — `$$` escapes to a literal `$`.
+  - `prometheus` — two scrape jobs: `kubernetes-pods` (annotation-based:
+    `prometheus.io/scrape: "true"`, honouring `prometheus.io/port` + `…/path`)
+    and `cnpg` (CloudNativePG instances by their `cnpg.io/cluster` label on
+    :9187 — they carry no prometheus.io annotations, and annotating the Cluster
+    specs would churn every `solutions/` copy). NB: literal relabel replacement
+    refs are written `$$1`/`$$2` because the collector expands `$…` as env vars —
+    `$$` escapes to a literal `$`.
   - `otlp` (4317/4318) — the apps (portal/uploader/resizer) push their OTLP
     traces + metrics here; it replaced otel-lgtm's OTLP endpoint. Exposed via the
     `otel-collector` Service.
