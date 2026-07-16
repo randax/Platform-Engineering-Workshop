@@ -65,6 +65,10 @@ src: ./pages/what.md
 ---
 
 ---
+src: ./pages/stack.md
+---
+
+---
 src: ./pages/how.md
 ---
 

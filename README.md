@@ -54,6 +54,11 @@ On object storage: we use [RustFS](https://rustfs.com), an Apache-2.0 alternativ
 MinIO, whose open-source community edition was discontinued in 2025–26 in favor of the
 proprietary AIStor. Same S3 API, licence you can live with.
 
+Every component was a deliberate choice against a rejected alternative — Talos over
+kubeadm, Cilium over kube-proxy, in-cluster Gitea over GitHub, Crossplane v2 over Helm,
+the Victoria stack over kube-prometheus-stack. The full "what we chose, what we rejected,
+and the tradeoff" reference is in **[docs/STACK.md](docs/STACK.md)**.
+
 ## Prerequisites — do this BEFORE the conference
 
 Conference WiFi carries keystrokes, not gigabytes. The setup downloads 15–20 GB of
