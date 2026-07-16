@@ -225,8 +225,6 @@ func sampleBuilds() buildsData {
 			{Name: "web", Tags: []string{"latest"}},
 		},
 		Telemetry: true,
-		WFSpark:   metrics.Sparkline([]float64{1, 1, 2, 1, 3, 2, 2, 3, 2, 1, 2, 1}, "workflows"),
-		WFNow:     "1",
 		CPUSpark:  metrics.Sparkline([]float64{0.05, 0.2, 0.6, 0.9, 0.7, 0.3, 0.1, 0.4, 0.8, 0.5, 0.2, 0.1}, "CPU usage"),
 		CPUNow:    "0.112 cores",
 		MemSpark:  metrics.Sparkline([]float64{1.2e8, 1.4e8, 2.1e8, 2.6e8, 2.4e8, 1.9e8, 1.6e8, 2.0e8, 2.5e8, 2.2e8, 1.8e8, 1.7e8}, "memory working set"),

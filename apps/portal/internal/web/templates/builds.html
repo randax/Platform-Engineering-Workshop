@@ -7,13 +7,8 @@ other resource. The catalog is your <code>Zot</code> registry over the OCI <code
 images your pipeline built and pushed. Nothing here is built or dispatched from the console.</p>
 
 {{if .Telemetry}}
-<h2>Monitoring <small>last 30 min · Argo controller + kubeletstats</small></h2>
+<h2>Monitoring <small>last 30 min · builds namespace (BuildKit)</small></h2>
 <div class="monitor">
-  <div class="metric">
-    <span class="metric-label">Workflows <small>tracked</small></span>
-    {{if .WFSpark}}<span class="metric-spark">{{.WFSpark}}</span><span class="metric-now">{{.WFNow}}</span>
-    {{else}}<span class="nodata">no data yet</span>{{end}}
-  </div>
   <div class="metric">
     <span class="metric-label">CPU <small>namespace builds</small></span>
     {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
@@ -25,6 +20,7 @@ images your pipeline built and pushed. Nothing here is built or dispatched from 
     {{else}}<span class="nodata">no data yet</span>{{end}}
   </div>
 </div>
+<p class="hint"><small>BuildKit's CPU and memory in the <code>builds</code> namespace — watch it spike while a workflow builds. The runs below come straight from the Argo Workflows API.</small></p>
 {{end}}
 
 {{template "builds-runs" .}}

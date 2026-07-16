@@ -94,28 +94,6 @@ data:
                 - source_labels: [__meta_kubernetes_pod_label_cnpg_io_cluster]
                   action: replace
                   target_label: cnpg_cluster
-            # Argo Workflows controller exposes workflow metrics on :9090
-            # (app=workflow-controller). Gives argo_workflows_* series for the
-            # Builds Monitoring panel (#56).
-            - job_name: argo-workflows
-              scrape_interval: 30s
-              kubernetes_sd_configs:
-                - role: pod
-              relabel_configs:
-                - source_labels: [__meta_kubernetes_pod_label_app]
-                  action: keep
-                  regex: workflow-controller
-                - source_labels: [__address__]
-                  action: replace
-                  regex: ([^:]+)(?::\d+)?
-                  replacement: $$1:9090
-                  target_label: __address__
-                - source_labels: [__meta_kubernetes_namespace]
-                  action: replace
-                  target_label: namespace
-                - source_labels: [__meta_kubernetes_pod_name]
-                  action: replace
-                  target_label: pod
 
     processors:
       # Explicit MiB (not percentage) for deterministic behaviour across cgroup

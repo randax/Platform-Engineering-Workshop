@@ -91,13 +91,6 @@ func CNPGSizeQuery(cluster string) string {
 	return fmt.Sprintf(`sum(cnpg_pg_database_size_bytes{cnpg_cluster=%q})`, cluster)
 }
 
-// ArgoWorkflowsQuery is the count of workflows the Argo controller is tracking,
-// for the Builds Monitoring panel (#56) — a proxy for CI activity. From the
-// workflow-controller's :9090 metrics (scraped by the collector's `argo` job).
-func ArgoWorkflowsQuery() string {
-	return `sum(argo_workflows_count)`
-}
-
 // NATS metrics for the Streams Monitoring panel (#56). Source is the
 // prometheus-nats-exporter sidecar (:7777, scraped via the pod's
 // prometheus.io/scrape annotation): -jsz=all gives the jetstream_* server

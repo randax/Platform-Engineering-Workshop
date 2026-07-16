@@ -16,7 +16,7 @@ Every page has a light and a `-dark` variant (the console is theme-aware via
 | `console-components.png` | The Components page — per-namespace health, each linking into its Monitoring detail. |
 | `console-services.png` | The Services page — request rate + avg-latency sparklines per Knative Service (#56). |
 | `console-database-monitoring.png` | A database's detail page — CNPG connections, cache-hit ratio and size (#56). |
-| `console-builds-monitoring.png` | The Builds page — Argo workflow activity + the builds namespace's CPU/memory (#56). |
+| `console-builds-monitoring.png` | The Builds page — BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs (#56). |
 | `console-streams-monitoring.png` | The Streams page — JetStream messages/bytes + connections from the NATS exporter sidecar (#56). |
 | `console-buckets-monitoring.png` | The Buckets page — RustFS pod CPU/memory (generic fallback; RustFS has no Prometheus endpoint) (#56). |
 

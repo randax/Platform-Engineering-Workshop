@@ -71,10 +71,12 @@ type buildsData struct {
 
 	// Monitoring — populated only by the full-page handler (not the polled
 	// fragment, which would re-query VM every 5s), and only when observability
-	// is collecting.
+	// is collecting. The builds namespace's resource use is BuildKit's, which
+	// spikes visibly during a build. (Argo v4's controller doesn't expose
+	// scrapeable Prometheus metrics, so — like Buckets/RustFS — this is the
+	// generic kubeletstats signal; the live runs table below carries the
+	// Argo-specific CI story.)
 	Telemetry bool
-	WFSpark   template.HTML
-	WFNow     string
 	CPUSpark  template.HTML
 	CPUNow    string
 	MemSpark  template.HTML
@@ -103,15 +105,11 @@ func gatherBuilds(ctx context.Context, wl workflowLister, cl catalogLister) buil
 
 func handleBuilds(s *Server, w http.ResponseWriter, r *http.Request) {
 	data := gatherBuilds(r.Context(), s.Kube, s.Registry)
-	// Monitoring: CI activity (Argo) + the builds namespace's BuildKit resource
-	// use, once the observability stack is collecting. Only here (full page),
-	// never in the 5s-polled fragment.
+	// Monitoring: the builds namespace's BuildKit resource use, once the
+	// observability stack is collecting. Only here (full page), never in the
+	// 5s-polled fragment.
 	if health, err := s.Kube.NamespaceWorkloads(r.Context()); err == nil && health["observability"].Ready > 0 && s.Prom != nil {
 		data.Telemetry = true
-		if v, _ := s.Prom.QueryRange(r.Context(), metrics.ArgoWorkflowsQuery()); len(v) > 0 {
-			data.WFSpark = metrics.Sparkline(v, "workflows")
-			data.WFNow = fmt.Sprintf("%.0f", v[len(v)-1])
-		}
 		if v, _ := s.Prom.QueryRange(r.Context(), metrics.NamespaceCPUQuery("builds")); len(v) > 0 {
 			data.CPUSpark = metrics.Sparkline(v, "CPU usage")
 			data.CPUNow = fmt.Sprintf("%.3f cores", v[len(v)-1])
