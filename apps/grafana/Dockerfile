@@ -16,8 +16,9 @@ FROM grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19
 
 USER root
 # Signed plugins from the Grafana catalog (no unsigned-loading needed). Versions
-# are pinned once the first rehearsal reports what resolved for 12.4.5.
-RUN grafana cli --pluginsDir /opt/grafana-plugins plugins install victoriametrics-metrics-datasource \
- && grafana cli --pluginsDir /opt/grafana-plugins plugins install victoriametrics-logs-datasource \
+# pinned to what resolved for Grafana 12.4.5 in the rehearsal (workshop rule:
+# everything pinned, no floating "latest").
+RUN grafana cli --pluginsDir /opt/grafana-plugins plugins install victoriametrics-metrics-datasource 0.25.2 \
+ && grafana cli --pluginsDir /opt/grafana-plugins plugins install victoriametrics-logs-datasource 0.29.0 \
  && chown -R 472:0 /opt/grafana-plugins
 USER 472
