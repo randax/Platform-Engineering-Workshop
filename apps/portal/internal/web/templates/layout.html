@@ -37,9 +37,9 @@
       {{- if .Locked}}
       {{/* capability not present yet: a non-link, greyed, with the module that
            unlocks it as a tooltip — see .nav-locked in style.css */}}
-      <span class="nav-locked" title="{{.Hint}}">🔒 {{.Title}}</span>
+      <span class="nav-locked" title="{{.Hint}}">{{navicon .Key}}<span>🔒 {{.Title}}</span></span>
       {{- else}}
-      <a href="{{.Href}}" {{if eq $ .Key}}aria-current="page"{{end}}>{{.Title}}</a>
+      <a href="{{.Href}}" {{if eq $ .Key}}aria-current="page"{{end}}>{{navicon .Key}}<span>{{.Title}}</span></a>
       {{- end}}
       {{- end}}
     </div>
