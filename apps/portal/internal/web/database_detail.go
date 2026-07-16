@@ -26,12 +26,12 @@ type dbDetailData struct {
 	GrafanaURL  string // Explore link with a PromQL placeholder prefilled
 
 	// Monitoring — CNPG metrics, populated only when observability is collecting.
-	Telemetry bool
-	ConnSpark template.HTML
-	ConnNow   string
-	TxnSpark  template.HTML
-	TxnNow    string
-	SizeNow   string
+	Telemetry  bool
+	ConnSpark  template.HTML
+	ConnNow    string
+	CacheSpark template.HTML
+	CacheNow   string
+	SizeNow    string
 }
 
 func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
@@ -81,9 +81,9 @@ func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 			data.ConnSpark = metrics.Sparkline(v, "connections")
 			data.ConnNow = fmt.Sprintf("%.0f", v[len(v)-1])
 		}
-		if v, _ := s.Prom.QueryRange(r.Context(), metrics.CNPGTxnRateQuery(clusterName)); len(v) > 0 {
-			data.TxnSpark = metrics.Sparkline(v, "transactions/s")
-			data.TxnNow = fmt.Sprintf("%.1f /s", v[len(v)-1])
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.CNPGCacheHitQuery(clusterName)); len(v) > 0 {
+			data.CacheSpark = metrics.Sparkline(v, "cache hit ratio")
+			data.CacheNow = fmt.Sprintf("%.1f%%", v[len(v)-1])
 		}
 		if v, _ := s.Prom.QueryRange(r.Context(), metrics.CNPGSizeQuery(clusterName)); len(v) > 0 {
 			data.SizeNow = humanBytes(v[len(v)-1])

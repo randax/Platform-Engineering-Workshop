@@ -188,8 +188,8 @@ func sampleDatabaseDetail() dbDetailData {
 	d.Telemetry = true
 	d.ConnSpark = metrics.Sparkline([]float64{2, 3, 2, 4, 3, 5, 4, 4, 5, 4, 3, 4}, "connections")
 	d.ConnNow = "4"
-	d.TxnSpark = metrics.Sparkline([]float64{0.5, 0.8, 1.2, 0.9, 1.5, 1.1, 1.8, 1.3, 1.6, 1.2, 1.4, 1.3}, "transactions/s")
-	d.TxnNow = "1.3 /s"
+	d.CacheSpark = metrics.Sparkline([]float64{99.1, 99.3, 99.2, 99.5, 99.4, 99.6, 99.5, 99.7, 99.6, 99.5, 99.6, 99.7}, "cache hit ratio")
+	d.CacheNow = "99.7%"
 	d.SizeNow = "14 MiB"
 	return d
 }

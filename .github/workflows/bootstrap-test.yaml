@@ -273,12 +273,12 @@ jobs:
           echo "--- cnpg_backends_total label set ---"
           curl -fsS -G "http://localhost:18428/api/v1/series" \
             --data-urlencode 'match[]=cnpg_backends_total' 2>/dev/null | jq -c '.data[0] // "none"' || true
-          for m in cnpg_backends_total cnpg_pg_stat_database_xact_commit cnpg_pg_database_size_bytes; do
+          for m in cnpg_backends_total cnpg_cache_hits cnpg_cache_miss cnpg_pg_database_size_bytes; do
             n=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode "query=count($m)" 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
             echo "  $m → ${n} series"
             [ "${n:-0}" -gt 0 ] 2>/dev/null || { echo "❌ Databases-panel metric $m absent"; exit 1; }
           done
-          echo "✅ CNPG panel metrics present (connections / transactions / size)"
+          echo "✅ CNPG panel metrics present (connections / cache-hit / size)"
 
           # --- logs proof: a non-app pod's logs must reach VLogs. kube-system
           # (cilium et al.) is never a first-party app, so its presence in the

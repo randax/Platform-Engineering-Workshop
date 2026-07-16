@@ -66,8 +66,8 @@ Ready to paste:</p>
     {{else}}<span class="nodata">no data yet</span>{{end}}
   </div>
   <div class="metric">
-    <span class="metric-label">Transactions <small>committed/s</small></span>
-    {{if .TxnSpark}}<span class="metric-spark">{{.TxnSpark}}</span><span class="metric-now">{{.TxnNow}}</span>
+    <span class="metric-label">Cache hit <small>ratio</small></span>
+    {{if .CacheSpark}}<span class="metric-spark">{{.CacheSpark}}</span><span class="metric-now">{{.CacheNow}}</span>
     {{else}}<span class="nodata">no data yet</span>{{end}}
   </div>
   <div class="metric">

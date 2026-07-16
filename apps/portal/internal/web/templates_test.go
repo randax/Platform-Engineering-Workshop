@@ -151,8 +151,8 @@ func TestTemplatesRender(t *testing.T) {
 				Telemetry:  true,
 				ConnSpark:  metrics.Sparkline([]float64{1, 3, 2, 4}, "connections"),
 				ConnNow:    "4",
-				TxnSpark:   metrics.Sparkline([]float64{0.5, 1.2, 0.8, 1.5}, "transactions/s"),
-				TxnNow:     "1.5 /s",
+				CacheSpark: metrics.Sparkline([]float64{99.2, 99.5, 99.4, 99.7}, "cache hit ratio"),
+				CacheNow:   "99.7%",
 				SizeNow:    "12 MiB",
 			},
 			want: []string{

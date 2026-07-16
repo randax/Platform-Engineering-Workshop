@@ -76,8 +76,15 @@ func CNPGConnectionsQuery(cluster string) string {
 	return fmt.Sprintf(`sum(cnpg_backends_total{cnpg_cluster=%q})`, cluster)
 }
 
-func CNPGTxnRateQuery(cluster string) string {
-	return fmt.Sprintf(`sum(rate(cnpg_pg_stat_database_xact_commit{cnpg_cluster=%q}[5m]))`, cluster)
+// CNPGCacheHitQuery is the buffer cache hit ratio (%), the classic Postgres
+// health metric: blks_hit / (blks_hit + blks_read). CNPG's default exporter has
+// no pg_stat_database.xact_commit, but it does expose cnpg_cache_hits/miss.
+// Cumulative (not rate) so it's a robust gauge; clamp_min avoids 0/0 on an idle
+// database (renders 0%, never NaN).
+func CNPGCacheHitQuery(cluster string) string {
+	return fmt.Sprintf(
+		`100 * sum(cnpg_cache_hits{cnpg_cluster=%q}) / clamp_min(sum(cnpg_cache_hits{cnpg_cluster=%q}) + sum(cnpg_cache_miss{cnpg_cluster=%q}), 1)`,
+		cluster, cluster, cluster)
 }
 
 func CNPGSizeQuery(cluster string) string {
