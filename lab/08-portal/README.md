@@ -15,6 +15,20 @@ you can.
 
 <p align="center"><em>This is what you're building: the Cloudbox Console — Go + htmx, server-rendered, offline, with per-component metrics/logs/traces from your OTel stack. Light + dark themes.</em></p>
 
+It isn't just component health, either — every capability you stood up gets its own
+page with a live **Monitoring** panel fed by the same OTel stack:
+
+<p align="center">
+  <img src="../../docs/screenshots/console-builds-monitoring-dark.png" alt="Cloudbox Console — the Builds page: Argo workflow activity and the builds namespace's CPU/memory" width="32%" />
+  <img src="../../docs/screenshots/console-streams-monitoring-dark.png" alt="Cloudbox Console — the Streams page: JetStream messages/bytes and connections from the NATS exporter" width="32%" />
+  <img src="../../docs/screenshots/console-buckets-monitoring-dark.png" alt="Cloudbox Console — the Buckets page: RustFS pod CPU/memory" width="32%" />
+</p>
+
+<p align="center"><em>Builds (Argo Workflows + your Zot registry), Streams (JetStream, via a
+prometheus-nats-exporter sidecar), and Buckets (RustFS — no Prometheus endpoint, so the
+generic per-namespace pod signal). Each queries VictoriaMetrics only on page load and
+degrades to "no data yet" when observability is off.</em></p>
+
 ## Why this matters
 
 Everything you built so far is APIs and YAML — perfect for platform engineers, invisible

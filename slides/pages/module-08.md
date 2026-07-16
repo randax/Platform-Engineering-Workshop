@@ -42,6 +42,26 @@ The star task in the lab: create console-db through the form, then prove it's re
 -->
 
 ---
+layout: center
+---
+
+# One console, every capability
+
+<div class="grid grid-cols-3 gap-3 mt-4">
+  <img src="/console/builds-dark.png" class="rounded shadow" alt="Builds page — Argo workflow activity + builds-namespace CPU/memory" />
+  <img src="/console/streams-dark.png" class="rounded shadow" alt="Streams page — JetStream messages/bytes + connections" />
+  <img src="/console/buckets-dark.png" class="rounded shadow" alt="Buckets page — RustFS pod CPU/memory" />
+</div>
+
+<div class="mt-4 text-sm opacity-75">
+Builds · Streams · Buckets — each with a live <strong>Monitoring</strong> panel off the same OTel stack. NATS gets a prometheus-nats-exporter sidecar; RustFS has no metrics endpoint, so it falls back to the generic per-namespace pod signal — honestly labelled.
+</div>
+
+<!--
+The console isn't one page — it's a front door for every capability the attendee stood up. Each self-service and platform page carries its own Monitoring panel fed by the same VictoriaMetrics/Logs/Traces stack: Builds shows Argo workflow activity next to the builds namespace's BuildKit resource use; Streams reads JetStream throughput and connections through a prometheus-nats-exporter sidecar (NATS core only speaks JSON on :8222, so the sidecar is what makes it Prometheus-scrapable); Buckets has no exporter to lean on — RustFS exposes no /metrics — so it shows the generic per-namespace pod CPU/memory and says so on the page. The honesty is the point: a real console shows you what it can measure and is upfront about what it can't. Every panel queries the metrics store only on page load (never the 5-second htmx poll) and degrades to "no data yet" when observability is switched off.
+-->
+
+---
 layout: two-cols
 ---
 
