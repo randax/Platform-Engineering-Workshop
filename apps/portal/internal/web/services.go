@@ -54,9 +54,9 @@ func handleServices(s *Server, w http.ResponseWriter, r *http.Request) {
 		if vals, err := s.Prom.QueryRange(r.Context(), metrics.RequestRateQuery(job)); err == nil {
 			row.Spark = metrics.Sparkline(vals, "request rate")
 		}
-		// p95 latency from the same histogram (best-effort, same as the rate).
-		if vals, err := s.Prom.QueryRange(r.Context(), metrics.LatencyP95Query(job)); err == nil && len(vals) > 0 {
-			row.Latency = metrics.Sparkline(vals, "p95 latency")
+		// Mean latency from the same histogram (best-effort, same as the rate).
+		if vals, err := s.Prom.QueryRange(r.Context(), metrics.LatencyAvgQuery(job)); err == nil && len(vals) > 0 {
+			row.Latency = metrics.Sparkline(vals, "avg latency")
 			row.LatencyNow = fmt.Sprintf("%.0f ms", vals[len(vals)-1]*1000)
 		}
 		rows = append(rows, row)

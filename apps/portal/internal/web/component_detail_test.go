@@ -140,7 +140,7 @@ func sampleComponents() componentsData {
 }
 
 // sampleServices mocks the Services page so the screenshot shows the request
-// rate + p95 latency sparkline columns.
+// rate + avg latency sparkline columns.
 func sampleServices() []serviceRow {
 	mk := func(name, url string, rate, lat []float64, latNow string) serviceRow {
 		var r serviceRow
@@ -148,7 +148,7 @@ func sampleServices() []serviceRow {
 		r.KnativeService.Status.URL = url
 		r.KnativeService.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "True"}}
 		r.Spark = metrics.Sparkline(rate, "request rate")
-		r.Latency = metrics.Sparkline(lat, "p95 latency")
+		r.Latency = metrics.Sparkline(lat, "avg latency")
 		r.LatencyNow = latNow
 		r.Grafana = "#"
 		return r

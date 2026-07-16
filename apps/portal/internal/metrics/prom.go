@@ -41,11 +41,17 @@ func RequestRateQuery(service string) string {
 	return fmt.Sprintf(`sum(rate(http_server_request_duration_seconds_count{service_name=%q}[5m]))`, service)
 }
 
-// LatencyP95Query builds the PromQL for a service's p95 request latency, from
-// the SAME otelhttp histogram RequestRateQuery uses — histogram_quantile over
-// its _bucket series (the `le` labels), rate'd over 5m. Result is in seconds.
-func LatencyP95Query(service string) string {
-	return fmt.Sprintf(`histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=%q}[5m])))`, service)
+// LatencyAvgQuery builds the PromQL for a service's mean request latency from
+// the SAME otelhttp histogram RequestRateQuery uses: rate(_sum) / rate(_count).
+// This deliberately avoids histogram_quantile/_bucket — VictoriaMetrics stores
+// OTLP histogram buckets with its native `vmrange` label, not Prometheus `le`,
+// so a `sum by (le)` p95 comes back empty. The mean is robust and needs only
+// the _sum/_count series (both present). Result is in seconds. (A true p95 via
+// VM's vmrange buckets is a follow-up.)
+func LatencyAvgQuery(service string) string {
+	return fmt.Sprintf(
+		`sum(rate(http_server_request_duration_seconds_sum{service_name=%q}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=%q}[5m]))`,
+		service, service)
 }
 
 // NamespaceCPUQuery / NamespaceMemQuery sum a namespace's pod resource usage —

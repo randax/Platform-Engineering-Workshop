@@ -310,11 +310,11 @@ jobs:
             --data-urlencode 'match[]=http_server_request_duration_seconds_count' 2>/dev/null \
             | jq -c '.data[0] // "none"' || true
           lat=$(curl -fsS -G http://localhost:18428/api/v1/query \
-            --data-urlencode 'query=histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="cloudbox-portal"}[5m])))' \
+            --data-urlencode 'query=sum(rate(http_server_request_duration_seconds_sum{service_name="cloudbox-portal"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name="cloudbox-portal"}[5m]))' \
             2>/dev/null | jq -r '.data.result[0].value[1] // ""')
-          echo "portal p95 latency query → ${lat:-<empty>}"
-          [ -n "$lat" ] || { echo "❌ p95 latency histogram not collected/queryable (Functions panel)"; exit 1; }
-          echo "✅ p95 latency histogram query resolves (Functions panel)"
+          echo "portal avg latency query → ${lat:-<empty>}"
+          [ -n "$lat" ] || { echo "❌ avg latency query returned no value (Functions panel)"; exit 1; }
+          echo "✅ avg latency query resolves (Functions panel)"
 
           # Catalog the component/app metric names VM actually stores (now that
           # -opentelemetry.usePrometheusNaming is on) — the console's Monitoring
