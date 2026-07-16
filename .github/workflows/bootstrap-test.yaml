@@ -423,15 +423,18 @@ jobs:
           echo "--- Knative-pushed metric names in VM (kn_* — component + scale-from-zero) ---"
           curl -fsS "http://localhost:18428/api/v1/label/__name__/values" 2>/dev/null \
             | jq -r '.data[]?' | grep -iE '^kn_' | sort | head -40 || echo "(none — Knative OTLP push may need a cycle)"
-          # RED metrics from portal traffic above.
-          sm=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"span_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
-          echo "VM span_* (spanmetrics RED) series = ${sm}"
-          [ "${sm:-0}" -gt 0 ] 2>/dev/null || { echo "❌ spanmetrics connector produced no series"; exit 1; }
+          # Label sets for the scale-from-zero metrics the console Services page
+          # will query — need to know which label carries the ksvc name.
+          for m in kn_revision_pods_desired kn_revision_pods_count kn_revision_concurrency_stable; do
+            echo "  ${m} labels →"; curl -fsS -G "http://localhost:18428/api/v1/series" --data-urlencode "match[]=${m}" 2>/dev/null | jq -c '.data[0] // "none"' || true
+          done
 
-          # Drive one upload through the pipeline (the picture-pipeline ksvcs from
-          # module 09 still exist, scaled to zero). 1x1 PNG, same multipart POST
-          # the gallery form makes. Cold-starts uploader → CloudEvent → broker →
-          # resizer, all now traced into VictoriaTraces.
+          # Drive one upload through the pipeline FIRST (the picture-pipeline ksvcs
+          # from module 09 still exist, scaled to zero). 1x1 PNG, same multipart
+          # POST the gallery form makes. Cold-starts uploader → CloudEvent → broker
+          # → resizer — this is what generates the cross-service spans that every
+          # assertion below needs (services, spanmetrics, servicegraph). Doing it
+          # up front is the fix for the earlier single-shot span check reading 0.
           printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' | base64 -d > /tmp/tel.png
           for _ in $(seq 1 5); do
             curl -fsS --max-time 60 -o /dev/null -F "file=@/tmp/tel.png;type=image/png;filename=tel.png" http://localhost:30600/gallery/upload 2>/dev/null && break
@@ -440,8 +443,10 @@ jobs:
           # Poll the Jaeger service list — the pipeline should now be traced end to
           # end. cloudbox-uploader proves portal→uploader traced; cloudbox-resizer
           # proves the chain survived the async broker hop (the headline fix).
+          # Keep re-uploading each round to keep spans flowing for the connectors.
           up=""; rz=""
           for _ in $(seq 1 30); do
+            curl -fsS --max-time 30 -o /dev/null -F "file=@/tmp/tel.png;type=image/png;filename=tel.png" http://localhost:30600/gallery/upload 2>/dev/null || true
             svcs=$(curl -fsS "http://localhost:10428/select/jaeger/api/services" 2>/dev/null | jq -r '.data[]?' || true)
             [[ "$svcs" == *cloudbox-uploader* ]] && up=1
             [[ "$svcs" == *cloudbox-resizer* ]] && rz=1
@@ -453,7 +458,16 @@ jobs:
           [ -n "$up" ] || { echo "❌ cloudbox-uploader never appeared in traces after an upload"; exit 1; }
           [ -n "$rz" ] || { echo "❌ cloudbox-resizer not traced — the chain broke at the broker (tracing/propagation gap)"; exit 1; }
           echo "✅ connected trace: portal → uploader → broker → resizer all in VictoriaTraces"
-          # Now the service-graph edges should have formed from the paired spans.
+          # spanmetrics RED — poll (flushes every 15s; the uploads produced spans).
+          sm=0
+          for _ in $(seq 1 18); do
+            sm=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"span_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
+            [ "${sm:-0}" -gt 0 ] 2>/dev/null && break
+            sleep 5
+          done
+          echo "VM span_* (spanmetrics RED) series = ${sm}"
+          [ "${sm:-0}" -gt 0 ] 2>/dev/null || { echo "❌ spanmetrics connector produced no series"; exit 1; }
+          # service-graph edges — formed from the paired client/server spans.
           sg=0
           for _ in $(seq 1 18); do
             sg=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"traces_service_graph_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
