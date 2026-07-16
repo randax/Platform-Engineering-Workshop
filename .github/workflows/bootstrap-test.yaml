@@ -425,6 +425,11 @@ jobs:
           echo "--- Knative-pushed metric names in VM (kn_* — component + scale-from-zero) ---"
           curl -fsS "http://localhost:18428/api/v1/label/__name__/values" 2>/dev/null \
             | jq -r '.data[]?' | grep -iE '^kn_' | sort | head -40 || echo "(none — Knative OTLP push may need a cycle)"
+          # Label sets for the scale-from-zero metrics the console Services page
+          # will query — need to know which label carries the ksvc name.
+          for m in kn_revision_pods_desired kn_revision_pods_count kn_revision_concurrency_stable; do
+            echo "  ${m} labels →"; curl -fsS -G "http://localhost:18428/api/v1/series" --data-urlencode "match[]=${m}" 2>/dev/null | jq -c '.data[0] // "none"' || true
+          done
           # RED metrics from portal traffic above.
           sm=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"span_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
           echo "VM span_* (spanmetrics RED) series = ${sm}"
