@@ -9,6 +9,12 @@ form and prove with `kubectl` that a real `WorkshopDatabase` XR and a real CNPG 
 appeared. Then you read the portal's entire source code, because it's small enough that
 you can.
 
+<p align="center">
+  <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console — a component's Monitoring page: CPU/memory sparklines and a live log tail" width="80%" />
+</p>
+
+<p align="center"><em>This is what you're building: the Cloudbox Console — Go + htmx, server-rendered, offline, with per-component metrics/logs/traces from your OTel stack. Light + dark themes.</em></p>
+
 ## Why this matters
 
 Everything you built so far is APIs and YAML — perfect for platform engineers, invisible
