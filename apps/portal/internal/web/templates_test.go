@@ -130,7 +130,7 @@ func TestTemplatesRender(t *testing.T) {
 		},
 		"services": {
 			data: []serviceRow{
-				{Spark: metrics.Sparkline([]float64{0, 1, 2, 1}), Grafana: "http://grafana/explore?x"},
+				{Spark: metrics.Sparkline([]float64{0, 1, 2, 1}, "request rate"), Grafana: "http://grafana/explore?x"},
 				{}, // uninstrumented service: no metrics
 			},
 			want: []string{

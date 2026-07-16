@@ -8,20 +8,20 @@ import (
 )
 
 func TestSparkline(t *testing.T) {
-	if got := Sparkline(nil); got != "" {
+	if got := Sparkline(nil, "cpu"); got != "" {
 		t.Errorf("nil input must render nothing (empty-state dash), got %q", got)
 	}
-	if got := Sparkline([]float64{1}); got != "" {
+	if got := Sparkline([]float64{1}, "cpu"); got != "" {
 		t.Errorf("single point can't make a line, got %q", got)
 	}
-	svg := string(Sparkline([]float64{0, 2, 1, 3}))
-	for _, want := range []string{"<svg", "polyline", "aria-label"} {
+	svg := string(Sparkline([]float64{0, 2, 1, 3}, "request rate"))
+	for _, want := range []string{"<svg", "polyline", `aria-label="request rate`} {
 		if !strings.Contains(svg, want) {
 			t.Errorf("sparkline missing %q in %s", want, svg)
 		}
 	}
 	// A flat all-zero series (idle service) must still render a line.
-	if flat := string(Sparkline([]float64{0, 0, 0})); !strings.Contains(flat, "polyline") {
+	if flat := string(Sparkline([]float64{0, 0, 0}, "cpu")); !strings.Contains(flat, "polyline") {
 		t.Errorf("flat series must render: %s", flat)
 	}
 }

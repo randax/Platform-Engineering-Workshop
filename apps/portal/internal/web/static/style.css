@@ -83,8 +83,11 @@ nav a[aria-current="page"] {
   .shell { flex-direction: column; }
   .rail { width: auto; }
   .logo { margin-bottom: 0.75rem; }
+  .rail { overflow-x: hidden; } /* belt: nothing in the top bar may scroll the page */
   .rail nav { display: flex; flex-wrap: wrap; gap: 0 1.5rem; }
-  .nav-group { display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.25rem; }
+  /* each section wraps its own items too — the Platform group has 8 links and
+     must not run off a phone's width (it did: horizontal scroll). */
+  .nav-group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.6rem; margin-bottom: 0.4rem; }
   .nav-label { margin: 0 0.25rem 0 0; }
   nav a { border-left: none; border-bottom: 2px solid transparent; border-radius: 0; }
   nav a[aria-current="page"] { border-bottom-color: var(--accent); background: none; }
@@ -334,3 +337,44 @@ pre.code {
   max-width: 40rem;
   margin-top: 0.75rem;
 }
+
+/* ---- #56: per-component Monitoring panel (metric sparklines + log tail) ---- */
+.monitor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.metric {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.metric-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.metric-label small { text-transform: none; letter-spacing: 0; }
+.metric-spark { display: block; }
+.metric-spark .spark { width: 100%; height: 34px; }
+.metric-now { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* log tail — the same dark surface as pre.code, scrollable, monospace */
+.logtail {
+  background: var(--ink);
+  color: #e2e8f0;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  max-height: 22rem;
+  overflow: auto;
+  font: 0.8rem/1.55 ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.logtime { color: #7b8794; }

@@ -49,7 +49,7 @@ func handleServices(s *Server, w http.ResponseWriter, r *http.Request) {
 		// Sparkline is best-effort: a prom error means the same thing as no
 		// data — the dash renders, the page never fails over decoration.
 		if vals, err := s.Prom.QueryRange(r.Context(), metrics.RequestRateQuery(job)); err == nil {
-			row.Spark = metrics.Sparkline(vals)
+			row.Spark = metrics.Sparkline(vals, "request rate")
 		}
 		rows = append(rows, row)
 	}

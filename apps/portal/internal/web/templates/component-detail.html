@@ -1,0 +1,38 @@
+{{define "component-detail"}}
+{{template "head" "components"}}
+<p><a href="/components">← all components</a></p>
+<h1>{{.Name}} <span class="badge {{.StatusClass}}">{{.Status}}</span></h1>
+<p class="lede">{{.Description}} · namespace <code>{{.Namespace}}</code> · <b>{{.Ready}}</b>/<b>{{.Total}}</b> workloads ready.</p>
+
+<h2>Monitoring <small>last 30 min · sourced from the OTel stack</small></h2>
+{{if .Telemetry}}
+<div class="monitor">
+  <div class="metric">
+    <span class="metric-label">CPU</span>
+    {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Memory <small>working set</small></span>
+    {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+</div>
+<p><a href="{{.MetricsURL}}" target="_blank">Explore in Grafana →</a>
+<span class="hint">deep-links out for history &amp; ad-hoc PromQL — the panel above is the live glance</span></p>
+
+<h2>Recent logs <small>newest first · via VictoriaLogs</small></h2>
+{{if .Logs}}
+<pre class="logtail">{{range .Logs}}<span class="logtime">{{.Time.Format "15:04:05"}}</span>  {{.Msg}}
+{{end}}</pre>
+{{else}}
+<p class="empty">No logs in the last hour for namespace <code>{{.Namespace}}</code>.</p>
+{{end}}
+
+{{else}}
+<p class="hint">🔒 Observability isn't running yet. Enable the Victoria stack
+(<code>gitops/catalog/victoria-metrics.yaml</code> … <code>otel-collector.yaml</code>)
+to light up this component's metrics, logs, and traces.</p>
+{{end}}
+{{template "foot" .}}
+{{end}}
