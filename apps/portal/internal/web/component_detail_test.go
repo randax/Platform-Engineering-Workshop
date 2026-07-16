@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/logs"
 	"cloudbox.io/portal/internal/metrics"
 )
@@ -101,6 +102,7 @@ func TestGenerateScreenshots(t *testing.T) {
 		{"component-detail-monitoring", "component-detail", sampleDetail()},
 		{"component-detail-locked", "component-detail", locked},
 		{"components", "components", sampleComponents()},
+		{"services", "services", sampleServices()},
 	}
 	for _, p := range pages {
 		var buf bytes.Buffer
@@ -135,4 +137,26 @@ func sampleComponents() componentsData {
 		{component: component{Title: "Backstage", Namespace: "backstage", Description: "the presenter's portal demo — heavyweight, enable last", Catalog: "backstage.yaml"}, Status: "Not installed", Class: "off", Hint: "enable gitops/catalog/backstage.yaml"},
 	}
 	return componentsData{Running: running, Marketplace: shelf}
+}
+
+// sampleServices mocks the Services page so the screenshot shows the request
+// rate + p95 latency sparkline columns.
+func sampleServices() []serviceRow {
+	mk := func(name, url string, rate, lat []float64, latNow string) serviceRow {
+		var r serviceRow
+		r.Metadata = kube.ObjMeta{Name: name, Namespace: "pipeline"}
+		r.KnativeService.Status.URL = url
+		r.KnativeService.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "True"}}
+		r.Spark = metrics.Sparkline(rate, "request rate")
+		r.Latency = metrics.Sparkline(lat, "p95 latency")
+		r.LatencyNow = latNow
+		r.Grafana = "#"
+		return r
+	}
+	return []serviceRow{
+		mk("uploader", "http://uploader.pipeline.127.0.0.1.sslip.io",
+			[]float64{0, 1, 3, 2, 5, 4, 6, 5, 7, 6, 5, 6}, []float64{0.02, 0.03, 0.025, 0.04, 0.035, 0.05, 0.045, 0.06, 0.05, 0.055, 0.048, 0.052}, "52 ms"),
+		mk("resizer", "http://resizer.pipeline.127.0.0.1.sslip.io",
+			[]float64{0, 0, 1, 2, 1, 3, 2, 4, 3, 2, 3, 2}, []float64{0.1, 0.12, 0.11, 0.18, 0.15, 0.22, 0.19, 0.2, 0.17, 0.19, 0.16, 0.18}, "180 ms"),
+	}
 }

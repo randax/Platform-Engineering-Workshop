@@ -44,6 +44,13 @@ func RequestRateQuery(job string) string {
 	return fmt.Sprintf(`sum(rate(http_server_request_duration_seconds_count{job=%q}[5m]))`, job)
 }
 
+// LatencyP95Query builds the PromQL for a service's p95 request latency, from
+// the SAME otelhttp histogram RequestRateQuery uses — histogram_quantile over
+// its _bucket series (the `le` labels), rate'd over 5m. Result is in seconds.
+func LatencyP95Query(job string) string {
+	return fmt.Sprintf(`histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=%q}[5m])))`, job)
+}
+
 // NamespaceCPUQuery / NamespaceMemQuery sum a namespace's pod resource usage —
 // the universal per-component Monitoring signal (#56). The source is the
 // kubeletstats receiver's k8s.pod.cpu.usage / k8s.pod.memory.working_set, which

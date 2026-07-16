@@ -4,6 +4,7 @@ package web
 // Grafana trace links.
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 
@@ -32,8 +33,10 @@ func init() {
 // uninstrumented simply has no series and renders the empty-state dash.
 type serviceRow struct {
 	kube.KnativeService
-	Spark   template.HTML
-	Grafana string
+	Spark      template.HTML // request rate, last 30 min
+	Latency    template.HTML // p95 request latency, last 30 min
+	LatencyNow string        // the latest p95, in ms
+	Grafana    string
 }
 
 func handleServices(s *Server, w http.ResponseWriter, r *http.Request) {
@@ -50,6 +53,11 @@ func handleServices(s *Server, w http.ResponseWriter, r *http.Request) {
 		// data — the dash renders, the page never fails over decoration.
 		if vals, err := s.Prom.QueryRange(r.Context(), metrics.RequestRateQuery(job)); err == nil {
 			row.Spark = metrics.Sparkline(vals, "request rate")
+		}
+		// p95 latency from the same histogram (best-effort, same as the rate).
+		if vals, err := s.Prom.QueryRange(r.Context(), metrics.LatencyP95Query(job)); err == nil && len(vals) > 0 {
+			row.Latency = metrics.Sparkline(vals, "p95 latency")
+			row.LatencyNow = fmt.Sprintf("%.0f ms", vals[len(vals)-1]*1000)
 		}
 		rows = append(rows, row)
 	}
