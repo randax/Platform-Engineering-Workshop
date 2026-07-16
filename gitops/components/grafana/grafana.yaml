@@ -20,26 +20,27 @@ data:
   datasources.yaml: |
     apiVersion: 1
     datasources:
-      # VictoriaMetrics speaks the Prometheus query API, so Grafana talks to it
-      # with the built-in Prometheus datasource — no plugin, works offline.
+      # VictoriaMetrics via its NATIVE Grafana datasource plugin (#65), baked
+      # into the image (see apps/grafana/Dockerfile) — the MetricsQL query editor
+      # instead of the Prometheus shim. Same uid, so nothing that references it
+      # by uid breaks.
       - name: VictoriaMetrics
         uid: victoriametrics
-        type: prometheus
+        type: victoriametrics-metrics-datasource
         access: proxy
         url: http://victoria-metrics.observability.svc.cluster.local:8428
         isDefault: true
         jsonData:
           httpMethod: POST
-          prometheusType: Prometheus
-      # VictoriaLogs exposes a Loki-compatible query API, so we use the built-in
-      # Loki datasource (offline rule: no internet-fetched plugin at boot).
-      # The Loki datasource appends /loki/api/v1/... to the URL, and VLogs serves
-      # those under /select/ — hence the /select suffix. See VENDOR.md.
+      # VictoriaLogs via its NATIVE datasource plugin — full LogsQL + the
+      # VictoriaLogs Explore UX, not the lossy Loki shim. The native plugin takes
+      # the VLogs base URL and appends its own /select/logsql paths (so no
+      # /select suffix here, unlike the old Loki datasource).
       - name: VictoriaLogs
         uid: victorialogs
-        type: loki
+        type: victoriametrics-logs-datasource
         access: proxy
-        url: http://victoria-logs.observability.svc.cluster.local:9428/select
+        url: http://victoria-logs.observability.svc.cluster.local:9428
       # VictoriaTraces exposes a Jaeger-compatible query API, so we use the
       # built-in Jaeger datasource (offline rule: no plugin at boot) pointed at
       # its /select/jaeger base. Replaces otel-lgtm's Tempo. See VENDOR.md.
@@ -108,7 +109,9 @@ spec:
           type: RuntimeDefault
       containers:
         - name: grafana
-          image: "docker.io/grafana/grafana:12.4.5@sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd"
+          # Custom image: stock Grafana 12.4.5 + the native VictoriaMetrics
+          # datasource plugins baked in (apps/grafana/Dockerfile, #65).
+          image: "ghcr.io/randax/cloudbox-grafana:v0.1.0"
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -131,9 +134,14 @@ spec:
               value: "false"
             - name: GF_ANALYTICS_CHECK_FOR_UPDATES
               value: "false"
-            # No plugins that would need internet to install at boot.
+            # No plugins fetched at boot — they're BAKED into the image (#65).
             - name: GF_INSTALL_PLUGINS
               value: ""
+            # Load the baked-in native VictoriaMetrics plugins from here. NOT the
+            # default /var/lib/grafana/plugins — the data emptyDir below mounts
+            # over /var/lib/grafana and would shadow it.
+            - name: GF_PATHS_PLUGINS
+              value: /opt/grafana-plugins
           ports:
             - name: http
               containerPort: 3000

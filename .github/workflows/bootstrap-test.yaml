@@ -66,7 +66,7 @@ jobs:
           # Build + push each app under the SAME repo path the gitops manifests
           # request (ghcr.io/randax/cloudbox-*), so the node's mirror lookup hits.
           # localhost push is insecure-by-default in Docker — no daemon config.
-          for app in portal uploader resizer; do
+          for app in portal uploader resizer grafana; do
             ref="localhost:${MIRROR_PORT}/randax/cloudbox-${app}:v0.1.0"
             echo "::group::build cloudbox-${app}"
             docker build -t "${ref}" "apps/${app}"
