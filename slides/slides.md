@@ -113,5 +113,9 @@ src: ./pages/module-09.md
 ---
 
 ---
+src: ./pages/principles.md
+---
+
+---
 src: ./pages/closing.md
 ---

@@ -240,3 +240,21 @@
 .ba h3 { margin: 0 0 0.4rem; font-size: 1.05rem; font-weight: 800; }
 .ba .before h3 { color: var(--jz-rent); }
 .ba .after h3  { color: var(--jz-run); }
+
+/* ============================================================================
+   IDP principles (PRD-0005) — a graphics-first card grid: emoji glyph + short
+   label + one-line "in your platform" tie. The exemplar for the deck's lighter,
+   less-texty visual language (PRD-0009). Readable on light + dark.
+   ========================================================================== */
+.principle {
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  background: rgba(56, 189, 248, 0.06);
+  line-height: 1.25;
+}
+.principle .ico { font-size: 1.7rem; line-height: 1; }
+.principle .name { font-weight: 800; font-size: 1.02rem; margin-top: 0.2rem; }
+.principle .tie { font-size: 0.8rem; opacity: 0.72; margin-top: 0.15rem; }
+.slidev-layout.section .principle,
+.slidev-layout.fact .principle { background: rgba(56, 189, 248, 0.12); }
