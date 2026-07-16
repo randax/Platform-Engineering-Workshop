@@ -10,10 +10,13 @@ package web
 
 import (
 	"context"
+	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 
 	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
 	"cloudbox.io/portal/internal/nats"
 )
 
@@ -51,6 +54,15 @@ type streamsSource interface {
 type streamsData struct {
 	Streams []nats.Stream
 	Flash   flash
+
+	// Monitoring — populated only by the full-page handler (never the 5s-polled
+	// fragment, which would re-hit VM), and only when observability collects.
+	Telemetry bool
+	MsgSpark  template.HTML
+	MsgNow    string
+	ConnSpark template.HTML
+	ConnNow   string
+	BytesNow  string
 }
 
 // fetchStreams lists the streams and wraps them for the template. Kept separate
@@ -69,6 +81,23 @@ func handleStreams(s *Server, w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.renderError(w, err)
 		return
+	}
+	// Monitoring: JetStream throughput + server connections from the exporter
+	// sidecar, once observability is collecting. Full page only, never the
+	// polled fragment.
+	if health, err := s.Kube.NamespaceWorkloads(r.Context()); err == nil && health["observability"].Ready > 0 && s.Prom != nil {
+		data.Telemetry = true
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.NATSMessagesQuery()); len(v) > 0 {
+			data.MsgSpark = metrics.Sparkline(v, "JetStream messages")
+			data.MsgNow = fmt.Sprintf("%.0f", v[len(v)-1])
+		}
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.NATSConnectionsQuery()); len(v) > 0 {
+			data.ConnSpark = metrics.Sparkline(v, "connections")
+			data.ConnNow = fmt.Sprintf("%.0f", v[len(v)-1])
+		}
+		if v, _ := s.Prom.QueryRange(r.Context(), metrics.NATSBytesQuery()); len(v) > 0 {
+			data.BytesNow = humanBytes(v[len(v)-1])
+		}
 	}
 	s.render(w, "streams", data)
 }

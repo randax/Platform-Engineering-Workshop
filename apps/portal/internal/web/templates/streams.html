@@ -6,6 +6,27 @@ capstone's in-memory broker forgets everything on restart; a <em>stream</em> per
 to disk, and each <em>consumer</em> tracks its own position through them. This is a read-only
 view straight off the NATS monitoring endpoint — one <code>GET /jsz</code>, no client library.</p>
 
+{{if .Telemetry}}
+<h2>Monitoring <small>last 30 min · from the NATS exporter</small></h2>
+<div class="monitor">
+  <div class="metric">
+    <span class="metric-label">JetStream <small>messages</small></span>
+    {{if .MsgSpark}}<span class="metric-spark">{{.MsgSpark}}</span><span class="metric-now">{{.MsgNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Connections</span>
+    {{if .ConnSpark}}<span class="metric-spark">{{.ConnSpark}}</span><span class="metric-now">{{.ConnNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Bytes <small>on disk</small></span>
+    {{if .BytesNow}}<span class="metric-now">{{.BytesNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+</div>
+{{end}}
+
 {{template "streams-list" .}}
 {{template "foot" .}}
 {{end}}

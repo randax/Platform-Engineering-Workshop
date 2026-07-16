@@ -88,6 +88,14 @@ spec:
       labels:
         app.kubernetes.io/name: nats
         app.kubernetes.io/instance: nats
+      # Opt this pod into the collector's annotation-based `kubernetes-pods`
+      # scrape job (see otel-collector gateway): scrape the exporter sidecar's
+      # :7777, not NATS itself — NATS core only speaks JSON on :8222, so the
+      # sidecar is what turns /varz + /jsz into Prometheus metrics (Streams
+      # panel, #56). gnatsd_* (server/connections) + jetstream_* (streams).
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7777"
     spec:
       securityContext:
         runAsNonRoot: true
@@ -144,6 +152,39 @@ spec:
               readOnly: true
             - name: data
               mountPath: /data
+        # prometheus-nats-exporter sidecar: polls NATS's :8222 monitoring
+        # endpoints (same pod → localhost) and re-exposes them as Prometheus
+        # metrics on :7777 for the collector to scrape. -jsz=all adds the
+        # JetStream series (jetstream_server_total_messages / _message_bytes)
+        # the Streams Monitoring panel plots; -varz/-connz add server +
+        # connection gauges (gnatsd_varz_*). Tag-pinned (no offline digest);
+        # the rehearsal pulls + verifies the exact metric names.
+        - name: metrics
+          image: "docker.io/natsio/prometheus-nats-exporter:0.17.3"
+          imagePullPolicy: IfNotPresent
+          args: [ "-varz", "-connz", "-jsz=all", "-port", "7777", "http://localhost:8222" ]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ ALL ]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: metrics
+              containerPort: 7777
+          resources:
+            limits:
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 24Mi
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 7777
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
       volumes:
         - name: config
           configMap:
