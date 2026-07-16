@@ -8558,6 +8558,27 @@ metadata:
   annotations:
     knative.dev/example-checksum: "59abacb5"
 data:
+  # Workshop: point Knative's own telemetry at the OTel Collector (#65). These
+  # are the REAL config keys — everything in _example is inert docs, and in 1.22
+  # this CM (not the deprecated config-tracing) is where tracing lives too.
+  # Endpoints are the current collector, NOT the removed otel-lgtm services the
+  # _example still names.
+  #
+  # Tracing → puts the activator / queue-proxy / broker hops INTO the capstone's
+  # trace waterfall (the module-09 "portal → uploader → broker → resizer" chain
+  # only fully connects with this on) and feeds the service-graph connector.
+  tracing-protocol: "http/protobuf"
+  tracing-endpoint: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
+  tracing-sampling-rate: "1"
+  # Metrics (push, OTLP) → control/data-plane component metrics (activator,
+  # autoscaler, controller) AND the queue-proxy request metrics (per-revision
+  # RPS, concurrency, scale-from-zero) that finally MEASURE the serverless story.
+  metrics-protocol: "http/protobuf"
+  metrics-endpoint: "http://otel-collector.observability.svc.cluster.local:4318/v1/metrics"
+  metrics-export-interval: "60s"
+  request-metrics-protocol: "http/protobuf"
+  request-metrics-endpoint: "http://otel-collector.observability.svc.cluster.local:4318/v1/metrics"
+  request-metrics-export-interval: "60s"
   _example: |
     ################################
     #                              #

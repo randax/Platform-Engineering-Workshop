@@ -410,6 +410,33 @@ jobs:
           { [ -n "$lat" ] && [ "$lat" != "NaN" ]; } || { echo "❌ avg latency query returned no value (Functions panel)"; exit 1; }
           echo "✅ avg latency query resolves (Functions panel)"
 
+          # Telemetry depth (#65): the spanmetrics + servicegraph connectors turn
+          # the trace stream into derived metrics, and Knative now pushes its own
+          # traces + metrics to the collector. These are additive — dump what
+          # landed and soft-assert the span/service-graph series exist (they only
+          # need app spans, which the portal traffic above produced). Names are
+          # surfaced so a future dashboard can pin them; failures here don't sink
+          # the run (the hard collector-health checks above already did).
+          echo "--- jaeger services in VictoriaTraces (Knative components should now appear) ---"
+          curl -fsS "http://localhost:10428/select/jaeger/api/services" 2>/dev/null | jq -r '.data[]?' | sort || true
+          echo "--- span_* (spanmetrics) + traces_service_graph_* names in VM ---"
+          curl -fsS "http://localhost:18428/api/v1/label/__name__/values" 2>/dev/null \
+            | jq -r '.data[]?' | grep -E '^(span_|traces_service_graph_)' | sort || echo "(none yet)"
+          sm=0
+          for _ in $(seq 1 18); do
+            curl -fsS -o /dev/null "http://localhost:30600/" 2>/dev/null || true
+            sm=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"span_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
+            [ "${sm:-0}" -gt 0 ] 2>/dev/null && break
+            sleep 5
+          done
+          echo "VM span_* (spanmetrics RED) series = ${sm}$([ "${sm:-0}" -gt 0 ] 2>/dev/null || echo '  ⚠️ spanmetrics connector produced nothing — check collector logs')"
+          sg=$(curl -fsS -G http://localhost:18428/api/v1/query --data-urlencode 'query=count({__name__=~"traces_service_graph_.+"})' 2>/dev/null | jq -r '.data.result[0].value[1] // "0"')
+          echo "VM traces_service_graph_* (service map edges) series = ${sg} (needs paired client/server spans — sparse without an upload)"
+          echo "--- Knative-pushed metric names in VM (kn_/knative_/revision/activator) ---"
+          curl -fsS "http://localhost:18428/api/v1/label/__name__/values" 2>/dev/null \
+            | jq -r '.data[]?' | grep -iE '^(kn_|knative|.*revision|.*activator|.*autoscaler|.*queue_proxy|.*broker)' | sort | head -40 || echo "(none — Knative OTLP push may need a cycle)"
+          echo "✅ telemetry-depth signals surfaced (spanmetrics/servicegraph + Knative OTLP push)"
+
           # Catalog the component/app metric names VM actually stores (now that
           # -opentelemetry.usePrometheusNaming is on) — the console's Monitoring
           # panels (#56) pin their PromQL to these exact names, so surface them.

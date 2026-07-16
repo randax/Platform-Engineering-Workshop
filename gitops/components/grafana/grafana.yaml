@@ -48,6 +48,13 @@ data:
         type: jaeger
         access: proxy
         url: http://victoria-traces.observability.svc.cluster.local:10428/select/jaeger
+        jsonData:
+          # Render each trace as a topology graph, not just a waterfall — the
+          # Jaeger datasource's built-in Node Graph tab (#65). For the capstone's
+          # one upload this IS the service map: portal → uploader → broker →
+          # resizer as connected nodes. No plugin, works offline.
+          nodeGraph:
+            enabled: true
 ---
 apiVersion: v1
 kind: Service
