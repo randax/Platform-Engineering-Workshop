@@ -103,6 +103,7 @@ func TestGenerateScreenshots(t *testing.T) {
 		{"component-detail-locked", "component-detail", locked},
 		{"components", "components", sampleComponents()},
 		{"services", "services", sampleServices()},
+		{"database-detail", "database-detail", sampleDatabaseDetail()},
 	}
 	for _, p := range pages {
 		var buf bytes.Buffer
@@ -159,4 +160,36 @@ func sampleServices() []serviceRow {
 		mk("resizer", "http://resizer.pipeline.127.0.0.1.sslip.io",
 			[]float64{0, 0, 1, 2, 1, 3, 2, 4, 3, 2, 3, 2}, []float64{0.1, 0.12, 0.11, 0.18, 0.15, 0.22, 0.19, 0.2, 0.17, 0.19, 0.16, 0.18}, "180 ms"),
 	}
+}
+
+// sampleDatabaseDetail mocks the database detail page so the screenshot shows
+// the CNPG Monitoring panel (connections / transactions / size).
+func sampleDatabaseDetail() dbDetailData {
+	var d dbDetailData
+	d.Name = "my-app"
+	var wdb kube.WorkshopDB
+	wdb.Metadata = kube.ObjMeta{Name: "my-app", Namespace: "demo"}
+	wdb.Spec.Size = "small"
+	wdb.Spec.StorageGB = 1
+	wdb.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "True", Reason: "Available", Message: "Composed and ready"}}
+	d.DB = &wdb
+	var cl kube.CNPGClusterDetail
+	cl.Spec.Instances = 1
+	cl.Spec.Storage.Size = "1Gi"
+	cl.Status.Phase = "Cluster in healthy state"
+	cl.Status.ReadyInstances = 1
+	cl.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "True", Reason: "ClusterIsReady", Message: "Cluster is Ready"}}
+	d.Cluster = &cl
+	d.ClusterName = "my-app-pg"
+	d.Secret = "my-app-pg-app"
+	d.Psql = "kubectl -n demo exec -it my-app-pg-1 -- psql -U app app"
+	d.GrafanaURL = "#"
+	d.Events = []kube.Event{{Type: "Normal", Reason: "Scheduled", Message: "Successfully assigned demo/my-app-pg-1"}}
+	d.Telemetry = true
+	d.ConnSpark = metrics.Sparkline([]float64{2, 3, 2, 4, 3, 5, 4, 4, 5, 4, 3, 4}, "connections")
+	d.ConnNow = "4"
+	d.TxnSpark = metrics.Sparkline([]float64{0.5, 0.8, 1.2, 0.9, 1.5, 1.1, 1.8, 1.3, 1.6, 1.2, 1.4, 1.3}, "transactions/s")
+	d.TxnNow = "1.3 /s"
+	d.SizeNow = "14 MiB"
+	return d
 }
