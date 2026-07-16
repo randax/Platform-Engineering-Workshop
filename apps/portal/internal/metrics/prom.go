@@ -109,6 +109,16 @@ func NATSBytesQuery() string {
 	return `sum(jetstream_server_total_message_bytes)`
 }
 
+// KnativeDesiredPodsQuery is a Knative Service's current desired pod count —
+// the scale-from-zero signal (PRD-0008). 0 when idle, N when serving. From the
+// autoscaler's kn_revision_pods_desired, which Knative pushes via OTLP (#65);
+// it's labelled by kn_service_name = the ksvc's own name (NOT the OTLP
+// service_name the request-rate query uses). sum() across the service's
+// revisions — stale revisions sit at 0, so the sum is the live count.
+func KnativeDesiredPodsQuery(ksvc string) string {
+	return fmt.Sprintf(`sum(kn_revision_pods_desired{kn_service_name=%q})`, ksvc)
+}
+
 // QueryRange fetches the last 30 minutes of a PromQL expression at 60s
 // resolution and returns just the values. No matching series is a normal
 // state (component disabled, no traffic yet) and returns nil, nil — the

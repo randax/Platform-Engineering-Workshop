@@ -481,6 +481,17 @@ jobs:
           [ "${sg:-0}" -gt 0 ] 2>/dev/null || { echo "❌ servicegraph connector formed no edges despite a cross-service upload"; exit 1; }
           echo "✅ service map: servicegraph edges present in VM (aggregate topology data)"
 
+          # Console scale-from-zero (#83): the Services page surfaces each ksvc's
+          # desired pods from kn_revision_pods_desired — 'idle · 0 pods' or 'N
+          # running'. Soft: the pipeline ksvcs may be scaling down at check time,
+          # but the scale text should render for at least one ksvc.
+          svcpage=$(curl -fsS "http://localhost:30600/services" 2>/dev/null || true)
+          if [[ "$svcpage" == *"pods"* || "$svcpage" == *"running"* ]]; then
+            echo "✅ console Services page surfaces scale-from-zero"
+          else
+            echo "⚠️ Services page showed no scale text yet (kn_revision_pods_desired timing)"
+          fi
+
           # Catalog the component/app metric names VM actually stores (now that
           # -opentelemetry.usePrometheusNaming is on) — the console's Monitoring
           # panels (#56) pin their PromQL to these exact names, so surface them.
