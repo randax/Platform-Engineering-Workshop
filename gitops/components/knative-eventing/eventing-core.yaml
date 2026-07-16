@@ -772,6 +772,21 @@ metadata:
   annotations:
     knative.dev/example-checksum: "0270bb17"
 data:
+  # Workshop: point eventing telemetry at the OTel Collector (#65). Real config
+  # (everything in _example is inert docs); endpoints are the current collector,
+  # not the removed otel-lgtm jaeger-collector.
+  #
+  # Tracing makes the BROKER hop appear as its own span in the capstone waterfall
+  # and, crucially, propagates traceparent across the async event hop so
+  # uploader → resizer stays ONE connected trace (and forms a service-graph edge).
+  tracing-protocol: "http/protobuf"
+  tracing-endpoint: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
+  tracing-sampling-rate: "1"
+  # Metrics (push, OTLP): broker ingress/filter + dispatcher metrics — how many
+  # events flowed and how the Trigger delivered them.
+  metrics-protocol: "http/protobuf"
+  metrics-endpoint: "http://otel-collector.observability.svc.cluster.local:4318/v1/metrics"
+  metrics-export-interval: "60s"
   _example: |
     ################################
     #                              #

@@ -117,11 +117,37 @@ data:
       otlphttp/traces:
         traces_endpoint: http://victoria-traces.observability.svc.cluster.local:10428/insert/opentelemetry/v1/traces
 
+    # Connectors are exporter-of-one-pipeline + receiver-of-another: they turn the
+    # trace stream into derived metrics, in-collector, no app changes (#65).
+    connectors:
+      # RED metrics per service/operation from spans (rate, errors, duration).
+      # Namespaced so the series are self-describing (span_calls_total,
+      # span_duration_*) and never collide with app/component metric names.
+      spanmetrics:
+        namespace: span
+        histogram:
+          explicit:
+            buckets: [ 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s ]
+        metrics_flush_interval: 15s
+      # Service-graph edge metrics: pairs client+server spans into
+      # traces_service_graph_request_* (who calls whom, how often, how slow) —
+      # the data behind an aggregate service map. Depends on connected traces,
+      # which the Knative tracing fix now provides across the broker hop.
+      servicegraph:
+        latency_histogram_buckets: [ 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s ]
+        store:
+          # Long enough to pair a client span with a server span that arrives
+          # later — the broker → resizer edge spans a scale-from-zero cold start,
+          # so a short TTL would drop that pair and lose the hop.
+          ttl: 30s
+          max_items: 2000
+
     service:
       extensions: [ health_check ]
       pipelines:
         metrics:
-          receivers: [ otlp, prometheus, k8s_cluster ]
+          # spanmetrics + servicegraph feed their derived metrics back in here.
+          receivers: [ otlp, prometheus, k8s_cluster, spanmetrics, servicegraph ]
           processors: [ memory_limiter, batch ]
           exporters: [ otlphttp/metrics ]
         logs:
@@ -131,7 +157,8 @@ data:
         traces:
           receivers: [ otlp ]
           processors: [ memory_limiter, batch ]
-          exporters: [ otlphttp/traces ]
+          # Fan traces out to VictoriaTraces AND the two connectors.
+          exporters: [ otlphttp/traces, spanmetrics, servicegraph ]
 ---
 apiVersion: v1
 kind: Service
@@ -179,7 +206,7 @@ spec:
         app.kubernetes.io/name: otel-collector
         app.kubernetes.io/instance: otel-collector-gateway
       annotations:
-        checksum/config: "stage2-v1"
+        checksum/config: "stage2-v3"
     spec:
       serviceAccountName: otel-collector
       securityContext:
