@@ -213,6 +213,25 @@ git instead?
 
 ## Going deeper
 
+<p align="center">
+  <img src="../../docs/screenshots/console-functions-new-dark.png" alt="Cloudbox Console — the New Function page: name a function, pick a source, and the platform builds the image in-cluster and deploys it as a Knative Service" width="80%" />
+</p>
+
+<p align="center"><em>The <strong>New Function</strong> page (a "Going deeper" capability): one form that builds your source in-cluster and deploys it as a scale-to-zero function — modules 06 + 07, tied together.</em></p>
+
+- **Deploy a function from the console (the Lambda moment).** The **New Function** page
+  (Self-service) ties modules 06 + 07 together: pick a source, name it, and the console
+  submits an Argo `Workflow` that builds your image (BuildKit → Zot) *and* a Knative
+  `Service` that runs it — one form, a scale-to-zero URL, no CLI. It stays locked until
+  both `argo-workflows` and `knative-serving` are Healthy, and the two creates need one
+  more scoped grant (same "hand the portal its keys" pattern as step 3):
+  ```bash
+  cp "$WORKSHOP/lab/08-portal/portal-functions-access.yaml" gitops/components/demo/
+  git add . && git commit -m "grant portal: create Workflows + Knative Services" && git push
+  ```
+  Then open **New Function**, build `hello-site`, watch it on **Builds**, and grab the URL
+  on **Services** once the image lands (~1 min). Until the grant is synced the create
+  surfaces a friendly *forbidden* flash — the portal can't grant itself anything.
 - **Add a column.** Show each CNPG cluster's `instances` count on the Databases page
   (`resources.go` + `databases.html` — it's one field and one `<td>`).
 - **Add a page.** The portal already has RBAC to list pods. A "Pods" page is ~30 lines
