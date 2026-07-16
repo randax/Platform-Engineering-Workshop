@@ -309,11 +309,22 @@ jobs:
           curl -fsS -G "http://localhost:18428/api/v1/series" \
             --data-urlencode 'match[]=http_server_request_duration_seconds_count' 2>/dev/null \
             | jq -c '.data[0] // "none"' || true
-          lat=$(curl -fsS -G http://localhost:18428/api/v1/query \
-            --data-urlencode 'query=sum(rate(http_server_request_duration_seconds_sum{service_name="cloudbox-portal"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name="cloudbox-portal"}[5m]))' \
-            2>/dev/null | jq -r '.data.result[0].value[1] // ""')
+          # These are rate() queries over counters. The app's OTLP metrics only
+          # started flowing when the collector came up in THIS step, so rate()
+          # needs a couple more app export cycles (~60s each) with the counter
+          # increasing. Poll while generating portal traffic so the http_server
+          # counters accumulate samples; NaN (0/0, no requests yet) also retries.
+          lat=""
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null "http://localhost:30600/" 2>/dev/null || true
+            lat=$(curl -fsS -G http://localhost:18428/api/v1/query \
+              --data-urlencode 'query=sum(rate(http_server_request_duration_seconds_sum{service_name="cloudbox-portal"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name="cloudbox-portal"}[5m]))' \
+              2>/dev/null | jq -r '.data.result[0].value[1] // ""')
+            [ -n "$lat" ] && [ "$lat" != "NaN" ] && break
+            sleep 5
+          done
           echo "portal avg latency query → ${lat:-<empty>}"
-          [ -n "$lat" ] || { echo "❌ avg latency query returned no value (Functions panel)"; exit 1; }
+          { [ -n "$lat" ] && [ "$lat" != "NaN" ]; } || { echo "❌ avg latency query returned no value (Functions panel)"; exit 1; }
           echo "✅ avg latency query resolves (Functions panel)"
 
           # Catalog the component/app metric names VM actually stores (now that
