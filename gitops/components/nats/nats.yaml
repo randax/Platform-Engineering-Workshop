@@ -157,10 +157,10 @@ spec:
         # metrics on :7777 for the collector to scrape. -jsz=all adds the
         # JetStream series (jetstream_server_total_messages / _message_bytes)
         # the Streams Monitoring panel plots; -varz/-connz add server +
-        # connection gauges (gnatsd_varz_*). Tag-pinned (no offline digest);
-        # the rehearsal pulls + verifies the exact metric names.
+        # connection gauges (gnatsd_varz_*). Digest-pinned (see scripts/images.txt);
+        # the rehearsal verifies the exact metric names land in VM.
         - name: metrics
-          image: "docker.io/natsio/prometheus-nats-exporter:0.17.3"
+          image: "docker.io/natsio/prometheus-nats-exporter:0.17.3@sha256:26c826662ac8424597cc9bdf89ea5b606eb66e3c11db9b1215c27d2076bbb01b"
           imagePullPolicy: IfNotPresent
           args: [ "-varz", "-connz", "-jsz=all", "-port", "7777", "http://localhost:8222" ]
           securityContext:
