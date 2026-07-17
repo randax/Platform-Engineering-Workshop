@@ -3,7 +3,7 @@
 <h1>Functions</h1>
 <p class="lede">Serverless workloads from modules 06, 07 and the capstone. A Ready service
 with zero pods is normal — that is scale-to-zero doing its job. <strong>Invoke</strong> one to
-watch it wake from zero; <strong>build a new one</strong> below and the platform compiles your
+watch it wake from zero, or hit <strong>New function</strong> and the platform compiles your
 source in-cluster and deploys it.</p>
 
 {{template "svc-list" .}}
@@ -12,21 +12,45 @@ source in-cluster and deploys it.</p>
      a cold-start result isn't wiped by the 5-second refresh. */}}
 <div id="invoke-result"></div>
 
-<h2>New function</h2>
-<p class="hint">The Lambda moment, on your laptop: pick a source, name it, and the platform
-<em>builds the image in-cluster</em> (Argo Workflows + BuildKit → your <code>Zot</code> registry)
-and <em>deploys it as a scale-to-zero function</em> (a Knative <code>Service</code> in
-<code>demo</code>). Modules 06 and 07 each taught one half; this form does both from one POST —
-no CLI, no cloud.</p>
-<form hx-post="/services" hx-target="#svc-list" hx-swap="outerHTML">
-  <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-fn"></label>
-  <label>Source
-    <select name="sample">
-      {{range .Samples}}<option value="{{.Key}}">{{.Label}}</option>{{end}}
-    </select>
-  </label>
-  <button type="submit">Build &amp; deploy</button>
-</form>
+{{/* CSS-only modal (checkbox hack — no JS, same approach as the mobile nav): the
+     "New function" button is a <label> that toggles the hidden checkbox; the
+     :checked sibling reveals the overlay. Reused shape for other create forms. */}}
+<input type="checkbox" id="fn-modal" class="modal-toggle" hidden>
+<label for="fn-modal" class="btn open-modal">+ New function</label>
+
+<div class="modal">
+  <label for="fn-modal" class="modal-backdrop" aria-hidden="true"></label>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>New function</h2>
+      <label for="fn-modal" class="modal-x" aria-label="Close">×</label>
+    </div>
+    <p class="hint">The Lambda moment, on your laptop: pick a source, name it, and the platform
+    <em>builds the image in-cluster</em> (Argo Workflows + BuildKit → your <code>Zot</code> registry)
+    and <em>deploys it as a scale-to-zero function</em> (a Knative <code>Service</code> in
+    <code>demo</code>). Modules 06 and 07 each taught one half; this does both from one POST.</p>
+    <form hx-post="/services" hx-target="#svc-list" hx-swap="outerHTML" hx-on::after-request="if(event.detail.successful) document.getElementById('fn-modal').checked=false">
+      <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-fn"></label>
+      <label>Source
+        <select name="sample">
+          {{range .Samples}}<option value="{{.Key}}">{{.Label}}</option>{{end}}
+        </select>
+      </label>
+      <fieldset class="env-rows">
+        <legend>Environment variables <small>— optional</small></legend>
+        {{/* Fixed blank rows keep this JS-free; empty names are dropped server-side. */}}
+        <div class="env-row"><input name="env_name" placeholder="NAME" pattern="[A-Za-z_][A-Za-z0-9_]*"><input name="env_value" placeholder="value"></div>
+        <div class="env-row"><input name="env_name" placeholder="NAME" pattern="[A-Za-z_][A-Za-z0-9_]*"><input name="env_value" placeholder="value"></div>
+        <div class="env-row"><input name="env_name" placeholder="NAME" pattern="[A-Za-z_][A-Za-z0-9_]*"><input name="env_value" placeholder="value"></div>
+      </fieldset>
+      <label class="check"><input type="checkbox" name="keep_warm" value="1"> Keep one instance warm <small>— no cold start; disables scale-to-zero</small></label>
+      <div class="modal-actions">
+        <label for="fn-modal" class="btn ghost">Cancel</label>
+        <button type="submit">Build &amp; deploy</button>
+      </div>
+    </form>
+  </div>
+</div>
 {{template "foot" .}}
 {{end}}
 

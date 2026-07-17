@@ -63,7 +63,7 @@ func TestBuildFunctionWorkflow(t *testing.T) {
 }
 
 func TestBuildFunctionService(t *testing.T) {
-	raw, err := BuildFunctionService("greeter")
+	raw, err := BuildFunctionService("greeter", FnOpts{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -109,6 +109,47 @@ func TestBuildFunctionService(t *testing.T) {
 	if svc.Spec.Template.Metadata.Annotations["autoscaling.knative.dev/window"] != "30s" {
 		t.Errorf("missing scale-to-zero window annotation: %+v", svc.Spec.Template.Metadata.Annotations)
 	}
+	// Default (no opts): scale-to-zero, so NO min-scale pin.
+	if _, ok := svc.Spec.Template.Metadata.Annotations["autoscaling.knative.dev/min-scale"]; ok {
+		t.Errorf("default function must not pin min-scale (breaks scale-to-zero): %+v", svc.Spec.Template.Metadata.Annotations)
+	}
+}
+
+// TestBuildFunctionServiceOpts covers the New-function form's optional knobs:
+// keep-warm pins min-scale 1, and env vars land on the container (blank rows
+// dropped).
+func TestBuildFunctionServiceOpts(t *testing.T) {
+	raw, err := BuildFunctionService("greeter", FnOpts{
+		KeepWarm: true,
+		Env:      []FnEnv{{Name: "GREETING", Value: "hei"}, {Name: "", Value: "dropped"}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var svc struct {
+		Spec struct {
+			Template struct {
+				Metadata struct {
+					Annotations map[string]string `json:"annotations"`
+				} `json:"metadata"`
+				Spec struct {
+					Containers []struct {
+						Env []struct{ Name, Value string } `json:"env"`
+					} `json:"containers"`
+				} `json:"spec"`
+			} `json:"template"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal(raw, &svc); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if got := svc.Spec.Template.Metadata.Annotations["autoscaling.knative.dev/min-scale"]; got != "1" {
+		t.Errorf("keep-warm must pin min-scale=1, got %q", got)
+	}
+	env := svc.Spec.Template.Spec.Containers[0].Env
+	if len(env) != 1 || env[0].Name != "GREETING" || env[0].Value != "hei" {
+		t.Errorf("env = %+v, want exactly the non-blank GREETING=hei", env)
+	}
 }
 
 func TestBuildFunctionInvalidName(t *testing.T) {
@@ -116,7 +157,7 @@ func TestBuildFunctionInvalidName(t *testing.T) {
 		if _, err := BuildFunctionWorkflow(bad, "http://gitea/x.git", "app"); err == nil {
 			t.Errorf("BuildFunctionWorkflow(%q): expected validation error", bad)
 		}
-		if _, err := BuildFunctionService(bad); err == nil {
+		if _, err := BuildFunctionService(bad, FnOpts{}); err == nil {
 			t.Errorf("BuildFunctionService(%q): expected validation error", bad)
 		}
 	}

@@ -175,13 +175,30 @@ func handleCreateFunction(s *Server, w http.ResponseWriter, r *http.Request) {
 	s.render(w, "svc-list", data)
 }
 
+// parseFnOpts pulls the optional knobs off the create form: a keep-warm
+// checkbox and paired env_name[]/env_value[] rows (the form ships a fixed few
+// blank rows; blank names are dropped in the builder).
+func parseFnOpts(r *http.Request) kube.FnOpts {
+	_ = r.ParseForm()
+	names, values := r.Form["env_name"], r.Form["env_value"]
+	env := make([]kube.FnEnv, 0, len(names))
+	for i, n := range names {
+		v := ""
+		if i < len(values) {
+			v = values[i]
+		}
+		env = append(env, kube.FnEnv{Name: n, Value: v})
+	}
+	return kube.FnOpts{Env: env, KeepWarm: r.FormValue("keep_warm") != ""}
+}
+
 // createFunction submits the two objects and returns the flash describing the
 // outcome. Split out so the handler stays about rendering.
 func createFunction(s *Server, r *http.Request, name string, sample fnSample) flash {
 	if err := s.Kube.CreateFunctionWorkflow(r.Context(), name, sample.Repo, sample.Path); err != nil {
 		return errorFlash("Couldn't start the build: " + err.Error())
 	}
-	if err := s.Kube.CreateFunctionService(r.Context(), name); err != nil {
+	if err := s.Kube.CreateFunctionService(r.Context(), name, parseFnOpts(r)); err != nil {
 		// The build is already running; only the deploy half failed. Say so —
 		// re-submitting after granting access will create the ksvc, and the
 		// finished image is waiting for it.

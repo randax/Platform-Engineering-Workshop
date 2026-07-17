@@ -14,7 +14,8 @@ Every page has a light and a `-dark` variant (the console is theme-aware via
 | `console-mobile-nav-open.png` | Phone width with the ☰ menu tapped open — the full nav revealed (CSS-only, no JS). |
 | `console-component-locked.png` | The Monitoring page when observability isn't enabled yet — degrade-in-place hint. |
 | `console-components.png` | The Components page — per-namespace health, each linking into its Monitoring detail. |
-| `console-services.png` | The **Functions** page — the whole function lifecycle in the **Services** nav section: request-rate + avg-latency sparklines and scale-from-zero per Knative Service (#56), an **Invoke** button that wakes one server-side, **Delete** for console-built functions, and the build-and-deploy form (Argo + BuildKit → Knative, #58). |
+| `console-services.png` | The **Functions** page — the whole function lifecycle in the **Services** nav section: request-rate + avg-latency sparklines and scale-from-zero per Knative Service (#56), an **Invoke** button that wakes one server-side, **Delete** for console-built functions, and a **New function** button that opens the build-and-deploy modal (#58). |
+| `console-new-function.png` | The **New function** modal (CSS-only, no JS) — name, source, optional env vars, and a keep-warm toggle; builds source in-cluster (Argo + BuildKit) and deploys it as a scale-to-zero Knative Service (#58). |
 | `console-database-monitoring.png` | A database's detail page — CNPG connections, cache-hit ratio and size (#56). |
 | `console-builds-monitoring.png` | The Builds page — BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs (#56). |
 | `console-streams-monitoring.png` | The Streams page — JetStream messages/bytes + connections from the NATS exporter sidecar (#56). |

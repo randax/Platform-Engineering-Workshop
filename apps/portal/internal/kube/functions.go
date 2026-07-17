@@ -83,13 +83,40 @@ func (k *Client) CreateFunctionWorkflow(ctx context.Context, name, repo, path st
 	return k.do(ctx, http.MethodPost, workflowsPath, bytes.NewReader(body), nil)
 }
 
+// FnEnv is one plain environment variable set on the function's container.
+type FnEnv struct{ Name, Value string }
+
+// FnOpts carries the optional knobs the New-function form collects beyond the
+// name: extra env vars and whether to keep one instance warm (min-scale 1)
+// instead of scaling to zero. Zero value = no env, scale-to-zero (the default).
+type FnOpts struct {
+	Env      []FnEnv
+	KeepWarm bool
+}
+
 // BuildFunctionService hand-writes the Knative `Service` — the same minimal
 // shape as lab/06-serverless/hello-ksvc.yaml, but pointed at the freshly-built
 // image via the node-side host. The short autoscaling window keeps the
-// scale-to-zero demo watchable.
-func BuildFunctionService(name string) ([]byte, error) {
+// scale-to-zero demo watchable; KeepWarm pins min-scale to 1 for a function
+// that should never cold-start, and Env appends plain container env vars.
+func BuildFunctionService(name string, opts FnOpts) ([]byte, error) {
 	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
+	}
+	annotations := map[string]any{"autoscaling.knative.dev/window": "30s"}
+	if opts.KeepWarm {
+		// Pin one instance warm — the opposite of the scale-to-zero default,
+		// for a function where cold-start latency isn't acceptable.
+		annotations["autoscaling.knative.dev/min-scale"] = "1"
+	}
+	container := map[string]any{
+		"image": functionImage(fnPullHost, name),
+		"resources": map[string]any{
+			"requests": map[string]any{"memory": "32Mi", "cpu": "25m"},
+		},
+	}
+	if env := envList(opts.Env); len(env) > 0 {
+		container["env"] = env
 	}
 	svc := map[string]any{
 		"apiVersion": "serving.knative.dev/v1",
@@ -97,18 +124,9 @@ func BuildFunctionService(name string) ([]byte, error) {
 		"metadata":   map[string]any{"name": "fn-" + name, "namespace": KsvcNamespace},
 		"spec": map[string]any{
 			"template": map[string]any{
-				"metadata": map[string]any{
-					"annotations": map[string]any{"autoscaling.knative.dev/window": "30s"},
-				},
+				"metadata": map[string]any{"annotations": annotations},
 				"spec": map[string]any{
-					"containers": []any{
-						map[string]any{
-							"image": functionImage(fnPullHost, name),
-							"resources": map[string]any{
-								"requests": map[string]any{"memory": "32Mi", "cpu": "25m"},
-							},
-						},
-					},
+					"containers": []any{container},
 				},
 			},
 		},
@@ -116,8 +134,21 @@ func BuildFunctionService(name string) ([]byte, error) {
 	return json.Marshal(svc)
 }
 
-func (k *Client) CreateFunctionService(ctx context.Context, name string) error {
-	body, err := BuildFunctionService(name)
+// envList drops blank pairs (the form ships fixed empty rows) and shapes the
+// rest as Knative container env entries.
+func envList(env []FnEnv) []any {
+	out := make([]any, 0, len(env))
+	for _, e := range env {
+		if e.Name == "" {
+			continue
+		}
+		out = append(out, map[string]any{"name": e.Name, "value": e.Value})
+	}
+	return out
+}
+
+func (k *Client) CreateFunctionService(ctx context.Context, name string, opts FnOpts) error {
+	body, err := BuildFunctionService(name, opts)
 	if err != nil {
 		return err
 	}
