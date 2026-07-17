@@ -10,7 +10,7 @@ import (
 // group platform.cloudbox.io, version v1alpha1, kind WorkshopDatabase,
 // namespaced, with a single knob: spec.size (the T-shirt, PRD-0006).
 func TestBuildWorkshopDatabase(t *testing.T) {
-	raw, err := BuildWorkshopDatabase("my-db", "large")
+	raw, err := BuildWorkshopDatabase("demo", "my-db", "large")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestBuildWorkshopDatabaseValidation(t *testing.T) {
 		{"ok", ""},             // empty size
 	}
 	for _, c := range cases {
-		if _, err := BuildWorkshopDatabase(c.name, c.size); err == nil {
+		if _, err := BuildWorkshopDatabase("demo", c.name, c.size); err == nil {
 			t.Errorf("BuildWorkshopDatabase(%q, %q): expected error, got none", c.name, c.size)
 		}
 	}
@@ -77,7 +77,7 @@ func TestResizeWorkshopDatabaseValidation(t *testing.T) {
 		{"ok", ""},         // empty size
 	}
 	for _, b := range bad {
-		if err := c.ResizeWorkshopDatabase(context.Background(), b.name, b.size); err == nil {
+		if err := c.ResizeWorkshopDatabase(context.Background(), "demo", b.name, b.size); err == nil {
 			t.Errorf("ResizeWorkshopDatabase(%q, %q): expected validation error", b.name, b.size)
 		}
 	}

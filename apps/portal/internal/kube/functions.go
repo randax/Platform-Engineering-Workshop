@@ -32,12 +32,16 @@ const (
 	fnPushHost = "zot.zot.svc.cluster.local:5000"
 	fnPullHost = "localhost:30500"
 
-	// Functions deploy as Knative Services in the same demo namespace the
-	// WorkshopDatabase self-service uses — the one namespace the attendee grants
-	// the portal write access to.
+	// KsvcNamespace is the DEFAULT project functions deploy into — the same
+	// default project the rest of self-service uses. With Projects (PRD-0011)
+	// the console deploys into whichever project is active.
 	KsvcNamespace = "demo"
-	ksvcPath      = "/apis/serving.knative.dev/v1/namespaces/" + KsvcNamespace + "/services"
 )
+
+// ksvcPath builds the Knative Service collection path for a project namespace.
+func ksvcPath(ns string) string {
+	return "/apis/serving.knative.dev/v1/namespaces/" + ns + "/services"
+}
 
 // functionImage builds the "fn-<name>:v1" image reference at the given host.
 // The fn- prefix namespaces built functions away from hand-deployed ksvcs and
@@ -99,7 +103,7 @@ type FnOpts struct {
 // image via the node-side host. The short autoscaling window keeps the
 // scale-to-zero demo watchable; KeepWarm pins min-scale to 1 for a function
 // that should never cold-start, and Env appends plain container env vars.
-func BuildFunctionService(name string, opts FnOpts) ([]byte, error) {
+func BuildFunctionService(ns, name string, opts FnOpts) ([]byte, error) {
 	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
@@ -121,7 +125,7 @@ func BuildFunctionService(name string, opts FnOpts) ([]byte, error) {
 	svc := map[string]any{
 		"apiVersion": "serving.knative.dev/v1",
 		"kind":       "Service",
-		"metadata":   map[string]any{"name": "fn-" + name, "namespace": KsvcNamespace},
+		"metadata":   map[string]any{"name": "fn-" + name, "namespace": ns},
 		"spec": map[string]any{
 			"template": map[string]any{
 				"metadata": map[string]any{"annotations": annotations},
@@ -147,21 +151,21 @@ func envList(env []FnEnv) []any {
 	return out
 }
 
-func (k *Client) CreateFunctionService(ctx context.Context, name string, opts FnOpts) error {
-	body, err := BuildFunctionService(name, opts)
+func (k *Client) CreateFunctionService(ctx context.Context, ns, name string, opts FnOpts) error {
+	body, err := BuildFunctionService(ns, name, opts)
 	if err != nil {
 		return err
 	}
-	return k.do(ctx, http.MethodPost, ksvcPath, bytes.NewReader(body), nil)
+	return k.do(ctx, http.MethodPost, ksvcPath(ns), bytes.NewReader(body), nil)
 }
 
-// DeleteKnativeService removes a Knative Service by name from the demo
-// namespace — the one the portal-functions-serve Role grants delete on. The
-// Functions page only offers Delete for demo-namespace services for exactly
-// this reason (capstone ksvcs in `pipeline` are shown read-only).
-func (k *Client) DeleteKnativeService(ctx context.Context, name string) error {
+// DeleteKnativeService removes a Knative Service by name from a project
+// namespace — the one whose portal-tenant grant lets the portal delete it. The
+// Functions page only offers Delete for project namespaces for exactly this
+// reason (capstone ksvcs in `pipeline`, not a project, are shown read-only).
+func (k *Client) DeleteKnativeService(ctx context.Context, ns, name string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
-	return k.do(ctx, http.MethodDelete, ksvcPath+"/"+name, nil, nil)
+	return k.do(ctx, http.MethodDelete, ksvcPath(ns)+"/"+name, nil, nil)
 }

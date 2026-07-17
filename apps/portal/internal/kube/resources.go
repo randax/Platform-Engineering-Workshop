@@ -166,11 +166,21 @@ func (k *Client) ListKnativeServices(ctx context.Context) ([]KnativeService, err
 const (
 	xrAPI  = "platform.cloudbox.io/v1alpha1"
 	xrKind = "WorkshopDatabase"
-	// The namespace the console provisions databases into. Crossplane v2 XRs
-	// are namespaced — no cluster-scoped claims anymore.
+	// XRNamespace is the DEFAULT project (namespace) the console provisions into.
+	// Crossplane v2 XRs are namespaced; with Projects (PRD-0011) the console now
+	// targets whichever project namespace is active, defaulting to this one.
 	XRNamespace = "demo"
-	xrPath      = "/apis/platform.cloudbox.io/v1alpha1/namespaces/" + XRNamespace + "/workshopdatabases"
 )
+
+// wdbPath builds the WorkshopDatabase collection path for a namespace. An empty
+// namespace yields the cluster-wide path (list across all projects) — used by
+// the billing/workshop status reads that count databases anywhere.
+func wdbPath(ns string) string {
+	if ns == "" {
+		return "/apis/platform.cloudbox.io/v1alpha1/workshopdatabases"
+	}
+	return "/apis/platform.cloudbox.io/v1alpha1/namespaces/" + ns + "/workshopdatabases"
+}
 
 type WorkshopDB struct {
 	Metadata ObjMeta `json:"metadata"`
@@ -184,11 +194,13 @@ type WorkshopDB struct {
 
 func (d WorkshopDB) Readiness() Readiness { return ReadinessOf(d.Status.Conditions) }
 
-func (k *Client) ListWorkshopDatabases(ctx context.Context) ([]WorkshopDB, error) {
+// ListWorkshopDatabases lists databases in a project namespace (or across all
+// projects when ns == "").
+func (k *Client) ListWorkshopDatabases(ctx context.Context, ns string) ([]WorkshopDB, error) {
 	var list struct {
 		Items []WorkshopDB `json:"items"`
 	}
-	err := k.get(ctx, xrPath, &list)
+	err := k.get(ctx, wdbPath(ns), &list)
 	return list.Items, err
 }
 
@@ -203,7 +215,7 @@ func ValidName(s string) bool { return dnsName.MatchString(s) }
 // trick behind "self-service platform APIs": creating a database is one POST
 // of ~10 lines of JSON, which Crossplane then expands into a CNPG Postgres
 // cluster and an S3 bucket (see lab/04's Composition).
-func BuildWorkshopDatabase(name, size string) ([]byte, error) {
+func BuildWorkshopDatabase(ns, name, size string) ([]byte, error) {
 	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
@@ -213,25 +225,25 @@ func BuildWorkshopDatabase(name, size string) ([]byte, error) {
 	xr := map[string]any{
 		"apiVersion": xrAPI,
 		"kind":       xrKind,
-		"metadata":   map[string]any{"name": name, "namespace": XRNamespace},
+		"metadata":   map[string]any{"name": name, "namespace": ns},
 		"spec":       map[string]any{"size": size},
 	}
 	return json.Marshal(xr)
 }
 
-func (k *Client) CreateWorkshopDatabase(ctx context.Context, name, size string) error {
-	body, err := BuildWorkshopDatabase(name, size)
+func (k *Client) CreateWorkshopDatabase(ctx context.Context, ns, name, size string) error {
+	body, err := BuildWorkshopDatabase(ns, name, size)
 	if err != nil {
 		return err
 	}
-	return k.do(ctx, http.MethodPost, xrPath, bytes.NewReader(body), nil)
+	return k.do(ctx, http.MethodPost, wdbPath(ns), bytes.NewReader(body), nil)
 }
 
-func (k *Client) DeleteWorkshopDatabase(ctx context.Context, name string) error {
+func (k *Client) DeleteWorkshopDatabase(ctx context.Context, ns, name string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
-	return k.do(ctx, http.MethodDelete, xrPath+"/"+name, nil, nil)
+	return k.do(ctx, http.MethodDelete, wdbPath(ns)+"/"+name, nil, nil)
 }
 
 // ResizeWorkshopDatabase changes an existing database's T-shirt size — a merge
@@ -240,7 +252,7 @@ func (k *Client) DeleteWorkshopDatabase(ctx context.Context, name string) error 
 // my database" self-service action in one field. Shrinking is the user's call;
 // CNPG won't shrink a PVC, so a smaller size may leave storage as-is (noted in
 // the UI). Validates like BuildWorkshopDatabase so a bad value fails friendly.
-func (k *Client) ResizeWorkshopDatabase(ctx context.Context, name, size string) error {
+func (k *Client) ResizeWorkshopDatabase(ctx context.Context, ns, name, size string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
@@ -251,7 +263,7 @@ func (k *Client) ResizeWorkshopDatabase(ctx context.Context, name, size string) 
 	if err != nil {
 		return err
 	}
-	return k.patchMerge(ctx, xrPath+"/"+name, bytes.NewReader(body))
+	return k.patchMerge(ctx, wdbPath(ns)+"/"+name, bytes.NewReader(body))
 }
 
 // ------------------------------------------------- Argo Workflows (CI)

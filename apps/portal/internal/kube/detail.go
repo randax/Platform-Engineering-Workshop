@@ -22,11 +22,11 @@ type CNPGClusterDetail struct {
 	} `json:"status"`
 }
 
-// GetWorkshopDatabase fetches one XR; a 404 means "no such database" and is
-// reported as nil, not as an error.
-func (k *Client) GetWorkshopDatabase(ctx context.Context, name string) (*WorkshopDB, error) {
+// GetWorkshopDatabase fetches one XR from a project namespace; a 404 means "no
+// such database" and is reported as nil, not as an error.
+func (k *Client) GetWorkshopDatabase(ctx context.Context, ns, name string) (*WorkshopDB, error) {
 	var db WorkshopDB
-	if err := k.get(ctx, xrPath+"/"+name, &db); err != nil {
+	if err := k.get(ctx, wdbPath(ns)+"/"+name, &db); err != nil {
 		if isNotFound(err) {
 			return nil, nil
 		}
@@ -35,13 +35,13 @@ func (k *Client) GetWorkshopDatabase(ctx context.Context, name string) (*Worksho
 	return &db, nil
 }
 
-// GetCNPGCluster looks up the composed cluster. The composition names it
-// "<xr>-pg" (see lab/04's Composition); the plain name is tried second so
-// the page also works for hand-made CNPG clusters in the demo namespace.
-func (k *Client) GetCNPGCluster(ctx context.Context, xrName string) (*CNPGClusterDetail, string, error) {
+// GetCNPGCluster looks up the composed cluster in a project namespace. The
+// composition names it "<xr>-pg" (see lab/04's Composition); the plain name is
+// tried second so the page also works for hand-made CNPG clusters.
+func (k *Client) GetCNPGCluster(ctx context.Context, ns, xrName string) (*CNPGClusterDetail, string, error) {
 	for _, name := range []string{xrName + "-pg", xrName} {
 		var c CNPGClusterDetail
-		err := k.get(ctx, "/apis/postgresql.cnpg.io/v1/namespaces/demo/clusters/"+name, &c)
+		err := k.get(ctx, "/apis/postgresql.cnpg.io/v1/namespaces/"+ns+"/clusters/"+name, &c)
 		if err == nil {
 			return &c, name, nil
 		}

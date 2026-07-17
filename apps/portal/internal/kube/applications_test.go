@@ -10,7 +10,7 @@ import (
 // gitops/components/application-xr: group platform.cloudbox.io, kind
 // Application, spec.image + replicas{min,max} + env + database/bucket.
 func TestBuildApplication(t *testing.T) {
-	raw, err := BuildApplication("my-app", AppOpts{
+	raw, err := BuildApplication("demo", "my-app", AppOpts{
 		Image:    "ghcr.io/acme/api:v2",
 		MinScale: 1, MaxScale: 5,
 		Env:      []AppEnv{{Name: "LOG_LEVEL", Value: "info"}, {Name: "", Value: "dropped"}},
@@ -54,15 +54,15 @@ func TestBuildApplication(t *testing.T) {
 // BuildApplication defaults the scale bounds and requires an image + valid name.
 func TestBuildApplicationValidation(t *testing.T) {
 	// Missing image.
-	if _, err := BuildApplication("ok", AppOpts{}); err == nil {
+	if _, err := BuildApplication("demo", "ok", AppOpts{}); err == nil {
 		t.Error("expected an error when image is empty")
 	}
 	// Bad name.
-	if _, err := BuildApplication("Bad_Name", AppOpts{Image: "x"}); err == nil {
+	if _, err := BuildApplication("demo", "Bad_Name", AppOpts{Image: "x"}); err == nil {
 		t.Error("expected an error for a non-DNS name")
 	}
 	// Defaults: max<1 → 3, min<0 → 0.
-	raw, err := BuildApplication("ok", AppOpts{Image: "x", MinScale: -1, MaxScale: 0})
+	raw, err := BuildApplication("demo", "ok", AppOpts{Image: "x", MinScale: -1, MaxScale: 0})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
