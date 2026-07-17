@@ -31,7 +31,7 @@ jobs:
       version: ${{ steps.rp.outputs['apps--version'] }}
       tag: ${{ steps.rp.outputs['apps--tag_name'] }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: rp
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
