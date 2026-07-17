@@ -135,6 +135,31 @@ func (k *Client) get(ctx context.Context, path string, out any) error {
 	return k.do(ctx, http.MethodGet, path, nil, out)
 }
 
+// patchMerge sends a JSON merge patch (RFC 7386) — the right shape for updating
+// one field of an existing object (e.g. a WorkshopDatabase's size) without a
+// read-modify-write. do() hardcodes application/json, which the API server
+// rejects for PATCH, so this sets the merge-patch content type itself.
+func (k *Client) patchMerge(ctx context.Context, path string, body io.Reader) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, k.baseURL+path, body)
+	if err != nil {
+		return err
+	}
+	if k.token != "" {
+		req.Header.Set("Authorization", "Bearer "+k.token)
+	}
+	req.Header.Set("Content-Type", "application/merge-patch+json")
+	resp, err := k.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return &apiError{Status: resp.StatusCode, Msg: fmt.Sprintf("PATCH %s: %s: %s", path, resp.Status, strings.TrimSpace(string(msg)))}
+	}
+	return nil
+}
+
 // apiError keeps the HTTP status so callers can tell "does not exist" (a
 // normal answer) apart from "something is broken".
 type apiError struct {

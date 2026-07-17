@@ -16,7 +16,7 @@ Every page has a light and a `-dark` variant (the console is theme-aware via
 | `console-components.png` | The Components page — per-namespace health, each linking into its Monitoring detail. |
 | `console-services.png` | The **Functions** page — the whole function lifecycle in the **Services** nav section: request-rate + avg-latency sparklines and scale-from-zero per Knative Service (#56), an **Invoke** button that wakes one server-side, **Delete** for console-built functions, and a **New function** button that opens the build-and-deploy modal (#58). |
 | `console-new-function.png` | The **New function** modal (CSS-only, no JS) — name, source, optional env vars, and a keep-warm toggle; builds source in-cluster (Argo + BuildKit) and deploys it as a scale-to-zero Knative Service (#58). |
-| `console-database-monitoring.png` | A database's detail page — CNPG connections, cache-hit ratio and size (#56). |
+| `console-database-monitoring.png` | A database's detail page — CNPG connections, cache-hit ratio and size (#56), plus a **Resize** control (change the T-shirt size → Crossplane re-composes, #27) and the delete danger zone. |
 | `console-builds-monitoring.png` | The Builds page — BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs (#56). |
 | `console-streams-monitoring.png` | The Streams page — JetStream messages/bytes + connections from the NATS exporter sidecar (#56). |
 | `console-buckets-monitoring.png` | The Buckets page — RustFS pod CPU/memory (generic fallback; RustFS has no Prometheus endpoint) (#56), plus full S3 CRUD: create a bucket, upload and delete objects, delete a bucket (#26). |

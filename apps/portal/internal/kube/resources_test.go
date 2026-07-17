@@ -1,6 +1,7 @@
 package kube
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -60,6 +61,24 @@ func TestBuildWorkshopDatabaseValidation(t *testing.T) {
 	for _, c := range cases {
 		if _, err := BuildWorkshopDatabase(c.name, c.size); err == nil {
 			t.Errorf("BuildWorkshopDatabase(%q, %q): expected error, got none", c.name, c.size)
+		}
+	}
+}
+
+// ResizeWorkshopDatabase validates name + size before any HTTP call, so a bad
+// input short-circuits without touching the (zero) client. Only the invalid
+// cases are exercised here — a valid one would try a real PATCH.
+func TestResizeWorkshopDatabaseValidation(t *testing.T) {
+	c := &Client{}
+	bad := []struct{ name, size string }{
+		{"UPPER", "small"}, // not a DNS label
+		{"", "small"},      // empty name
+		{"ok", "xlarge"},   // size outside the enum
+		{"ok", ""},         // empty size
+	}
+	for _, b := range bad {
+		if err := c.ResizeWorkshopDatabase(context.Background(), b.name, b.size); err == nil {
+			t.Errorf("ResizeWorkshopDatabase(%q, %q): expected validation error", b.name, b.size)
 		}
 	}
 }

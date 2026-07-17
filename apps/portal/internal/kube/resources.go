@@ -234,6 +234,26 @@ func (k *Client) DeleteWorkshopDatabase(ctx context.Context, name string) error 
 	return k.do(ctx, http.MethodDelete, xrPath+"/"+name, nil, nil)
 }
 
+// ResizeWorkshopDatabase changes an existing database's T-shirt size — a merge
+// patch on the ONE knob (spec.size). Crossplane re-composes: the size decides
+// storage, HA instances and memory, so bumping small→large is the whole "resize
+// my database" self-service action in one field. Shrinking is the user's call;
+// CNPG won't shrink a PVC, so a smaller size may leave storage as-is (noted in
+// the UI). Validates like BuildWorkshopDatabase so a bad value fails friendly.
+func (k *Client) ResizeWorkshopDatabase(ctx context.Context, name, size string) error {
+	if !ValidName(name) {
+		return fmt.Errorf("invalid name %q", name)
+	}
+	if size != "small" && size != "medium" && size != "large" {
+		return fmt.Errorf("size must be small, medium or large, got %q", size)
+	}
+	body, err := json.Marshal(map[string]any{"spec": map[string]any{"size": size}})
+	if err != nil {
+		return err
+	}
+	return k.patchMerge(ctx, xrPath+"/"+name, bytes.NewReader(body))
+}
+
 // ------------------------------------------------- Argo Workflows (CI)
 
 // A Workflow is one Argo Workflows run — the in-cluster CI object from module

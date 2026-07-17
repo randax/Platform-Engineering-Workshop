@@ -619,6 +619,40 @@ jobs:
           echo "✅ deleted object + bucket from the console"
           { echo ""; echo "### Buckets (#26) — create → upload → delete object → delete bucket from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify Databases resize from the console (#27)
+        run: |
+          set -euo pipefail
+          # The Databases detail page can now RESIZE a WorkshopDatabase — a merge
+          # patch on spec.size, needing the patch/update verbs added to
+          # portal-access.yaml. Grant the portal its database keys, create one
+          # from the console, resize it, and prove spec.size actually changed
+          # (validates the RBAC verb AND the merge-patch+json content type).
+          kubectl apply -f lab/08-portal/portal-access.yaml
+          base=http://localhost:30600
+          db=e2edb
+          c=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST "$base/databases" --data-urlencode "name=$db" --data-urlencode "size=small" 2>/dev/null || true)
+          echo "POST /databases $db size=small → HTTP $c"; [ "$c" = 200 ] || { echo "❌ create-database failed"; exit 1; }
+          # Wait for the XR to exist and read back size=small.
+          sz=""
+          for _ in $(seq 1 20); do
+            sz=$(kubectl -n demo get workshopdatabase "$db" -o jsonpath='{.spec.size}' 2>/dev/null || true)
+            [ -n "$sz" ] && break; sleep 3
+          done
+          [ "$sz" = small ] || { echo "❌ WorkshopDatabase $db not created at size=small (got '$sz')"; exit 1; }
+          echo "✅ console created WorkshopDatabase $db (small)"
+          # Resize small → medium (the patch path + RBAC).
+          rc=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST "$base/databases/$db/resize" --data-urlencode "size=medium" 2>/dev/null || true)
+          echo "POST /databases/$db/resize medium → HTTP $rc"; [ "$rc" = 200 ] || { echo "❌ resize failed (RBAC patch verb? content-type?)"; exit 1; }
+          for _ in $(seq 1 10); do
+            [ "$(kubectl -n demo get workshopdatabase "$db" -o jsonpath='{.spec.size}' 2>/dev/null)" = medium ] && break; sleep 2
+          done
+          got=$(kubectl -n demo get workshopdatabase "$db" -o jsonpath='{.spec.size}' 2>/dev/null || true)
+          [ "$got" = medium ] || { echo "❌ resize didn't stick: spec.size=$got"; exit 1; }
+          echo "✅ console resized $db small → medium (spec.size patched)"
+          # Cleanup: delete via the console too.
+          curl -fsS -o /dev/null -X DELETE "$base/databases/$db" 2>/dev/null || true
+          { echo ""; echo "### Databases (#27) — create → resize (spec.size patch) from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |
