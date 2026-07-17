@@ -155,8 +155,9 @@ func TestTemplatesRender(t *testing.T) {
 				`name="image"`, `Min scale`, `Max scale`, // the fuller input set
 				`name="source"`, `Build from a repo`, `name="repo"`, // deploy-from-source toggle
 				`Attach a Postgres database`, `Attach an S3 bucket`, // dependency toggles
-				`my-app.demo.127.0.0.1.sslip.io`,   // the Ready app's URL
-				`hx-delete="/applications/my-app"`, // per-row delete
+				`web.demo.127.0.0.1.sslip.io`,          // the Ready app's URL
+				`hx-post="/applications/web/redeploy"`, // Redeploy on the source-built app
+				`hx-delete="/applications/web"`,        // per-row delete
 			},
 		},
 		"database-detail": {

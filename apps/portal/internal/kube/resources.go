@@ -17,9 +17,10 @@ import (
 
 // objMeta is the tiny slice of ObjectMeta we care about.
 type ObjMeta struct {
-	Name              string `json:"name"`
-	Namespace         string `json:"namespace"`
-	CreationTimestamp string `json:"creationTimestamp"`
+	Name              string            `json:"name"`
+	Namespace         string            `json:"namespace"`
+	CreationTimestamp string            `json:"creationTimestamp"`
+	Annotations       map[string]string `json:"annotations,omitempty"`
 }
 
 // condition is the standard Kubernetes status condition shape.

@@ -56,8 +56,30 @@ type Application struct {
 
 func (a Application) Readiness() Readiness { return ReadinessOf(a.Status.Conditions) }
 
+// Source annotations record where a source-built Application came from, so the
+// console can rebuild it (Redeploy) without asking again.
+const (
+	SourceRepoAnno   = "platform.cloudbox.io/source-repo"
+	SourceBranchAnno = "platform.cloudbox.io/source-branch"
+	SourcePathAnno   = "platform.cloudbox.io/source-path"
+)
+
+// Source returns the repo/branch/path an Application was built from, and whether
+// it was source-built at all (vs a prebuilt image).
+func (a Application) Source() (repo, branch, path string, ok bool) {
+	an := a.Metadata.Annotations
+	if an == nil || an[SourceRepoAnno] == "" {
+		return "", "", "", false
+	}
+	return an[SourceRepoAnno], an[SourceBranchAnno], an[SourcePathAnno], true
+}
+
 // AppEnv is one plain env var on the workload.
 type AppEnv struct{ Name, Value string }
+
+// AppSource records the Gitea repo an Application was built from — set on a
+// deploy-from-source create so Redeploy can rebuild the same source.
+type AppSource struct{ Repo, Branch, Path string }
 
 // AppOpts is what the New-application form collects.
 type AppOpts struct {
@@ -66,6 +88,7 @@ type AppOpts struct {
 	MaxScale         int
 	Env              []AppEnv
 	Database, Bucket bool
+	Source           *AppSource // non-nil when built from source
 }
 
 // ListApplications lists apps in a project namespace (or across all projects
@@ -106,10 +129,19 @@ func BuildApplication(ns, name string, opts AppOpts) ([]byte, error) {
 	if env := appEnvList(opts.Env); len(env) > 0 {
 		spec["env"] = env
 	}
+	meta := map[string]any{"name": name, "namespace": ns}
+	if s := opts.Source; s != nil {
+		// Record the source so Redeploy can rebuild the same repo.
+		meta["annotations"] = map[string]any{
+			SourceRepoAnno:   s.Repo,
+			SourceBranchAnno: s.Branch,
+			SourcePathAnno:   s.Path,
+		}
+	}
 	xr := map[string]any{
 		"apiVersion": appAPI,
 		"kind":       appKind,
-		"metadata":   map[string]any{"name": name, "namespace": ns},
+		"metadata":   meta,
 		"spec":       spec,
 	}
 	return json.Marshal(xr)
@@ -164,28 +196,59 @@ func GiteaRepoURL(orgRepo string) (string, error) {
 }
 
 // appSourceImage is the built-application image reference. The app- prefix keeps
-// source-built app images distinct from fn- function images and hand-deployed
-// workloads.
-func appSourceImage(host, name string) string {
-	return fmt.Sprintf("%s/app-%s:v1", host, name)
+// source-built app images distinct from fn- function images; the tag is UNIQUE
+// per build — a mutable tag (once :v1) would leave the ksvc pinned to the old
+// image on a rebuild (same tag → no new Knative revision → node keeps the
+// cached layer), so pushing new code would silently not deploy.
+func appSourceImage(host, name, tag string) string {
+	return fmt.Sprintf("%s/app-%s:%s", host, name, tag)
 }
 
 // AppSourcePullImage is the image an Application built from source should point
 // its workload at — the node-side pull host (localhost:30500 is in Knative's
 // tag-resolution skip list, so the ksvc is admitted before the build finishes
 // and converges once the image lands).
-func AppSourcePullImage(name string) string { return appSourceImage(fnPullHost, name) }
+func AppSourcePullImage(name, tag string) string { return appSourceImage(fnPullHost, name, tag) }
 
 // CreateAppBuildWorkflow submits the build that produces an Application's image
-// from a Gitea repo. It pushes to Zot over cluster DNS; the composed workload
-// pulls the same artifact back via the node host (AppSourcePullImage).
-func (k *Client) CreateAppBuildWorkflow(ctx context.Context, name, repo, branch, path string) error {
+// from a Gitea repo at a unique tag. It pushes to Zot over cluster DNS; the
+// composed workload pulls the same artifact back via the node host.
+func (k *Client) CreateAppBuildWorkflow(ctx context.Context, name, repo, branch, path, tag string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
-	body, err := buildWorkflow("build-app-"+name+"-", repo, branch, path, appSourceImage(fnPushHost, name))
+	body, err := buildWorkflow("build-app-"+name+"-", repo, branch, path, appSourceImage(fnPushHost, name, tag))
 	if err != nil {
 		return err
 	}
 	return k.do(ctx, http.MethodPost, workflowsPath, bytes.NewReader(body), nil)
+}
+
+// GetApplication fetches one Application XR (with its metadata annotations, so
+// the caller can read the recorded source for a Redeploy). 404 → nil.
+func (k *Client) GetApplication(ctx context.Context, ns, name string) (*Application, error) {
+	if !ValidName(name) {
+		return nil, fmt.Errorf("invalid name %q", name)
+	}
+	var app Application
+	if err := k.get(ctx, appPath(ns)+"/"+name, &app); err != nil {
+		if isNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &app, nil
+}
+
+// SetApplicationImage merge-patches spec.image — how a Redeploy rolls the app to
+// a freshly built image (a new tag → a new Knative revision).
+func (k *Client) SetApplicationImage(ctx context.Context, ns, name, image string) error {
+	if !ValidName(name) {
+		return fmt.Errorf("invalid name %q", name)
+	}
+	body, err := json.Marshal(map[string]any{"spec": map[string]any{"image": image}})
+	if err != nil {
+		return err
+	}
+	return k.patchMerge(ctx, appPath(ns)+"/"+name, bytes.NewReader(body))
 }

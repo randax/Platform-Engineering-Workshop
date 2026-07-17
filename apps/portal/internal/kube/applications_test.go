@@ -74,7 +74,7 @@ func TestGiteaRepoURL(t *testing.T) {
 // The app build workflow reuses the shared build-and-push primitive with an
 // app-prefixed image and the source branch/path the developer chose.
 func TestBuildAppWorkflowShape(t *testing.T) {
-	raw, err := buildWorkflow("build-app-web-", "http://gitea-http.gitea.svc.cluster.local:3000/team-a/web.git", "main", "svc", appSourceImage(fnPushHost, "web"))
+	raw, err := buildWorkflow("build-app-web-", "http://gitea-http.gitea.svc.cluster.local:3000/team-a/web.git", "main", "svc", appSourceImage(fnPushHost, "web", "b7"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,12 +103,40 @@ func TestBuildAppWorkflowShape(t *testing.T) {
 	for _, kv := range wf.Spec.Arguments.Parameters {
 		p[kv.Name] = kv.Value
 	}
-	if p["image"] != "zot.zot.svc.cluster.local:5000/app-web:v1" || p["path"] != "svc" || p["branch"] != "main" {
+	if p["image"] != "zot.zot.svc.cluster.local:5000/app-web:b7" || p["path"] != "svc" || p["branch"] != "main" {
 		t.Errorf("params = %+v", p)
 	}
-	// The workload must pull from the node host (skip-list), not the push host.
-	if AppSourcePullImage("web") != "localhost:30500/app-web:v1" {
-		t.Errorf("pull image = %q", AppSourcePullImage("web"))
+	// The workload must pull from the node host (skip-list), not the push host,
+	// at the SAME unique tag the build pushed.
+	if AppSourcePullImage("web", "b7") != "localhost:30500/app-web:b7" {
+		t.Errorf("pull image = %q", AppSourcePullImage("web", "b7"))
+	}
+}
+
+// A source-built Application records its repo in annotations so Redeploy can
+// rebuild it; a prebuilt-image app carries none.
+func TestApplicationSourceAnnotations(t *testing.T) {
+	raw, err := BuildApplication("demo", "web", AppOpts{
+		Image:  "localhost:30500/app-web:b7",
+		Source: &AppSource{Repo: "http://gitea/team-a/web.git", Branch: "main", Path: "svc"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var app Application
+	if err := json.Unmarshal(raw, &app); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	repo, branch, path, ok := app.Source()
+	if !ok || repo != "http://gitea/team-a/web.git" || branch != "main" || path != "svc" {
+		t.Errorf("Source() = %q/%q/%q ok=%v", repo, branch, path, ok)
+	}
+	// A prebuilt-image app has no source.
+	raw2, _ := BuildApplication("demo", "img", AppOpts{Image: "ghcr.io/x/y:1"})
+	var app2 Application
+	_ = json.Unmarshal(raw2, &app2)
+	if _, _, _, ok := app2.Source(); ok {
+		t.Error("a prebuilt-image app must not report a source")
 	}
 }
 
