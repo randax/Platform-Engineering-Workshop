@@ -34,7 +34,7 @@ func handleBilling(s *Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dbCount := 0
-	if dbs, err := s.Kube.ListWorkshopDatabases(r.Context()); err == nil {
+	if dbs, err := s.Kube.ListWorkshopDatabases(r.Context(), ""); err == nil {
 		dbCount = len(dbs)
 	}
 	s.render(w, "billing", billingData{

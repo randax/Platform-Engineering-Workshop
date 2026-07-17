@@ -19,9 +19,16 @@ import (
 const (
 	appAPI  = "platform.cloudbox.io/v1alpha1"
 	appKind = "Application"
-	// Namespaced XR in the same demo namespace the rest of self-service uses.
-	appPath = "/apis/platform.cloudbox.io/v1alpha1/namespaces/" + XRNamespace + "/applications"
 )
+
+// appPath builds the Application collection path for a project namespace (or the
+// cluster-wide path when ns == "").
+func appPath(ns string) string {
+	if ns == "" {
+		return "/apis/platform.cloudbox.io/v1alpha1/applications"
+	}
+	return "/apis/platform.cloudbox.io/v1alpha1/namespaces/" + ns + "/applications"
+}
 
 // Application mirrors the XRD (applications.platform.cloudbox.io): an image, its
 // autoscaling bounds, extra env, and the database/bucket toggles. Status carries
@@ -60,18 +67,20 @@ type AppOpts struct {
 	Database, Bucket bool
 }
 
-func (k *Client) ListApplications(ctx context.Context) ([]Application, error) {
+// ListApplications lists apps in a project namespace (or across all projects
+// when ns == "").
+func (k *Client) ListApplications(ctx context.Context, ns string) ([]Application, error) {
 	var list struct {
 		Items []Application `json:"items"`
 	}
-	err := k.get(ctx, appPath, &list)
+	err := k.get(ctx, appPath(ns), &list)
 	return list.Items, err
 }
 
 // BuildApplication hand-writes the Application XR document — the whole "deploy
 // an app + its dependencies" request is this ~15 lines of JSON, which Crossplane
 // expands into a ksvc, a database and a bucket (see the golden-path Composition).
-func BuildApplication(name string, opts AppOpts) ([]byte, error) {
+func BuildApplication(ns, name string, opts AppOpts) ([]byte, error) {
 	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
@@ -99,7 +108,7 @@ func BuildApplication(name string, opts AppOpts) ([]byte, error) {
 	xr := map[string]any{
 		"apiVersion": appAPI,
 		"kind":       appKind,
-		"metadata":   map[string]any{"name": name, "namespace": XRNamespace},
+		"metadata":   map[string]any{"name": name, "namespace": ns},
 		"spec":       spec,
 	}
 	return json.Marshal(xr)
@@ -116,17 +125,17 @@ func appEnvList(env []AppEnv) []any {
 	return out
 }
 
-func (k *Client) CreateApplication(ctx context.Context, name string, opts AppOpts) error {
-	body, err := BuildApplication(name, opts)
+func (k *Client) CreateApplication(ctx context.Context, ns, name string, opts AppOpts) error {
+	body, err := BuildApplication(ns, name, opts)
 	if err != nil {
 		return err
 	}
-	return k.do(ctx, http.MethodPost, appPath, bytes.NewReader(body), nil)
+	return k.do(ctx, http.MethodPost, appPath(ns), bytes.NewReader(body), nil)
 }
 
-func (k *Client) DeleteApplication(ctx context.Context, name string) error {
+func (k *Client) DeleteApplication(ctx context.Context, ns, name string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
-	return k.do(ctx, http.MethodDelete, appPath+"/"+name, nil, nil)
+	return k.do(ctx, http.MethodDelete, appPath(ns)+"/"+name, nil, nil)
 }

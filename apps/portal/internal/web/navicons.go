@@ -23,7 +23,7 @@ var navIcons = map[string]template.HTML{
 	// "Applications" — a dashboard/app-window frame: the composite workload.
 	"applications": template.HTML(navIcoOpen + `<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`),
 	"databases":    template.HTML(navIcoOpen + `<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`),
-	"buckets":   template.HTML(navIcoOpen + `<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`),
+	"buckets":      template.HTML(navIcoOpen + `<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`),
 	// Functions — a lightning bolt (Feather "zap"): the serverless glyph.
 	"services": template.HTML(navIcoOpen + `<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`),
 	// Capstone

@@ -198,7 +198,7 @@ func createFunction(s *Server, r *http.Request, name string, sample fnSample) fl
 	if err := s.Kube.CreateFunctionWorkflow(r.Context(), name, sample.Repo, sample.Path); err != nil {
 		return errorFlash("Couldn't start the build: " + err.Error())
 	}
-	if err := s.Kube.CreateFunctionService(r.Context(), name, parseFnOpts(r)); err != nil {
+	if err := s.Kube.CreateFunctionService(r.Context(), s.activeProject(r), name, parseFnOpts(r)); err != nil {
 		// The build is already running; only the deploy half failed. Say so —
 		// re-submitting after granting access will create the ksvc, and the
 		// finished image is waiting for it.
@@ -275,7 +275,7 @@ func handleInvokeFunction(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleDeleteFunction(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	fl := flash{Msg: "Deleted " + name + "."}
-	if err := s.Kube.DeleteKnativeService(r.Context(), name); err != nil {
+	if err := s.Kube.DeleteKnativeService(r.Context(), s.activeProject(r), name); err != nil {
 		fl = errorFlash("Delete failed: " + err.Error())
 	}
 	data, err := fetchFunctions(s, r, fl)

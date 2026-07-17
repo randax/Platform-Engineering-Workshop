@@ -41,16 +41,17 @@ func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ns := s.activeProject(r)
 	data := dbDetailData{Name: name}
 
-	db, err := s.Kube.GetWorkshopDatabase(r.Context(), name)
+	db, err := s.Kube.GetWorkshopDatabase(r.Context(), ns, name)
 	if err != nil {
 		s.renderError(w, err)
 		return
 	}
 	data.DB = db
 
-	cluster, clusterName, err := s.Kube.GetCNPGCluster(r.Context(), name)
+	cluster, clusterName, err := s.Kube.GetCNPGCluster(r.Context(), ns, name)
 	if err != nil {
 		s.renderError(w, err)
 		return
@@ -61,7 +62,7 @@ func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 	// Events for the backing cluster object — same log the Activity page
 	// reads, narrowed with a fieldSelector instead of filtering client-side.
 	events, err := s.Kube.ListEvents(r.Context(),
-		"/api/v1/namespaces/demo/events", "involvedObject.name="+clusterName)
+		"/api/v1/namespaces/"+ns+"/events", "involvedObject.name="+clusterName)
 	if err == nil {
 		if len(events) > 20 {
 			events = events[:20]
@@ -70,7 +71,7 @@ func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 	}
 
 	data.Secret = clusterName + "-app"
-	data.Psql = fmt.Sprintf("kubectl -n demo exec -it %s-1 -- psql -U app app", clusterName)
+	data.Psql = fmt.Sprintf("kubectl -n %s exec -it %s-1 -- psql -U app app", ns, clusterName)
 	data.GrafanaURL = grafanaExplore(s.GrafanaURL, "victoriametrics", metrics.CNPGConnectionsQuery(clusterName))
 
 	// Monitoring: CNPG's own metrics for this cluster, once the observability

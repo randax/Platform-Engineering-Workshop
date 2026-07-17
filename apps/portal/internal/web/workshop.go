@@ -52,7 +52,7 @@ func workshopSnapshot(ctx context.Context, s *Server) (kube.Snapshot, error) {
 			}
 		}
 	}
-	if dbs, err := s.Kube.ListWorkshopDatabases(ctx); err == nil {
+	if dbs, err := s.Kube.ListWorkshopDatabases(ctx, ""); err == nil {
 		snap.WDBCount = len(dbs)
 	}
 	if svcs, err := s.Kube.ListKnativeServices(ctx); err == nil {

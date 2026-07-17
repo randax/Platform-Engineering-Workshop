@@ -52,8 +52,8 @@ type applicationsData struct {
 	Flash flash
 }
 
-func fetchApplications(ctx context.Context, s *Server, fl flash) (applicationsData, error) {
-	apps, err := s.Kube.ListApplications(ctx)
+func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (applicationsData, error) {
+	apps, err := s.Kube.ListApplications(ctx, ns)
 	if err != nil {
 		return applicationsData{}, err
 	}
@@ -62,7 +62,7 @@ func fetchApplications(ctx context.Context, s *Server, fl flash) (applicationsDa
 		row := appRow{Application: a}
 		if a.Readiness().Class == "ok" {
 			// The sslip.io URL the composed ksvc serves on, via Kourier's NodePort.
-			row.URL = fmt.Sprintf("http://%s.%s.127.0.0.1.sslip.io:31080", a.Metadata.Name, kube.XRNamespace)
+			row.URL = fmt.Sprintf("http://%s.%s.127.0.0.1.sslip.io:31080", a.Metadata.Name, a.Metadata.Namespace)
 		}
 		rows = append(rows, row)
 	}
@@ -70,7 +70,7 @@ func fetchApplications(ctx context.Context, s *Server, fl flash) (applicationsDa
 }
 
 func handleApplications(s *Server, w http.ResponseWriter, r *http.Request) {
-	data, err := fetchApplications(r.Context(), s, flash{})
+	data, err := fetchApplications(r.Context(), s, s.activeProject(r), flash{})
 	if err != nil {
 		s.renderError(w, err)
 		return
@@ -79,7 +79,7 @@ func handleApplications(s *Server, w http.ResponseWriter, r *http.Request) {
 }
 
 func handleApplicationsList(s *Server, w http.ResponseWriter, r *http.Request) {
-	data, err := fetchApplications(r.Context(), s, flash{})
+	data, err := fetchApplications(r.Context(), s, s.activeProject(r), flash{})
 	if err != nil {
 		data = applicationsData{Flash: errorFlash("API error: " + err.Error())}
 	}
@@ -91,11 +91,12 @@ func handleApplicationsList(s *Server, w http.ResponseWriter, r *http.Request) {
 // row turns Ready as they converge. Answers with the refreshed list fragment.
 func handleCreateApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
+	ns := s.activeProject(r)
 	fl := flash{Msg: "Deploying " + name + " — Crossplane is composing the workload, its database and bucket. Watch it turn Ready below."}
-	if err := s.Kube.CreateApplication(r.Context(), name, parseAppOpts(r)); err != nil {
+	if err := s.Kube.CreateApplication(r.Context(), ns, name, parseAppOpts(r)); err != nil {
 		fl = errorFlash("Deploy failed: " + err.Error())
 	}
-	data, err := fetchApplications(r.Context(), s, fl)
+	data, err := fetchApplications(r.Context(), s, ns, fl)
 	if err != nil {
 		data = applicationsData{Flash: errorFlash("API error: " + err.Error())}
 	}
@@ -104,11 +105,12 @@ func handleCreateApplication(s *Server, w http.ResponseWriter, r *http.Request) 
 
 func handleDeleteApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	ns := s.activeProject(r)
 	fl := flash{Msg: "Deleted " + name + " — its composed workload, database and bucket are being removed."}
-	if err := s.Kube.DeleteApplication(r.Context(), name); err != nil {
+	if err := s.Kube.DeleteApplication(r.Context(), ns, name); err != nil {
 		fl = errorFlash("Delete failed: " + err.Error())
 	}
-	data, err := fetchApplications(r.Context(), s, fl)
+	data, err := fetchApplications(r.Context(), s, ns, fl)
 	if err != nil {
 		data = applicationsData{Flash: errorFlash("API error: " + err.Error())}
 	}

@@ -63,7 +63,7 @@ func TestBuildFunctionWorkflow(t *testing.T) {
 }
 
 func TestBuildFunctionService(t *testing.T) {
-	raw, err := BuildFunctionService("greeter", FnOpts{})
+	raw, err := BuildFunctionService("demo", "greeter", FnOpts{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestBuildFunctionService(t *testing.T) {
 // keep-warm pins min-scale 1, and env vars land on the container (blank rows
 // dropped).
 func TestBuildFunctionServiceOpts(t *testing.T) {
-	raw, err := BuildFunctionService("greeter", FnOpts{
+	raw, err := BuildFunctionService("demo", "greeter", FnOpts{
 		KeepWarm: true,
 		Env:      []FnEnv{{Name: "GREETING", Value: "hei"}, {Name: "", Value: "dropped"}},
 	})
@@ -157,7 +157,7 @@ func TestBuildFunctionInvalidName(t *testing.T) {
 		if _, err := BuildFunctionWorkflow(bad, "http://gitea/x.git", "app"); err == nil {
 			t.Errorf("BuildFunctionWorkflow(%q): expected validation error", bad)
 		}
-		if _, err := BuildFunctionService(bad, FnOpts{}); err == nil {
+		if _, err := BuildFunctionService("demo", bad, FnOpts{}); err == nil {
 			t.Errorf("BuildFunctionService(%q): expected validation error", bad)
 		}
 	}

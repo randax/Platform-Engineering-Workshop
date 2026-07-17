@@ -123,3 +123,14 @@ func (s *Server) renderError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	s.render(w, "error", err.Error())
 }
+
+// activeProject is the project (namespace) the self-service pages list and
+// create in — read from the `project` cookie, defaulting to the built-in demo
+// project. Projects map 1:1 to namespaces (PRD-0011); the top-bar selector sets
+// this cookie (Projects P2). Validated as a DNS label so it's safe in a path.
+func (s *Server) activeProject(r *http.Request) string {
+	if c, err := r.Cookie("project"); err == nil && kube.ValidName(c.Value) {
+		return c.Value
+	}
+	return kube.XRNamespace
+}

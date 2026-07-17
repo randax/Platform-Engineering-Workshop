@@ -42,20 +42,20 @@ type databasesData struct {
 	Flash     flash
 }
 
-func fetchDatabases(ctx context.Context, s *Server, fl flash) (databasesData, error) {
+func fetchDatabases(ctx context.Context, s *Server, ns string, fl flash) (databasesData, error) {
 	clusters, err := s.Kube.ListCNPGClusters(ctx)
 	if err != nil {
 		return databasesData{}, err
 	}
-	dbs, err := s.Kube.ListWorkshopDatabases(ctx)
+	dbs, err := s.Kube.ListWorkshopDatabases(ctx, ns)
 	if err != nil {
 		return databasesData{}, err
 	}
-	return databasesData{Clusters: clusters, Databases: dbs, Namespace: kube.XRNamespace, Flash: fl}, nil
+	return databasesData{Clusters: clusters, Databases: dbs, Namespace: ns, Flash: fl}, nil
 }
 
 func handleDatabases(s *Server, w http.ResponseWriter, r *http.Request) {
-	data, err := fetchDatabases(r.Context(), s, flash{})
+	data, err := fetchDatabases(r.Context(), s, s.activeProject(r), flash{})
 	if err != nil {
 		s.renderError(w, err)
 		return
@@ -68,9 +68,10 @@ func handleDatabases(s *Server, w http.ResponseWriter, r *http.Request) {
 // flash instead of a full error page — that keeps the polling attributes in
 // the DOM, so the tables heal themselves once the API answers again.
 func handleDatabasesList(s *Server, w http.ResponseWriter, r *http.Request) {
-	data, err := fetchDatabases(r.Context(), s, flash{})
+	ns := s.activeProject(r)
+	data, err := fetchDatabases(r.Context(), s, ns, flash{})
 	if err != nil {
-		data = databasesData{Namespace: kube.XRNamespace, Flash: errorFlash("API error: " + err.Error())}
+		data = databasesData{Namespace: ns, Flash: errorFlash("API error: " + err.Error())}
 	}
 	s.render(w, "db-list", data)
 }
@@ -81,16 +82,17 @@ func handleDatabasesList(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleCreateDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	size := r.FormValue("size")
+	ns := s.activeProject(r)
 
 	fl := flash{Msg: "Created " + name + " — Crossplane is composing a Postgres cluster and a bucket. Watch it turn Ready below."}
-	if err := s.Kube.CreateWorkshopDatabase(r.Context(), name, size); err != nil {
+	if err := s.Kube.CreateWorkshopDatabase(r.Context(), ns, name, size); err != nil {
 		fl = errorFlash("Create failed: " + err.Error())
 	}
 	// Always answer with the fragment htmx targeted — a full 500 error page
 	// would not be swapped in and the button would appear to do nothing.
-	data, err := fetchDatabases(r.Context(), s, fl)
+	data, err := fetchDatabases(r.Context(), s, ns, fl)
 	if err != nil {
-		data = databasesData{Namespace: kube.XRNamespace, Flash: errorFlash("API error: " + err.Error())}
+		data = databasesData{Namespace: ns, Flash: errorFlash("API error: " + err.Error())}
 	}
 	s.render(w, "db-list", data)
 }
@@ -101,7 +103,7 @@ func handleCreateDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 // list; on failure the error lands in the detail page's #delete-result slot.
 func handleDeleteDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	if err := s.Kube.DeleteWorkshopDatabase(r.Context(), name); err != nil {
+	if err := s.Kube.DeleteWorkshopDatabase(r.Context(), s.activeProject(r), name); err != nil {
 		s.render(w, "flash", errorFlash("Delete failed: "+err.Error()))
 		return
 	}
@@ -115,7 +117,7 @@ func handleDeleteDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleResizeDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	size := r.FormValue("size")
-	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), name, size); err != nil {
+	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), s.activeProject(r), name, size); err != nil {
 		s.render(w, "flash", errorFlash("Resize failed: "+err.Error()))
 		return
 	}

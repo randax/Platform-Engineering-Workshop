@@ -19,7 +19,7 @@ func init() {
 		Path:       "/components",
 		Handler:    handleComponents,
 		Extra: []Route{
-			{"GET /components/list", handleComponentsList},       // polled by htmx
+			{"GET /components/list", handleComponentsList},         // polled by htmx
 			{"GET /components/{namespace}", handleComponentDetail}, // per-component Monitoring (#56)
 		},
 	})
