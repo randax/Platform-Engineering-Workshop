@@ -214,7 +214,7 @@ git instead?
 ## Going deeper
 
 <p align="center">
-  <img src="../../docs/screenshots/console-services-dark.png" alt="Cloudbox Console — the Functions page: Knative Services with scale-from-zero and sparklines, an Invoke button, Delete for console-built functions, and a build-and-deploy form" width="80%" />
+  <img src="../../docs/screenshots/console-new-function-dark.png" alt="Cloudbox Console — the New function modal: name, source, optional env vars and a keep-warm toggle; builds the image in-cluster and deploys it as a Knative Service" width="80%" />
 </p>
 
 <p align="center"><em>The <strong>Functions</strong> page: the whole function lifecycle in one place — list, <strong>Invoke</strong> (wakes one from zero), <strong>Delete</strong>, and a build-and-deploy form that ties modules 06 + 07 together.</em></p>

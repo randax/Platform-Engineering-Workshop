@@ -261,6 +261,43 @@ button:focus-visible { outline: none; box-shadow: var(--ring); }
 button.danger { background: var(--bad); padding: 0.28rem 0.7rem; font-size: 0.85rem; }
 button.danger:hover { background: color-mix(in srgb, var(--bad) 85%, black); }
 
+/* Buttons rendered as <label> (the CSS-only modal triggers) — match <button>. */
+.btn {
+  display: inline-block; font: inherit; font-weight: 550;
+  padding: 0.44rem 1rem; border-radius: var(--r-sm);
+  background: var(--accent); color: var(--accent-fg);
+  cursor: pointer; user-select: none; transition: background .12s ease;
+}
+.btn:hover { background: var(--accent-hover); }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line-strong); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--fg); }
+.open-modal { margin-top: 0.5rem; }
+
+/* CSS-only modal (checkbox hack, no JS): a hidden toggle reveals the overlay via
+   the sibling combinator — the same JS-free approach as the mobile nav. */
+.modal { display: none; position: fixed; inset: 0; z-index: 50; align-items: center; justify-content: center; padding: 1rem; }
+.modal-toggle:checked ~ .modal { display: flex; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.55); cursor: pointer; }
+.modal-card {
+  position: relative; width: min(560px, 100%); max-height: 90vh; overflow: auto;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-md); box-shadow: var(--shadow-lg, 0 24px 60px rgba(0,0,0,.35));
+  padding: 1.2rem 1.4rem 1.4rem;
+}
+.modal-head { display: flex; align-items: baseline; justify-content: space-between; }
+.modal-head h2 { margin: 0; }
+.modal-x { cursor: pointer; font-size: 1.5rem; line-height: 1; color: var(--muted); padding: 0 0.25rem; user-select: none; }
+.modal-x:hover { color: var(--fg); }
+.modal-actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1rem; align-items: center; }
+/* env-var rows + the keep-warm checkbox inside the create modal */
+.env-rows { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0.6rem 0.8rem 0.8rem; margin: 0.4rem 0; }
+.env-rows legend { color: var(--muted); font-size: 0.85rem; padding: 0 0.4rem; }
+.env-row { display: grid; grid-template-columns: 1fr 1.3fr; gap: 0.5rem; margin-top: 0.4rem; }
+.env-row input { width: 100%; }
+label.check { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-weight: 450; margin: 0.6rem 0 0.2rem; color: var(--fg); }
+label.check input { width: auto; }
+label.check small { color: var(--muted); }
+
 /* Functions page: per-row actions (Invoke / traces / Delete) sit inline and
    compact so a row of buttons doesn't tower over the table. */
 td.actions { white-space: nowrap; }
