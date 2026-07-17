@@ -128,15 +128,23 @@ func TestTemplatesRender(t *testing.T) {
 			want: []string{`Nothing here yet — upload the first image.`},
 		},
 		"services": {
-			data: []serviceRow{
-				{Spark: metrics.Sparkline([]float64{0, 1, 2, 1}, "request rate"), Grafana: "http://grafana/explore?x"},
-				{}, // uninstrumented service: no metrics
+			data: functionsData{
+				Rows: []serviceRow{
+					{KnativeService: kube.KnativeService{Metadata: kube.ObjMeta{Name: "fn-hello", Namespace: "demo"}}, Spark: metrics.Sparkline([]float64{0, 1, 2, 1}, "request rate"), Grafana: "http://grafana/explore?x"},
+					{}, // uninstrumented service: no metrics
+				},
+				Samples: fnSamples,
 			},
 			want: []string{
 				`Not ready`,                      // empty conditions: amber fallback, not a red "False"
 				`<svg class="spark"`, `polyline`, // server-rendered sparkline
 				`— no metrics yet`, // the required empty state
 				`traces →`,         // Grafana Tempo deep link
+				// merged lifecycle: build form + invoke + delete (demo ns only)
+				`hx-post="/services"`,
+				`Build &amp; deploy`,
+				`/services/demo/fn-hello/invoke`, // invoke wakes it server-side
+				`hx-delete="/services/fn-hello"`, // delete offered for demo ns
 			},
 		},
 		"database-detail": {
@@ -198,8 +206,8 @@ func TestTemplatesRender(t *testing.T) {
 				Teaser: "Deploy serverless workloads that scale to zero.",
 			},
 			want: []string{
-				`<svg class="ico"`,                                // the lock icon (replaced the 🔒 emoji)
-				`Services`,                                        // the locked page title
+				`<svg class="ico"`, // the lock icon (replaced the 🔒 emoji)
+				`Services`,         // the locked page title
 				`Deploy serverless workloads that scale to zero.`, // teaser
 				`Complete Module 06 · Serverless`,                 // unlock hint
 			},

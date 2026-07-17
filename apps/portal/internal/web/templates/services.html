@@ -1,29 +1,84 @@
 {{define "services"}}
 {{template "head" "services"}}
 <h1>Functions</h1>
-<p class="lede">Serverless workloads from modules 06 and the capstone. A Ready service
-with zero pods is normal — that is scale-to-zero doing its job.</p>
+<p class="lede">Serverless workloads from modules 06, 07 and the capstone. A Ready service
+with zero pods is normal — that is scale-to-zero doing its job. <strong>Invoke</strong> one to
+watch it wake from zero; <strong>build a new one</strong> below and the platform compiles your
+source in-cluster and deploys it.</p>
 
-<table>
-  <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th><th>Scale</th><th>Requests (30 min)</th><th>avg latency (30 min)</th><th></th></tr></thead>
-  <tbody>
-  {{range .}}
-    <tr>
-      <td>{{.Metadata.Name}}</td>
-      <td>{{.Metadata.Namespace}}</td>
-      <td><code>{{.Status.URL}}</code></td>
-      <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
-      {{/* scale-from-zero: 0 pods when idle, N when serving — the serverless payoff */}}
-      <td>{{if .Scale}}<span class="metric-now">{{.Scale}}</span>{{else}}<span class="nodata">—</span>{{end}}</td>
-      {{/* server-rendered SVG straight from a Prometheus range query */}}
-      <td>{{if .Spark}}{{.Spark}}{{else}}<span class="nodata">— no metrics yet</span>{{end}}</td>
-      <td>{{if .Latency}}{{.Latency}} <small>{{.LatencyNow}}</small>{{else}}<span class="nodata">—</span>{{end}}</td>
-      <td><a href="{{.Grafana}}" target="_blank">traces →</a></td>
-    </tr>
-  {{else}}
-    <tr><td colspan="8" class="empty">No Knative Services yet — enable knative-serving from the catalog (module 06).</td></tr>
-  {{end}}
-  </tbody>
-</table>
+{{template "svc-list" .}}
+
+{{/* Server-side invoke lands here — a "Test" panel outside the polling list, so
+     a cold-start result isn't wiped by the 5-second refresh. */}}
+<div id="invoke-result"></div>
+
+<h2>New function</h2>
+<p class="hint">The Lambda moment, on your laptop: pick a source, name it, and the platform
+<em>builds the image in-cluster</em> (Argo Workflows + BuildKit → your <code>Zot</code> registry)
+and <em>deploys it as a scale-to-zero function</em> (a Knative <code>Service</code> in
+<code>demo</code>). Modules 06 and 07 each taught one half; this form does both from one POST —
+no CLI, no cloud.</p>
+<form hx-post="/services" hx-target="#svc-list" hx-swap="outerHTML">
+  <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-fn"></label>
+  <label>Source
+    <select name="sample">
+      {{range .Samples}}<option value="{{.Key}}">{{.Label}}</option>{{end}}
+    </select>
+  </label>
+  <button type="submit">Build &amp; deploy</button>
+</form>
 {{template "foot" .}}
+{{end}}
+
+{{/* The self-updating table. hx-get + hx-trigger="every 5s" + hx-swap="outerHTML"
+     make it poll and replace itself — live updates, zero JavaScript. The create
+     and delete handlers return this same fragment, so every path renders the
+     same markup. */}}
+{{define "svc-list"}}
+<div id="svc-list" hx-get="/services/list" hx-trigger="every 5s" hx-swap="outerHTML">
+  {{template "flash" .Flash}}
+  <table>
+    <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th><th>Scale</th><th>Requests (30 min)</th><th>avg latency (30 min)</th><th></th></tr></thead>
+    <tbody>
+    {{range .Rows}}
+      <tr>
+        <td>{{.Metadata.Name}}</td>
+        <td>{{.Metadata.Namespace}}</td>
+        <td><code>{{.Status.URL}}</code></td>
+        <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
+        {{/* scale-from-zero: 0 pods when idle, N when serving — the serverless payoff */}}
+        <td>{{if .Scale}}<span class="metric-now">{{.Scale}}</span>{{else}}<span class="nodata">—</span>{{end}}</td>
+        {{/* server-rendered SVG straight from a Prometheus range query */}}
+        <td>{{if .Spark}}{{.Spark}}{{else}}<span class="nodata">— no metrics yet</span>{{end}}</td>
+        <td>{{if .Latency}}{{.Latency}} <small>{{.LatencyNow}}</small>{{else}}<span class="nodata">—</span>{{end}}</td>
+        <td class="actions">
+          {{/* Invoke wakes a scaled-to-zero function server-side (GET the cluster-local URL). */}}
+          <button hx-post="/services/{{.Metadata.Namespace}}/{{.Metadata.Name}}/invoke" hx-target="#invoke-result" hx-swap="innerHTML">Invoke</button>
+          <a href="{{.Grafana}}" target="_blank">traces →</a>
+          {{/* Delete only for demo-namespace functions — the ones this console created and has RBAC to remove. */}}
+          {{if eq .Metadata.Namespace "demo"}}
+          <button class="danger" hx-delete="/services/{{.Metadata.Name}}" hx-target="#svc-list" hx-swap="outerHTML" hx-confirm="Delete {{.Metadata.Name}}? This removes the Knative Service.">Delete</button>
+          {{end}}
+        </td>
+      </tr>
+    {{else}}
+      <tr><td colspan="8" class="empty">No functions yet — build one below, or enable knative-serving from the catalog (module 06).</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{/* The invoke "Test" panel — swapped into #invoke-result by htmx. A cold start
+     blocks the request for a few seconds; the status + response body land here. */}}
+{{define "invoke-result"}}
+<div class="invoke-out">
+  <h3>Invoke <code>{{.Name}}</code></h3>
+  {{if .Error}}
+    <p class="flash flash-error">{{.Error}}</p>
+  {{else}}
+    <p><span class="badge {{.Class}}">{{.Status}}</span> <small>· {{.Duration}}</small></p>
+    <pre>{{.Body}}</pre>
+  {{end}}
+</div>
 {{end}}
