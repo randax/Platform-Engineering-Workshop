@@ -735,6 +735,45 @@ jobs:
           kubectl get ns "$proj" >/dev/null 2>&1 && echo "⚠️ namespace $proj still terminating (cascade slow) — acceptable" || echo "✅ project $proj deleted (namespace gone)"
           { echo ""; echo "### Projects (#96, PRD-0011) — create project → provision into it → delete, from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify deploy-from-source — the app-team golden path (PRD-0012)
+        run: |
+          set -euo pipefail
+          # The app-team golden path: the console builds an app from a Gitea repo
+          # and deploys it as an Application (workload + DB + bucket) — reusing the
+          # module-07 build-and-push primitive + the Application XR. Needs BOTH the
+          # workflows grant (functions) and the applications grant, both already
+          # applied by the Functions/Applications steps above.
+          base=http://localhost:30600
+          app=srcapp
+          # source=repo → the portal builds cloudbox/platform:lab/07-ci/app (a
+          # Dockerfile), pushes to Zot, then creates the Application at that image.
+          c=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/applications" \
+            --data-urlencode "name=$app" --data-urlencode "source=repo" \
+            --data-urlencode "repo=cloudbox/platform" --data-urlencode "branch=main" \
+            --data-urlencode "path=lab/07-ci/app" \
+            --data-urlencode "database=1" --data-urlencode "bucket=1" 2>/dev/null || true)
+          echo "POST /applications (source=repo) → HTTP $c"; [ "$c" = 200 ] || { echo "❌ deploy-from-source POST errored (HTTP $c)"; exit 1; }
+          # Build half: a build-app-srcapp-* Workflow appears in `builds` and Succeeds.
+          wf=""
+          for _ in $(seq 1 30); do
+            wf=$(kubectl -n builds get wf -o name 2>/dev/null | grep "build-app-${app}-" | head -1 || true)
+            [ -n "$wf" ] && break; sleep 5
+          done
+          [ -n "$wf" ] || { echo "❌ no build-app-${app}-* Workflow (RBAC missing, or source not parsed?)"; kubectl -n builds get wf; exit 1; }
+          kubectl -n builds wait --for=jsonpath='{.status.phase}'=Succeeded "$wf" --timeout=300s \
+            || { echo "❌ app build did not Succeed"; kubectl -n builds get "$wf" -o yaml | tail -40; exit 1; }
+          echo "✅ built the app from source (${wf##*/})"
+          # The Application XR was created pointing at the built (node-side) image.
+          img=$(kubectl -n demo get applications.platform.cloudbox.io "$app" -o jsonpath='{.spec.image}' 2>/dev/null || true)
+          [ "$img" = "localhost:30500/app-${app}:v1" ] || { echo "❌ Application image = '$img', want the built node-side image"; exit 1; }
+          # Deploy half: the composed workload runs the freshly built image.
+          kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=240s \
+            || { echo "❌ composed ksvc ${app} not Ready (image pull / build handoff?)"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
+          echo "✅ deploy-from-source: Gitea repo → build → Application, and the built image runs (ksvc ${app} Ready)"
+          # Cleanup (cascades the composed ksvc/DB/bucket).
+          curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
+          { echo ""; echo "### Deploy-from-source (PRD-0012) — Gitea repo → build → Application (workload+DB+bucket), from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |

@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 )
 
 const (
@@ -138,4 +139,53 @@ func (k *Client) DeleteApplication(ctx context.Context, ns, name string) error {
 		return fmt.Errorf("invalid name %q", name)
 	}
 	return k.do(ctx, http.MethodDelete, appPath(ns)+"/"+name, nil, nil)
+}
+
+// ---------------------------------------- deploy from source (app-team CI/CD)
+
+// giteaBase is the in-cluster Gitea host — the ONLY source the platform builds
+// from. The offline rule (no github.com) is also the anti-SSRF boundary: the
+// app team pushes their code to Gitea, then deploys it; the portal never builds
+// an arbitrary URL.
+const giteaBase = "http://gitea-http.gitea.svc.cluster.local:3000"
+
+// orgRepoRe validates a "<org>/<repo>" reference as two path segments that each
+// start with an alphanumeric/underscore/hyphen — so "." and ".." (path
+// traversal) and empty segments can't escape the Gitea host into another URL.
+var orgRepoRe = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9._-]*/[A-Za-z0-9_-][A-Za-z0-9._-]*$`)
+
+// GiteaRepoURL builds the clone URL for an in-cluster Gitea repo from
+// "<org>/<repo>" (the form the developer pushed their code to).
+func GiteaRepoURL(orgRepo string) (string, error) {
+	if !orgRepoRe.MatchString(orgRepo) {
+		return "", fmt.Errorf("repo must be <org>/<repo> in the in-cluster Gitea, got %q", orgRepo)
+	}
+	return giteaBase + "/" + orgRepo + ".git", nil
+}
+
+// appSourceImage is the built-application image reference. The app- prefix keeps
+// source-built app images distinct from fn- function images and hand-deployed
+// workloads.
+func appSourceImage(host, name string) string {
+	return fmt.Sprintf("%s/app-%s:v1", host, name)
+}
+
+// AppSourcePullImage is the image an Application built from source should point
+// its workload at — the node-side pull host (localhost:30500 is in Knative's
+// tag-resolution skip list, so the ksvc is admitted before the build finishes
+// and converges once the image lands).
+func AppSourcePullImage(name string) string { return appSourceImage(fnPullHost, name) }
+
+// CreateAppBuildWorkflow submits the build that produces an Application's image
+// from a Gitea repo. It pushes to Zot over cluster DNS; the composed workload
+// pulls the same artifact back via the node host (AppSourcePullImage).
+func (k *Client) CreateAppBuildWorkflow(ctx context.Context, name, repo, branch, path string) error {
+	if !ValidName(name) {
+		return fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
+	}
+	body, err := buildWorkflow("build-app-"+name+"-", repo, branch, path, appSourceImage(fnPushHost, name))
+	if err != nil {
+		return err
+	}
+	return k.do(ctx, http.MethodPost, workflowsPath, bytes.NewReader(body), nil)
 }

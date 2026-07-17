@@ -92,15 +92,42 @@ func handleApplicationsList(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleCreateApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	ns := s.activeProject(r)
-	fl := flash{Msg: "Deploying " + name + " — Crossplane is composing the workload, its database and bucket. Watch it turn Ready below."}
-	if err := s.Kube.CreateApplication(r.Context(), ns, name, parseAppOpts(r)); err != nil {
-		fl = errorFlash("Deploy failed: " + err.Error())
-	}
+	fl := deployApplication(s, r, ns, name, parseAppOpts(r))
 	data, err := fetchApplications(r.Context(), s, ns, fl)
 	if err != nil {
 		data = applicationsData{Flash: errorFlash("API error: " + err.Error())}
 	}
 	s.render(w, "app-list", data)
+}
+
+// deployApplication handles both sources: a prebuilt container image, or — the
+// app-team golden path — a Gitea repo the platform builds first (build → push
+// to Zot → deploy the Application at the built image). Build first (nothing to
+// run without an image), then the XR, which composes the workload + database +
+// bucket and converges from ImagePullBackOff once the build lands.
+func deployApplication(s *Server, r *http.Request, ns, name string, opts kube.AppOpts) flash {
+	if r.FormValue("source") == "repo" {
+		repoURL, err := kube.GiteaRepoURL(r.FormValue("repo"))
+		if err != nil {
+			return errorFlash(err.Error())
+		}
+		path := r.FormValue("path")
+		if path == "" {
+			path = "."
+		}
+		if err := s.Kube.CreateAppBuildWorkflow(r.Context(), name, repoURL, r.FormValue("branch"), path); err != nil {
+			return errorFlash("Couldn't start the build: " + err.Error())
+		}
+		opts.Image = kube.AppSourcePullImage(name)
+		if err := s.Kube.CreateApplication(r.Context(), ns, name, opts); err != nil {
+			return errorFlash("Build started, but deploying the app failed: " + err.Error())
+		}
+		return flash{Msg: "Building app-" + name + " from your repo and deploying it — workload + database + bucket. Watch the build on the Builds page; the row turns Ready once the image lands (~1 min)."}
+	}
+	if err := s.Kube.CreateApplication(r.Context(), ns, name, opts); err != nil {
+		return errorFlash("Deploy failed: " + err.Error())
+	}
+	return flash{Msg: "Deploying " + name + " — Crossplane is composing the workload, its database and bucket. Watch it turn Ready below."}
 }
 
 func handleDeleteApplication(s *Server, w http.ResponseWriter, r *http.Request) {
