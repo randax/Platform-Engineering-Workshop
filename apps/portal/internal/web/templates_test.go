@@ -130,7 +130,7 @@ func TestTemplatesRender(t *testing.T) {
 		"services": {
 			data: functionsData{
 				Rows: []serviceRow{
-					{KnativeService: kube.KnativeService{Metadata: kube.ObjMeta{Name: "fn-hello", Namespace: "demo"}}, Spark: metrics.Sparkline([]float64{0, 1, 2, 1}, "request rate"), Grafana: "http://grafana/explore?x"},
+					{KnativeService: kube.KnativeService{Metadata: kube.ObjMeta{Name: "fn-hello", Namespace: "demo"}}, Deletable: true, Spark: metrics.Sparkline([]float64{0, 1, 2, 1}, "request rate"), Grafana: "http://grafana/explore?x"},
 					{}, // uninstrumented service: no metrics
 				},
 				Samples: fnSamples,

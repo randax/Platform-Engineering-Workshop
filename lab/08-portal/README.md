@@ -244,6 +244,20 @@ git instead?
   ```
   Deploy `my-app`, watch it turn Ready, and open its `*.sslip.io` URL — the apex of the
   self-service arc, from a form.
+- **Create projects from the console (grant via git; act via console).** The top-bar
+  **Project** selector maps 1:1 to Kubernetes namespaces; "New project" provisions a
+  namespace *and* binds the portal's tenant grant into it, so the databases/functions/apps
+  you create there land in that project. This is the platform pattern in miniature: you hand
+  the portal a **tightly scoped** project-creation grant via git (namespaces + rolebindings +
+  `bind` on exactly `portal-tenant` — the RBAC escalation guard), and it does the
+  console-direct create. It still can't grant itself anything broader.
+  ```bash
+  cp "$WORKSHOP/lab/08-portal/portal-projects-access.yaml" gitops/components/demo/
+  git add . && git commit -m "grant portal: create projects (scoped)" && git push
+  ```
+  Then create `team-a` from the selector, switch to it, and provision a database — note it
+  lands in the `team-a` namespace, not `demo`. (See [DR-0004](../../docs/prd/0004-console-write-model.md)
+  for why project *creation* is console-direct rather than a git round-trip.)
 - **Add a column.** Show each CNPG cluster's `instances` count on the Databases page
   (`resources.go` + `databases.html` — it's one field and one `<td>`).
 - **Add a page.** The portal already has RBAC to list pods. A "Pods" page is ~30 lines

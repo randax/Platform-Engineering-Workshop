@@ -85,6 +85,12 @@ func main() {
 	})
 	// Infrastructure-level routes (no nav entry), alongside /healthz.
 	mux.HandleFunc("GET /teapot", bind(srv, web.Teapot))
+	// Projects (PRD-0011): global chrome, not registry pages — the top-bar
+	// selector fragment + switch/create/delete.
+	mux.HandleFunc("GET /project/bar", bind(srv, web.HandleProjectBar))
+	mux.HandleFunc("GET /project", bind(srv, web.HandleProjectSwitch))
+	mux.HandleFunc("POST /projects", bind(srv, web.HandleCreateProject))
+	mux.HandleFunc("DELETE /projects/{name}", bind(srv, web.HandleDeleteProject))
 	// Catch-all: any GET the registry didn't claim renders the 404 page.
 	// Less specific than "/{$}" and every "GET /page", so it only fires last.
 	mux.HandleFunc("GET /", bind(srv, web.NotFound))

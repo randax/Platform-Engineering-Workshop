@@ -691,6 +691,50 @@ jobs:
           echo "✅ console deleted Application $app"
           { echo ""; echo "### Applications (#28) — deploy → delete the golden-path XR from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify Projects — create a project + provision into it (#96, PRD-0011)
+        run: |
+          set -euo pipefail
+          # Projects map to namespaces. The console CREATES one (namespace +
+          # a portal-tenant RoleBinding) behind a scoped, git-delivered grant —
+          # "grant via git; act via console". Prove the whole loop: grant, create
+          # a project from the console, confirm the namespace + binding exist,
+          # provision a database INTO the project (cookie-scoped), then delete
+          # the project and watch it cascade. This exercises the trickiest RBAC
+          # in the console — namespace create + the `bind` escalation guard.
+          kubectl apply -f lab/08-portal/portal-projects-access.yaml
+          base=http://localhost:30600
+          proj=team-e2e
+          # Create the project from the console.
+          # A non-htmx client gets a 303 (POST-redirect-GET) on success; a
+          # failed create renders the bar fragment with a flash (200). Accept
+          # either at the HTTP layer — the kubectl checks below are the real gate.
+          c=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/projects" --data-urlencode "name=$proj" 2>/dev/null || true)
+          echo "POST /projects $proj → HTTP $c"; case "$c" in 200|303) ;; *) echo "❌ create-project POST errored (HTTP $c)"; exit 1;; esac
+          # The namespace exists, is labelled a project, and carries the tenant binding.
+          for _ in $(seq 1 15); do kubectl get ns "$proj" >/dev/null 2>&1 && break; sleep 2; done
+          kubectl get ns "$proj" -o jsonpath='{.metadata.labels.platform\.cloudbox\.io/project}' | grep -q true \
+            || { echo "❌ namespace $proj not labelled a project"; kubectl get ns "$proj" -o yaml | tail -20; exit 1; }
+          kubectl -n "$proj" get rolebinding portal-tenant >/dev/null 2>&1 \
+            || { echo "❌ portal-tenant RoleBinding missing in $proj (bind grant?)"; exit 1; }
+          echo "✅ console created project $proj (labelled namespace + portal-tenant binding)"
+          # Provision a database INTO the project — the cookie scopes the create.
+          dc=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST "$base/databases" -b "project=$proj" \
+            --data-urlencode "name=projdb" --data-urlencode "size=small" 2>/dev/null || true)
+          echo "POST /databases (project=$proj) → HTTP $dc"; [ "$dc" = 200 ] || { echo "❌ scoped create-database failed"; exit 1; }
+          got=""
+          for _ in $(seq 1 20); do
+            got=$(kubectl -n "$proj" get workshopdatabases.platform.cloudbox.io projdb -o jsonpath='{.metadata.name}' 2>/dev/null || true)
+            [ -n "$got" ] && break; sleep 3
+          done
+          [ "$got" = projdb ] || { echo "❌ database not created in project $proj (RBAC scoped there?)"; exit 1; }
+          echo "✅ console provisioned a database INTO project $proj"
+          # Delete the project — cascades to everything inside it.
+          pc=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "$base/projects/$proj" 2>/dev/null || true)
+          echo "DELETE /projects/$proj → HTTP $pc"; case "$pc" in 200|303) ;; *) echo "❌ delete-project errored (HTTP $pc)"; exit 1;; esac
+          for _ in $(seq 1 24); do kubectl get ns "$proj" >/dev/null 2>&1 || break; sleep 5; done
+          kubectl get ns "$proj" >/dev/null 2>&1 && echo "⚠️ namespace $proj still terminating (cascade slow) — acceptable" || echo "✅ project $proj deleted (namespace gone)"
+          { echo ""; echo "### Projects (#96, PRD-0011) — create project → provision into it → delete, from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |

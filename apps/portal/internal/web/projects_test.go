@@ -1,7 +1,9 @@
 package web
 
 import (
+	"bytes"
 	"net/http"
+	"strings"
 	"testing"
 
 	"cloudbox.io/portal/internal/kube"
@@ -30,5 +32,36 @@ func TestActiveProject(t *testing.T) {
 	bad.AddCookie(&http.Cookie{Name: "project", Value: "../evil"})
 	if got := s.activeProject(bad); got != kube.XRNamespace {
 		t.Errorf("invalid cookie must fall back to default, got %q", got)
+	}
+}
+
+// The project-bar fragment renders the switcher: the active project, a switch
+// link + delete per non-default project, no delete on the default, and the
+// New-project affordance.
+func TestProjectBarRender(t *testing.T) {
+	tmpl, err := ParseTemplates(&Server{})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	var buf bytes.Buffer
+	data := projectBarData{Active: "team-a", Default: "demo", Projects: []string{"demo", "team-a"}}
+	if err := tmpl.ExecuteTemplate(&buf, "project-bar", data); err != nil {
+		t.Fatalf("render project-bar: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		`href="/project?set=demo"`,     // switch to the default
+		`href="/project?set=team-a"`,   // switch to team-a
+		`hx-delete="/projects/team-a"`, // delete a non-default project
+		`hx-post="/projects"`,          // the create form
+		`for="proj-modal"`,             // the New-project trigger
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("project-bar missing %q", want)
+		}
+	}
+	// The default project must NOT be deletable.
+	if strings.Contains(out, `hx-delete="/projects/demo"`) {
+		t.Error("the default project must not offer delete")
 	}
 }

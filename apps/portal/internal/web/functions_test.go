@@ -19,7 +19,7 @@ func TestFunctionsPageRender(t *testing.T) {
 
 	data := functionsData{
 		Rows: []serviceRow{
-			{KnativeService: kube.KnativeService{Metadata: kube.ObjMeta{Name: "fn-hello", Namespace: "demo"}}},
+			{KnativeService: kube.KnativeService{Metadata: kube.ObjMeta{Name: "fn-hello", Namespace: "demo"}}, Deletable: true},
 			{KnativeService: kube.KnativeService{Metadata: kube.ObjMeta{Name: "uploader", Namespace: "pipeline"}}},
 		},
 		Samples: fnSamples,

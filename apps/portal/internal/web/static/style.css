@@ -297,6 +297,27 @@ button.danger:hover { background: color-mix(in srgb, var(--bad) 85%, black); }
 label.check { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-weight: 450; margin: 0.6rem 0 0.2rem; color: var(--fg); }
 label.check input { width: auto; }
 label.check small { color: var(--muted); }
+/* ---- top-bar project selector (PRD-0011) ---- */
+.topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+.topbar-inner { display: flex; align-items: center; gap: 0.6rem; max-width: 64rem; margin: 0 auto; padding: 0.5rem 1.75rem; }
+.topbar-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.proj-dropdown { position: relative; }
+.proj-dropdown > summary { list-style: none; cursor: pointer; font-weight: 600; padding: 0.22rem 0.7rem; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface-2); }
+.proj-dropdown > summary::-webkit-details-marker { display: none; }
+.proj-dropdown > summary::after { content: " ▾"; color: var(--muted); }
+.proj-menu {
+  position: absolute; top: 100%; left: 0; margin-top: 0.3rem; min-width: 200px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md); padding: 0.3rem; z-index: 30;
+}
+.proj-row { display: flex; align-items: center; }
+.proj-item { flex: 1; display: block; padding: 0.32rem 0.55rem; border-radius: var(--r-sm); color: var(--ink); text-decoration: none; font-size: 0.9rem; }
+.proj-item:hover { background: var(--surface-2); }
+.proj-item.active { color: var(--accent); font-weight: 600; }
+.proj-del { background: none; color: var(--muted); padding: 0.1rem 0.45rem; font-size: 1rem; line-height: 1; }
+.proj-del:hover { background: var(--bad-bg); color: var(--bad); }
+.proj-new { color: var(--accent); cursor: pointer; border-top: 1px solid var(--line); margin-top: 0.25rem; padding-top: 0.45rem; }
+
 /* Two inputs side by side in a modal (e.g. min/max scale). */
 .two-col { display: flex; gap: 0.8rem; }
 .two-col > label { flex: 1; }
