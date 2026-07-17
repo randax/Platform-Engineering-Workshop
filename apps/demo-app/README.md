@@ -15,6 +15,11 @@ Applications → **New application** → **Source: Build from a repo** →
 The platform builds it in-cluster (Argo + BuildKit → Zot) and composes the
 workload + Postgres + bucket. Then change the code, push, and hit **Redeploy**.
 
+Or start fresh: **Source: Start from a template** → the console forks this repo
+into a new `cloudbox/<name>` of your own (Gitea's generate API), then builds and
+deploys it — clone your new repo and iterate from there. This repo is marked a
+Gitea *template* so it can be the source of that fork.
+
 ## Build
 Multi-stage: a golang builder compiles a static binary; the runtime is
 `scratch` + a CA bundle. Go deps are **vendored**, so the build needs no module

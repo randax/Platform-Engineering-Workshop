@@ -46,6 +46,12 @@ The GitOps-vs-console-write *contrast* remains a **module 08 "going deeper" teac
 
 ## Implications
 
-- **Console:** tenant create/update/delete stay direct-to-API (as they already are). No console→Gitea write path is built.
+- **Console:** tenant create/update/delete stay direct-to-API (as they already are).
 - **PRD-0011 (projects):** revised to console-direct create behind a scoped, git-delivered `ClusterRole` grant (was: Gitea-API-backed). See the issue.
 - **Slides/docs:** state the two-plane model explicitly (module 08); it is already *true today* (database/function creates are console-direct).
+
+## Amendment — the scaffold bridge (PRD-0012)
+
+The one **deliberate exception** to "no console→Gitea write path": the New-application form can *start an app from a template* (`source=template`). The console calls Gitea's generate API to fork the sample into a fresh tenant repo (`cloudbox/<name>`), then builds and deploys that repo through the normal deploy-from-source path.
+
+This is consistent with the model, not a hole in it, because scaffolding a repo is **a one-time bootstrap of the developer's *own* space** — not a change to the *platform* (no capability install, no RBAC, no cluster infra). The DR-0004 boundary is about *who mutates the platform* (git, auditable, operator-driven); a tenant creating their own app repo is squarely on the self-service side. It stays a scoped, low-blast-radius write: the portal authenticates with the fixed lab `gitea_admin` creds (wired in `portal.yaml`, like the S3 creds), creates only public repos under the `cloudbox` org, and validates the name/template up front (the same anti-SSRF guard as `GiteaRepoURL`). If the portal has no Gitea creds, the option simply isn't offered. Once created, the repo is the developer's to push to — the console does not keep writing to it (the iterate loop is *build → Redeploy*, never a console commit).

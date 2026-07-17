@@ -51,8 +51,9 @@ type appRow struct {
 }
 
 type applicationsData struct {
-	Apps  []appRow
-	Flash flash
+	Apps            []appRow
+	Flash           flash
+	ScaffoldEnabled bool // portal has Gitea creds → offer "start from a template"
 }
 
 func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (applicationsData, error) {
@@ -70,7 +71,7 @@ func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (app
 		}
 		rows = append(rows, row)
 	}
-	return applicationsData{Apps: rows, Flash: fl}, nil
+	return applicationsData{Apps: rows, Flash: fl, ScaffoldEnabled: kube.GiteaConfigured()}, nil
 }
 
 func handleApplications(s *Server, w http.ResponseWriter, r *http.Request) {
@@ -104,37 +105,63 @@ func handleCreateApplication(s *Server, w http.ResponseWriter, r *http.Request) 
 	s.render(w, "app-list", data)
 }
 
-// deployApplication handles both sources: a prebuilt container image, or — the
-// app-team golden path — a Gitea repo the platform builds first (build → push
-// to Zot → deploy the Application at the built image). Build first (nothing to
-// run without an image), then the XR, which composes the workload + database +
-// bucket and converges from ImagePullBackOff once the build lands.
+// deployApplication handles all three sources: a prebuilt container image; a
+// Gitea repo the platform builds first (the app-team golden path); or a template
+// the console scaffolds into a fresh repo and THEN builds (scaffold bridge,
+// PRD-0012). Source-built paths build first (nothing to run without an image),
+// then create the XR, which composes the workload + database + bucket and
+// converges from ImagePullBackOff once the build lands.
 func deployApplication(s *Server, r *http.Request, ns, name string, opts kube.AppOpts) flash {
-	if r.FormValue("source") == "repo" {
-		repoURL, err := kube.GiteaRepoURL(r.FormValue("repo"))
+	switch r.FormValue("source") {
+	case "template":
+		// "Console creates the repo": scaffold GiteaOrg/<name> from the template,
+		// then deploy from source off the new repo's main branch.
+		tmpl := r.FormValue("template")
+		if tmpl == "" {
+			tmpl = kube.DefaultTemplate
+		}
+		repoRef, err := s.Kube.ScaffoldRepo(r.Context(), tmpl, name)
 		if err != nil {
-			return errorFlash(err.Error())
+			return errorFlash("Couldn't create the repo from the template: " + err.Error())
 		}
-		path := r.FormValue("path")
-		if path == "" {
-			path = "."
+		fl := buildFromRepo(s, r, ns, name, opts, repoRef, "main", ".")
+		if !fl.Error {
+			fl.Msg = "Scaffolded " + repoRef + " from " + tmpl + ". " + fl.Msg
 		}
-		branch := r.FormValue("branch")
-		tag := newBuildTag()
-		if err := s.Kube.CreateAppBuildWorkflow(r.Context(), name, repoURL, branch, path, tag); err != nil {
-			return errorFlash("Couldn't start the build: " + err.Error())
-		}
-		opts.Image = kube.AppSourcePullImage(name, tag)
-		opts.Source = &kube.AppSource{Repo: repoURL, Branch: branch, Path: path}
-		if err := s.Kube.CreateApplication(r.Context(), ns, name, opts); err != nil {
-			return errorFlash("Build started, but deploying the app failed: " + err.Error())
-		}
-		return flash{Msg: "Building app-" + name + " from your repo and deploying it — workload + database + bucket. Watch the build on the Builds page; the row turns Ready once the image lands (~1 min)."}
+		return fl
+	case "repo":
+		return buildFromRepo(s, r, ns, name, opts, r.FormValue("repo"), r.FormValue("branch"), r.FormValue("path"))
 	}
 	if err := s.Kube.CreateApplication(r.Context(), ns, name, opts); err != nil {
 		return errorFlash("Deploy failed: " + err.Error())
 	}
 	return flash{Msg: "Deploying " + name + " — Crossplane is composing the workload, its database and bucket. Watch it turn Ready below."}
+}
+
+// buildFromRepo is the deploy-from-source path shared by the "repo" and
+// "template" sources: build the image from the Gitea repo (<org>/<repo>), then
+// create the Application at that image with the source recorded for Redeploy.
+func buildFromRepo(s *Server, r *http.Request, ns, name string, opts kube.AppOpts, repoRef, branch, path string) flash {
+	repoURL, err := kube.GiteaRepoURL(repoRef)
+	if err != nil {
+		return errorFlash(err.Error())
+	}
+	if path == "" {
+		path = "."
+	}
+	if branch == "" {
+		branch = "main"
+	}
+	tag := newBuildTag()
+	if err := s.Kube.CreateAppBuildWorkflow(r.Context(), name, repoURL, branch, path, tag); err != nil {
+		return errorFlash("Couldn't start the build: " + err.Error())
+	}
+	opts.Image = kube.AppSourcePullImage(name, tag)
+	opts.Source = &kube.AppSource{Repo: repoURL, Branch: branch, Path: path}
+	if err := s.Kube.CreateApplication(r.Context(), ns, name, opts); err != nil {
+		return errorFlash("Build started, but deploying the app failed: " + err.Error())
+	}
+	return flash{Msg: "Building app-" + name + " from " + repoRef + " and deploying it — workload + database + bucket. Watch the build on the Builds page; the row turns Ready once the image lands (~1 min)."}
 }
 
 // newBuildTag is a unique image tag per build — so a rebuild pushes a NEW tag,
