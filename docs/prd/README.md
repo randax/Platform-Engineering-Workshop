@@ -60,3 +60,13 @@ already teaches. NATS (PRD-0001) is built first and then absorbed as `spec.queue
 It's woven across the platform, the console ("New Application" form + templates),
 and the slides, and it's dogfooded by redeploying the picture-pipeline capstone as
 `Application`s. This is the apex of the self-service arc, not a side stretch.
+
+## Decision records
+
+Settled architectural choices (not proposals) live here as `DR-NNNN`:
+
+- [DR-0004 — The platform's write model: two planes](0004-console-write-model.md) —
+  **git changes the platform; the console uses the platform; `kubectl` inspects both.**
+  Tenant self-service is console-direct (k8s API); the platform layer is GitOps; the
+  console-as-git-frontend option was evaluated and rejected for this workshop. Governs
+  PRD-0011 (projects) and every console create/update/delete.
