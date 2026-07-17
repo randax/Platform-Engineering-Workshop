@@ -207,7 +207,7 @@ func sampleApplications() applicationsData {
 	return applicationsData{Apps: []appRow{
 		src,
 		mk("api", "ghcr.io/acme/api:v2", 1, 5, false),
-	}}
+	}, ScaffoldEnabled: true}
 }
 
 // sampleComponents mocks the Components list so the screenshot shows the new
