@@ -261,6 +261,24 @@ button:focus-visible { outline: none; box-shadow: var(--ring); }
 button.danger { background: var(--bad); padding: 0.28rem 0.7rem; font-size: 0.85rem; }
 button.danger:hover { background: color-mix(in srgb, var(--bad) 85%, black); }
 
+/* Functions page: per-row actions (Invoke / traces / Delete) sit inline and
+   compact so a row of buttons doesn't tower over the table. */
+td.actions { white-space: nowrap; }
+td.actions > * { vertical-align: middle; }
+td.actions button { padding: 0.28rem 0.7rem; font-size: 0.85rem; margin-right: 0.5rem; }
+td.actions a { margin-right: 0.5rem; }
+/* the server-side invoke "Test" panel */
+.invoke-out { margin: 1.1rem 0 1.6rem; }
+.invoke-out h3 { margin: 0 0 0.45rem; font-size: 0.95rem; }
+.invoke-out pre {
+  margin: 0.5rem 0 0; padding: 0.7rem 0.9rem;
+  background: var(--code-bg); color: var(--code-fg);
+  border: 1px solid color-mix(in srgb, #ffffff 6%, var(--code-bg));
+  border-radius: var(--r-sm); overflow-x: auto; max-height: 13rem;
+  font: 0.82rem/1.5 ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  white-space: pre-wrap; word-break: break-word;
+}
+
 /* ---- flashes / hints / errors ---- */
 .flash {
   padding: 0.55rem 0.85rem;

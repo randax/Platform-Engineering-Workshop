@@ -123,3 +123,14 @@ func (k *Client) CreateFunctionService(ctx context.Context, name string) error {
 	}
 	return k.do(ctx, http.MethodPost, ksvcPath, bytes.NewReader(body), nil)
 }
+
+// DeleteKnativeService removes a Knative Service by name from the demo
+// namespace — the one the portal-functions-serve Role grants delete on. The
+// Functions page only offers Delete for demo-namespace services for exactly
+// this reason (capstone ksvcs in `pipeline` are shown read-only).
+func (k *Client) DeleteKnativeService(ctx context.Context, name string) error {
+	if !ValidName(name) {
+		return fmt.Errorf("invalid name %q", name)
+	}
+	return k.do(ctx, http.MethodDelete, ksvcPath+"/"+name, nil, nil)
+}

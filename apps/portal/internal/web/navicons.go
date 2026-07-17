@@ -19,13 +19,11 @@ var navIcons = map[string]template.HTML{
 	"activity":   template.HTML(navIcoOpen + `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`),
 	"billing":    template.HTML(navIcoOpen + `<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`),
 	"builds":     template.HTML(navIcoOpen + `<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`),
-	// Self-service
+	// Services
 	"databases": template.HTML(navIcoOpen + `<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`),
-	// "New Function" — a lightning bolt inside a rounded square: the serverless
-	// "function" glyph, boxed to read as a create action.
-	"functions/new": template.HTML(navIcoOpen + `<rect x="3" y="3" width="18" height="18" rx="2"/><polygon points="13 7 9 13 12 13 11 17 15 11 12 11 13 7"/></svg>`),
-	"buckets":       template.HTML(navIcoOpen + `<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`),
-	"services":      template.HTML(navIcoOpen + `<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`),
+	"buckets":   template.HTML(navIcoOpen + `<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`),
+	// Functions — a lightning bolt (Feather "zap"): the serverless glyph.
+	"services": template.HTML(navIcoOpen + `<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`),
 	// Capstone
 	"gallery": template.HTML(navIcoOpen + `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`),
 }
