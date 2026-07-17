@@ -28,7 +28,7 @@ flowchart LR
 - Git → build → push → deploy: all in-cluster
 
 <div class="mt-6 text-sm opacity-75">
-☁️ <strong>Cloud parallel:</strong> CodeBuild + ECR · Cloud Build + Artifact Registry — the whole build-and-ship pipeline, running inside your own cluster with zero external services.
+<span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> CodeBuild + ECR · Cloud Build + Artifact Registry — the whole build-and-ship pipeline, running inside your own cluster with zero external services.
 </div>
 
 <!--

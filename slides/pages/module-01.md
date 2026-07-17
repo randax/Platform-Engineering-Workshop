@@ -27,7 +27,7 @@ flowchart LR
 ```
 
 <div class="mt-6 text-sm opacity-75">
-☁️ <strong>Cloud parallel:</strong> EKS · AKS · GKE hand you a cluster and hide this layer — today you own the OS and the network underneath it.
+<span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> EKS · AKS · GKE hand you a cluster and hide this layer — today you own the OS and the network underneath it.
 </div>
 
 <!--

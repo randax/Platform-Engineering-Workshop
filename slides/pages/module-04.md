@@ -38,7 +38,7 @@ Lab flow: enable crossplane.yaml from the catalog, ship the two halves of the pl
 
 ---
 
-# ⚠️ Your training data is stale
+# <span class="svgi i-triangle-alert"></span> Your training data is stale
 
 - This is Crossplane **v2** (2025)
 - Claims are **gone** — namespaced XRs instead

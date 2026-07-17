@@ -29,7 +29,7 @@ flowchart LR
 - Your git server runs **inside** the cluster
 
 <div class="mt-6 text-sm opacity-75">
-☁️ <strong>Cloud parallel:</strong> no product to buy — where a hyperscaler gives you a console + CLI, GitOps makes git the single control plane (the same Argo/Flux that runs on managed clusters).
+<span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> no product to buy — where a hyperscaler gives you a console + CLI, GitOps makes git the single control plane (the same Argo/Flux that runs on managed clusters).
 </div>
 
 <!--

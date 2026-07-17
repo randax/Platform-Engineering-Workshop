@@ -30,7 +30,7 @@ Shown → a component's live <strong>Monitoring</strong> page: per-component met
 </div>
 
 <div class="mt-4 text-sm opacity-75">
-☁️ <strong>Cloud parallel:</strong> the AWS · Azure · GCP Console — except this one is ~730 lines you can read end to end, not a product you log into.
+<span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> the AWS · Azure · GCP Console — except this one is ~730 lines you can read end to end, not a product you log into.
 </div>
 
 <!--
