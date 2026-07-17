@@ -32,7 +32,7 @@ type Page struct {
 	// would shuffle the nav on every restart, and init() order across files
 	// is just "alphabetical by filename", which is not a design.
 	Weight     int
-	NavSection string // sidebar group: Platform | Self-service | Capstone
+	NavSection string // sidebar group: Platform | Services | Capstone
 	NavTitle   string
 	Path       string // href and GET route ("/" is the overview)
 	Handler    HandlerFunc

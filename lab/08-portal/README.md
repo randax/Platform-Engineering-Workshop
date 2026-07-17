@@ -220,7 +220,7 @@ git instead?
 <p align="center"><em>The <strong>New Function</strong> page (a "Going deeper" capability): one form that builds your source in-cluster and deploys it as a scale-to-zero function — modules 06 + 07, tied together.</em></p>
 
 - **Deploy a function from the console (the Lambda moment).** The **New Function** page
-  (Self-service) ties modules 06 + 07 together: pick a source, name it, and the console
+  (in the **Services** nav section) ties modules 06 + 07 together: pick a source, name it, and the console
   submits an Argo `Workflow` that builds your image (BuildKit → Zot) *and* a Knative
   `Service` that runs it — one form, a scale-to-zero URL, no CLI. It stays locked until
   both `argo-workflows` and `knative-serving` are Healthy, and the two creates need one

@@ -14,9 +14,9 @@ import (
 
 func init() {
 	register(Page{
-		Weight:     70,
-		NavSection: "Self-service",
-		NavTitle:   "Services",
+		Weight:     64,
+		NavSection: "Services",
+		NavTitle:   "Functions",
 		Path:       "/services",
 		Handler:    handleServices,
 		// Serverless (module 06): nothing to list until Knative Serving is

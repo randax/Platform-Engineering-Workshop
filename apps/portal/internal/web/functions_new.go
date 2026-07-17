@@ -16,10 +16,10 @@ import (
 
 func init() {
 	register(Page{
-		// Weight 65: Self-service, between Databases (60) and Services (70) —
-		// the function you create lands on the Services page right below.
-		Weight:     65,
-		NavSection: "Self-service",
+		// Weight 66 sits right after Functions (64) — the function you create
+		// lands on the Functions page just above.
+		Weight:     66,
+		NavSection: "Services",
 		NavTitle:   "New Function",
 		Path:       "/functions/new",
 		Handler:    handleNewFunction,

@@ -54,7 +54,7 @@ func TestTemplatesRender(t *testing.T) {
 			want: []string{
 				`aria-current="page"`,
 				// the sidebar's grouped sections
-				`>Platform</span>`, `>Self-service</span>`, `>Capstone</span>`,
+				`>Platform</span>`, `>Services</span>`, `>Capstone</span>`,
 				`href="/components"`, `href="/workshop"`,
 				`href="/activity"`, `href="/billing"`,
 				`Grafana →`, // rail footer deep link
