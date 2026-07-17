@@ -25,9 +25,10 @@ func findNavItem(groups []navGroup, key string) (navItem, bool) {
 func TestNavUnlock(t *testing.T) {
 	// The gated pages and the ArgoCD Application whose health unlocks each.
 	gated := map[string]string{
-		"services":  "knative-serving",  // module 06
-		"databases": "crossplane",       // module 04
-		"gallery":   "picture-pipeline", // module 09
+		"services":     "knative-serving",  // module 06
+		"databases":    "crossplane",       // module 04
+		"applications": "application-xr",   // golden path (PRD-0003)
+		"gallery":      "picture-pipeline", // module 09
 	}
 	// Pages with no Unlock predicate — these must be reachable from a bare
 	// cluster, or a workshop attendee could never get started.

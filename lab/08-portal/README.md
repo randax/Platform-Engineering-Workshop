@@ -233,6 +233,17 @@ git instead?
   same **Functions** page once the image lands (~1 min). Hit **Invoke** to wake it from zero
   and see the response; **Delete** removes it. Until the grant is synced the create surfaces a
   friendly *forbidden* flash — the portal can't grant itself anything.
+- **Deploy the golden path from the console.** The **Applications** page turns the module-04
+  golden-path `Application` XR into a form: name, image, scale, env, and the database/bucket
+  toggles — one POST composes a workload **plus** its Postgres database **plus** its S3 bucket,
+  wired together. It unlocks once `application-xr` is enabled, and (same "hand the portal its
+  keys" pattern) needs one scoped grant:
+  ```bash
+  cp "$WORKSHOP/lab/08-portal/portal-applications-access.yaml" gitops/components/demo/
+  git add . && git commit -m "grant portal: create Applications" && git push
+  ```
+  Deploy `my-app`, watch it turn Ready, and open its `*.sslip.io` URL — the apex of the
+  self-service arc, from a form.
 - **Add a column.** Show each CNPG cluster's `instances` count on the Databases page
   (`resources.go` + `databases.html` — it's one field and one `<td>`).
 - **Add a page.** The portal already has RBAC to list pods. A "Pods" page is ~30 lines

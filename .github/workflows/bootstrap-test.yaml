@@ -653,6 +653,44 @@ jobs:
           curl -fsS -o /dev/null -X DELETE "$base/databases/$db" 2>/dev/null || true
           { echo ""; echo "### Databases (#27) — create → resize (spec.size patch) from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify Applications page — deploy the golden path from the console (#28)
+        run: |
+          set -euo pipefail
+          # The Applications page creates an Application XR (workload + DB + bucket)
+          # from a form. Grant the portal its applications key, deploy one from the
+          # console, prove the XR appears with the requested image, then delete it.
+          # (Full composition to Ready is the golden-path step's job; here we prove
+          # the console's create/delete path + its RBAC.)
+          kubectl apply -f lab/08-portal/portal-applications-access.yaml
+          base=http://localhost:30600
+          app=e2eapp
+          img=ghcr.io/randax/cloudbox-uploader:v0.1.0
+          c=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST "$base/applications" \
+            --data-urlencode "name=$app" --data-urlencode "image=$img" \
+            --data-urlencode "min=0" --data-urlencode "max=3" \
+            --data-urlencode "database=1" --data-urlencode "bucket=1" 2>/dev/null || true)
+          echo "POST /applications $app → HTTP $c"; [ "$c" = 200 ] || { echo "❌ create-application failed"; exit 1; }
+          # NB: fully-qualified resource — a bare `application` is ambiguous
+          # (argoproj.io AND platform.cloudbox.io both register `applications`),
+          # and kubectl would query the ArgoCD one and find nothing.
+          got=""
+          for _ in $(seq 1 20); do
+            got=$(kubectl -n demo get applications.platform.cloudbox.io "$app" -o jsonpath='{.spec.image}' 2>/dev/null || true)
+            [ -n "$got" ] && break; sleep 3
+          done
+          [ "$got" = "$img" ] || { echo "❌ Application $app not created with image $img (got '$got')"; exit 1; }
+          echo "✅ console created Application $app (image $img)"
+          # Delete via the console, then prove the XR is gone.
+          dc=$(curl -fsS -o /dev/null -w '%{http_code}' -X DELETE "$base/applications/$app" 2>/dev/null || true)
+          echo "DELETE /applications/$app → HTTP $dc"; [ "$dc" = 200 ] || { echo "❌ delete-application failed"; exit 1; }
+          for _ in $(seq 1 12); do
+            kubectl -n demo get applications.platform.cloudbox.io "$app" >/dev/null 2>&1 || break; sleep 5
+          done
+          kubectl -n demo get applications.platform.cloudbox.io "$app" >/dev/null 2>&1 \
+            && { echo "❌ Application $app still present after console delete"; exit 1; } || true
+          echo "✅ console deleted Application $app"
+          { echo ""; echo "### Applications (#28) — deploy → delete the golden-path XR from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |
