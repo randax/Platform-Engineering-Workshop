@@ -96,6 +96,23 @@ Ready to paste:</p>
 </table>
 
 {{if .DB}}
+<h2>Resize</h2>
+<p class="hint">Change the T-shirt size and Crossplane re-composes — storage, HA instances and memory
+all follow the size. <small>Growing is safe; shrinking storage isn't (CNPG won't shrink a PVC), so a
+smaller size keeps the existing disk.</small></p>
+<div id="resize-result"></div>
+<form hx-post="/databases/{{.Name}}/resize" hx-target="#resize-result"
+      hx-confirm="Resize {{.Name}}? Crossplane will re-compose the database.">
+  <label>Size
+    <select name="size">
+      <option value="small"{{if eq .DB.Spec.Size "small"}} selected{{end}}>small — 1 instance · 1Gi</option>
+      <option value="medium"{{if eq .DB.Spec.Size "medium"}} selected{{end}}>medium — 2 instances · 5Gi</option>
+      <option value="large"{{if eq .DB.Spec.Size "large"}} selected{{end}}>large — 3 instances (HA) · 10Gi</option>
+    </select>
+  </label>
+  <button type="submit">Apply size</button>
+</form>
+
 <h2>Danger zone</h2>
 <div id="delete-result"></div>
 <p>

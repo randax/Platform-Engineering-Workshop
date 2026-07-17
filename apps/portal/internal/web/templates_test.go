@@ -168,6 +168,8 @@ func TestTemplatesRender(t *testing.T) {
 				`psql -U app app`, // paste-ready one-liner
 				`evwarn`,          // warning event tinted
 				`Monitoring`, `Connections`, `Database size`, `Explore in Grafana`,
+				// resize: the form + the current size pre-selected
+				`hx-post="/databases/my-db/resize"`, `value="small" selected`, `Apply size`,
 			},
 		},
 		"activity": {

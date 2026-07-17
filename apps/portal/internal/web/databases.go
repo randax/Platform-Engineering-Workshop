@@ -29,6 +29,7 @@ func init() {
 			{"GET /databases/list", handleDatabasesList}, // polled by htmx
 			{"GET /databases/{name}", handleDatabaseDetail},
 			{"POST /databases", handleCreateDatabase},
+			{"POST /databases/{name}/resize", handleResizeDatabase},
 			{"DELETE /databases/{name}", handleDeleteDatabase},
 		},
 	})
@@ -105,4 +106,20 @@ func handleDeleteDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("HX-Redirect", "/databases")
+}
+
+// handleResizeDatabase changes the database's T-shirt size (a merge patch on
+// spec.size) and reloads the detail page so the new size + re-composing
+// conditions show. On failure the error lands in the resize form's result slot,
+// keeping the page put — same pattern as delete.
+func handleResizeDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	size := r.FormValue("size")
+	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), name, size); err != nil {
+		s.render(w, "flash", errorFlash("Resize failed: "+err.Error()))
+		return
+	}
+	// Reload the detail page: Crossplane is re-composing, and the page's live
+	// conditions + size now reflect the new T-shirt.
+	w.Header().Set("HX-Redirect", "/databases/"+name)
 }
