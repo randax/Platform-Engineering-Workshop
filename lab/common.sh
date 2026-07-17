@@ -59,6 +59,14 @@ wait_app() { # <app-name> [timeout-seconds]
       echo "app '$name' is Synced/Healthy"
       return 0
     fi
+    # If the child Application doesn't exist yet, the app-of-apps parent hasn't
+    # rendered it — hard-refresh the parent to nudge child creation. Fixes
+    # intermittent "last: missing" timeouts when ArgoCD is slow to reconcile the
+    # git push under load (only fires while the child is absent).
+    if [ -z "$st" ]; then
+      kubectl -n argocd annotate application platform \
+        argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+    fi
     sleep 10
     waited=$((waited + 10))
   done
