@@ -49,6 +49,10 @@
   <a class="rail-foot" href="{{grafanaURL}}" target="_blank">Grafana →</a>
 </aside>
 <div class="content">
+{{/* The project selector (PRD-0011) — global chrome. htmx-loaded so the
+     fragment sees the request (the `project` cookie); the shared layout stays
+     request-independent. */}}
+<header class="topbar"><div id="project-bar" hx-get="/project/bar" hx-trigger="load"></div></header>
 <main>
 {{end}}
 

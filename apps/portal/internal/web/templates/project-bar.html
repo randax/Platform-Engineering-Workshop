@@ -1,0 +1,45 @@
+{{/* The top-bar project selector — a native <details> dropdown (no JS): switch
+     projects, create one, delete a non-default one. Reloads the page on any
+     change so every project-scoped view re-fetches. */}}
+{{define "project-bar"}}
+<div class="topbar-inner">
+  <span class="topbar-label">Project</span>
+  <details class="proj-dropdown">
+    <summary>{{.Active}}</summary>
+    <div class="proj-menu">
+      {{range .Projects}}
+      <div class="proj-row">
+        {{/* plain link: the switch handler 303-redirects back, so it works
+             without JS; htmx turns it into an in-page reload. */}}
+        <a class="proj-item{{if eq . $.Active}} active{{end}}" href="/project?set={{.}}">{{.}}</a>
+        {{if ne . $.Default}}
+        <button class="proj-del" title="Delete project {{.}}"
+          hx-delete="/projects/{{.}}" hx-confirm="Delete project {{.}}? This removes the namespace and everything in it.">×</button>
+        {{end}}
+      </div>
+      {{end}}
+      <label for="proj-modal" class="proj-item proj-new">+ New project</label>
+    </div>
+  </details>
+  {{template "flash" .Flash}}
+</div>
+
+{{/* Create-project modal — same CSS-only pattern as the other create forms. */}}
+<input type="checkbox" id="proj-modal" class="modal-toggle" hidden>
+<div class="modal">
+  <label for="proj-modal" class="modal-backdrop" aria-hidden="true"></label>
+  <div class="modal-card">
+    <div class="modal-head"><h2>New project</h2><label for="proj-modal" class="modal-x" aria-label="Close">×</label></div>
+    <p class="hint">A project is a Kubernetes <b>namespace</b>. The console provisions it and grants
+    itself scoped access (a <code>RoleBinding</code> to <code>portal-tenant</code>) — the databases,
+    functions and apps you create then land in it. <small>Grant via git; act via console.</small></p>
+    <form hx-post="/projects" hx-target="#project-bar" hx-swap="innerHTML">
+      <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="team-a"></label>
+      <div class="modal-actions">
+        <label for="proj-modal" class="btn ghost">Cancel</label>
+        <button type="submit">Create project</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}

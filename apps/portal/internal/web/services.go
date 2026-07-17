@@ -54,6 +54,7 @@ type serviceRow struct {
 	LatencyNow string        // the latest p95, in ms
 	Scale      string        // current desired pods: "idle (0)" or "N running"
 	Grafana    string
+	Deletable  bool // true when this ksvc is in a project namespace (portal has the grant)
 }
 
 // functionsData is the Functions page model: the live rows, the whitelisted
@@ -100,10 +101,17 @@ func fetchFunctions(s *Server, r *http.Request, fl flash) (functionsData, error)
 	if err != nil {
 		return functionsData{}, err
 	}
+	// Delete is offered only for functions in a project namespace — the ones the
+	// portal has a portal-tenant grant to remove. Capstone ksvcs (ns pipeline,
+	// not a project) stay read-only.
+	projects := make(map[string]bool)
+	for _, p := range s.projectList(r.Context()) {
+		projects[p] = true
+	}
 	rows := make([]serviceRow, 0, len(svcs))
 	for _, k := range svcs {
 		job := "cloudbox-" + k.Metadata.Name
-		row := serviceRow{KnativeService: k, Grafana: grafanaTraces(s.GrafanaURL, job)}
+		row := serviceRow{KnativeService: k, Grafana: grafanaTraces(s.GrafanaURL, job), Deletable: projects[k.Metadata.Namespace]}
 		// Sparkline is best-effort: a prom error means the same thing as no
 		// data — the dash renders, the page never fails over decoration.
 		if vals, err := s.Prom.QueryRange(r.Context(), metrics.RequestRateQuery(job)); err == nil {

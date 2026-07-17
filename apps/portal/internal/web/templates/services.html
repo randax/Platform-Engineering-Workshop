@@ -79,8 +79,8 @@ source in-cluster and deploys it.</p>
           {{/* Invoke wakes a scaled-to-zero function server-side (GET the cluster-local URL). */}}
           <button hx-post="/services/{{.Metadata.Namespace}}/{{.Metadata.Name}}/invoke" hx-target="#invoke-result" hx-swap="innerHTML">Invoke</button>
           <a href="{{.Grafana}}" target="_blank">traces →</a>
-          {{/* Delete only for demo-namespace functions — the ones this console created and has RBAC to remove. */}}
-          {{if eq .Metadata.Namespace "demo"}}
+          {{/* Delete only for functions in a project namespace — the ones this console has the grant to remove. */}}
+          {{if .Deletable}}
           <button class="danger" hx-delete="/services/{{.Metadata.Name}}" hx-target="#svc-list" hx-swap="outerHTML" hx-confirm="Delete {{.Metadata.Name}}? This removes the Knative Service.">Delete</button>
           {{end}}
         </td>

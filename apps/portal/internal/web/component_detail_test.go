@@ -149,6 +149,14 @@ func TestGenerateScreenshots(t *testing.T) {
 		{"streams", "streams", sampleStreams()},
 		{"buckets", "buckets", sampleBuckets()},
 	}
+	// The project bar is htmx-loaded at runtime; for a static shot, render the
+	// fragment and inline it into the placeholder so every page shows the selector.
+	var barBuf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&barBuf, "project-bar", projectBarData{
+		Active: "demo", Default: "demo", Projects: []string{"demo", "team-a"},
+	}); err != nil {
+		t.Fatalf("render project-bar: %v", err)
+	}
 	for _, p := range pages {
 		var buf bytes.Buffer
 		if err := tmpl.ExecuteTemplate(&buf, p.tmpl, p.data); err != nil {
@@ -159,6 +167,9 @@ func TestGenerateScreenshots(t *testing.T) {
 		out := strings.Replace(buf.String(),
 			`<link rel="stylesheet" href="/static/style.css">`,
 			"<style>\n"+string(css)+"\n</style>", 1)
+		out = strings.Replace(out,
+			`<div id="project-bar" hx-get="/project/bar" hx-trigger="load"></div>`,
+			`<div id="project-bar">`+barBuf.String()+`</div>`, 1)
 		out = strings.NewReplacer(
 			`<script src="/static/htmx.min.js"></script>`, "",
 			`<script defer src="/static/egg.js"></script>`, "",
@@ -224,6 +235,7 @@ func sampleServices() []serviceRow {
 		r.LatencyNow = latNow
 		r.Scale = scale
 		r.Grafana = "#"
+		r.Deletable = ns == "demo" // a project namespace → the console can delete it
 		return r
 	}
 	return []serviceRow{
