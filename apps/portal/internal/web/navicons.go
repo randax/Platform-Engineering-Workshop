@@ -32,3 +32,17 @@ var navIcons = map[string]template.HTML{
 
 // navIcon returns the inline SVG for a nav page key, or "" if none.
 func navIcon(key string) template.HTML { return navIcons[key] }
+
+// General-purpose inline icons (Lucide, MIT) — replace decorative emoji in the
+// templates with crisp, theme-aware SVG that inherits text colour and size
+// (1em). Same offline, no-CDN approach as navIcons above. Add entries as needed.
+const iconOpen = `<svg class="ico" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-0.14em">`
+
+var icons = map[string]template.HTML{
+	"lock":    template.HTML(iconOpen + `<rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>`),
+	"menu":    template.HTML(iconOpen + `<path d="M4 5h16" /><path d="M4 12h16" /><path d="M4 19h16" /></svg>`),
+	"hexagon": template.HTML(iconOpen + `<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /></svg>`),
+}
+
+// icon returns the inline SVG for a name, or "" if none.
+func icon(name string) template.HTML { return icons[name] }
