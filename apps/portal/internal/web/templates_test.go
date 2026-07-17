@@ -147,6 +147,17 @@ func TestTemplatesRender(t *testing.T) {
 				`hx-delete="/services/fn-hello"`, // delete offered for demo ns
 			},
 		},
+		"applications": {
+			data: sampleApplications(),
+			want: []string{
+				`hx-trigger="every 5s"`,                  // the list polls itself
+				`hx-post="/applications"`,                // the rich create form
+				`name="image"`, `Min scale`, `Max scale`, // the fuller input set
+				`Attach a Postgres database`, `Attach an S3 bucket`, // dependency toggles
+				`my-app.demo.127.0.0.1.sslip.io`,   // the Ready app's URL
+				`hx-delete="/applications/my-app"`, // per-row delete
+			},
+		},
 		"database-detail": {
 			data: dbDetailData{
 				Name: "my-db", DB: &db, ClusterName: "my-db-pg",

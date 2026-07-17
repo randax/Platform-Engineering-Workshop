@@ -1,0 +1,75 @@
+{{define "applications"}}
+{{template "head" "applications"}}
+<h1>Applications</h1>
+<p class="lede">The golden path: one <code>Application</code> composes a whole app — a scale-to-zero
+<b>workload</b>, a Postgres <b>database</b> and an S3 <b>bucket</b>, wired together (<code>DATABASE_URL</code>
+and <code>S3_*</code> injected) so it boots already connected. The New-database and New-function forms
+provision one thing; this provisions an app <em>and its dependencies</em> from a single POST.</p>
+
+{{template "app-list" .}}
+
+{{/* Rich create modal — the fullest form in the console: image, scale, env, and
+     the dependency toggles. Same CSS-only pattern as the other create forms. */}}
+<input type="checkbox" id="app-modal" class="modal-toggle" hidden>
+<label for="app-modal" class="btn open-modal">+ New application</label>
+<div class="modal">
+  <label for="app-modal" class="modal-backdrop" aria-hidden="true"></label>
+  <div class="modal-card">
+    <div class="modal-head"><h2>New application</h2><label for="app-modal" class="modal-x" aria-label="Close">×</label></div>
+    <p class="hint">Everything a workload needs, from one manifest — Crossplane composes it.</p>
+    <form hx-post="/applications" hx-target="#app-list" hx-swap="outerHTML" hx-on::after-request="if(event.detail.successful) document.getElementById('app-modal').checked=false">
+      <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-app"></label>
+      <label>Image <input name="image" required placeholder="ghcr.io/randax/cloudbox-uploader:v0.1.0"></label>
+      <div class="two-col">
+        <label>Min scale <input type="number" name="min" value="0" min="0" step="1"></label>
+        <label>Max scale <input type="number" name="max" value="3" min="1" step="1"></label>
+      </div>
+      <fieldset class="env-rows">
+        <legend>Environment variables <small>— optional</small></legend>
+        <div class="env-row"><input name="env_name" placeholder="NAME" pattern="[A-Za-z_][A-Za-z0-9_]*"><input name="env_value" placeholder="value"></div>
+        <div class="env-row"><input name="env_name" placeholder="NAME" pattern="[A-Za-z_][A-Za-z0-9_]*"><input name="env_value" placeholder="value"></div>
+        <div class="env-row"><input name="env_name" placeholder="NAME" pattern="[A-Za-z_][A-Za-z0-9_]*"><input name="env_value" placeholder="value"></div>
+      </fieldset>
+      <label class="check"><input type="checkbox" name="database" value="1" checked> Attach a Postgres database <small>— injects <code>DATABASE_URL</code></small></label>
+      <label class="check"><input type="checkbox" name="bucket" value="1" checked> Attach an S3 bucket <small>— injects <code>S3_*</code></small></label>
+      <p class="hint"><small>v1: the database and bucket are always provisioned regardless of these toggles (a composition limitation — see the component VENDOR.md).</small></p>
+      <div class="modal-actions">
+        <label for="app-modal" class="btn ghost">Cancel</label>
+        <button type="submit">Deploy</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{template "foot" .}}
+{{end}}
+
+{{/* The self-updating application list. Create + delete return this same
+     fragment (hx-swap="outerHTML" on #app-list). */}}
+{{define "app-list"}}
+<div id="app-list" hx-get="/applications/list" hx-trigger="every 5s" hx-swap="outerHTML">
+  {{template "flash" .Flash}}
+  <table>
+    <thead><tr><th>Name</th><th>Image</th><th>Scale</th><th>Wired</th><th>Ready</th><th>URL</th><th></th></tr></thead>
+    <tbody>
+    {{range .Apps}}
+      <tr>
+        <td>{{.Metadata.Name}}</td>
+        <td><code>{{.Spec.Image}}</code></td>
+        <td>{{.Spec.Replicas.Min}}–{{.Spec.Replicas.Max}}</td>
+        <td>
+          {{if .Spec.Database}}<span class="badge ok">db</span>{{end}}
+          {{if .Spec.Bucket}}<span class="badge ok">bucket</span>{{end}}
+        </td>
+        <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
+        <td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">open ↗</a>{{else}}<span class="nodata">—</span>{{end}}</td>
+        <td class="actions"><button class="danger" hx-delete="/applications/{{.Metadata.Name}}"
+            hx-target="#app-list" hx-swap="outerHTML"
+            hx-confirm="Delete {{.Metadata.Name}}? This removes the workload, its database and bucket.">Delete</button></td>
+      </tr>
+    {{else}}
+      <tr><td colspan="7" class="empty">No applications yet — deploy one below (the golden path from module 04).</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

@@ -142,6 +142,7 @@ func TestGenerateScreenshots(t *testing.T) {
 		{"component-detail-monitoring", "component-detail", sampleDetail()},
 		{"component-detail-locked", "component-detail", locked},
 		{"components", "components", sampleComponents()},
+		{"applications", "applications", sampleApplications()},
 		{"services", "services", functionsData{Rows: sampleServices(), Samples: fnSamples}},
 		{"database-detail", "database-detail", sampleDatabaseDetail()},
 		{"builds", "builds", sampleBuilds()},
@@ -166,6 +167,32 @@ func TestGenerateScreenshots(t *testing.T) {
 			t.Fatalf("write %s: %v", p.file, err)
 		}
 	}
+}
+
+// sampleApplications mocks the Applications page: one Ready app (with its URL)
+// composed from the golden-path XR, and one still composing.
+func sampleApplications() applicationsData {
+	mk := func(name, image string, min, max int, ready bool) appRow {
+		var a kube.Application
+		a.Metadata = kube.ObjMeta{Name: name, Namespace: "demo"}
+		a.Spec.Image = image
+		a.Spec.Replicas.Min, a.Spec.Replicas.Max = min, max
+		a.Spec.Database, a.Spec.Bucket = true, true
+		if ready {
+			a.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "True", Reason: "Available"}}
+		} else {
+			a.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "False", Reason: "Creating"}}
+		}
+		row := appRow{Application: a}
+		if ready {
+			row.URL = "http://" + name + ".demo.127.0.0.1.sslip.io:31080"
+		}
+		return row
+	}
+	return applicationsData{Apps: []appRow{
+		mk("my-app", "ghcr.io/randax/cloudbox-uploader:v0.1.0", 0, 3, true),
+		mk("api", "ghcr.io/acme/api:v2", 1, 5, false),
+	}}
 }
 
 // sampleComponents mocks the Components list so the screenshot shows the new

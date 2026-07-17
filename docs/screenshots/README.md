@@ -14,6 +14,8 @@ Every page has a light and a `-dark` variant (the console is theme-aware via
 | `console-mobile-nav-open.png` | Phone width with the ☰ menu tapped open — the full nav revealed (CSS-only, no JS). |
 | `console-component-locked.png` | The Monitoring page when observability isn't enabled yet — degrade-in-place hint. |
 | `console-components.png` | The Components page — per-namespace health, each linking into its Monitoring detail. |
+| `console-applications.png` | The **Applications** page — the golden path (PRD-0003) as a console action: deploy an app + its Postgres database + S3 bucket from one `Application` XR, with per-row Ready/URL/Delete (#28). |
+| `console-new-application.png` | The **New application** modal — the fullest form in the console: image, min/max scale, env vars, and the database/bucket dependency toggles (#28). |
 | `console-services.png` | The **Functions** page — the whole function lifecycle in the **Services** nav section: request-rate + avg-latency sparklines and scale-from-zero per Knative Service (#56), an **Invoke** button that wakes one server-side, **Delete** for console-built functions, and a **New function** button that opens the build-and-deploy modal (#58). |
 | `console-new-function.png` | The **New function** modal (CSS-only, no JS) — name, source, optional env vars, and a keep-warm toggle; builds source in-cluster (Argo + BuildKit) and deploys it as a scale-to-zero Knative Service (#58). |
 | `console-database-monitoring.png` | A database's detail page — CNPG connections, cache-hit ratio and size (#56), plus a **Resize** control (change the T-shirt size → Crossplane re-composes, #27) and the delete danger zone. |
