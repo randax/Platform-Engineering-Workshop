@@ -246,7 +246,12 @@ git instead?
   self-service arc, from a form.
 - **Ship your own code (the app-team golden path, PRD-0012).** In *New Application*, switch
   **Source → Build from a repo** and give an in-cluster Gitea repo (`<org>/<repo>` + branch +
-  path with a `Dockerfile`). The console runs the module-07 `build-and-push` Workflow (clone →
+  path with a `Dockerfile`). A ready one is seeded for you: **`cloudbox/demo-app`** — a real
+  Go service that uses its composed Postgres (a live visit counter) and S3 bucket, so the page
+  proves the wiring rather than ignoring it. Its Dockerfile builds `FROM` a golang base in Zot,
+  so seed that base once first (same move as module 07's busybox):
+  `crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine localhost:30500/library/golang:1.25-alpine`.
+  The console runs the module-07 `build-and-push` Workflow (clone →
   BuildKit → Zot) **and** creates the Application at the built image — so `git push → build →
   deploy` is the app team's counterpart to the platform team's `git push → ArgoCD → converge`.
   It needs **both** grants (the functions/workflows one from step 3 *and* the applications one

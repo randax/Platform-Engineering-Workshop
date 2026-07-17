@@ -78,6 +78,33 @@ curl -fsS -X PATCH \
   "${GITEA_HOST_URL}/api/v1/repos/${PLATFORM_REPO_PATH}" >/dev/null \
   || warn "Could not verify repo visibility — check ${GITEA_HOST_URL}/${PLATFORM_REPO_PATH}"
 
+# --- 3b. Seed the demo app as its OWN repo ------------------------------------------
+# The app-team golden path (deploy from source) needs a real, standalone app to
+# build — separate from this platform config repo. Push apps/demo-app as
+# cloudbox/demo-app (push-to-create in the same org), public, and marked a Gitea
+# TEMPLATE so the console can later scaffold new app repos from it.
+DEMO_REPO="${ORG}/demo-app"
+DEMO_PUSH_URL="http://localhost:${NODEPORT_GITEA}/${DEMO_REPO}.git"
+if [[ -d "${REPO_ROOT}/apps/demo-app" ]]; then
+  step "Seeding the demo app as ${DEMO_REPO} (a standalone repo to deploy-from-source)"
+  DEMO_TMP="$(mktemp -d)"
+  cp -R "${REPO_ROOT}/apps/demo-app/." "${DEMO_TMP}/"
+  (
+    cd "${DEMO_TMP}"
+    git init -q
+    git add -A
+    git -c user.name="cloudbox" -c user.email="cloudbox@localhost" \
+      commit -q -m "demo-app: visit counter + bucket, wired via the platform"
+    git_as_gitea_admin push --force "${DEMO_PUSH_URL}" "HEAD:refs/heads/main"
+  )
+  rm -rf "${DEMO_TMP}"
+  curl -fsS -X PATCH -u "${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}" \
+    -H "Content-Type: application/json" -d '{"private": false, "template": true}' \
+    "${GITEA_HOST_URL}/api/v1/repos/${DEMO_REPO}" >/dev/null \
+    || warn "Could not set ${DEMO_REPO} visibility/template flag"
+  ok "Seeded ${DEMO_REPO} (public, template) — deploy it from the console's Applications page"
+fi
+
 # --- 3. Root Application (app-of-apps) -----------------------------------------------
 if kubectl get namespace argocd >/dev/null 2>&1; then
   step "Applying the root 'platform' Application (app-of-apps)"
