@@ -198,7 +198,8 @@ func TestTemplatesRender(t *testing.T) {
 				Teaser: "Deploy serverless workloads that scale to zero.",
 			},
 			want: []string{
-				`🔒 Services`,
+				`<svg class="ico"`,                                // the lock icon (replaced the 🔒 emoji)
+				`Services`,                                        // the locked page title
 				`Deploy serverless workloads that scale to zero.`, // teaser
 				`Complete Module 06 · Serverless`,                 // unlock hint
 			},

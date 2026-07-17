@@ -25,8 +25,8 @@
        hide until tapped — no JS, works offline. Desktop ignores all of it. */}}
   <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden>
   <div class="rail-bar">
-    <span class="logo" id="logo">⬢ Cloudbox Console</span>
-    <label for="nav-toggle" class="nav-burger" aria-label="Toggle navigation" title="Menu">☰</label>
+    <span class="logo" id="logo">{{icon "hexagon"}} Cloudbox Console</span>
+    <label for="nav-toggle" class="nav-burger" aria-label="Toggle navigation" title="Menu">{{icon "menu"}}</label>
   </div>
   <nav>
     {{/* built from the page registry — a new page file adds itself here */}}
@@ -37,7 +37,7 @@
       {{- if .Locked}}
       {{/* capability not present yet: a non-link, greyed, with the module that
            unlocks it as a tooltip — see .nav-locked in style.css */}}
-      <span class="nav-locked" title="{{.Hint}}">{{navicon .Key}}<span>🔒 {{.Title}}</span></span>
+      <span class="nav-locked" title="{{.Hint}}">{{navicon .Key}}<span>{{icon "lock"}} {{.Title}}</span></span>
       {{- else}}
       <a href="{{.Href}}" {{if eq $ .Key}}aria-current="page"{{end}}>{{navicon .Key}}<span>{{.Title}}</span></a>
       {{- end}}
@@ -73,7 +73,7 @@
      module unlocks it. The sidebar shows the same 🔒 next to the page. */}}
 {{define "locked"}}
 {{template "head" .Key}}
-<h1>🔒 {{.Title}}</h1>
+<h1>{{icon "lock"}} {{.Title}}</h1>
 <p class="lede">{{.Teaser}}</p>
 <p class="hint">{{.Hint}} to unlock this page.</p>
 {{template "foot" .}}
