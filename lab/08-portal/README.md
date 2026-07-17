@@ -251,6 +251,9 @@ git instead?
   deploy` is the app team's counterpart to the platform team's `git push → ArgoCD → converge`.
   It needs **both** grants (the functions/workflows one from step 3 *and* the applications one
   above); repos are restricted to the in-cluster Gitea (offline + no arbitrary-URL builds).
+  Then close the loop: change the code, push again, and hit **Redeploy** on the app's row — it
+  rebuilds the repo at a fresh image tag and rolls the running app forward (a mutable tag would
+  leave it pinned to the old image). That's `push → build → deploy` end to end, in the console.
 - **Create projects from the console (grant via git; act via console).** The top-bar
   **Project** selector maps 1:1 to Kubernetes namespaces; "New project" provisions a
   namespace *and* binds the portal's tenant grant into it, so the databases/functions/apps

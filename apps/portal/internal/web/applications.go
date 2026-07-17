@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"cloudbox.io/portal/internal/kube"
 )
@@ -34,6 +35,7 @@ func init() {
 		Extra: []Route{
 			{"GET /applications/list", handleApplicationsList},
 			{"POST /applications", handleCreateApplication},
+			{"POST /applications/{name}/redeploy", handleRedeployApplication},
 			{"DELETE /applications/{name}", handleDeleteApplication},
 		},
 	})
@@ -44,7 +46,8 @@ func init() {
 // NodePort 31080) — shown once the app is Ready.
 type appRow struct {
 	kube.Application
-	URL string
+	URL         string
+	SourceBuilt bool // built from a Gitea repo → offer Redeploy
 }
 
 type applicationsData struct {
@@ -59,7 +62,8 @@ func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (app
 	}
 	rows := make([]appRow, 0, len(apps))
 	for _, a := range apps {
-		row := appRow{Application: a}
+		_, _, _, sourceBuilt := a.Source()
+		row := appRow{Application: a, SourceBuilt: sourceBuilt}
 		if a.Readiness().Class == "ok" {
 			// The sslip.io URL the composed ksvc serves on, via Kourier's NodePort.
 			row.URL = fmt.Sprintf("http://%s.%s.127.0.0.1.sslip.io:31080", a.Metadata.Name, a.Metadata.Namespace)
@@ -115,10 +119,13 @@ func deployApplication(s *Server, r *http.Request, ns, name string, opts kube.Ap
 		if path == "" {
 			path = "."
 		}
-		if err := s.Kube.CreateAppBuildWorkflow(r.Context(), name, repoURL, r.FormValue("branch"), path); err != nil {
+		branch := r.FormValue("branch")
+		tag := newBuildTag()
+		if err := s.Kube.CreateAppBuildWorkflow(r.Context(), name, repoURL, branch, path, tag); err != nil {
 			return errorFlash("Couldn't start the build: " + err.Error())
 		}
-		opts.Image = kube.AppSourcePullImage(name)
+		opts.Image = kube.AppSourcePullImage(name, tag)
+		opts.Source = &kube.AppSource{Repo: repoURL, Branch: branch, Path: path}
 		if err := s.Kube.CreateApplication(r.Context(), ns, name, opts); err != nil {
 			return errorFlash("Build started, but deploying the app failed: " + err.Error())
 		}
@@ -128,6 +135,47 @@ func deployApplication(s *Server, r *http.Request, ns, name string, opts kube.Ap
 		return errorFlash("Deploy failed: " + err.Error())
 	}
 	return flash{Msg: "Deploying " + name + " — Crossplane is composing the workload, its database and bucket. Watch it turn Ready below."}
+}
+
+// newBuildTag is a unique image tag per build — so a rebuild pushes a NEW tag,
+// which changes the workload's spec.image → a fresh Knative revision → the new
+// code actually rolls out. UnixNano makes back-to-back rebuilds distinct.
+func newBuildTag() string { return "b" + strconv.FormatInt(time.Now().UnixNano(), 36) }
+
+// handleRedeployApplication rebuilds a source-built app from its recorded repo
+// (a new tag) and patches the workload to the new image — the iterate loop:
+// push new code, hit Redeploy, the running app rolls forward.
+func handleRedeployApplication(s *Server, w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	ns := s.activeProject(r)
+	fl := redeployApplication(s, r, ns, name)
+	data, err := fetchApplications(r.Context(), s, ns, fl)
+	if err != nil {
+		data = applicationsData{Flash: errorFlash("API error: " + err.Error())}
+	}
+	s.render(w, "app-list", data)
+}
+
+func redeployApplication(s *Server, r *http.Request, ns, name string) flash {
+	app, err := s.Kube.GetApplication(r.Context(), ns, name)
+	if err != nil {
+		return errorFlash("Lookup failed: " + err.Error())
+	}
+	if app == nil {
+		return errorFlash("No such application: " + name)
+	}
+	repo, branch, path, ok := app.Source()
+	if !ok {
+		return errorFlash(name + " wasn't built from source, so there's nothing to rebuild — it runs a prebuilt image.")
+	}
+	tag := newBuildTag()
+	if err := s.Kube.CreateAppBuildWorkflow(r.Context(), name, repo, branch, path, tag); err != nil {
+		return errorFlash("Couldn't start the rebuild: " + err.Error())
+	}
+	if err := s.Kube.SetApplicationImage(r.Context(), ns, name, kube.AppSourcePullImage(name, tag)); err != nil {
+		return errorFlash("Rebuild started, but rolling the app failed: " + err.Error())
+	}
+	return flash{Msg: "Rebuilding " + name + " from " + repo + " and rolling it forward. Watch the build on the Builds page; the new revision goes live once the image lands (~1 min)."}
 }
 
 func handleDeleteApplication(s *Server, w http.ResponseWriter, r *http.Request) {

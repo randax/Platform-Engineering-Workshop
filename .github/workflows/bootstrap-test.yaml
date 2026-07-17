@@ -216,7 +216,10 @@ jobs:
           CLONE="$(gitops_clone)"
           enable_catalog "$CLONE" otel-collector.yaml
           gitops_push "$CLONE" "verify: enable otel-collector"
-          wait_app otel-collector
+          # 600s (not the 420s default): otel-collector is the last, heaviest
+          # catalog enable, and the app-of-apps parent can be slow to render the
+          # child this late in a loaded run (recurring "last: missing" flake).
+          wait_app otel-collector 600
           kubectl -n observability rollout status deploy/otel-collector-gateway --timeout=180s
           kubectl -n observability rollout status ds/otel-collector-agent --timeout=180s
 
@@ -765,7 +768,11 @@ jobs:
           echo "✅ built the app from source (${wf##*/})"
           # The Application XR was created pointing at the built (node-side) image.
           img=$(kubectl -n demo get applications.platform.cloudbox.io "$app" -o jsonpath='{.spec.image}' 2>/dev/null || true)
-          [ "$img" = "localhost:30500/app-${app}:v1" ] || { echo "❌ Application image = '$img', want the built node-side image"; exit 1; }
+          # Image is the node-side pull host + app-<name> at a UNIQUE per-build tag.
+          case "$img" in
+            localhost:30500/app-${app}:*) ;;
+            *) echo "❌ Application image = '$img', want localhost:30500/app-${app}:<tag>"; exit 1;;
+          esac
           # Deploy half: the composed workload runs the freshly built image.
           kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=240s \
             || { echo "❌ composed ksvc ${app} not Ready (image pull / build handoff?)"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
@@ -773,6 +780,51 @@ jobs:
           # Cleanup (cascades the composed ksvc/DB/bucket).
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
           { echo ""; echo "### Deploy-from-source (PRD-0012) — Gitea repo → build → Application (workload+DB+bucket), from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Verify the iterate loop — change code → Redeploy → new content (PRD-0012)
+        run: |
+          set -euo pipefail
+          # The dev's core loop: deploy from source, change the code, hit Redeploy,
+          # and the RUNNING app must roll forward. This is the test that catches a
+          # mutable image tag (a rebuild that doesn't actually deploy).
+          # shellcheck source=../../lab/common.sh
+          source lab/common.sh
+          base=http://localhost:30600
+          app=iterapp
+          # 1. Deploy from source (the module-07 hello-site) and prove it SERVES.
+          curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$base/applications" \
+            --data-urlencode "name=$app" --data-urlencode "source=repo" \
+            --data-urlencode "repo=cloudbox/platform" --data-urlencode "branch=main" \
+            --data-urlencode "path=lab/07-ci/app" \
+            --data-urlencode "database=1" --data-urlencode "bucket=1"
+          # Wait for the build + the composed ksvc to serve.
+          kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=360s \
+            || { echo "❌ first deploy of ${app} not Ready"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
+          host=$(kubectl -n demo get ksvc "${app}" -o jsonpath='{.status.url}'); host="${host#http://}"
+          v1=$(curl -sS --max-time 30 -H "Host: ${host}" http://localhost:31080/ 2>/dev/null || true)
+          echo "$v1" | grep -q "hello-site" || { echo "❌ deployed app did not serve the expected page"; echo "$v1" | head; exit 1; }
+          echo "$v1" | grep -q "ITERATE-MARKER" && { echo "❌ marker already present before the change"; exit 1; } || true
+          echo "✅ deployed from source and it serves"
+          # 2. Change the code: inject a unique marker into the app's page, push to Gitea.
+          CLONE="$(gitops_clone)"
+          sed -i 's#<h1>hello-site v1</h1>#<h1>hello-site v1 ITERATE-MARKER</h1>#' "$CLONE/lab/07-ci/app/index.html"
+          grep -q "ITERATE-MARKER" "$CLONE/lab/07-ci/app/index.html" || { echo "❌ marker sed didn't apply (page changed?)"; exit 1; }
+          gitops_push "$CLONE" "rehearsal: change the demo app to prove the iterate loop"
+          # 3. Redeploy from the console — rebuild the (now changed) repo + roll.
+          rc=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/applications/${app}/redeploy" 2>/dev/null || true)
+          echo "POST /applications/${app}/redeploy → HTTP $rc"; [ "$rc" = 200 ] || { echo "❌ redeploy POST errored (HTTP $rc)"; exit 1; }
+          # 4. The RUNNING app must now serve the new content. This fails if the
+          #    rebuild reused a mutable tag (no new revision → old code sticks).
+          got=""
+          for _ in $(seq 1 48); do
+            got=$(curl -sS --max-time 20 -H "Host: ${host}" http://localhost:31080/ 2>/dev/null || true)
+            echo "$got" | grep -q "ITERATE-MARKER" && break; sleep 5
+          done
+          echo "$got" | grep -q "ITERATE-MARKER" \
+            || { echo "❌ Redeploy did not roll the new code (mutable-tag regression?)"; echo "$got" | head; kubectl -n demo get revisions.serving.knative.dev -l serving.knative.dev/service="${app}"; exit 1; }
+          echo "✅ iterate loop works: changed code → Redeploy → the running app serves the new content"
+          curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
+          { echo ""; echo "### Iterate loop (PRD-0012) — deploy → change code → Redeploy → running app rolled to new content ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()

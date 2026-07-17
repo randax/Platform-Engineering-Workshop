@@ -79,9 +79,15 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
         </td>
         <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
         <td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">open ↗</a>{{else}}<span class="nodata">—</span>{{end}}</td>
-        <td class="actions"><button class="danger" hx-delete="/applications/{{.Metadata.Name}}"
+        <td class="actions">
+          {{/* Redeploy only for source-built apps — rebuild the repo and roll it. */}}
+          {{if .SourceBuilt}}<button hx-post="/applications/{{.Metadata.Name}}/redeploy"
             hx-target="#app-list" hx-swap="outerHTML"
-            hx-confirm="Delete {{.Metadata.Name}}? This removes the workload, its database and bucket.">Delete</button></td>
+            hx-confirm="Rebuild {{.Metadata.Name}} from its repo and roll it forward?">Redeploy</button>{{end}}
+          <button class="danger" hx-delete="/applications/{{.Metadata.Name}}"
+            hx-target="#app-list" hx-swap="outerHTML"
+            hx-confirm="Delete {{.Metadata.Name}}? This removes the workload, its database and bucket.">Delete</button>
+        </td>
       </tr>
     {{else}}
       <tr><td colspan="7" class="empty">No applications yet — deploy one below (the golden path from module 04).</td></tr>

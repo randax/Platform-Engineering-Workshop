@@ -200,8 +200,12 @@ func sampleApplications() applicationsData {
 		}
 		return row
 	}
+	// The source-built app carries a repo image + offers Redeploy; the other is
+	// a prebuilt image.
+	src := mk("web", "localhost:30500/app-web:b7", 0, 3, true)
+	src.SourceBuilt = true
 	return applicationsData{Apps: []appRow{
-		mk("my-app", "ghcr.io/randax/cloudbox-uploader:v0.1.0", 0, 3, true),
+		src,
 		mk("api", "ghcr.io/acme/api:v2", 1, 5, false),
 	}}
 }
