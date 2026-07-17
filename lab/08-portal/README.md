@@ -244,6 +244,13 @@ git instead?
   ```
   Deploy `my-app`, watch it turn Ready, and open its `*.sslip.io` URL — the apex of the
   self-service arc, from a form.
+- **Ship your own code (the app-team golden path, PRD-0012).** In *New Application*, switch
+  **Source → Build from a repo** and give an in-cluster Gitea repo (`<org>/<repo>` + branch +
+  path with a `Dockerfile`). The console runs the module-07 `build-and-push` Workflow (clone →
+  BuildKit → Zot) **and** creates the Application at the built image — so `git push → build →
+  deploy` is the app team's counterpart to the platform team's `git push → ArgoCD → converge`.
+  It needs **both** grants (the functions/workflows one from step 3 *and* the applications one
+  above); repos are restricted to the in-cluster Gitea (offline + no arbitrary-URL builds).
 - **Create projects from the console (grant via git; act via console).** The top-bar
   **Project** selector maps 1:1 to Kubernetes namespaces; "New project" provisions a
   namespace *and* binds the portal's tenant grant into it, so the databases/functions/apps

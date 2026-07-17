@@ -102,6 +102,37 @@ That's the whole platform in one feature: the capability is granted declarativel
 -->
 
 ---
+
+# Two golden paths
+
+<div class="grid grid-cols-2 gap-4 mt-4">
+  <div class="principle">
+    <div class="ico"><span class="svgi i-package"></span></div>
+    <div class="name">Platform team</div>
+    <div class="tie" style="opacity:.85"><code>git push</code> (config repo) → <b>ArgoCD</b> → converge.<br>Changing the platform. <b>GitOps.</b></div>
+  </div>
+  <div class="principle">
+    <div class="ico"><span class="svgi i-workflow"></span></div>
+    <div class="name">App team</div>
+    <div class="tie" style="opacity:.85"><code>git push</code> (app repo) → <b>build</b> → deploy.<br>Shipping an app onto the platform. <b>CI/CD.</b></div>
+  </div>
+</div>
+
+<div class="mt-5 text-lg opacity-85">Same Gitea, two reconcilers, two audiences — <b>GitOps is not the app team's deploy path.</b></div>
+
+<!--
+The missing half of the "how does everyone use this platform" story, and the answer to a question sharp attendees carry all day: if everything is GitOps, how does an app developer ship THEIR code?
+
+Two golden paths, and they are NOT the same path:
+- The PLATFORM team changes the platform by committing to the config repo (cloudbox/platform.git); ArgoCD reconciles. That's the GitOps you've done in every module.
+- The APP team ships an app by pushing to THEIR OWN repo in the same Gitea, which gets built (the module-07 Argo Workflow + BuildKit → Zot) and deployed. That's CI/CD — a different repo, a different reconciler, a different audience.
+
+The console makes the second one self-service: New Application → "Build from a repo" → point at your Gitea repo, and it builds and deploys as an Application (workload + database + bucket), the app-team counterpart to the golden-path XR. Same "git push and it happens" feeling, but it is emphatically NOT GitOps — GitOps is the platform team's plane (DR-0004). Gitea wearing two hats — config store for the platform, source host for apps — is the thing that ties the whole day together.
+
+Security beat worth 20 seconds: the console only builds registered in-cluster Gitea repos, never a free-form URL — because a build is arbitrary code execution and a server-side fetch of a user URL is an SSRF path to your credentials. Real platforms (Nais, GitHub Actions) scope builds to team-owned repos for exactly this reason.
+-->
+
+---
 layout: center
 ---
 

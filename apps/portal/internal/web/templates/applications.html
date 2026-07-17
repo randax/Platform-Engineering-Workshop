@@ -19,7 +19,24 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
     <p class="hint">Everything a workload needs, from one manifest — Crossplane composes it.</p>
     <form hx-post="/applications" hx-target="#app-list" hx-swap="outerHTML" hx-on::after-request="if(event.detail.successful) document.getElementById('app-modal').checked=false">
       <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-app"></label>
-      <label>Image <input name="image" required placeholder="ghcr.io/randax/cloudbox-uploader:v0.1.0"></label>
+      {{/* Source: a prebuilt image, or — the app-team golden path — a repo the
+           platform builds. CSS :has() swaps the fields; the handler reads `source`. */}}
+      <div class="src-pick">
+        <span class="topbar-label">Source</span>
+        <label class="check"><input type="radio" name="source" value="image" checked> Container image</label>
+        <label class="check"><input type="radio" name="source" value="repo"> Build from a repo</label>
+      </div>
+      <div class="src-image">
+        <label>Image <input name="image" placeholder="ghcr.io/randax/cloudbox-uploader:v0.1.0"></label>
+      </div>
+      <div class="src-repo">
+        <label>Repo <input name="repo" pattern="[A-Za-z0-9._-]+/[A-Za-z0-9._-]+" placeholder="team-a/myapp"></label>
+        <div class="two-col">
+          <label>Branch <input name="branch" value="main"></label>
+          <label>Path <input name="path" value="." placeholder="."></label>
+        </div>
+        <p class="hint"><small>Your repo in the in-cluster <b>Gitea</b> — push your code there first; it needs a <code>Dockerfile</code> at that path. The platform builds it (Argo + BuildKit → Zot) and deploys the result.</small></p>
+      </div>
       <div class="two-col">
         <label>Min scale <input type="number" name="min" value="0" min="0" step="1"></label>
         <label>Max scale <input type="number" name="max" value="3" min="1" step="1"></label>

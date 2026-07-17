@@ -50,33 +50,42 @@ func functionImage(host, name string) string {
 	return fmt.Sprintf("%s/fn-%s:v1", host, name)
 }
 
-// BuildFunctionWorkflow hand-writes the Argo `Workflow` that builds the
-// function's image. generateName (not name) so each submit mints a fresh run,
-// exactly like `kubectl create` on lab/07-ci/workflow-run.yaml — which is why
-// we POST to the collection, never PUT/apply.
-func BuildFunctionWorkflow(name, repo, path string) ([]byte, error) {
-	if !ValidName(name) {
-		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
+// buildWorkflow hand-writes an Argo `Workflow` that references the module-07
+// `build-and-push` WorkflowTemplate: git-clone → BuildKit → push to Zot. This
+// is the platform's ONE reusable CI primitive — the New Function flow and the
+// deploy-from-source Application flow both submit one of these. generateName
+// (not name) so each submit mints a fresh run, exactly like `kubectl create` on
+// lab/07-ci/workflow-run.yaml — which is why we POST to the collection.
+func buildWorkflow(generatePrefix, repo, branch, path, image string) ([]byte, error) {
+	params := []any{
+		map[string]any{"name": "repo", "value": repo},
+		map[string]any{"name": "path", "value": path},
+		map[string]any{"name": "image", "value": image},
+	}
+	if branch != "" {
+		params = append(params, map[string]any{"name": "branch", "value": branch})
 	}
 	wf := map[string]any{
 		"apiVersion": "argoproj.io/v1alpha1",
 		"kind":       "Workflow",
 		"metadata": map[string]any{
-			"generateName": "build-fn-" + name + "-",
+			"generateName": generatePrefix,
 			"namespace":    WorkflowNamespace,
 		},
 		"spec": map[string]any{
 			"workflowTemplateRef": map[string]any{"name": "build-and-push"},
-			"arguments": map[string]any{
-				"parameters": []any{
-					map[string]any{"name": "repo", "value": repo},
-					map[string]any{"name": "path", "value": path},
-					map[string]any{"name": "image", "value": functionImage(fnPushHost, name)},
-				},
-			},
+			"arguments":           map[string]any{"parameters": params},
 		},
 	}
 	return json.Marshal(wf)
+}
+
+// BuildFunctionWorkflow builds the function's image from a vetted source repo.
+func BuildFunctionWorkflow(name, repo, path string) ([]byte, error) {
+	if !ValidName(name) {
+		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
+	}
+	return buildWorkflow("build-fn-"+name+"-", repo, "", path, functionImage(fnPushHost, name))
 }
 
 func (k *Client) CreateFunctionWorkflow(ctx context.Context, name, repo, path string) error {
