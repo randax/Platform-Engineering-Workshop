@@ -1,10 +1,10 @@
 {{define "buckets"}}
 {{template "head" "buckets"}}
 <h1>Buckets</h1>
-<p class="lede">Your object storage from module 03, seen from outside: this is just
-<code>ListBuckets</code> and <code>ListObjects</code> on the S3 API you stood up. Pick a bucket to
-browse its objects — each <b>Download</b> link is a presigned URL signed by the browser-facing
-endpoint, valid 15 minutes, so the file downloads straight from RustFS with zero AWS.</p>
+<p class="lede">Your object storage from module 03, seen from outside: <code>ListBuckets</code>,
+<code>ListObjects</code> and now the write half too — <b>create</b> a bucket, <b>upload</b> and
+<b>delete</b> objects. Each <b>Download</b> link is a presigned URL signed by the browser-facing
+endpoint, valid 15 minutes, so files move straight to and from RustFS with zero AWS.</p>
 
 {{if .Telemetry}}
 <h2>Monitoring <small>last 30 min · RustFS pod resources</small></h2>
@@ -23,36 +23,70 @@ endpoint, valid 15 minutes, so the file downloads straight from RustFS with zero
 <p class="hint"><small>RustFS exposes no Prometheus endpoint, so this is the generic pod resource signal — the same fallback the component detail pages use.</small></p>
 {{end}}
 
-<table>
-  <thead><tr><th>Bucket</th><th>Created</th></tr></thead>
-  <tbody>
-  {{range .Buckets}}
-    <tr>
-      {{/* href keeps the selection bookmarkable + JS-free; hx-get swaps just
-           the object list in place, so browsing buckets never reloads the page. */}}
-      <td><a href="/buckets?b={{.Name}}" hx-get="/buckets/objects?b={{.Name}}"
-             hx-target="#bucket-objects" hx-swap="innerHTML">{{.Name}}</a></td>
-      <td>{{.Created.Format "2006-01-02 15:04"}}</td>
-    </tr>
-  {{else}}
-    <tr><td colspan="2" class="empty">No buckets yet — module 03 creates the first one.</td></tr>
-  {{end}}
-  </tbody>
-</table>
+{{template "bucket-list" .}}
+
+{{/* Create-bucket modal — same CSS-only pattern as the New-function form. */}}
+<input type="checkbox" id="bkt-modal" class="modal-toggle" hidden>
+<label for="bkt-modal" class="btn open-modal">+ New bucket</label>
+<div class="modal">
+  <label for="bkt-modal" class="modal-backdrop" aria-hidden="true"></label>
+  <div class="modal-card">
+    <div class="modal-head"><h2>New bucket</h2><label for="bkt-modal" class="modal-x" aria-label="Close">×</label></div>
+    <form hx-post="/buckets" hx-target="#bucket-list" hx-swap="outerHTML" hx-on::after-request="if(event.detail.successful) document.getElementById('bkt-modal').checked=false">
+      <label>Name <input name="name" required pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]" placeholder="my-bucket"></label>
+      <p class="hint"><small>3–63 lowercase letters, digits or hyphens.</small></p>
+      <div class="modal-actions">
+        <label for="bkt-modal" class="btn ghost">Cancel</label>
+        <button type="submit">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <div id="bucket-objects">
   {{if .Objects.Bucket}}{{template "bucket-objects" .Objects}}
-  {{else}}<p class="hint">Pick a bucket above to browse its objects.</p>{{end}}
+  {{else}}<p class="hint">Pick a bucket above to browse and upload its objects.</p>{{end}}
 </div>
 {{template "foot" .}}
 {{end}}
 
-{{/* The object list for one selected bucket. Loaded on demand by htmx (the
-     bucket links target #bucket-objects) and also server-rendered on ?b= for a
-     bookmarkable, JavaScript-free path — same markup either way. */}}
+{{/* The bucket list. Wrapped so create + delete-bucket can swap it in place
+     (hx-swap="outerHTML" on this same #bucket-list div). */}}
+{{define "bucket-list"}}
+<div id="bucket-list" class="bucket-list">
+  {{template "flash" .Flash}}
+  <table>
+    <thead><tr><th>Bucket</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+    {{range .Buckets}}
+      <tr>
+        {{/* href keeps the selection bookmarkable + JS-free; hx-get swaps just
+             the object panel in place, so browsing buckets never reloads. */}}
+        <td><a href="/buckets?b={{.Name}}" hx-get="/buckets/objects?b={{.Name}}"
+               hx-target="#bucket-objects" hx-swap="innerHTML">{{.Name}}</a></td>
+        <td>{{.Created.Format "2006-01-02 15:04"}}</td>
+        <td class="actions"><button class="danger" hx-delete="/buckets/{{.Name}}"
+            hx-target="#bucket-list" hx-swap="outerHTML"
+            hx-confirm="Delete bucket {{.Name}}? It must be empty.">Delete</button></td>
+      </tr>
+    {{else}}
+      <tr><td colspan="3" class="empty">No buckets yet — create one below, or module 03 makes the first.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{/* The object list for one selected bucket, with an upload form and per-object
+     delete. Loaded on demand by htmx and also server-rendered on ?b= for a
+     bookmarkable, JS-free path — same markup either way. */}}
 {{define "bucket-objects"}}
 {{template "flash" .Flash}}
 <h2>{{.Bucket}} <small>(showing up to 200 objects)</small></h2>
+<form class="upload-form" hx-post="/buckets/{{.Bucket}}/upload" hx-target="#bucket-objects" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+  <input type="file" name="file" required>
+  <button type="submit">Upload</button>
+</form>
 <table>
   <thead><tr><th>Key</th><th>Size</th><th>Modified</th><th></th></tr></thead>
   <tbody>
@@ -61,10 +95,14 @@ endpoint, valid 15 minutes, so the file downloads straight from RustFS with zero
       <td><code>{{.Key}}</code></td>
       <td>{{.HumanBytes}}</td>
       <td>{{.LastModified.Format "2006-01-02 15:04"}}</td>
-      <td>{{if .DownloadURL}}<a href="{{.DownloadURL}}" target="_blank" rel="noopener noreferrer">Download ↗</a>{{end}}</td>
+      <td class="actions">
+        {{if .DownloadURL}}<a href="{{.DownloadURL}}" target="_blank" rel="noopener noreferrer">Download ↗</a>{{end}}
+        <button class="danger" hx-delete="/buckets/{{$.Bucket}}/objects/{{.Key}}"
+          hx-target="#bucket-objects" hx-swap="innerHTML" hx-confirm="Delete {{.Key}}?">Delete</button>
+      </td>
     </tr>
   {{else}}
-    <tr><td colspan="4" class="empty">This bucket is empty.</td></tr>
+    <tr><td colspan="4" class="empty">This bucket is empty — upload the first object above.</td></tr>
   {{end}}
   </tbody>
 </table>

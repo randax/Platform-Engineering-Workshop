@@ -88,10 +88,47 @@ func TestBucketObjectsRender(t *testing.T) {
 		"originals/1-cat.png", // an object key
 		"245 KB",              // 250880 bytes, humanized
 		"http://localhost:30900/images/originals/1-cat.png?X-Amz-Signature=fake", // presigned link
-		"Download ↗", // the download affordance
+		"Download ↗",                       // the download affordance
+		`hx-post="/buckets/images/upload"`, // the upload form
+		`hx-delete="/buckets/images/objects/originals/1-cat.png"`, // per-object delete (key with slash)
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered fragment missing %q", want)
+		}
+	}
+}
+
+// TestBucketListRender proves the list fragment carries a Delete button per
+// bucket (create/delete-bucket both target #bucket-list).
+func TestBucketListRender(t *testing.T) {
+	tmpl, err := ParseTemplates(&Server{})
+	if err != nil {
+		t.Fatalf("parsing templates: %v", err)
+	}
+	data := bucketsData{Buckets: []store.BucketInfo{{Name: "images", Created: time.Unix(1700000000, 0)}}}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "bucket-list", data); err != nil {
+		t.Fatalf("rendering bucket-list: %v", err)
+	}
+	for _, want := range []string{`id="bucket-list"`, "images", `hx-delete="/buckets/images"`} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("bucket-list missing %q", want)
+		}
+	}
+}
+
+// TestBucketNameValidation pins the S3 naming rule the create handler enforces.
+func TestBucketNameValidation(t *testing.T) {
+	good := []string{"images", "my-bucket", "a1b2", "team-a-uploads"}
+	bad := []string{"", "ab", "UP", "under_score", "-lead", "trail-", "dots.not.allowed", strings.Repeat("x", 64)}
+	for _, n := range good {
+		if !bucketName.MatchString(n) {
+			t.Errorf("bucketName rejected valid %q", n)
+		}
+	}
+	for _, n := range bad {
+		if bucketName.MatchString(n) {
+			t.Errorf("bucketName accepted invalid %q", n)
 		}
 	}
 }

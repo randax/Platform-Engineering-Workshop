@@ -297,6 +297,9 @@ button.danger:hover { background: color-mix(in srgb, var(--bad) 85%, black); }
 label.check { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-weight: 450; margin: 0.6rem 0 0.2rem; color: var(--fg); }
 label.check input { width: auto; }
 label.check small { color: var(--muted); }
+/* Buckets: the inline upload form above a bucket's object list. */
+.upload-form { display: flex; flex-direction: row; gap: 0.6rem; align-items: center; margin: 0.5rem 0 1rem; }
+.upload-form input[type=file] { width: auto; flex: 1; font-size: 0.85rem; }
 
 /* Functions page: per-row actions (Invoke / traces / Delete) sit inline and
    compact so a row of buttons doesn't tower over the table. */

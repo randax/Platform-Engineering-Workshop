@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"regexp"
 
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/metrics"
@@ -30,12 +31,22 @@ func init() {
 		// Healthy — before that there are no buckets to browse, only errors.
 		Unlock:     func(s kube.Snapshot) bool { _, h := s.AppHealthy("rustfs"); return h },
 		LockedHint: "Complete Module 03 · Data",
-		Teaser:     "Browse your object storage and hand out presigned download links — the S3 API you stood up, no AWS required.",
+		Teaser:     "Browse your object storage and hand out presigned download links — create buckets, upload and delete objects, all on the S3 API you stood up, no AWS required.",
+		// Mutating routes. No CSRF token — single-user disposable lab. These are
+		// pure S3 (minio-go → RustFS); no Kubernetes RBAC is involved.
 		Extra: []Route{
 			{"GET /buckets/objects", handleBucketObjects}, // htmx-loaded object list
+			{"POST /buckets", handleCreateBucket},
+			{"DELETE /buckets/{bucket}", handleDeleteBucket},
+			{"POST /buckets/{bucket}/upload", handleUploadObject},
+			{"DELETE /buckets/{bucket}/objects/{key...}", handleDeleteObject},
 		},
 	})
 }
+
+// bucketName is the S3 naming rule we enforce client-side for a friendly error:
+// lowercase DNS-ish, 3–63 chars, no leading/trailing hyphen.
+var bucketName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$`)
 
 // maxObjects caps a single object listing. A bucket can hold millions of keys;
 // this browser is a teaching aid, not a file manager, so 200 rows is plenty and
@@ -168,6 +179,89 @@ func handleBucketObjects(s *Server, w http.ResponseWriter, r *http.Request) {
 	data, err := bucketObjects(r.Context(), s.Store, bucket, flash{})
 	if err != nil {
 		log.Printf("list objects in %s: %v", bucket, err)
+		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("S3 error: " + err.Error())})
+		return
+	}
+	s.render(w, "bucket-objects", data)
+}
+
+// renderBucketList re-lists the buckets and renders the list fragment with a
+// flash — the response to create/delete-bucket, swapped into #bucket-list.
+func (s *Server) renderBucketList(ctx context.Context, w http.ResponseWriter, fl flash) {
+	buckets, err := s.Store.ListBuckets(ctx)
+	if err != nil {
+		s.render(w, "bucket-list", bucketsData{Flash: errorFlash("S3 error: " + err.Error())})
+		return
+	}
+	s.render(w, "bucket-list", bucketsData{Buckets: buckets, Flash: fl})
+}
+
+// handleCreateBucket makes a bucket on the S3 API and re-renders the list.
+func handleCreateBucket(s *Server, w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	fl := flash{Msg: "Created bucket " + name + "."}
+	switch {
+	case !bucketName.MatchString(name):
+		fl = errorFlash("Invalid bucket name — 3–63 lowercase letters, digits or hyphens (no leading/trailing hyphen).")
+	default:
+		if err := s.Store.CreateBucket(r.Context(), name); err != nil {
+			fl = errorFlash("Create failed: " + err.Error())
+		}
+	}
+	s.renderBucketList(r.Context(), w, fl)
+}
+
+// handleDeleteBucket removes an empty bucket. RustFS refuses a non-empty one, so
+// the flash tells the user to empty it first.
+func handleDeleteBucket(s *Server, w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("bucket")
+	fl := flash{Msg: "Deleted bucket " + name + "."}
+	if err := s.Store.DeleteBucket(r.Context(), name); err != nil {
+		fl = errorFlash("Delete failed — is the bucket empty? " + err.Error())
+	}
+	s.renderBucketList(r.Context(), w, fl)
+}
+
+// handleUploadObject streams one uploaded file into the bucket (key = filename)
+// and re-renders that bucket's object list. maxUpload caps the multipart parse
+// so a huge file can't exhaust memory in the lab pod.
+const maxUpload = 32 << 20 // 32 MiB
+
+func handleUploadObject(s *Server, w http.ResponseWriter, r *http.Request) {
+	bucket := r.PathValue("bucket")
+	if err := r.ParseMultipartForm(maxUpload); err != nil {
+		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("Upload too large or malformed (max 32 MiB).")})
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("Pick a file to upload.")})
+		return
+	}
+	defer file.Close()
+	fl := flash{Msg: "Uploaded " + header.Filename + "."}
+	if err := s.Store.PutObject(r.Context(), bucket, header.Filename, file, header.Size, header.Header.Get("Content-Type")); err != nil {
+		fl = errorFlash("Upload failed: " + err.Error())
+	}
+	s.renderBucketObjectsAfter(r.Context(), w, bucket, fl)
+}
+
+// handleDeleteObject removes one object and re-renders the bucket's object list.
+// The {key...} wildcard carries slashes, so keys like originals/1.png work.
+func handleDeleteObject(s *Server, w http.ResponseWriter, r *http.Request) {
+	bucket, key := r.PathValue("bucket"), r.PathValue("key")
+	fl := flash{Msg: "Deleted " + key + "."}
+	if err := s.Store.DeleteObject(r.Context(), bucket, key); err != nil {
+		fl = errorFlash("Delete failed: " + err.Error())
+	}
+	s.renderBucketObjectsAfter(r.Context(), w, bucket, fl)
+}
+
+// renderBucketObjectsAfter re-lists one bucket's objects with a flash — shared
+// by upload and delete-object, both of which target #bucket-objects.
+func (s *Server) renderBucketObjectsAfter(ctx context.Context, w http.ResponseWriter, bucket string, fl flash) {
+	data, err := bucketObjects(ctx, s.Store, bucket, fl)
+	if err != nil {
 		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("S3 error: " + err.Error())})
 		return
 	}

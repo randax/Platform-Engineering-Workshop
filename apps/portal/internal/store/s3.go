@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"sort"
 	"strings"
@@ -128,6 +129,33 @@ func (s *Client) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
 		buckets = append(buckets, BucketInfo{Name: b.Name, Created: b.CreationDate})
 	}
 	return buckets, nil
+}
+
+// CreateBucket makes a new bucket on the API endpoint — the write half of the
+// module-03 win, from the console. Idempotent-ish: minio returns an error if it
+// already exists, which the handler surfaces as a friendly flash.
+func (s *Client) CreateBucket(ctx context.Context, name string) error {
+	return s.api.MakeBucket(ctx, name, minio.MakeBucketOptions{})
+}
+
+// PutObject uploads one object. size may be -1 (unknown) — minio then streams
+// with a multipart upload; for the small files this console handles, passing the
+// known size from the multipart header is the common path.
+func (s *Client) PutObject(ctx context.Context, bucket, key string, r io.Reader, size int64, contentType string) error {
+	_, err := s.api.PutObject(ctx, bucket, key, r, size, minio.PutObjectOptions{ContentType: contentType})
+	return err
+}
+
+// DeleteObject removes one object from a bucket.
+func (s *Client) DeleteObject(ctx context.Context, bucket, key string) error {
+	return s.api.RemoveObject(ctx, bucket, key, minio.RemoveObjectOptions{})
+}
+
+// DeleteBucket removes an (empty) bucket. RustFS/minio refuse a non-empty
+// bucket, so the handler tells the user to empty it first — the same guardrail
+// real S3 has.
+func (s *Client) DeleteBucket(ctx context.Context, name string) error {
+	return s.api.RemoveBucket(ctx, name)
 }
 
 // ListObjectsIn lists a bucket's objects, capped at max. The cap matters: a

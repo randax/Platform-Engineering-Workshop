@@ -259,8 +259,16 @@ func sampleBuckets() bucketsData {
 	base := time.Date(2026, 7, 16, 9, 12, 0, 0, time.UTC)
 	return bucketsData{
 		Buckets: []store.BucketInfo{
-			{Name: "uploads", Created: base},
+			{Name: "images", Created: base},
 			{Name: "thumbnails", Created: base.Add(90 * time.Second)},
+		},
+		// A selected bucket so the shot shows the upload form + per-object delete.
+		Objects: objectsData{
+			Bucket: "images",
+			Objects: []objectRow{
+				{ObjectInfo: store.ObjectInfo{Key: "originals/1-cat.png", Size: 250880, LastModified: base}, DownloadURL: "#"},
+				{ObjectInfo: store.ObjectInfo{Key: "originals/2-dog.png", Size: 189440, LastModified: base.Add(2 * time.Minute)}, DownloadURL: "#"},
+			},
 		},
 		Telemetry: true,
 		CPUSpark:  metrics.Sparkline([]float64{0.01, 0.03, 0.02, 0.05, 0.04, 0.06, 0.05, 0.07, 0.06, 0.05, 0.04, 0.05}, "CPU usage"),

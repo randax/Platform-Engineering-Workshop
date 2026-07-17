@@ -19,7 +19,7 @@ Every page has a light and a `-dark` variant (the console is theme-aware via
 | `console-database-monitoring.png` | A database's detail page — CNPG connections, cache-hit ratio and size (#56). |
 | `console-builds-monitoring.png` | The Builds page — BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs (#56). |
 | `console-streams-monitoring.png` | The Streams page — JetStream messages/bytes + connections from the NATS exporter sidecar (#56). |
-| `console-buckets-monitoring.png` | The Buckets page — RustFS pod CPU/memory (generic fallback; RustFS has no Prometheus endpoint) (#56). |
+| `console-buckets-monitoring.png` | The Buckets page — RustFS pod CPU/memory (generic fallback; RustFS has no Prometheus endpoint) (#56), plus full S3 CRUD: create a bucket, upload and delete objects, delete a bucket (#26). |
 
 ## Regenerating
 

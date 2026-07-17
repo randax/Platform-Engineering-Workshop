@@ -588,6 +588,37 @@ jobs:
           echo "✅ console Delete removed the Knative Service"
           { echo ""; echo "### Functions (#58) — build → deploy → invoke → delete from the console ✅"; echo "POSTed the form; \`${wf##*/}\` Succeeded, \`fn-${fn}\` served through Kourier, the console **invoked** it (200 OK, woke from zero) and then **deleted** it."; } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify Buckets page — S3 CRUD from the console (#26)
+        run: |
+          set -euo pipefail
+          # The Buckets page gained the write half: create a bucket, upload an
+          # object, delete the object, delete the bucket — all pure S3 (minio-go
+          # → RustFS), driven through the portal exactly as the browser would.
+          b=e2e-crud
+          base=http://localhost:30600
+          # Create.
+          c=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST "$base/buckets" --data-urlencode "name=$b" 2>/dev/null || true)
+          echo "POST /buckets name=$b → HTTP $c"; [ "$c" = 200 ] || { echo "❌ create-bucket failed"; exit 1; }
+          kubectl -n rustfs get pods >/dev/null 2>&1 || true
+          # Upload a small object (multipart, as the browser sends it).
+          echo "hello cloudbox" > /tmp/hello.txt
+          u=$(curl -fsS -o /tmp/up.html -w '%{http_code}' -X POST "$base/buckets/$b/upload" -F "file=@/tmp/hello.txt" 2>/dev/null || true)
+          echo "POST /buckets/$b/upload → HTTP $u"; [ "$u" = 200 ] || { echo "❌ upload failed"; cat /tmp/up.html; exit 1; }
+          # The object list fragment must now show the uploaded key.
+          curl -fsS "$base/buckets/objects?b=$b" 2>/dev/null | grep -q "hello.txt" \
+            || { echo "❌ uploaded object not listed"; exit 1; }
+          echo "✅ created bucket + uploaded object, visible in the console"
+          # Delete the object, then the (now empty) bucket.
+          do_=$(curl -fsS -o /dev/null -w '%{http_code}' -X DELETE "$base/buckets/$b/objects/hello.txt" 2>/dev/null || true)
+          echo "DELETE object → HTTP $do_"; [ "$do_" = 200 ] || { echo "❌ delete-object failed"; exit 1; }
+          db=$(curl -fsS -o /dev/null -w '%{http_code}' -X DELETE "$base/buckets/$b" 2>/dev/null || true)
+          echo "DELETE bucket → HTTP $db"; [ "$db" = 200 ] || { echo "❌ delete-bucket failed"; exit 1; }
+          # Prove the bucket is gone from the list.
+          curl -fsS "$base/buckets" 2>/dev/null | grep -q ">$b<" \
+            && { echo "❌ bucket $b still listed after delete"; exit 1; } || true
+          echo "✅ deleted object + bucket from the console"
+          { echo ""; echo "### Buckets (#26) — create → upload → delete object → delete bucket from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Resource snapshot → run summary (issue #8 RAM)
         if: always()
         run: |
