@@ -40,7 +40,7 @@ Hardware honesty, one more time: 16 GB RAM minimum with at least 10 GB allocatab
 cd lab/00-setup && ./verify.sh
 ```
 
-<span class="badge">15 min</span> · red sticky if anything is ❌
+<span class="badge">15 min</span> · red sticky if anything is <span class="svgi i-circle-x"></span>
 
 <!--
 Set the timer visibly. The task: run the pre-flight, fix what it flags (most common: Docker not running, or Docker memory limit below 10 GB), and run the module's verify.sh.

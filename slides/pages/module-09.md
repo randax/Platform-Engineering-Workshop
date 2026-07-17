@@ -44,12 +44,12 @@ Demystifier worth saying: a CloudEvent is just an HTTP POST with five ce-* heade
 
 <div class="grid grid-cols-2 gap-4 mt-4">
   <div class="principle">
-    <div class="ico">💃</div>
+    <div class="ico"><span class="svgi i-share-2"></span></div>
     <div class="name">Choreography · this module</div>
     <div class="tie" style="opacity:.85">Services react to <em>events</em>. The uploader emits a fact; the Broker routes it. No central brain — add a consumer, nobody rewires.<br><b>= Knative Eventing</b> &nbsp;(≈ EventBridge)</div>
   </div>
   <div class="principle">
-    <div class="ico">🎬</div>
+    <div class="ico"><span class="svgi i-workflow"></span></div>
     <div class="name">Orchestration · module 07</div>
     <div class="tie" style="opacity:.85">One controller drives a <em>defined sequence</em> — step 1→2→3, retries, a visual DAG. You already ran it: your CI build.<br><b>= Argo Workflows</b> &nbsp;(≈ Step Functions)</div>
   </div>

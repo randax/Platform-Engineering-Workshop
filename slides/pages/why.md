@@ -19,7 +19,7 @@ Every hand that goes up is a person who already knows why they're here. Then: "L
 <div class="text-xl opacity-90 mt-2">A Norwegian second-hand marketplace — <em>kjøp og selg brukt.</em></div>
 
 <div class="story mt-6">
-📦 Snap a photo of the thing in your loft → it's a listing in seconds. Someone across the fjord buys it. <strong>Photos in, thumbnails out, listings browsable.</strong> A million small uploads a day.
+<span class="svgi i-package"></span> Snap a photo of the thing in your loft → it's a listing in seconds. Someone across the fjord buys it. <strong>Photos in, thumbnails out, listings browsable.</strong> A million small uploads a day.
 </div>
 
 <div class="mt-6 text-lg opacity-80">

@@ -44,12 +44,12 @@ The mental model is the real takeaway: cloud products are software plus an API, 
 
 | Cloud primitive | You're running |
 |---|---|
-| Kubernetes / compute | ✅ Talos + Cilium |
-| Managed Postgres | ✅ CloudNativePG |
-| Object storage (S3) | ✅ RustFS |
-| Self-service infra | ✅ Crossplane |
-| Serverless · CI · registry | ✅ Knative · Argo Workflows · Zot |
-| Cloud console | ✅ Cloudbox Console |
+| Kubernetes / compute | <span class="svgi i-check" style="color:var(--jz-run)"></span> Talos + Cilium |
+| Managed Postgres | <span class="svgi i-check" style="color:var(--jz-run)"></span> CloudNativePG |
+| Object storage (S3) | <span class="svgi i-check" style="color:var(--jz-run)"></span> RustFS |
+| Self-service infra | <span class="svgi i-check" style="color:var(--jz-run)"></span> Crossplane |
+| Serverless · CI · registry | <span class="svgi i-check" style="color:var(--jz-run)"></span> Knative · Argo Workflows · Zot |
+| Cloud console | <span class="svgi i-check" style="color:var(--jz-run)"></span> Cloudbox Console |
 
 </div>
 
@@ -150,7 +150,7 @@ layout: cover
 
 <div class="callout mt-8 mx-auto max-w-120">
   <code>github.com/randax/Platform-Engineering-Workshop</code><br>
-  ⭐ it — then go run your cloud on your terms.
+  <span class="svgi i-star"></span> it — then go run your cloud on your terms.
 </div>
 
 <!--
