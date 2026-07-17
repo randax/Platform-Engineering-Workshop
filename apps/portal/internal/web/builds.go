@@ -27,11 +27,10 @@ import (
 
 func init() {
 	register(Page{
-		// Weight 55 keeps Builds at the tail of the Platform group (after
-		// Billing 50, before Self-service opens at 60), so the sidebar sections
-		// stay contiguous — CI is a platform capability, not a per-user tool.
-		Weight:     55,
-		NavSection: "Platform",
+		// Weight 72 puts Builds at the tail of the Services group — the CI
+		// pipeline is the machinery behind Functions, so it lives beside them.
+		Weight:     72,
+		NavSection: "Services",
 		NavTitle:   "Builds",
 		Path:       "/builds",
 		Handler:    handleBuilds,

@@ -14,7 +14,7 @@ Every page has a light and a `-dark` variant (the console is theme-aware via
 | `console-mobile-nav-open.png` | Phone width with the ☰ menu tapped open — the full nav revealed (CSS-only, no JS). |
 | `console-component-locked.png` | The Monitoring page when observability isn't enabled yet — degrade-in-place hint. |
 | `console-components.png` | The Components page — per-namespace health, each linking into its Monitoring detail. |
-| `console-services.png` | The Services page — request rate + avg-latency sparklines per Knative Service (#56). |
+| `console-services.png` | The **Functions** page — request rate + avg-latency sparklines per Knative Service (#56). Lives in the new **Services** nav section. |
 | `console-database-monitoring.png` | A database's detail page — CNPG connections, cache-hit ratio and size (#56). |
 | `console-builds-monitoring.png` | The Builds page — BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs (#56). |
 | `console-streams-monitoring.png` | The Streams page — JetStream messages/bytes + connections from the NATS exporter sidecar (#56). |

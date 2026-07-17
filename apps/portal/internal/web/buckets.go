@@ -20,10 +20,9 @@ import (
 
 func init() {
 	register(Page{
-		// Weight 65 puts Buckets between Databases (60) and Services (70), so it
-		// sits right after Databases inside the same Self-service section.
-		Weight:     65,
-		NavSection: "Self-service",
+		// Weight 60 sits right after Databases (56) in the Services section.
+		Weight:     60,
+		NavSection: "Services",
 		NavTitle:   "Buckets",
 		Path:       "/buckets",
 		Handler:    handleBuckets,

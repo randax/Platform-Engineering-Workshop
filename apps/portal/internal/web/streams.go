@@ -22,11 +22,10 @@ import (
 
 func init() {
 	register(Page{
-		// Weight 35 slots Streams right after Workshop (30) and before Activity
-		// (40), keeping it in the Platform section with the other read-only
-		// cluster views.
-		Weight:     35,
-		NavSection: "Platform",
+		// Weight 68 slots Streams into the Services section after New Function
+		// (66). Read-only for now (JetStream CRUD is tracked in PRD-0010).
+		Weight:     68,
+		NavSection: "Services",
 		NavTitle:   "Streams",
 		Path:       "/streams",
 		Handler:    handleStreams,

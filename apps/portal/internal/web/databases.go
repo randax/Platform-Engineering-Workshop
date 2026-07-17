@@ -13,8 +13,8 @@ import (
 
 func init() {
 	register(Page{
-		Weight:     60,
-		NavSection: "Self-service",
+		Weight:     56,
+		NavSection: "Services",
 		NavTitle:   "Databases",
 		Path:       "/databases",
 		Handler:    handleDatabases,
