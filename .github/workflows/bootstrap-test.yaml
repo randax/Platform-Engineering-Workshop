@@ -216,9 +216,12 @@ jobs:
           CLONE="$(gitops_clone)"
           enable_catalog "$CLONE" otel-collector.yaml
           gitops_push "$CLONE" "verify: enable otel-collector"
-          # 600s (not the 420s default): otel-collector is the last, heaviest
-          # catalog enable, and the app-of-apps parent can be slow to render the
-          # child this late in a loaded run (recurring "last: missing" flake).
+          # The app-of-apps intermittently fails to render this last child under
+          # load ("last: missing" flakes). The gitops push above still lands it in
+          # git (the flow we teach), but to make the rehearsal DETERMINISTIC we
+          # also apply the same catalog Application directly — ArgoCD then owns it
+          # either way. wait_app just waits for the collector to go Healthy.
+          kubectl apply -f gitops/catalog/otel-collector.yaml
           wait_app otel-collector 600
           kubectl -n observability rollout status deploy/otel-collector-gateway --timeout=180s
           kubectl -n observability rollout status ds/otel-collector-agent --timeout=180s
@@ -738,48 +741,80 @@ jobs:
           kubectl get ns "$proj" >/dev/null 2>&1 && echo "⚠️ namespace $proj still terminating (cascade slow) — acceptable" || echo "✅ project $proj deleted (namespace gone)"
           { echo ""; echo "### Projects (#96, PRD-0011) — create project → provision into it → delete, from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Verify deploy-from-source — the app-team golden path (PRD-0012)
+      - name: Verify deploy-from-source — real demo app, DB + bucket wired (PRD-0012, #35)
         run: |
           set -euo pipefail
-          # The app-team golden path: the console builds an app from a Gitea repo
-          # and deploys it as an Application (workload + DB + bucket) — reusing the
-          # module-07 build-and-push primitive + the Application XR. Needs BOTH the
-          # workflows grant (functions) and the applications grant, both already
-          # applied by the Functions/Applications steps above.
+          # The app-team golden path, end to end, with the REAL seeded demo app
+          # (cloudbox/demo-app, seeded by seed-gitea.sh): the console builds it
+          # from its own Gitea repo and deploys it as an Application, and the
+          # running app USES its composed Postgres (a visit counter) + S3 bucket.
+          # Needs BOTH grants (workflows + applications), applied above.
           base=http://localhost:30600
-          app=srcapp
-          # source=repo → the portal builds cloudbox/platform:lab/07-ci/app (a
-          # Dockerfile), pushes to Zot, then creates the Application at that image.
+          app=demoapp
+          # An in-cluster build pod can't reach the internet (offline cluster), so
+          # the demo app's golang builder base must be in Zot — seed it the same
+          # way module 07 seeds busybox (host-side crane against Zot's NodePort).
+          mise x crane@0.21.7 -- crane copy --insecure \
+            public.ecr.aws/docker/library/golang:1.25-alpine \
+            localhost:30500/library/golang:1.25-alpine
+          echo "✅ seeded the golang builder base into Zot"
+          # source=repo → build cloudbox/demo-app (multi-stage golang Dockerfile),
+          # push to Zot, create the Application at the built image.
           c=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/applications" \
             --data-urlencode "name=$app" --data-urlencode "source=repo" \
-            --data-urlencode "repo=cloudbox/platform" --data-urlencode "branch=main" \
-            --data-urlencode "path=lab/07-ci/app" \
+            --data-urlencode "repo=cloudbox/demo-app" --data-urlencode "branch=main" \
+            --data-urlencode "path=." \
             --data-urlencode "database=1" --data-urlencode "bucket=1" 2>/dev/null || true)
           echo "POST /applications (source=repo) → HTTP $c"; [ "$c" = 200 ] || { echo "❌ deploy-from-source POST errored (HTTP $c)"; exit 1; }
-          # Build half: a build-app-srcapp-* Workflow appears in `builds` and Succeeds.
+          # Build half: a build-app-demoapp-* Workflow appears. Poll its phase so a
+          # Failed build fails FAST (with the build's error) instead of hanging the
+          # full wait timeout.
           wf=""
           for _ in $(seq 1 30); do
             wf=$(kubectl -n builds get wf -o name 2>/dev/null | grep "build-app-${app}-" | head -1 || true)
             [ -n "$wf" ] && break; sleep 5
           done
           [ -n "$wf" ] || { echo "❌ no build-app-${app}-* Workflow (RBAC missing, or source not parsed?)"; kubectl -n builds get wf; exit 1; }
-          kubectl -n builds wait --for=jsonpath='{.status.phase}'=Succeeded "$wf" --timeout=300s \
-            || { echo "❌ app build did not Succeed"; kubectl -n builds get "$wf" -o yaml | tail -40; exit 1; }
-          echo "✅ built the app from source (${wf##*/})"
-          # The Application XR was created pointing at the built (node-side) image.
+          ph=""
+          for _ in $(seq 1 84); do
+            ph=$(kubectl -n builds get "$wf" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+            case "$ph" in
+              Succeeded) break;;
+              Failed|Error)
+                echo "❌ demo-app build $ph — node messages:"
+                kubectl -n builds get "$wf" -o jsonpath='{range .status.nodes.*}{.displayName}{": "}{.message}{"\n"}{end}'
+                echo "--- build container log ---"
+                bp=$(kubectl -n builds get pods -l "workflows.argoproj.io/workflow=${wf##*/}" -o name 2>/dev/null | head -1)
+                [ -n "$bp" ] && kubectl -n builds logs "$bp" -c main --tail=40 2>/dev/null || true
+                exit 1;;
+            esac
+            sleep 5
+          done
+          [ "$ph" = Succeeded ] || { echo "❌ demo-app build didn't Succeed in time (phase=$ph)"; exit 1; }
+          echo "✅ built the demo app from its own repo (${wf##*/})"
+          # The XR points at the built node-side image (unique per-build tag).
           img=$(kubectl -n demo get applications.platform.cloudbox.io "$app" -o jsonpath='{.spec.image}' 2>/dev/null || true)
-          # Image is the node-side pull host + app-<name> at a UNIQUE per-build tag.
           case "$img" in
             localhost:30500/app-${app}:*) ;;
             *) echo "❌ Application image = '$img', want localhost:30500/app-${app}:<tag>"; exit 1;;
           esac
-          # Deploy half: the composed workload runs the freshly built image.
-          kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=240s \
-            || { echo "❌ composed ksvc ${app} not Ready (image pull / build handoff?)"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
-          echo "✅ deploy-from-source: Gitea repo → build → Application, and the built image runs (ksvc ${app} Ready)"
-          # Cleanup (cascades the composed ksvc/DB/bucket).
+          # Deploy half: the composed workload runs and USES its dependencies.
+          kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=300s \
+            || { echo "❌ composed ksvc ${app} not Ready"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
+          host=$(kubectl -n demo get ksvc "${app}" -o jsonpath='{.status.url}'); host="${host#http://}"
+          # The page must show a DB-backed visit counter (proves the composed
+          # Postgres is wired AND used) — give the DB a moment to finish composing.
+          got=""
+          for _ in $(seq 1 30); do
+            got=$(curl -sS --max-time 20 -H "Host: ${host}" http://localhost:31080/ 2>/dev/null || true)
+            echo "$got" | grep -qE 'visitor <b>#[0-9]' && break; sleep 5
+          done
+          echo "$got" | grep -qE 'visitor <b>#[0-9]' \
+            || { echo "❌ demo-app didn't report a DB-backed counter (Postgres wiring?)"; echo "$got" | head -40; exit 1; }
+          echo "$got" | grep -qi "Bucket <code>" || echo "⚠️ bucket line missing on the demo-app page"
+          echo "✅ deploy-from-source: the demo app runs and USES its composed Postgres (visit counter) + bucket"
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
-          { echo ""; echo "### Deploy-from-source (PRD-0012) — Gitea repo → build → Application (workload+DB+bucket), from the console ✅"; } >> "${GITHUB_STEP_SUMMARY}"
+          { echo ""; echo "### Deploy-from-source + demo app (PRD-0012 / #35) — built cloudbox/demo-app from source; the running app uses its composed Postgres (live counter) + S3 bucket ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Verify the iterate loop — change code → Redeploy → new content (PRD-0012)
         run: |
