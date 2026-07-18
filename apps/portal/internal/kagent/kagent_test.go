@@ -18,7 +18,8 @@ import (
 // two tool steps (call + result), a thinking message, a verdict, then a terminal
 // status-update. Message/verdict/terminal frames use the documented,
 // kind-discriminated A2A envelope; tool-call/tool-result are the modeled shape
-// (#134). The verdict rides an A2A message DataPart.
+// (reconcile against live kagent at rehearsal — see spec #133 rehearsal gates).
+// The verdict rides an A2A message DataPart.
 const happyStream = `data: {"result":{"kind":"tool-call","tool":"k8s_get_resources","args":"pods -n demo-app"}}
 
 data: {"result":{"kind":"tool-result","output":"0/1 Running 7 restarts","observation":"7 restarts in 11 minutes"}}

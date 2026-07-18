@@ -165,9 +165,10 @@ type rpcError struct {
 // kind-discriminated (Message / TaskStatusUpdateEvent / TaskArtifactUpdateEvent
 // / Task). We align the `message` and terminal `status-update` frames to the
 // documented A2A envelope — including the verdict, carried as a message DataPart
-// — so issue #134's live reconciliation only has to settle how a *tool step*
-// surfaces. The `tool-call` / `tool-result` kinds are the console's model of
-// that and remain the contract of record for the seam until then.
+// — so we only have to reconcile against live kagent at rehearsal (see spec
+// #133 rehearsal gates) how a *tool step* surfaces. The `tool-call` /
+// `tool-result` kinds are the console's model of that and remain the
+// contract of record for the seam until then.
 type rpcResult struct {
 	Kind string `json:"kind"` // A2A: message | status-update; modeled: tool-call | tool-result
 
@@ -178,7 +179,7 @@ type rpcResult struct {
 	// A2A status-update: the documented terminal streaming signal
 	Final bool `json:"final"`
 
-	// Modeled tool step (reconciled in #134)
+	// Modeled tool step (reconcile against live kagent at rehearsal — see spec #133 rehearsal gates)
 	Tool        string `json:"tool"`
 	Args        string `json:"args"`
 	Output      string `json:"output"`
@@ -291,9 +292,9 @@ func translate(r *rpcResult) (ev Event, ok, done bool) {
 	case "status-update":
 		// The documented terminal streaming event ends the run.
 		return Event{}, false, r.Final
-	case "tool-call": // modeled (#134)
+	case "tool-call": // modeled (reconcile against live kagent at rehearsal — see spec #133 rehearsal gates)
 		return Event{Kind: KindToolCall, Tool: r.Tool, Args: r.Args}, true, false
-	case "tool-result": // modeled (#134)
+	case "tool-result": // modeled (reconcile against live kagent at rehearsal — see spec #133 rehearsal gates)
 		return Event{Kind: KindToolResult, Output: r.Output, Observation: r.Observation}, true, false
 	default:
 		return Event{}, false, false

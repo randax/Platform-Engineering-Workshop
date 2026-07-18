@@ -143,9 +143,10 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 	}
 	// A clean stream that produced nothing means every frame fell through the
 	// translation — almost always an A2A envelope mismatch. Make it visible
-	// rather than ending on a silent "complete" with an empty log (#134).
+	// rather than ending on a silent "complete" with an empty log (reconcile
+	// against live kagent at rehearsal — see spec #133 rehearsal gates).
 	if emitted == 0 {
-		emit("error", s.fragment("cf-error", "The agent finished without any readable steps — its response format may not match this console yet (see issue #134)."))
+		emit("error", s.fragment("cf-error", "The agent responded in a format this console doesn't recognize. Check that your kagent version matches the workshop pin."))
 		return
 	}
 	emit("done", "")
