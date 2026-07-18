@@ -4,6 +4,12 @@
 <h1>{{.Name}} <span class="badge {{.StatusClass}}">{{.Status}}</span></h1>
 <p class="lede">{{.Description}} · namespace <code>{{.Namespace}}</code> · <b>{{.Ready}}</b>/<b>{{.Total}}</b> workloads ready.</p>
 
+{{if .ShowDiag}}
+<h2>Diagnostics <small>why this component isn't healthy</small></h2>
+{{template "diagnostics" .Diag}}
+<p class="hint">The cause a <code>kubectl describe</code> would show — container faults and the namespace's Warning events. Platform components are fixed on the GitOps plane: edit <code>gitops/components/{{.Namespace}}</code> (or the catalog file) and push.</p>
+{{end}}
+
 <h2>Monitoring <small>last 30 min · sourced from the OTel stack</small></h2>
 {{if .Telemetry}}
 <div class="monitor">

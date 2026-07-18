@@ -192,22 +192,31 @@ func sampleApplications() applicationsData {
 		if ready {
 			a.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "True", Reason: "Available"}}
 		} else {
-			a.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "False", Reason: "Creating"}}
+			a.Status.Conditions = []kube.Condition{{Type: "Ready", Status: "False", Reason: "Creating",
+				Message: "cannot resolve resources: composed Deployment is not Available"}}
 		}
 		row := appRow{Application: a}
 		if ready {
 			row.URL = "http://" + name + ".demo.127.0.0.1.sslip.io:31080"
+		} else {
+			row.Why = a.Why() // the DR-0005 inline cause
 		}
 		return row
 	}
 	// The source-built app carries a repo image + offers Redeploy; the other is
-	// a prebuilt image.
+	// a prebuilt image that's stuck — so the shot also shows the DR-0005
+	// diagnostics (the cause a describe would show, right in the console).
 	src := mk("web", "localhost:30500/app-web:b7", 0, 3, true)
 	src.SourceBuilt = true
-	return applicationsData{Apps: []appRow{
-		src,
-		mk("api", "ghcr.io/acme/api:v2", 1, 5, false),
-	}, ScaffoldEnabled: true}
+	return applicationsData{
+		Apps:            []appRow{src, mk("api", "ghcr.io/acme/api:v2", 1, 5, false)},
+		ScaffoldEnabled: true,
+		ShowDiag:        true,
+		Diag: kube.Diagnostics{PodTroubles: []kube.PodTrouble{{
+			Pod: "api-00001-deployment-6c9f-8t2wq", Container: "user-container",
+			Reason: "ImagePullBackOff", Message: `Back-off pulling image "ghcr.io/acme/api:v2"`,
+		}}},
+	}
 }
 
 // sampleComponents mocks the Components list so the screenshot shows the new

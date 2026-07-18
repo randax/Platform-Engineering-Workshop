@@ -491,3 +491,23 @@ pre.code {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* Diagnostics panel (DR-0005) — the read-only "why unhealthy" rollup on the
+   component/application detail. Muted, dense, describe-like; the red badges
+   carry the alarm so the panel itself stays calm. */
+.diag { margin: 0.4rem 0 0.8rem; }
+.diag-pods { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 0.6rem; }
+.diag-pods th { text-align: left; font-weight: 600; color: var(--muted); font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.04em; padding: 0.2rem 0.6rem 0.2rem 0; }
+.diag-pods td { padding: 0.3rem 0.6rem 0.3rem 0; border-top: 1px solid var(--line); vertical-align: top; }
+.diag-msg { color: var(--muted); font-size: 0.85rem; word-break: break-word; }
+.diag-events { list-style: none; padding: 0; margin: 0; font-size: 0.88rem; }
+.diag-events li { padding: 0.25rem 0; border-top: 1px solid var(--line); }
+.diag-when { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 0.3rem; }
+.diag-obj { color: var(--muted); font-family: ui-monospace, monospace; font-size: 0.8rem; margin: 0 0.3rem; }
+
+/* Inline cause row under an unhealthy application, + the project diagnostics
+   panel below the table (DR-0005). */
+.diag-row td { color: var(--muted); font-size: 0.85rem; padding-top: 0; border-top: 0; }
+.diag-panel { margin-top: 1rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
+.diag-panel h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
