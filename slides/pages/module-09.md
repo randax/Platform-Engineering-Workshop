@@ -58,7 +58,7 @@ Demystifier worth saying: a CloudEvent is just an HTTP POST with five ce-* heade
 <div class="mt-5 text-lg opacity-85">Two shapes of multi-service coordination — and your platform ships <b>both</b>.</div>
 
 <!--
-A conceptual beat worth 60 seconds (PRD-0007). The room just built choreography; name it, and name its opposite — because "how do I coordinate services?" has two canonical answers and a platform engineer should know when to reach for each.
+A conceptual beat worth 60 seconds. The room just built choreography; name it, and name its opposite — because "how do I coordinate services?" has two canonical answers and a platform engineer should know when to reach for each.
 
 Choreography (this capstone): event-driven, decoupled. Services emit and subscribe to facts; no component knows the topology. Resilient and extensible (add a Trigger, not a code change) — but the flow is emergent, harder to see end to end. Knative Eventing is the open-source shape of EventBridge / SQS→Lambda.
 

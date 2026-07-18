@@ -14,20 +14,20 @@ Five minutes on mechanics, then hands on keyboards. This section is the contract
 
 | # | Module | Time |
 |---|--------|------|
-| 00 | Setup & pre-flight | 15 min |
+| 00 | Setup & pre-flight | 10 min |
 | 01 | Talos + Cilium — your own cloud | 35 min |
 | 02 | GitOps — Gitea + ArgoCD | 35 min |
 | 03 | Data — Postgres + S3 | 35 min |
 | 04 | Self-service — Crossplane v2 | 35 min |
-| 05 | Debug it (with or without AI) | 25 min |
+| 05 | Debug it (with or without AI) | 20 min |
 | 06–09 | Serverless · CI · Portal · Capstone | stretch |
 
 <!--
-Core is 00–05 — that's the plan, and it fits with slack. 06–09 are stretch: serverless (Knative), in-cluster CI (Argo Workflows + BuildKit + Zot), the Cloudbox Console portal, and the capstone picture pipeline that wires everything together.
+Core is 00–05: 170 minutes of guided content. Add a ~20-minute intro and two 10-minute breaks and that's 210 of our 240 — the last 30 are yours. 06–09 are stretch: serverless (Knative), in-cluster CI (Argo Workflows + BuildKit + Zot), the Cloudbox Console portal, and the capstone picture pipeline that wires everything together.
 
 Expectations management, said out loud: "We planned half of what fits. If you only finish the core, you've built a real platform. The stretch modules are for the fast 20% — and for your couch afterwards; nothing later depends on them and everything is public."
 
-Two 10-minute breaks: after module 03 and after module 05. The last 30 minutes are protected for open tinkering and weird questions.
+Two 10-minute breaks: after module 03 and after module 05. The math is deliberately tight — 210 minutes of guided time — so the final 30 do double duty: buffer if we ran long, and protected open tinkering and weird questions if we didn't. The stretch modules live in that window and on your couch.
 -->
 
 ---
