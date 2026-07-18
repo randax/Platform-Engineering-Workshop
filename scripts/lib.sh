@@ -47,6 +47,28 @@ need() {
   have "$1" || die "'$1' not found. ${2:-Run ./scripts/dev-setup.sh first, or restart your shell so mise activation takes effect.}"
 }
 
+# wait_rollout <ns> <kind/name> [timeout-seconds] — a robust rollout wait for the
+# bootstrap path. A single `kubectl rollout status --timeout` fails HARD the
+# moment a cold cluster's first image pull or a scheduling delay overruns the
+# clock (the recurring "timed out waiting for the condition" flake). This wraps
+# it with a generous default timeout and ONE retry — a slow first pull almost
+# always succeeds on the second attempt — and, only on a genuine final failure,
+# dumps the namespace's pod status + recent events so it's debuggable instead of
+# a bare timeout. Idempotent and safe for attendees, not just CI.
+wait_rollout() {
+  local ns="$1" obj="$2" timeout="${3:-300}" attempt
+  for attempt in 1 2; do
+    if kubectl -n "$ns" rollout status "$obj" --timeout="${timeout}s"; then
+      return 0
+    fi
+    warn "rollout ${ns}/${obj} not ready after ${timeout}s (attempt ${attempt}/2) — retrying"
+  done
+  fail "rollout ${ns}/${obj} never became ready — recent state:"
+  kubectl -n "$ns" get pods -o wide 2>/dev/null || true
+  kubectl -n "$ns" get events --sort-by=.lastTimestamp 2>/dev/null | tail -20 || true
+  return 1
+}
+
 # confirm "question" — interactive yes/no, defaults to no. Returns 0 on yes.
 confirm() {
   local answer

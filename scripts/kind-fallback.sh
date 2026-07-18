@@ -109,7 +109,7 @@ helm upgrade --install cilium cilium/cilium \
 
 # --- 4. Wait for Ready -------------------------------------------------------------------
 step "Waiting for nodes to become Ready (Cilium rollout)"
-kubectl -n kube-system rollout status daemonset/cilium --timeout=300s
+wait_rollout kube-system daemonset/cilium
 kubectl wait --for=condition=Ready nodes --all --timeout=300s
 kubectl get nodes -o wide
 

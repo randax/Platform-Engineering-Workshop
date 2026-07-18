@@ -39,7 +39,7 @@ step "Installing local-path-provisioner ${LOCAL_PATH_PROVISIONER_VERSION} (stora
 # apply avoids field-ownership conflicts on adoption.
 kubectl apply --server-side --force-conflicts \
   -f "${REPO_ROOT}/gitops/components/local-path-provisioner/local-path-storage.yaml"
-kubectl -n local-path-storage rollout status deployment/local-path-provisioner --timeout=180s
+wait_rollout local-path-storage deployment/local-path-provisioner
 ok "Default storage class 'local-path' ready"
 
 # --- 2. Gitea ----------------------------------------------------------------------
@@ -157,10 +157,10 @@ kubectl -n argocd rollout restart deployment argocd-server argocd-repo-server >/
 
 # --- 4. Wait for everything --------------------------------------------------------------
 step "Waiting for Gitea and ArgoCD to become ready"
-kubectl -n gitea rollout status deployment/gitea --timeout=300s
-kubectl -n argocd rollout status deployment/argocd-server --timeout=300s
-kubectl -n argocd rollout status deployment/argocd-repo-server --timeout=300s
-kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s
+wait_rollout gitea deployment/gitea
+wait_rollout argocd deployment/argocd-server
+wait_rollout argocd deployment/argocd-repo-server
+wait_rollout argocd statefulset/argocd-application-controller
 
 echo
 ok "GitOps engine is running."
