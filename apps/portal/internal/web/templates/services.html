@@ -66,7 +66,7 @@ source in-cluster and deploys it.</p>
     <tbody>
     {{range .Rows}}
       <tr>
-        <td>{{.Metadata.Name}}</td>
+        <td><a href="/services/{{.Metadata.Namespace}}/{{.Metadata.Name}}">{{.Metadata.Name}}</a></td>
         <td>{{.Metadata.Namespace}}</td>
         <td><code>{{.Status.URL}}</code></td>
         <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
@@ -85,9 +85,6 @@ source in-cluster and deploys it.</p>
           {{end}}
         </td>
       </tr>
-      {{/* The cause, inline under an unhealthy function — the Knative condition
-           message (DR-0005). Quiet while it's still coming up (.Why is ""). */}}
-      {{if .Why}}<tr class="diag-row"><td colspan="8"><span class="diag-when">why</span> {{.Why}}</td></tr>{{end}}
     {{else}}
       <tr><td colspan="8" class="empty">No functions yet — build one below, or enable knative-serving from the catalog (module 06).</td></tr>
     {{end}}
@@ -108,4 +105,53 @@ source in-cluster and deploys it.</p>
     <pre>{{.Body}}</pre>
   {{end}}
 </div>
+{{end}}
+
+{{/* Function detail — parity with the Application/Database detail views. Depth
+     (conditions, diagnostics, scale, metrics, invoke, delete) lives here; the
+     list stays scannable triage. */}}
+{{define "function-detail"}}
+{{template "head" "services"}}
+<p><a href="/services">← all functions</a></p>
+{{if not .Found}}
+<h1>{{.Name}}</h1>
+<p class="lede">No function named <code>{{.Name}}</code> in namespace <code>{{.Namespace}}</code> — it may have been deleted, or a different project is selected.</p>
+{{template "foot" .}}
+{{else}}
+<h1>{{.Name}} <span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></h1>
+<p class="lede">A Knative Service in <code>{{.Namespace}}</code> — scales to zero and back.{{if .URL}} Serving at <code>{{.URL}}</code>.{{end}}</p>
+
+{{if .ShowDiag}}
+<h2>Diagnostics <small>why this function isn't ready</small></h2>
+{{if .Why}}<p class="diag-why">{{.Why}}</p>{{end}}
+{{template "diagnostics" .Diag}}
+<p class="hint">The cause a <code>kubectl describe</code> would show — a failed revision usually means a bad image or a crash on boot. Rebuild from the Functions list, or delete and recreate.</p>
+{{end}}
+
+<h2>Actions</h2>
+<div class="fn-actions">
+  {{/* Invoke wakes a scaled-to-zero function server-side (GET its cluster-local URL). */}}
+  <button hx-post="/services/{{.Namespace}}/{{.Name}}/invoke" hx-target="#invoke-result" hx-swap="innerHTML">Invoke</button>
+  <a class="btn ghost" href="{{.TracesURL}}" target="_blank">traces →</a>
+  {{if .Deletable}}<button class="danger" hx-delete="/services/{{.Name}}"
+    hx-on::after-request="if(event.detail.successful) window.location='/services'"
+    hx-confirm="Delete {{.Name}}? This removes the Knative Service.">Delete</button>{{end}}
+</div>
+<div id="invoke-result"></div>
+
+<h2>Monitoring <small>last 30 min</small></h2>
+{{if .Telemetry}}
+<div class="monitor">
+  <div class="metric"><span class="metric-label">Scale</span>
+    {{if .Scale}}<span class="metric-now">{{.Scale}}</span>{{else}}<span class="nodata">—</span>{{end}}</div>
+  <div class="metric"><span class="metric-label">Request rate</span>
+    {{if .ReqSpark}}<span class="metric-spark">{{.ReqSpark}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
+  <div class="metric"><span class="metric-label">Avg latency</span>
+    {{if .LatSpark}}<span class="metric-spark">{{.LatSpark}}</span><span class="metric-now">{{.LatNow}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
+</div>
+{{else}}
+<p class="hint">{{icon "lock"}} Enable the observability stack to light up this function's metrics.</p>
+{{end}}
+{{template "foot" .}}
+{{end}}
 {{end}}

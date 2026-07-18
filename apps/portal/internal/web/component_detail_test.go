@@ -143,7 +143,8 @@ func TestGenerateScreenshots(t *testing.T) {
 		{"component-detail-locked", "component-detail", locked},
 		{"components", "components", sampleComponents()},
 		{"applications", "applications", sampleApplications()},
-		{"applications-diagnostics", "applications", sampleApplicationsUnhealthy()},
+		{"application-detail", "application-detail", sampleAppDetail()},
+		{"function-detail", "function-detail", sampleFnDetail()},
 		{"services", "services", functionsData{Rows: sampleServices(), Samples: fnSamples}},
 		{"database-detail", "database-detail", sampleDatabaseDetail()},
 		{"builds", "builds", sampleBuilds()},
@@ -212,24 +213,52 @@ func sampleApplications() applicationsData {
 	}, ScaffoldEnabled: true}
 }
 
-// sampleApplicationsUnhealthy is the DR-0005 diagnostics state: the api app is
-// stuck on an unpullable image, so the console shows the failing condition
-// inline AND the Diagnostics panel (the cause a describe would show).
-func sampleApplicationsUnhealthy() applicationsData {
-	d := sampleApplications()
-	for i := range d.Apps {
-		if d.Apps[i].Metadata.Name == "api" {
-			d.Apps[i].Status.Conditions = []kube.Condition{{Type: "Ready", Status: "False", Reason: "Creating",
-				Message: "cannot resolve resources: composed Deployment is not Available"}}
-			d.Apps[i].Why = d.Apps[i].Application.Why()
-		}
+// sampleAppDetail is the Application detail page in its most instructive state:
+// a source-built app stuck on an unpullable image, showing the composed-resource
+// cross-links AND the DR-0005 diagnostics (the cause a describe would show).
+func sampleAppDetail() appDetailData {
+	return appDetailData{
+		Name: "api", Namespace: "demo", Found: true,
+		Readiness:   kube.Readiness{Label: "Creating", Class: "meh"},
+		SourceBuilt: true,
+		Repo:        "http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/api.git",
+		Branch:      "main",
+		Composed: []composedRef{
+			{Kind: "Workload", Name: "api", Note: "Knative Service — scales to zero; serves the URL above"},
+			{Kind: "Database", Name: "api", Href: "/databases/api", Note: "Postgres, injected as DATABASE_URL"},
+			{Kind: "Bucket", Name: "api-data", Href: "/buckets/api-data", Note: "S3 bucket, injected as S3_*"},
+		},
+		Why:      "cannot resolve resources: composed Deployment is not Available",
+		ShowDiag: true,
+		Diag: kube.Diagnostics{PodTroubles: []kube.PodTrouble{{
+			Pod: "api-00001-deployment-6c9f-8t2wq", Container: "user-container",
+			Reason: "ImagePullBackOff", Message: `Back-off pulling image "ghcr.io/acme/api:v2"`,
+		}}},
 	}
-	d.ShowDiag = true
-	d.Diag = kube.Diagnostics{PodTroubles: []kube.PodTrouble{{
-		Pod: "api-00001-deployment-6c9f-8t2wq", Container: "user-container",
-		Reason: "ImagePullBackOff", Message: `Back-off pulling image "ghcr.io/acme/api:v2"`,
-	}}}
-	return d
+}
+
+// sampleFnDetail is the Function detail page with BOTH gated branches live
+// (ShowDiag + Telemetry) so the render test exercises them — a stuck revision
+// showing its diagnostics plus the monitoring panel.
+func sampleFnDetail() fnDetailData {
+	return fnDetailData{
+		Name: "fn-hello", Namespace: "demo", Found: true,
+		Readiness: kube.Readiness{Label: "RevisionFailed", Class: "meh"},
+		URL:       "http://fn-hello.demo.127.0.0.1.sslip.io:31080",
+		Deletable: true,
+		Why:       `Revision "fn-hello-00001" failed: unable to fetch image`,
+		ShowDiag:  true,
+		Diag: kube.Diagnostics{PodTroubles: []kube.PodTrouble{{
+			Pod: "fn-hello-00001-deployment-7c9f-2kx8m", Container: "user-container",
+			Reason: "ImagePullBackOff", Message: `Back-off pulling image "localhost:30500/fn-hello:b7"`,
+		}}},
+		Telemetry: true,
+		ReqSpark:  metrics.Sparkline([]float64{0, 1, 2, 1, 3, 2}, "request rate"),
+		LatSpark:  metrics.Sparkline([]float64{40, 55, 48, 60}, "avg latency"),
+		LatNow:    "60 ms",
+		Scale:     "idle · 0 pods",
+		TracesURL: "#",
+	}
 }
 
 // sampleComponents mocks the Components list so the screenshot shows the new

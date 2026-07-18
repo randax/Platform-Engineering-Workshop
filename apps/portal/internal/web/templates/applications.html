@@ -78,7 +78,7 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
     <tbody>
     {{range .Apps}}
       <tr>
-        <td>{{.Metadata.Name}}</td>
+        <td><a href="/applications/{{.Metadata.Name}}">{{.Metadata.Name}}</a></td>
         <td><code>{{.Spec.Image}}</code></td>
         <td>{{.Spec.Replicas.Min}}–{{.Spec.Replicas.Max}}</td>
         <td>
@@ -88,29 +88,77 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
         <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
         <td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">open ↗</a>{{else}}<span class="nodata">—</span>{{end}}</td>
         <td class="actions">
-          {{/* Redeploy only for source-built apps — rebuild the repo and roll it. */}}
-          {{if .SourceBuilt}}<button hx-post="/applications/{{.Metadata.Name}}/redeploy"
-            hx-target="#app-list" hx-swap="outerHTML"
-            hx-confirm="Rebuild {{.Metadata.Name}} from its repo and roll it forward?">Redeploy</button>{{end}}
+          <a class="btn ghost" href="/applications/{{.Metadata.Name}}">Details</a>
           <button class="danger" hx-delete="/applications/{{.Metadata.Name}}"
             hx-target="#app-list" hx-swap="outerHTML"
             hx-confirm="Delete {{.Metadata.Name}}? This removes the workload, its database and bucket.">Delete</button>
         </td>
       </tr>
-      {{/* The cause, inline under an unhealthy app — the Crossplane condition
-           message (DR-0005). Quiet while it's still converging (.Why is ""). */}}
-      {{if .Why}}<tr class="diag-row"><td colspan="7"><span class="diag-when">why</span> {{.Why}}</td></tr>{{end}}
     {{else}}
       <tr><td colspan="7" class="empty">No applications yet — deploy one below (the golden path from module 04).</td></tr>
     {{end}}
     </tbody>
   </table>
-  {{if .ShowDiag}}
-  <div class="diag-panel">
-    <h3>Diagnostics <small>why an app isn't healthy</small></h3>
-    {{template "diagnostics" .Diag}}
-    <p class="hint">The cause a <code>kubectl describe</code> would show. Tenant-plane fix: push a fix and hit <b>Redeploy</b> (source-built apps), or delete and recreate with a working image.</p>
-  </div>
-  {{end}}
 </div>
+{{end}}
+
+{{/* Application detail — the composition hub (composed-resource cross-links +
+     diagnostics + source/redeploy + monitoring), so the list stays triage-only. */}}
+{{define "application-detail"}}
+{{template "head" "applications"}}
+<p><a href="/applications">← all applications</a></p>
+{{if not .Found}}
+<h1>{{.Name}}</h1>
+<p class="lede">No application named <code>{{.Name}}</code> in project <code>{{.Namespace}}</code> — it may have been deleted, or a different project is selected.</p>
+{{template "foot" .}}
+{{else}}
+<h1>{{.Name}} <span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span>
+  {{if .SourceBuilt}}<span class="tag">source-built</span>{{end}}</h1>
+<p class="lede">One <code>Application</code> composing a workload, a database and a bucket, in project <code>{{.Namespace}}</code>.{{if .URL}} Serving at <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.URL}} ↗</a>.{{end}}</p>
+
+{{if .ShowDiag}}
+<h2>Diagnostics <small>why this app isn't ready</small></h2>
+{{if .Why}}<p class="diag-why">{{.Why}}</p>{{end}}
+{{template "diagnostics" .Diag}}
+<p class="hint">The cause a <code>kubectl describe</code> would show. Tenant-plane fix: {{if .SourceBuilt}}push a fix and hit <b>Redeploy</b> below{{else}}delete and recreate with a working image{{end}}.</p>
+{{end}}
+
+<h2>Composed resources <small>what this app wired together</small></h2>
+<table class="composed"><tbody>
+  {{range .Composed}}
+  <tr>
+    <td class="composed-kind">{{.Kind}}</td>
+    <td>{{if .Href}}<a href="{{.Href}}"><code>{{.Name}}</code></a>{{else}}<code>{{.Name}}</code>{{end}}</td>
+    <td class="composed-note">{{.Note}}</td>
+  </tr>
+  {{end}}
+</tbody></table>
+
+{{if .SourceBuilt}}
+<h2>Source <small>deploy-from-source</small></h2>
+<p>Built from <code>{{.Repo}}</code> <small>(branch {{.Branch}})</small>. Change the code, push, then roll it forward:</p>
+<button hx-post="/applications/{{.Name}}/redeploy" hx-target="#redeploy-flash" hx-swap="innerHTML"
+  hx-confirm="Rebuild {{.Name}} from its repo and roll it forward?">Redeploy</button>
+<div id="redeploy-flash"></div>
+{{end}}
+
+<h2>Monitoring <small>last 30 min · the workload</small></h2>
+{{if .Telemetry}}
+<div class="monitor">
+  <div class="metric"><span class="metric-label">Request rate</span>
+    {{if .ReqSpark}}<span class="metric-spark">{{.ReqSpark}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
+  <div class="metric"><span class="metric-label">Avg latency</span>
+    {{if .LatSpark}}<span class="metric-spark">{{.LatSpark}}</span><span class="metric-now">{{.LatNow}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
+</div>
+<p><a href="{{.MetricsURL}}" target="_blank">Explore traces in Grafana →</a></p>
+{{else}}
+<p class="hint">{{icon "lock"}} Enable the observability stack to light up the workload's metrics.</p>
+{{end}}
+
+<h2>Danger zone</h2>
+<button class="danger" hx-delete="/applications/{{.Name}}"
+  hx-on::after-request="if(event.detail.successful) window.location='/applications'"
+  hx-confirm="Delete {{.Name}}? This removes the workload, its database and bucket.">Delete application</button>
+{{template "foot" .}}
+{{end}}
 {{end}}

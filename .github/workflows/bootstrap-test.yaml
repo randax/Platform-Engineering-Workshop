@@ -926,8 +926,9 @@ jobs:
           set -euo pipefail
           # DR-0005: when something breaks, the console surfaces the CAUSE a
           # `kubectl describe` would show. Deploy an app with an unpullable image →
-          # the composed workload ImagePullBackOffs → the Applications page must
-          # show that reason (the Diagnostics section), not merely "not Ready".
+          # the composed workload ImagePullBackOffs → the Application DETAIL page
+          # (the composition hub — diagnostics live here, not crammed on the list)
+          # must show that reason, not merely "not Ready".
           base=http://localhost:30600
           app=brokenapp
           c=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/applications" \
@@ -935,22 +936,22 @@ jobs:
             --data-urlencode "image=localhost:30500/does-not-exist:nope" \
             --data-urlencode "database=1" --data-urlencode "bucket=1" 2>/dev/null || true)
           echo "POST /applications (unpullable image) → HTTP $c"; [ "$c" = 200 ] || { echo "❌ POST errored (HTTP $c)"; exit 1; }
-          # The Applications page must surface the image-pull cause once the
-          # composed workload's POD actually backs off (not just the XR/Knative
-          # condition, which mentions the image within ~100ms — too early). Poll
-          # for the DR-0005 cause→action HINT itself, which only renders from a
-          # real pod-trouble row. Apostrophe-free slice: html/template escapes the
-          # apostrophe in "can't" to &#39;, so a literal grep would miss.
+          # Poll the DETAIL page (the composition hub — diagnostics live here now,
+          # not crammed on the list) for the DR-0005 cause→action HINT. The hint
+          # only renders from a real pod-trouble row, so it won't match the
+          # XR/Knative condition text that mentions the image within ~100ms (before
+          # any pod has backed off). Apostrophe-free slice: html/template escapes
+          # the apostrophe in "can't" to &#39;, so a literal grep would miss.
           ok=0; page=""
           for _ in $(seq 1 60); do
-            page=$(curl -fsS "$base/applications" 2>/dev/null || true)
+            page=$(curl -fsS "$base/applications/$app" 2>/dev/null || true)
             if echo "$page" | grep -qi "check the tag exists in the registry"; then ok=1; break; fi
             sleep 5
           done
-          [ "$ok" = 1 ] || { echo "❌ console didn't surface the image-pull cause+hint on /applications"; echo "$page" | grep -io "diag-hint[^<]*" | head; kubectl -n demo get pods; exit 1; }
+          [ "$ok" = 1 ] || { echo "❌ detail page didn't surface the image-pull cause+hint"; echo "$page" | grep -io "diag-hint[^<]*" | head; kubectl -n demo get pods; exit 1; }
           echo "$page" | grep -q "Diagnostics" || { echo "❌ hint present but no Diagnostics section?"; exit 1; }
           echo "$page" | grep -qE "ImagePullBackOff|ErrImagePull" || { echo "❌ hint present but the raw reason isn't shown?"; exit 1; }
-          echo "✅ diagnostics: the console surfaced the ImagePullBackOff cause AND a next-step hint (not just 'not Ready')"
+          echo "✅ diagnostics: the Application detail page surfaced the ImagePullBackOff cause AND a next-step hint (not just 'not Ready')"
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
           { echo ""; echo "### Diagnostics (DR-0005) — a broken app's ImagePullBackOff cause is surfaced in the console, not just a red 'not Ready' ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
