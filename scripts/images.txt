@@ -102,8 +102,10 @@ ghcr.io/kagent-dev/kagent/tools:0.2.1
 ghcr.io/kagent-dev/kagent/ui:0.9.11
 docker.io/library/postgres:18.3-alpine
 # app + skills-init are controller-created at Agent reconcile; the static scan
-# misses them, but offline needs them (comments must be full-line: crane-check
-# reads entries verbatim and does not strip trailing comments)
+# misses them, but offline needs them. Comments in this file must be FULL-LINE:
+# both checkers read image entries verbatim and only strip full-line comments —
+# the crane-check job (.github/workflows/images-gate.yaml) and
+# scripts/check-consistency.sh.
 ghcr.io/kagent-dev/kagent/app:0.9.11
 ghcr.io/kagent-dev/kagent/skills-init:0.9.11
 

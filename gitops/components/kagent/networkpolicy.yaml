@@ -27,10 +27,20 @@ spec:
   policyTypes:
     - Ingress
   ingress:
+    # Intra-namespace: UI/agents/tools talk to their control plane — all ports,
+    # so upstream's internal wiring keeps working across chart bumps.
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kagent
+    # The Console: only portal-labeled pods, only the A2A/API port.
+    - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: portal
+          podSelector:
+            matchLabels:
+              app: portal
+      ports:
+        - protocol: TCP
+          port: 8083
