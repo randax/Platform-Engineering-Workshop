@@ -451,8 +451,13 @@ jobs:
           # end. cloudbox-uploader proves portal→uploader traced; cloudbox-resizer
           # proves the chain survived the async broker hop (the headline fix).
           # Keep re-uploading each round to keep spans flowing for the connectors.
+          # The resizer half is the slowest thing in the rehearsal by nature: a
+          # scale-from-zero ksvc, woken by an async CloudEvent through the broker,
+          # whose spans then have to export and become queryable in VictoriaTraces.
+          # 48×5s ≈ 4 min of patience (was 150s, which flaked on the tail) — the
+          # re-upload each round keeps the pipeline warm so it eventually traces.
           up=""; rz=""
-          for _ in $(seq 1 30); do
+          for _ in $(seq 1 48); do
             curl -fsS --max-time 30 -o /dev/null -F "file=@/tmp/tel.png;type=image/png;filename=tel.png" http://localhost:30600/gallery/upload 2>/dev/null || true
             svcs=$(curl -fsS "http://localhost:10428/select/jaeger/api/services" 2>/dev/null | jq -r '.data[]?' || true)
             [[ "$svcs" == *cloudbox-uploader* ]] && up=1

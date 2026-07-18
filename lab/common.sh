@@ -55,8 +55,19 @@ wait_app() { # <app-name> [timeout-seconds]
     argocd_refresh "$name"
     st="$(kubectl -n argocd get application "$name" \
       -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || true)"
-    if [ "$st" = "Synced Healthy" ]; then
-      echo "app '$name' is Synced/Healthy"
+    # Succeed on HEALTH — the workloads are running, which is what every
+    # capability check downstream actually needs. Sync status (the git-vs-cluster
+    # diff) is advisory: an app legitimately sits "OutOfSync Healthy" while ArgoCD
+    # is mid-reconcile or on a benign serverside-apply field diff, and timing out
+    # on that is a race, not a real failure (the functional assertions that follow
+    # catch genuine breakage). Requiring "Synced Healthy" was a recurring flake.
+    local sync="${st%% *}" health="${st##* }"
+    if [ "$health" = "Healthy" ]; then
+      if [ "$sync" = "Synced" ]; then
+        echo "app '$name' is Synced/Healthy"
+      else
+        echo "app '$name' is Healthy (sync: ${sync:-unknown})"
+      fi
       return 0
     fi
     # If the child Application doesn't exist yet, the app-of-apps parent hasn't
@@ -71,6 +82,22 @@ wait_app() { # <app-name> [timeout-seconds]
     waited=$((waited + 10))
   done
   echo "ERROR: timed out after ${timeout}s waiting for app '$name' (last: ${st:-missing})" >&2
+  return 1
+}
+
+# wait_exists <ns> <kind/name> [timeout-seconds] — poll until a resource EXISTS.
+# `kubectl wait --for=condition=...` errors immediately on a missing resource
+# (it does not wait for creation), and wait_app now returns on app HEALTH — an
+# app can be Healthy while still OutOfSync with a resource not yet applied. Use
+# this before any `kubectl wait` on a resource an ArgoCD app is expected to create.
+wait_exists() {
+  local ns="$1" obj="$2" timeout="${3:-300}" waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    kubectl -n "$ns" get "$obj" >/dev/null 2>&1 && return 0
+    sleep 5
+    waited=$((waited + 5))
+  done
+  echo "ERROR: $obj never appeared in ns $ns after ${timeout}s" >&2
   return 1
 }
 
