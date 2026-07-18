@@ -928,8 +928,9 @@ jobs:
           set -euo pipefail
           # DR-0005: when something breaks, the console surfaces the CAUSE a
           # `kubectl describe` would show. Deploy an app with an unpullable image →
-          # the composed workload ImagePullBackOffs → the Applications page must
-          # show that reason (the Diagnostics section), not merely "not Ready".
+          # the composed workload ImagePullBackOffs → the Application DETAIL page
+          # (the composition hub — diagnostics live here, not crammed on the list)
+          # must show that reason, not merely "not Ready".
           base=http://localhost:30600
           app=brokenapp
           c=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/applications" \
@@ -937,17 +938,19 @@ jobs:
             --data-urlencode "image=localhost:30500/does-not-exist:nope" \
             --data-urlencode "database=1" --data-urlencode "bucket=1" 2>/dev/null || true)
           echo "POST /applications (unpullable image) → HTTP $c"; [ "$c" = 200 ] || { echo "❌ POST errored (HTTP $c)"; exit 1; }
-          # The Applications page must surface the image-pull cause once the pod
-          # backs off (the composed ksvc spins a pod that can't pull).
+          # Poll the detail page for the POD-trouble row — its container name
+          # ("user-container", Knative's app container) only renders from a real
+          # pod trouble, so it won't match the XR/Knative condition text that
+          # mentions the image within ~100ms (before any pod has backed off).
           ok=0; page=""
-          for _ in $(seq 1 48); do
-            page=$(curl -fsS "$base/applications" 2>/dev/null || true)
-            if echo "$page" | grep -qE "ImagePullBackOff|ErrImagePull"; then ok=1; break; fi
+          for _ in $(seq 1 60); do
+            page=$(curl -fsS "$base/applications/$app" 2>/dev/null || true)
+            if echo "$page" | grep -q "user-container" && echo "$page" | grep -qE "ImagePullBackOff|ErrImagePull"; then ok=1; break; fi
             sleep 5
           done
-          [ "$ok" = 1 ] || { echo "❌ console didn't surface the image-pull cause on /applications"; echo "$page" | grep -iE "diagnostic|why|ready|badge" | head; kubectl -n demo get pods; exit 1; }
+          [ "$ok" = 1 ] || { echo "❌ detail page didn't surface the image-pull pod trouble"; echo "$page" | grep -iE "diag|why|ready|container" | head; kubectl -n demo get pods; exit 1; }
           echo "$page" | grep -q "Diagnostics" || { echo "❌ page has the reason but no Diagnostics section?"; exit 1; }
-          echo "✅ diagnostics: the console surfaced the ImagePullBackOff cause (not just 'not Ready')"
+          echo "✅ diagnostics: the Application detail page surfaced the ImagePullBackOff cause (not just 'not Ready')"
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
           { echo ""; echo "### Diagnostics (DR-0005) — a broken app's ImagePullBackOff cause is surfaced in the console, not just a red 'not Ready' ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 

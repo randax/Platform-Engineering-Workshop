@@ -42,7 +42,7 @@ component-detail-monitoring:console-component-monitoring
 component-detail-locked:console-component-locked
 components:console-components
 applications:console-applications
-applications-diagnostics:console-applications-diagnostics
+application-detail:console-application-detail
 services:console-services
 database-detail:console-database-monitoring
 builds:console-builds-monitoring

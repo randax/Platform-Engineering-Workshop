@@ -155,9 +155,21 @@ func TestTemplatesRender(t *testing.T) {
 				`name="image"`, `Min scale`, `Max scale`, // the fuller input set
 				`name="source"`, `Build from a repo`, `name="repo"`, // deploy-from-source toggle
 				`Attach a Postgres database`, `Attach an S3 bucket`, // dependency toggles
-				`web.demo.127.0.0.1.sslip.io`,          // the Ready app's URL
-				`hx-post="/applications/web/redeploy"`, // Redeploy on the source-built app
-				`hx-delete="/applications/web"`,        // per-row delete
+				`web.demo.127.0.0.1.sslip.io`,   // the Ready app's URL
+				`href="/applications/web"`,      // name + Details link into the detail view
+				`hx-delete="/applications/web"`, // per-row delete
+			},
+		},
+		"application-detail": {
+			data: sampleAppDetail(),
+			want: []string{
+				`Composed resources`,                   // the composition hub
+				`href="/databases/api"`,                // cross-link to the composed database
+				`href="/buckets/api-data"`,             // cross-link to the composed bucket
+				`Diagnostics`,                          // the "why", moved here off the list
+				`ImagePullBackOff`,                     // the pod-trouble cause
+				`hx-post="/applications/api/redeploy"`, // Redeploy lives on the detail now
+				`hx-delete="/applications/api"`,        // delete from the danger zone
 			},
 		},
 		"database-detail": {
