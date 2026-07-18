@@ -213,14 +213,17 @@ jobs:
           set -euo pipefail
           # shellcheck source=../../lab/common.sh
           source lab/common.sh
-          CLONE="$(gitops_clone)"
-          enable_catalog "$CLONE" otel-collector.yaml
-          gitops_push "$CLONE" "verify: enable otel-collector"
-          # The app-of-apps intermittently fails to render this last child under
-          # load ("last: missing" flakes). The gitops push above still lands it in
-          # git (the flow we teach), but to make the rehearsal DETERMINISTIC we
-          # also apply the same catalog Application directly — ArgoCD then owns it
-          # either way. wait_app just waits for the collector to go Healthy.
+          # otel-collector is enabled the SAME gitops way as the Victoria stack
+          # above (cp catalog → apps → push → the app-of-apps renders it) — that
+          # flow is already proven by those apps in this very run. otel-collector
+          # is the last and heaviest catalog enable, and under CI load the
+          # app-of-apps was intermittently slow to render THIS child, so the wait
+          # flaked. Earlier attempts made it worse: pushing to git AND applying
+          # directly gave it two owners → a stuck "Unknown Progressing".
+          # Fix: give it a SINGLE owner. Apply the catalog Application directly —
+          # it carries its own automated syncPolicy, so it self-syncs from
+          # gitops/components/otel-collector. No gitops push here → no app-of-apps
+          # race, no dual ownership. wait_app gates on it actually going Healthy.
           kubectl apply -f gitops/catalog/otel-collector.yaml
           wait_app otel-collector 600
           kubectl -n observability rollout status deploy/otel-collector-gateway --timeout=180s
@@ -815,6 +818,65 @@ jobs:
           echo "✅ deploy-from-source: the demo app runs and USES its composed Postgres (visit counter) + bucket"
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
           { echo ""; echo "### Deploy-from-source + demo app (PRD-0012 / #35) — built cloudbox/demo-app from source; the running app uses its composed Postgres (live counter) + S3 bucket ✅"; } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Verify scaffold bridge — console creates a repo from a template, then deploys it (PRD-0012)
+        run: |
+          set -euo pipefail
+          # "Console creates the repo": source=template makes the portal call
+          # Gitea's generate API to fork cloudbox/demo-app into a fresh tenant repo
+          # (cloudbox/<name>), then builds and deploys THAT repo from source. The
+          # golang builder base is already in Zot (seeded by the step above, same run).
+          base=http://localhost:30600
+          app=scaffolded
+          gitea=http://localhost:30300
+          creds=gitea_admin:cloudbox123
+          # Make sure a stale repo from a re-run doesn't turn "generate" into a 409.
+          curl -sS -o /dev/null -X DELETE -u "$creds" "$gitea/api/v1/repos/cloudbox/${app}" 2>/dev/null || true
+          c=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$base/applications" \
+            --data-urlencode "name=$app" --data-urlencode "source=template" \
+            --data-urlencode "template=cloudbox/demo-app" \
+            --data-urlencode "database=1" --data-urlencode "bucket=1" 2>/dev/null || true)
+          echo "POST /applications (source=template) → HTTP $c"; [ "$c" = 200 ] || { echo "❌ scaffold-from-template POST errored (HTTP $c)"; exit 1; }
+          # The NEW behavior: the console created the repo in Gitea.
+          rc=$(curl -sS -o /dev/null -w '%{http_code}' -u "$creds" "$gitea/api/v1/repos/cloudbox/${app}" 2>/dev/null || true)
+          [ "$rc" = 200 ] || { echo "❌ console didn't create cloudbox/${app} in Gitea (HTTP $rc)"; exit 1; }
+          echo "✅ console scaffolded cloudbox/${app} from the template"
+          # And it builds from the scaffolded repo (fail fast on a Failed build).
+          wf=""
+          for _ in $(seq 1 30); do
+            wf=$(kubectl -n builds get wf -o name 2>/dev/null | grep "build-app-${app}-" | head -1 || true)
+            [ -n "$wf" ] && break; sleep 5
+          done
+          [ -n "$wf" ] || { echo "❌ no build-app-${app}-* Workflow for the scaffolded repo"; kubectl -n builds get wf; exit 1; }
+          ph=""
+          for _ in $(seq 1 84); do
+            ph=$(kubectl -n builds get "$wf" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+            case "$ph" in
+              Succeeded) break;;
+              Failed|Error)
+                echo "❌ scaffolded build $ph — node messages:"
+                kubectl -n builds get "$wf" -o jsonpath='{range .status.nodes.*}{.displayName}{": "}{.message}{"\n"}{end}'
+                exit 1;;
+            esac
+            sleep 5
+          done
+          [ "$ph" = Succeeded ] || { echo "❌ scaffolded build didn't Succeed in time (phase=$ph)"; exit 1; }
+          # And it deploys and serves (proves scaffold → build → deploy end to end).
+          kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=300s \
+            || { echo "❌ scaffolded ksvc ${app} not Ready"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
+          host=$(kubectl -n demo get ksvc "${app}" -o jsonpath='{.status.url}'); host="${host#http://}"
+          got=""
+          for _ in $(seq 1 30); do
+            got=$(curl -sS --max-time 20 -H "Host: ${host}" http://localhost:31080/ 2>/dev/null || true)
+            echo "$got" | grep -qE 'visitor <b>#[0-9]' && break; sleep 5
+          done
+          echo "$got" | grep -qE 'visitor <b>#[0-9]' \
+            || { echo "❌ scaffolded app didn't report a DB-backed counter"; echo "$got" | head -40; exit 1; }
+          echo "✅ scaffold bridge: console created the repo, built it, and the app runs with its composed DB + bucket"
+          # Clean up both the app and the scaffolded repo.
+          curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
+          curl -sS -o /dev/null -X DELETE -u "$creds" "$gitea/api/v1/repos/cloudbox/${app}" 2>/dev/null || true
+          { echo ""; echo "### Scaffold bridge (PRD-0012) — the console created cloudbox/${app} from the demo-app template, built it, and deployed a working app with its composed DB + bucket ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Verify the iterate loop — change code → Redeploy → new content (PRD-0012)
         run: |

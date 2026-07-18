@@ -318,12 +318,15 @@ label.check small { color: var(--muted); }
 .proj-del:hover { background: var(--bad-bg); color: var(--bad); }
 .proj-new { color: var(--accent); cursor: pointer; border-top: 1px solid var(--line); margin-top: 0.25rem; padding-top: 0.45rem; }
 
-/* Source picker in the New Application modal: prebuilt image vs build-from-repo.
-   :has() swaps the field set on the selected radio — no JS. */
+/* Source picker in the New Application modal: prebuilt image, build-from-repo,
+   or scaffold-from-template. :has() swaps the field set on the selected radio —
+   no JS. */
 .src-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem; margin: 0.3rem 0; }
-.src-repo { display: none; }
+.src-repo, .src-template { display: none; }
 form:has(input[name="source"][value="repo"]:checked) .src-repo { display: block; }
 form:has(input[name="source"][value="repo"]:checked) .src-image { display: none; }
+form:has(input[name="source"][value="template"]:checked) .src-template { display: block; }
+form:has(input[name="source"][value="template"]:checked) .src-image { display: none; }
 
 /* Two inputs side by side in a modal (e.g. min/max scale). */
 .two-col { display: flex; gap: 0.8rem; }

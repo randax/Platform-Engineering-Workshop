@@ -19,12 +19,14 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
     <p class="hint">Everything a workload needs, from one manifest — Crossplane composes it.</p>
     <form hx-post="/applications" hx-target="#app-list" hx-swap="outerHTML" hx-on::after-request="if(event.detail.successful) document.getElementById('app-modal').checked=false">
       <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-app"></label>
-      {{/* Source: a prebuilt image, or — the app-team golden path — a repo the
-           platform builds. CSS :has() swaps the fields; the handler reads `source`. */}}
+      {{/* Source: a prebuilt image; a repo the platform builds (the app-team
+           golden path); or a template the console scaffolds into a fresh repo
+           and then builds. CSS :has() swaps the fields; the handler reads `source`. */}}
       <div class="src-pick">
         <span class="topbar-label">Source</span>
         <label class="check"><input type="radio" name="source" value="image" checked> Container image</label>
         <label class="check"><input type="radio" name="source" value="repo"> Build from a repo</label>
+        {{if .ScaffoldEnabled}}<label class="check"><input type="radio" name="source" value="template"> Start from a template</label>{{end}}
       </div>
       <div class="src-image">
         <label>Image <input name="image" placeholder="ghcr.io/randax/cloudbox-uploader:v0.1.0"></label>
@@ -37,6 +39,12 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
         </div>
         <p class="hint"><small>Your repo in the in-cluster <b>Gitea</b> — push your code there first; it needs a <code>Dockerfile</code> at that path. The platform builds it (Argo + BuildKit → Zot) and deploys the result.</small></p>
       </div>
+      {{if .ScaffoldEnabled}}
+      <div class="src-template">
+        <label>Template <input name="template" pattern="[A-Za-z0-9._-]+/[A-Za-z0-9._-]+" value="cloudbox/demo-app"></label>
+        <p class="hint"><small>The console creates a new repo <code>cloudbox/&lt;name&gt;</code> in <b>Gitea</b> from this template (using the <b>Name</b> above), then builds and deploys it. Clone your new repo, change the code, push, and hit <b>Redeploy</b> to roll it forward.</small></p>
+      </div>
+      {{end}}
       <div class="two-col">
         <label>Min scale <input type="number" name="min" value="0" min="0" step="1"></label>
         <label>Max scale <input type="number" name="max" value="3" min="1" step="1"></label>

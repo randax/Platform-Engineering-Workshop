@@ -105,6 +105,15 @@ spec:
             # Grafana) — used for the portal's observability deep-links.
             - name: GRAFANA_URL
               value: http://localhost:30030
+            # Gitea credentials for the scaffold bridge (PRD-0012): the console
+            # calls Gitea's generate API to create a tenant repo from a template.
+            # The lab's fixed gitea_admin (versions.env) — committed on purpose,
+            # like the S3 creds above (ephemeral lab sandbox). When GITEA_USER is
+            # unset the "start from a template" option is simply not offered.
+            - name: GITEA_USER
+              value: gitea_admin
+            - name: GITEA_PASSWORD
+              value: cloudbox123
           ports:
             - containerPort: 8080
               name: http
