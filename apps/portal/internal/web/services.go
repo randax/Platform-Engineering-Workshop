@@ -39,7 +39,7 @@ func init() {
 			{"GET /services/{namespace}/{name}", handleFunctionDetail}, // per-function detail
 			{"POST /services", handleCreateFunction},                   // build & deploy
 			{"POST /services/{namespace}/{name}/invoke", handleInvokeFunction},
-			{"DELETE /services/{name}", handleDeleteFunction}, // demo ns only (RBAC)
+			{"DELETE /services/{namespace}/{name}", handleDeleteFunction}, // project namespaces only — RBAC-granted
 		},
 	})
 }
@@ -277,14 +277,22 @@ func handleInvokeFunction(s *Server, w http.ResponseWriter, r *http.Request) {
 	s.render(w, "invoke-result", res)
 }
 
-// handleDeleteFunction deletes a Knative Service and re-renders the list. Only
-// demo-namespace functions expose a Delete button (the template gates on it),
-// matching the portal-functions-serve RBAC grant; a stray DELETE for anything
+// handleDeleteFunction deletes a Knative Service and re-renders the list. The
+// namespace comes from the URL path, not the project cookie: the Functions list
+// is cluster-wide, so a function viewed under project team-a must be deleted
+// from team-a even when the cookie points elsewhere (mirrors the Invoke route).
+// Only project-namespace functions expose a Delete button (the template gates
+// on it), matching the portal-tenant RBAC grant; a stray DELETE for anything
 // else just surfaces the API's forbidden error in the flash.
 func handleDeleteFunction(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	namespace := r.PathValue("namespace")
+	if !kube.ValidName(namespace) || !kube.ValidName(name) {
+		http.NotFound(w, r)
+		return
+	}
 	fl := flash{Msg: "Deleted " + name + "."}
-	if err := s.Kube.DeleteKnativeService(r.Context(), s.activeProject(r), name); err != nil {
+	if err := s.Kube.DeleteKnativeService(r.Context(), namespace, name); err != nil {
 		fl = errorFlash("Delete failed: " + err.Error())
 	}
 	data, err := fetchFunctions(s, r, fl)
