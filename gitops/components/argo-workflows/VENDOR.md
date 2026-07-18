@@ -22,6 +22,12 @@ In `namespace-install.yaml` (both Deployments):
   `--auth-mode server` (no SSO/client tokens in a 4-hour lab)
 - added container resource requests **50m/64Mi** to both (upstream ships
   none; small-cluster requests convention, no limits)
+- `workflow-controller` **PriorityClass**: annotate
+  `argocd.argoproj.io/sync-wave: "-1"` so ArgoCD applies it before the
+  Deployment that sets `priorityClassName: workflow-controller`. Without it,
+  a fresh ArgoCD sync races (ArgoCD ignores file order) and the controller's
+  ReplicaSet hits `FailedCreate: no PriorityClass ... was found`, leaving the
+  app Degraded for minutes until the stale `ReplicaFailure` condition clears.
 
 Why managed-namespace: workflow pods run rootless BuildKit, which needs
 seccomp/AppArmor `Unconfined`. Talos enforces PSA `baseline` cluster-wide, so
