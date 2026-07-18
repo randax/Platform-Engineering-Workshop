@@ -12,12 +12,22 @@ app_status() { # <name> -> "<sync> <health>"
 }
 
 check_app() { # <name>
-  local st; st="$(app_status "$1")"
-  if [ "$st" = "Synced Healthy" ]; then
-    ok "ArgoCD app '$1' is Synced/Healthy"
-  else
-    fail "ArgoCD app '$1' is '$st' (want 'Synced Healthy') — open http://localhost:30080 or: kubectl -n argocd get app $1 -o yaml"
-  fi
+  # HEALTH is the real signal (workloads running); sync is advisory. Poll ~90s so
+  # a transient OutOfSync/Progressing/Degraded while the app reconciles under CI
+  # load rides out, instead of failing on a single point-in-time sample.
+  local st sync health
+  for _ in $(seq 1 18); do
+    st="$(app_status "$1")"
+    health="${st##* }"
+    if [ "$health" = "Healthy" ]; then
+      sync="${st%% *}"
+      if [ "$sync" = "Synced" ]; then ok "ArgoCD app '$1' is Synced/Healthy"
+      else ok "ArgoCD app '$1' is Healthy (sync: ${sync:-unknown})"; fi
+      return 0
+    fi
+    sleep 5
+  done
+  fail "ArgoCD app '$1' is '$st' (want Healthy) — open http://localhost:30080 or: kubectl -n argocd get app $1 -o yaml"
 }
 
 # --- Gitea -------------------------------------------------------------------

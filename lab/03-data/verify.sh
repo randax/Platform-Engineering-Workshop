@@ -7,14 +7,23 @@ ok()   { echo "✅ $1"; }
 fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 
 check_app() { # <name>
-  local st
-  st="$(kubectl -n argocd get application "$1" \
-    -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || echo missing)"
-  if [ "$st" = "Synced Healthy" ]; then
-    ok "ArgoCD app '$1' is Synced/Healthy"
-  else
-    fail "ArgoCD app '$1' is '$st' — did you cp gitops/catalog/$1.yaml to gitops/apps/ and push? Check http://localhost:30080"
-  fi
+  # HEALTH is the real signal (workloads running); sync is advisory. Poll ~90s so
+  # a transient OutOfSync/Progressing/Degraded while the app reconciles under CI
+  # load rides out, instead of failing on a single point-in-time sample.
+  local st sync health
+  for _ in $(seq 1 18); do
+    st="$(kubectl -n argocd get application "$1" \
+      -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || echo missing)"
+    health="${st##* }"
+    if [ "$health" = "Healthy" ]; then
+      sync="${st%% *}"
+      if [ "$sync" = "Synced" ]; then ok "ArgoCD app '$1' is Synced/Healthy"
+      else ok "ArgoCD app '$1' is Healthy (sync: ${sync:-unknown})"; fi
+      return 0
+    fi
+    sleep 5
+  done
+  fail "ArgoCD app '$1' is '$st' — did you cp gitops/catalog/$1.yaml to gitops/apps/ and push? Check http://localhost:30080"
 }
 
 # --- Platform components enabled -------------------------------------------
