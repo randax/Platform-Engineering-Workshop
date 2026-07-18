@@ -15,6 +15,12 @@ gitops_push "$CLONE" "module 07: enable zot + argo-workflows"
 
 wait_app zot
 wait_app argo-workflows
+# wait_app returns on app HEALTH, but argo-workflows can be Healthy while still
+# OutOfSync — the build-and-push WorkflowTemplate syncs a beat after the
+# controller. Guard so the submit below can't race ahead of the template it
+# references (else the Workflow errors "workflowtemplates ... build-and-push not
+# found"). This is the exact case wait_exists exists for.
+wait_exists builds workflowtemplate/build-and-push 180
 
 # 2. Seed YOUR registry with the (pre-pulled) base image — the app's Dockerfile
 #    builds FROM zot.zot.svc.cluster.local:5000, so the platform never touches
