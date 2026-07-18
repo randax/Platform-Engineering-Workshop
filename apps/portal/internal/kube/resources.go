@@ -56,6 +56,19 @@ func ReadinessOf(conds []Condition) Readiness {
 	return Readiness{Label: "Not ready", Class: "meh"}
 }
 
+// whyOf returns the message of a False condition — the cause a controller
+// recorded when it couldn't make the object Ready (Crossplane composition
+// errors, Knative revision failures, CNPG). Shared by the *.Why() helpers that
+// feed the DR-0005 diagnostics. "" when nothing informative (still converging).
+func whyOf(conds []Condition) string {
+	for _, c := range conds {
+		if c.Status == "False" && c.Message != "" {
+			return c.Message
+		}
+	}
+	return ""
+}
+
 // ---------------------------------------------------------------- ArgoCD
 
 type ArgoApp struct {
@@ -149,6 +162,11 @@ type KnativeService struct {
 
 func (s KnativeService) Readiness() Readiness { return ReadinessOf(s.Status.Conditions) }
 
+// Why is the failing-condition cause when a function isn't Ready — Knative
+// records revision/config failures here (RevisionFailed, container start). See
+// Application.Why (DR-0005).
+func (s KnativeService) Why() string { return whyOf(s.Status.Conditions) }
+
 func (k *Client) ListKnativeServices(ctx context.Context) ([]KnativeService, error) {
 	var list struct {
 		Items []KnativeService `json:"items"`
@@ -194,6 +212,10 @@ type WorkshopDB struct {
 }
 
 func (d WorkshopDB) Readiness() Readiness { return ReadinessOf(d.Status.Conditions) }
+
+// Why is the failing-condition cause when the database isn't Ready — Crossplane
+// records the composition error here (DR-0005).
+func (d WorkshopDB) Why() string { return whyOf(d.Status.Conditions) }
 
 // ListWorkshopDatabases lists databases in a project namespace (or across all
 // projects when ns == "").

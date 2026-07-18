@@ -112,7 +112,7 @@
       {{range .PodTroubles}}
       <tr><td><code>{{.Pod}}</code></td><td><code>{{.Container}}</code></td>
         <td><span class="badge bad">{{.Reason}}</span></td>
-        <td class="diag-msg">{{.Message}}</td></tr>
+        <td class="diag-msg">{{.Message}}{{with .Hint}}<div class="diag-hint">→ {{.}}</div>{{end}}</td></tr>
       {{end}}
     </tbody>
   </table>

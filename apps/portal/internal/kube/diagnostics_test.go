@@ -74,6 +74,21 @@ func TestBenignWaiting(t *testing.T) {
 	}
 }
 
+// Hint must turn the reasons we know about into an actionable line, and stay
+// silent (rather than guess) for ones we don't.
+func TestPodTroubleHint(t *testing.T) {
+	for _, reason := range []string{"ImagePullBackOff", "ErrImagePull", "CrashLoopBackOff", "CreateContainerConfigError", "OOMKilled", "RunContainerError"} {
+		if (PodTrouble{Reason: reason}).Hint() == "" {
+			t.Errorf("Hint for %q is empty, want an actionable line", reason)
+		}
+	}
+	for _, reason := range []string{"", "SomeFutureReason", "Completed"} {
+		if h := (PodTrouble{Reason: reason}).Hint(); h != "" {
+			t.Errorf("Hint for %q = %q, want \"\" (don't guess)", reason, h)
+		}
+	}
+}
+
 func TestDiagnosticsEmpty(t *testing.T) {
 	if !(Diagnostics{}).Empty() {
 		t.Error("zero Diagnostics should be Empty")

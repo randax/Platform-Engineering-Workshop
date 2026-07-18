@@ -61,14 +61,7 @@ func (a Application) Readiness() Readiness { return ReadinessOf(a.Status.Conditi
 // resolve resources", image pull, etc.). "" when nothing informative yet (still
 // converging), so the UI can stay quiet during a normal rollout. This is the
 // first line of the DR-0005 "why is this unhealthy" story.
-func (a Application) Why() string {
-	for _, c := range a.Status.Conditions {
-		if c.Status == "False" && c.Message != "" {
-			return c.Message
-		}
-	}
-	return ""
-}
+func (a Application) Why() string { return whyOf(a.Status.Conditions) }
 
 // Source annotations record where a source-built Application came from, so the
 // console can rebuild it (Redeploy) without asking again.

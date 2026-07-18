@@ -85,6 +85,9 @@ source in-cluster and deploys it.</p>
           {{end}}
         </td>
       </tr>
+      {{/* The cause, inline under an unhealthy function — the Knative condition
+           message (DR-0005). Quiet while it's still coming up (.Why is ""). */}}
+      {{if .Why}}<tr class="diag-row"><td colspan="8"><span class="diag-when">why</span> {{.Why}}</td></tr>{{end}}
     {{else}}
       <tr><td colspan="8" class="empty">No functions yet — build one below, or enable knative-serving from the catalog (module 06).</td></tr>
     {{end}}

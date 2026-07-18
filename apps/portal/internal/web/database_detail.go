@@ -25,6 +25,12 @@ type dbDetailData struct {
 	Psql        string // ready-to-paste one-liner
 	GrafanaURL  string // Explore link with a PromQL placeholder prefilled
 
+	// Diagnostics — the "why" when the database isn't Ready (DR-0005): the
+	// WorkshopDB failing condition + the instance pods' trouble.
+	Why      string
+	Diag     kube.Diagnostics
+	ShowDiag bool
+
 	// Monitoring — CNPG metrics, populated only when observability is collecting.
 	Telemetry  bool
 	ConnSpark  template.HTML
@@ -68,6 +74,16 @@ func handleDatabaseDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 			events = events[:20]
 		}
 		data.Events = events
+	}
+
+	// Diagnose when the database isn't Ready (DR-0005): the Crossplane cause +
+	// the CNPG instance pods' trouble. Best-effort; never breaks the page.
+	if db != nil && db.Readiness().Class != "ok" {
+		data.Why = db.Why()
+		if diag, derr := s.Kube.NamespaceDiagnostics(r.Context(), ns); derr == nil {
+			data.Diag = diag
+		}
+		data.ShowDiag = data.Why != "" || !data.Diag.Empty()
 	}
 
 	data.Secret = clusterName + "-app"
