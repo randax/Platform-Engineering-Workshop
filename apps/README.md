@@ -63,8 +63,9 @@ minimal: `minio-go` for S3, `x/image` for scaling, stdlib for everything else.
 
 ```bash
 # Portal — point it at any cluster via kubectl proxy (no token needed):
+# LAB_MODE=1 supplies the workshop S3 default so local dev doesn't fail-close.
 kubectl proxy &
-cd portal && KUBE_API_URL=http://127.0.0.1:8001 go run .
+cd portal && LAB_MODE=1 KUBE_API_URL=http://127.0.0.1:8001 go run .
 # open http://localhost:8080
 
 # Uploader / resizer — need an S3 endpoint:

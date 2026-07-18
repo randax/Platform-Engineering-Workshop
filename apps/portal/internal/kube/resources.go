@@ -266,7 +266,14 @@ func (k *Client) DeleteWorkshopDatabase(ctx context.Context, ns, name string) er
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
-	return k.do(ctx, http.MethodDelete, wdbPath(ns)+"/"+name, nil, nil)
+	// 404 → already gone: a double-delete or a stale tab is a no-op, not an error.
+	if err := k.do(ctx, http.MethodDelete, wdbPath(ns)+"/"+name, nil, nil); err != nil {
+		if isNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // ResizeWorkshopDatabase changes an existing database's T-shirt size — a merge

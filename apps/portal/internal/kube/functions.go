@@ -176,7 +176,14 @@ func (k *Client) DeleteKnativeService(ctx context.Context, ns, name string) erro
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
-	return k.do(ctx, http.MethodDelete, ksvcPath(ns)+"/"+name, nil, nil)
+	// 404 → already gone: a double-delete or a stale tab is a no-op, not an error.
+	if err := k.do(ctx, http.MethodDelete, ksvcPath(ns)+"/"+name, nil, nil); err != nil {
+		if isNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // GetKnativeService fetches one Knative Service (URL + conditions) for its
