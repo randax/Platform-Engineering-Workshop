@@ -294,6 +294,10 @@ func handleDeleteFunction(s *Server, w http.ResponseWriter, r *http.Request) {
 	fl := flash{Msg: "Deleted " + name + "."}
 	if err := s.Kube.DeleteKnativeService(r.Context(), namespace, name); err != nil {
 		fl = errorFlash("Delete failed: " + err.Error())
+		// The detail page redirects to the list on success; the response is 200
+		// (the error flash rides the re-rendered svc-list for the list view), so
+		// signal failure out-of-band to stop the detail page's silent redirect.
+		w.Header().Set("X-Delete-Failed", "1")
 	}
 	data, err := fetchFunctions(s, r, fl)
 	if err != nil {

@@ -131,6 +131,32 @@ func TestHandleDeleteFunctionUsesPathNamespaceNotCookie(t *testing.T) {
 	}
 }
 
+// A failed delete must still be visible: the detail page redirects on any 2xx,
+// so the handler signals failure with the X-Delete-Failed header (the template's
+// hx-on guard reads it to suppress the silent redirect). Success sets no header.
+func TestHandleDeleteFunctionSignalsFailureHeader(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			http.Error(w, `{"message":"forbidden"}`, http.StatusForbidden)
+			return
+		}
+		_, _ = w.Write([]byte(`{"items":[]}`)) // the re-list after delete
+	})
+	req := httptest.NewRequest(http.MethodDelete, "/services/demo/fn-x", nil)
+	req.SetPathValue("namespace", "demo")
+	req.SetPathValue("name", "fn-x")
+	rec := httptest.NewRecorder()
+
+	handleDeleteFunction(srv, rec, req)
+
+	if rec.Header().Get("X-Delete-Failed") != "1" {
+		t.Errorf("expected X-Delete-Failed=1 on a failed delete, got %q", rec.Header().Get("X-Delete-Failed"))
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "Delete failed") {
+		t.Errorf("expected the error flash in the fragment, got:\n%s", body)
+	}
+}
+
 // Creating a project provisions BOTH the namespace and the tenant RoleBinding
 // (two POSTs), sets the active-project cookie, and refreshes.
 func TestHandleCreateProject(t *testing.T) {

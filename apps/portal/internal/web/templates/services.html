@@ -134,8 +134,10 @@ source in-cluster and deploys it.</p>
   <button hx-post="/services/{{.Namespace}}/{{.Name}}/invoke" hx-target="#invoke-result" hx-swap="innerHTML">Invoke</button>
   <a class="btn ghost" href="{{.TracesURL}}" target="_blank">traces →</a>
   {{if .Deletable}}<button class="danger" hx-delete="/services/{{.Namespace}}/{{.Name}}"
-    hx-on::after-request="if(event.detail.successful) window.location='/services'"
-    hx-confirm="Delete {{.Name}}? This removes the Knative Service.">Delete</button>{{end}}
+    hx-swap="none"
+    hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Delete-Failed')){this.nextElementSibling.textContent='Delete failed — the function may still exist. Check the Functions list.'}else if(event.detail.successful){window.location='/services'}"
+    hx-confirm="Delete {{.Name}}? This removes the Knative Service.">Delete</button>
+  <span id="fn-detail-delete-flash" class="flash flash-error" role="alert"></span>{{end}}
 </div>
 <div id="invoke-result"></div>
 
