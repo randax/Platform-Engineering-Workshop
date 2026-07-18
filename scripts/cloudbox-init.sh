@@ -18,8 +18,10 @@
 # registry mirrors at it, with automatic fallback to the real registries.
 #
 # Usage:
-#   ./scripts/cloudbox-init.sh          # pull + mirror everything
-#   ./scripts/cloudbox-init.sh --yes    # skip the size confirmation
+#   ./scripts/cloudbox-init.sh                    # pull + mirror everything
+#   ./scripts/cloudbox-init.sh --yes              # skip the size confirmation
+#   ./scripts/cloudbox-init.sh --skip-model-pull  # do not pull the optional Ollama model
+#   ./scripts/cloudbox-init.sh -y --skip-model-pull
 #
 # Expect ~15–20 GB of downloads. Run this at home, not at the venue!
 # Safe to re-run: already-present images are skipped quickly.
@@ -27,10 +29,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
 ASSUME_YES="false"
-[[ "${1:-}" == "--yes" || "${1:-}" == "-y" ]] && ASSUME_YES="true"
+SKIP_MODEL_PULL="false"
+for arg in "$@"; do
+  case "${arg}" in
+    --yes|-y) ASSUME_YES="true" ;;
+    --skip-model-pull) SKIP_MODEL_PULL="true" ;;
+    *) die "Unknown argument '${arg}'. Usage: $0 [--yes|-y] [--skip-model-pull]" ;;
+  esac
+done
 
 need docker "Install Docker Desktop / OrbStack / docker-ce first."
 docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
@@ -155,4 +165,21 @@ if [[ ${#failed[@]} -gt 0 ]]; then
 fi
 
 ok "All ${total} images pre-pulled. The mirror survives reboots and cluster rebuilds."
+
+# --- 4. Pull the optional host-side model used by kagent ----------------------
+if [[ "${SKIP_MODEL_PULL}" == "true" ]]; then
+  info "Model pull skipped (--skip-model-pull). Before enabling kagent, run: ollama pull ${KAGENT_OLLAMA_MODEL}"
+elif ! have ollama; then
+  warn "'ollama' not found. Kagent's default ModelConfig needs ${KAGENT_OLLAMA_MODEL} pulled on the host. Install it from https://ollama.com."
+  warn "On minimum-spec machines, --skip-model-pull silences this optional warning."
+else
+  step "Pulling host-side Ollama model for kagent (${KAGENT_OLLAMA_MODEL})"
+  if ollama pull "${KAGENT_OLLAMA_MODEL}"; then
+    ok "Host-side Ollama model ${KAGENT_OLLAMA_MODEL} is ready for kagent."
+  else
+    warn "Ollama could not pull ${KAGENT_OLLAMA_MODEL}; the image pre-pull completed successfully."
+    warn "Re-run ./scripts/cloudbox-init.sh --skip-model-pull to finish without it, or fix Ollama and re-run."
+  fi
+fi
+
 info "Next: ./scripts/install.sh --check"

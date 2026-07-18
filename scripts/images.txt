@@ -96,6 +96,14 @@ docker.io/library/nats:2.12.12-alpine@sha256:2ca98656a279b2d88cfdf2b8c3f0d5d7f39
 # metrics for the console's Streams Monitoring panel (#56)
 docker.io/natsio/prometheus-nats-exporter:0.17.3@sha256:26c826662ac8424597cc9bdf89ea5b606eb66e3c11db9b1215c27d2076bbb01b
 
+# --- Kagent (day-2 ops agent, module 10)
+ghcr.io/kagent-dev/kagent/controller:0.9.11
+ghcr.io/kagent-dev/kagent/tools:0.2.1
+ghcr.io/kagent-dev/kagent/ui:0.9.11
+docker.io/library/postgres:18.3-alpine
+ghcr.io/kagent-dev/kagent/app:0.9.11 # controller-created at Agent reconcile; static scan misses it, but offline needs it
+ghcr.io/kagent-dev/kagent/skills-init:0.9.11 # controller-created at Agent reconcile; static scan misses it, but offline needs it
+
 # --- Observability v2 (Victoria stack, issue #57) — the on-demand observability
 # capability that REPLACED otel-lgtm: metrics + logs + traces + Grafana, fed by
 # the OTel Collector below.
