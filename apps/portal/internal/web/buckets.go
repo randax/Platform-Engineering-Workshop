@@ -13,11 +13,20 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"time"
 
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/metrics"
 	"cloudbox.io/portal/internal/store"
 )
+
+// s3Timeout bounds an S3 read so a slow/wedged RustFS can't hang the page:
+// minio-go only respects the context, and the HTTP server has no WriteTimeout
+// (the Invoke proxy needs a long one). Generous for a lab list of ≤200 objects
+// (adversarial review I1).
+func s3Ctx(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), 15*time.Second)
+}
 
 func init() {
 	register(Page{
@@ -142,7 +151,9 @@ func bucketsPage(ctx context.Context, st bucketStore, selected string) (bucketsD
 }
 
 func handleBuckets(s *Server, w http.ResponseWriter, r *http.Request) {
-	data, err := bucketsPage(r.Context(), s.Store, r.URL.Query().Get("b"))
+	ctx, cancel := s3Ctx(r)
+	defer cancel()
+	data, err := bucketsPage(ctx, s.Store, r.URL.Query().Get("b"))
 	if err != nil {
 		s.renderError(w, err)
 		return
@@ -176,7 +187,9 @@ func handleBucketObjects(s *Server, w http.ResponseWriter, r *http.Request) {
 		s.render(w, "bucket-objects", objectsData{Flash: errorFlash("No bucket selected")})
 		return
 	}
-	data, err := bucketObjects(r.Context(), s.Store, bucket, flash{})
+	ctx, cancel := s3Ctx(r)
+	defer cancel()
+	data, err := bucketObjects(ctx, s.Store, bucket, flash{})
 	if err != nil {
 		log.Printf("list objects in %s: %v", bucket, err)
 		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("S3 error: " + err.Error())})

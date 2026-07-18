@@ -141,6 +141,11 @@ func (p *Client) QueryRange(ctx context.Context, query string) ([]float64, error
 		return nil, err
 	}
 	defer resp.Body.Close()
+	// A non-200 (a bad query, or a degraded VM returning HTML) must be an error,
+	// not decoded into an empty result and rendered as a benign "no data yet".
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("prometheus query_range: %s", resp.Status)
+	}
 
 	var body struct {
 		Status string `json:"status"`

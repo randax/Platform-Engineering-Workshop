@@ -92,5 +92,21 @@ func (k *Client) DeleteProject(ctx context.Context, name string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
+	// Guard: only delete namespaces that ARE console projects (carry the label).
+	// The portal's grant is cluster-wide namespace delete — Kubernetes RBAC can't
+	// scope a verb to label-selected objects — so this app-layer check is the only
+	// thing stopping a stray/typo'd name (kube-system, argocd, gitea) from being
+	// deleted. Refuse anything not explicitly marked a project.
+	var ns struct {
+		Metadata struct {
+			Labels map[string]string `json:"labels"`
+		} `json:"metadata"`
+	}
+	if err := k.get(ctx, "/api/v1/namespaces/"+name, &ns); err != nil {
+		return err
+	}
+	if ns.Metadata.Labels[ProjectLabel] != "true" {
+		return fmt.Errorf("%q isn't a console project (missing the %s=true label) — refusing to delete it", name, ProjectLabel)
+	}
 	return k.do(ctx, http.MethodDelete, "/api/v1/namespaces/"+name, nil, nil)
 }

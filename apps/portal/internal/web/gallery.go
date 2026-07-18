@@ -57,7 +57,9 @@ func galleryItems(ctx context.Context, st galleryStore, fl flash) (galleryData, 
 }
 
 func handleGallery(s *Server, w http.ResponseWriter, r *http.Request) {
-	data, err := galleryItems(r.Context(), s.Store, flash{})
+	ctx, cancel := s3Ctx(r)
+	defer cancel()
+	data, err := galleryItems(ctx, s.Store, flash{})
 	if err != nil {
 		s.renderError(w, err)
 		return
@@ -68,7 +70,9 @@ func handleGallery(s *Server, w http.ResponseWriter, r *http.Request) {
 // handleGalleryGrid serves the polled grid fragment; like the databases
 // list, errors become a flash inside the fragment so polling keeps running.
 func handleGalleryGrid(s *Server, w http.ResponseWriter, r *http.Request) {
-	data, err := galleryItems(r.Context(), s.Store, flash{})
+	ctx, cancel := s3Ctx(r)
+	defer cancel()
+	data, err := galleryItems(ctx, s.Store, flash{})
 	if err != nil {
 		log.Printf("poll error: %v", err)
 		s.render(w, "gallery-grid", galleryData{Flash: errorFlash("S3 error: " + err.Error())})

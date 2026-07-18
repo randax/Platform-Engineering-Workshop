@@ -36,7 +36,9 @@ var giteaHTTP = &http.Client{Timeout: 15 * time.Second}
 
 // GiteaConfigured reports whether the portal has Gitea credentials — the
 // scaffold-from-template option is only offered when it does.
-func GiteaConfigured() bool { return os.Getenv("GITEA_USER") != "" }
+func GiteaConfigured() bool {
+	return os.Getenv("GITEA_USER") != "" && os.Getenv("GITEA_PASSWORD") != ""
+}
 
 // ScaffoldRepo generates a new repo GiteaOrg/<name> from the template
 // "<org>/<repo>" via Gitea's generate API, copying the template's files. It
@@ -51,7 +53,7 @@ func (k *Client) ScaffoldRepo(ctx context.Context, template, name string) (strin
 		return "", fmt.Errorf("template must be <org>/<repo> in the in-cluster Gitea, got %q", template)
 	}
 	user, pass := os.Getenv("GITEA_USER"), os.Getenv("GITEA_PASSWORD")
-	if user == "" {
+	if user == "" || pass == "" {
 		return "", fmt.Errorf("repo scaffolding isn't configured on this portal (no Gitea credentials)")
 	}
 	payload, err := json.Marshal(map[string]any{

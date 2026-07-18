@@ -127,7 +127,17 @@ func main() {
 
 	addr := ":" + cfg.Port
 	log.Printf("cloudbox console listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, handler))
+	// Bound request setup so a slow/half-open client can't tie up a handler
+	// indefinitely (adversarial review I1). No WriteTimeout: the Invoke proxy
+	// legitimately waits up to ~60s for a scale-from-zero cold start.
+	httpSrv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	log.Fatal(httpSrv.ListenAndServe())
 }
 
 // bind turns a page handler into a plain http.HandlerFunc with the server's
