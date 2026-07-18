@@ -178,3 +178,19 @@ func (k *Client) DeleteKnativeService(ctx context.Context, ns, name string) erro
 	}
 	return k.do(ctx, http.MethodDelete, ksvcPath(ns)+"/"+name, nil, nil)
 }
+
+// GetKnativeService fetches one Knative Service (URL + conditions) for its
+// detail page. 404 → nil (deleted, or a different project selected).
+func (k *Client) GetKnativeService(ctx context.Context, ns, name string) (*KnativeService, error) {
+	if !ValidName(ns) || !ValidName(name) {
+		return nil, fmt.Errorf("invalid namespace/name")
+	}
+	var svc KnativeService
+	if err := k.get(ctx, ksvcPath(ns)+"/"+name, &svc); err != nil {
+		if isNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &svc, nil
+}

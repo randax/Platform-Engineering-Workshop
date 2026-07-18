@@ -519,3 +519,4 @@ pre.code {
 .composed td { padding: 0.35rem 1rem 0.35rem 0; border-top: 1px solid var(--line); vertical-align: baseline; }
 .composed-kind { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
 .composed-note { color: var(--muted); font-size: 0.85rem; }
+.fn-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin: 0.3rem 0 0.6rem; }

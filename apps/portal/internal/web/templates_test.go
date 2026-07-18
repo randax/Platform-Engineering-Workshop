@@ -172,6 +172,17 @@ func TestTemplatesRender(t *testing.T) {
 				`hx-delete="/applications/api"`,        // delete from the danger zone
 			},
 		},
+		"function-detail": {
+			data: sampleFnDetail(),
+			want: []string{
+				`Diagnostics`,                    // the "why" (ShowDiag branch)
+				`ImagePullBackOff`,               // the pod-trouble cause
+				`polyline`,                       // the monitoring sparkline (Telemetry branch)
+				`idle · 0 pods`,                  // scale-from-zero
+				`/services/demo/fn-hello/invoke`, // Invoke wakes it server-side
+				`hx-delete="/services/fn-hello"`, // delete (project ns)
+			},
+		},
 		"database-detail": {
 			data: dbDetailData{
 				Name: "my-db", DB: &db, ClusterName: "my-db-pg",

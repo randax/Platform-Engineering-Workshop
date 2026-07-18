@@ -144,6 +144,7 @@ func TestGenerateScreenshots(t *testing.T) {
 		{"components", "components", sampleComponents()},
 		{"applications", "applications", sampleApplications()},
 		{"application-detail", "application-detail", sampleAppDetail()},
+		{"function-detail", "function-detail", sampleFnDetail()},
 		{"services", "services", functionsData{Rows: sampleServices(), Samples: fnSamples}},
 		{"database-detail", "database-detail", sampleDatabaseDetail()},
 		{"builds", "builds", sampleBuilds()},
@@ -233,6 +234,30 @@ func sampleAppDetail() appDetailData {
 			Pod: "api-00001-deployment-6c9f-8t2wq", Container: "user-container",
 			Reason: "ImagePullBackOff", Message: `Back-off pulling image "ghcr.io/acme/api:v2"`,
 		}}},
+	}
+}
+
+// sampleFnDetail is the Function detail page with BOTH gated branches live
+// (ShowDiag + Telemetry) so the render test exercises them — a stuck revision
+// showing its diagnostics plus the monitoring panel.
+func sampleFnDetail() fnDetailData {
+	return fnDetailData{
+		Name: "fn-hello", Namespace: "demo", Found: true,
+		Readiness: kube.Readiness{Label: "RevisionFailed", Class: "meh"},
+		URL:       "http://fn-hello.demo.127.0.0.1.sslip.io:31080",
+		Deletable: true,
+		Why:       `Revision "fn-hello-00001" failed: unable to fetch image`,
+		ShowDiag:  true,
+		Diag: kube.Diagnostics{PodTroubles: []kube.PodTrouble{{
+			Pod: "fn-hello-00001-deployment-7c9f-2kx8m", Container: "user-container",
+			Reason: "ImagePullBackOff", Message: `Back-off pulling image "localhost:30500/fn-hello:b7"`,
+		}}},
+		Telemetry: true,
+		ReqSpark:  metrics.Sparkline([]float64{0, 1, 2, 1, 3, 2}, "request rate"),
+		LatSpark:  metrics.Sparkline([]float64{40, 55, 48, 60}, "avg latency"),
+		LatNow:    "60 ms",
+		Scale:     "idle · 0 pods",
+		TracesURL: "#",
 	}
 }
 

@@ -43,6 +43,7 @@ component-detail-locked:console-component-locked
 components:console-components
 applications:console-applications
 application-detail:console-application-detail
+function-detail:console-function-detail
 services:console-services
 database-detail:console-database-monitoring
 builds:console-builds-monitoring
