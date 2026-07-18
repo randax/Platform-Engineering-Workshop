@@ -123,7 +123,7 @@ cd "$WORKSHOP/lab/04-self-service" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: the crossplane and platform-api apps are Synced/Healthy; the
+It checks: the crossplane and platform-api apps are Healthy (Synced is the happy path; sync is advisory); the
 `function-patch-and-transform` Function is installed and healthy; the XRD is Established;
 the Composition exists; `my-db` is Synced *and* Ready; the composed CNPG cluster
 `my-db-pg` is healthy; and the `my-db-assets` bucket really exists in RustFS.

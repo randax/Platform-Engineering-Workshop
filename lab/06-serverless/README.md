@@ -104,7 +104,7 @@ cd "$WORKSHOP/lab/06-serverless" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: the knative-serving app is Synced/Healthy and its deployments are up; ksvc
+It checks: the knative-serving app is Healthy (Synced is the happy path; sync is advisory) and its deployments are up; ksvc
 `hello` is Ready; a curl through Kourier (:31080, correct Host header) returns 200 with
 the expected body; and — after a quiet period — that the revision has scaled to zero pods
 (this check waits up to ~2 minutes, be patient).

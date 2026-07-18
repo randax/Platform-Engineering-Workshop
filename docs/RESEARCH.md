@@ -67,6 +67,14 @@ in late August before the final pin.
   in `argocd-cm`** (removed in 1.8; without it waves don't gate — most-missed step);
   `SkipDryRunOnMissingResource=true` on CR-shipping apps; `ServerSideApply=true` on
   CRD-heavy apps (Crossplane blows the 262KB annotation limit); automated sync + retry.
+- **Custom HPA health rule (same `argocd-cm`, sibling to the recipe above):** this lab has
+  **no metrics-server** — observability is VictoriaMetrics/OTel, not the resource-metrics
+  API — so any HPA that keys on CPU can never fetch metrics. ArgoCD's default HPA health
+  then reports **Degraded**, which cascades to mark the whole owning app Degraded even when
+  every pod is Ready (knative-eventing ships broker-ingress/-filter HPAs and flipped its app
+  Degraded over time on exactly this). An idle autoscaler is not a broken capability in a
+  single-user lab, so the bootstrap installs a `resource.customizations.health.autoscaling_HorizontalPodAutoscaler`
+  rule treating HPAs as Healthy (see `scripts/bootstrap-gitops.sh`).
 - **Git topology (critical):** point ArgoCD **only at an in-cluster Gitea**, never at GitHub:
   attendees can't push to GitHub (no GitOps experience), and ~50 clusters polling anonymously
   through one venue NAT hits GitHub's tightened per-IP limits. Gitea single-pod SQLite mode
