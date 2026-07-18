@@ -27,6 +27,7 @@ gitops/
 │   ├── knative-eventing.yaml         (wave 2)
 │   ├── argo-workflows.yaml           (wave 2)
 │   ├── nats.yaml                     (wave 2)
+│   ├── kagent.yaml                   (wave 2)
 │   ├── backstage.yaml                (wave 3)
 │   ├── portal.yaml                   (wave 3)
 │   └── picture-pipeline.yaml         (wave 3)
@@ -79,6 +80,7 @@ Applications (`argocd.argoproj.io/sync-wave`).
 | 2 | knative-eventing | knative-eventing | broker/trigger mesh for the pipeline |
 | 2 | argo-workflows | argo (pods in builds) | pushes to zot |
 | 2 | nats | nats | durable messaging (JetStream) — stretch/golden-path queue |
+| 2 | kagent | kagent | day-2 Kubernetes AI agent (module 10); read-only against the cluster it's diagnosing |
 | 3 | backstage | backstage | heaviest; scaffolds against everything else |
 | 3 | portal | portal | Cloudbox Console; reads everything below it |
 | 3 | picture-pipeline | pipeline | ksvcs + Broker/Trigger need waves 1–2 (rustfs, serving, eventing) |

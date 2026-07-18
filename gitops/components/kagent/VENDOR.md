@@ -20,9 +20,10 @@ cat > /tmp/kagent-values-workshop.yaml <<'VALUES'
 # k8s-agent only, doc-search off, UI scaled to zero, tool server read-only.
 
 # cr.kagent.dev is a vanity pull-through proxy in front of ghcr.io (verified
-# in docs/research/kagent-current-state.md #3) — point straight at ghcr.io so
-# the pinned image refs in scripts/images.txt resolve to the canonical host
-# the pre-pull mirror copies from.
+# in the research resolution, issue #123:
+# https://github.com/randax/Platform-Engineering-Workshop/issues/123) —
+# point straight at ghcr.io so the pinned image refs in scripts/images.txt
+# resolve to the canonical host the pre-pull mirror copies from.
 registry: "ghcr.io"
 
 ui:
@@ -57,9 +58,11 @@ kagent-tools:
 
 providers:
   # Default ModelConfig points at host-side Ollama — offline-honest baseline
-  # (docs/research/offline-llm-kagent.md: local ≤8B models are unreliable at
-  # multi-step tool calling; qwen3:4b is the smallest verified tool-calling
-  # model and is what cloudbox-init.sh pre-pulls on the host).
+  # (module 10 PRD, issue #132:
+  # https://github.com/randax/Platform-Engineering-Workshop/issues/132 —
+  # local ≤8B models are unreliable at multi-step tool calling; qwen3:4b is
+  # the smallest verified tool-calling model and is what cloudbox-init.sh
+  # pre-pulls on the host).
   default: ollama
   ollama:
     provider: Ollama
@@ -76,8 +79,10 @@ providers:
 
 # k8s-agent is the only built-in agent enabled — everything below is
 # disabled to keep the offline image list and runtime RAM footprint minimal
-# (docs/research/kagent-current-state.md #5, #9: the demo profile's ~10
-# agent Deployments will not fit the workshop's 13-17GB idle budget).
+# (research resolution, issue #123:
+# https://github.com/randax/Platform-Engineering-Workshop/issues/123 — the
+# demo profile's ~10 agent Deployments will not fit the workshop's 13-17GB
+# idle budget).
 kgateway-agent:
   enabled: false
 istio-agent:
@@ -136,8 +141,10 @@ helm template kagent ./kagent --version 0.9.11 --namespace kagent \
 - **Host-side Ollama is the offline-honest baseline** — the default
   `ModelConfig` uses `qwen3:4b` on the attendee host. Small local models are
   not presented as hosted-model equivalents; a hosted provider is the
-  upgrade path (see `docs/research/offline-llm-kagent.md`). Native Linux users
-  must replace `host.docker.internal` with the Talos bridge gateway.
+  upgrade path (see the module 10 PRD, issue #132:
+  https://github.com/randax/Platform-Engineering-Workshop/issues/132).
+  Native Linux users must replace `host.docker.internal` with the Talos
+  bridge gateway.
 - **Bundled Postgres stays** — this slice keeps upstream's dev-mode database
   and workshop-grade database/user/password credentials
   `kagent`/`kagent`/`kagent`. It is intentionally not wired to the separately
