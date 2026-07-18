@@ -161,19 +161,40 @@ type rpcError struct {
 	Message string `json:"message"`
 }
 
-// rpcResult carries one investigation event. `type` discriminates; the rest are
-// the payload. This is the console's mapping of the agent's A2A event stream —
-// the exact upstream JSON is reconciled against the real controller at
-// packaging time (issue #134); here it is the contract of record for the seam.
+// rpcResult is one A2A streaming result off the SSE stream. A2A results are
+// kind-discriminated (Message / TaskStatusUpdateEvent / TaskArtifactUpdateEvent
+// / Task). We align the `message` and terminal `status-update` frames to the
+// documented A2A envelope — including the verdict, carried as a message DataPart
+// — so issue #134's live reconciliation only has to settle how a *tool step*
+// surfaces. The `tool-call` / `tool-result` kinds are the console's model of
+// that and remain the contract of record for the seam until then.
 type rpcResult struct {
-	Type        string   `json:"type"`
-	Tool        string   `json:"tool"`
-	Args        string   `json:"args"`
-	Output      string   `json:"output"`
-	Observation string   `json:"observation"`
-	Text        string   `json:"text"`
-	Final       bool     `json:"final"`
-	Verdict     *Verdict `json:"verdict"`
+	Kind string `json:"kind"` // A2A: message | status-update; modeled: tool-call | tool-result
+
+	// A2A message
+	Role  string    `json:"role"`
+	Parts []a2aPart `json:"parts"`
+
+	// A2A status-update: the documented terminal streaming signal
+	Final bool `json:"final"`
+
+	// Modeled tool step (reconciled in #134)
+	Tool        string `json:"tool"`
+	Args        string `json:"args"`
+	Output      string `json:"output"`
+	Observation string `json:"observation"`
+}
+
+// a2aPart is one part of an A2A message: a text part (agent narration) or a data
+// part carrying the structured verdict.
+type a2aPart struct {
+	Kind string    `json:"kind"` // text | data
+	Text string    `json:"text"`
+	Data *partData `json:"data"`
+}
+
+type partData struct {
+	Verdict *Verdict `json:"verdict"`
 }
 
 // errDone is the sentinel a `done` frame raises to stop the scan cleanly.
@@ -244,22 +265,37 @@ func parseSSE(r io.Reader, emit func(Event) error) error {
 	return nil
 }
 
-// translate maps a JSON-RPC result to a console Event. ok is false for frames
-// that carry no user-visible event (e.g. the terminal `done`); done signals the
-// stream is complete.
+// translate maps one A2A result to a console Event. ok is false for frames that
+// carry no user-visible event (a terminal status-update, an unrecognised kind);
+// done signals the stream is complete.
 func translate(r *rpcResult) (ev Event, ok, done bool) {
-	switch r.Type {
-	case "tool_call":
-		return Event{Kind: KindToolCall, Tool: r.Tool, Args: r.Args}, true, false
-	case "tool_result":
-		return Event{Kind: KindToolResult, Output: r.Output, Observation: r.Observation}, true, false
+	switch r.Kind {
 	case "message":
-		return Event{Kind: KindMessage, Text: r.Text}, true, false
-	case "verdict":
-		return Event{Kind: KindVerdict, Verdict: r.Verdict}, true, false
-	case "done":
-		return Event{}, false, true
-	default:
+		// A2A message: a data part carries the structured verdict; otherwise the
+		// text parts are agent narration.
+		for _, p := range r.Parts {
+			if p.Kind == "data" && p.Data != nil && p.Data.Verdict != nil {
+				return Event{Kind: KindVerdict, Verdict: p.Data.Verdict}, true, false
+			}
+		}
+		var text strings.Builder
+		for _, p := range r.Parts {
+			if p.Kind == "text" {
+				text.WriteString(p.Text)
+			}
+		}
+		if text.Len() > 0 {
+			return Event{Kind: KindMessage, Text: text.String()}, true, false
+		}
+		return Event{}, false, false
+	case "status-update":
+		// The documented terminal streaming event ends the run.
 		return Event{}, false, r.Final
+	case "tool-call": // modeled (#134)
+		return Event{Kind: KindToolCall, Tool: r.Tool, Args: r.Args}, true, false
+	case "tool-result": // modeled (#134)
+		return Event{Kind: KindToolResult, Output: r.Output, Observation: r.Observation}, true, false
+	default:
+		return Event{}, false, false
 	}
 }

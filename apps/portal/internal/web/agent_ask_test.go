@@ -20,31 +20,34 @@ import (
 	"cloudbox.io/portal/internal/kube"
 )
 
-// fakeKagent is a scripted A2A controller: it emits the canned SSE frames and
-// counts how many times it was called (so a "no backend call" claim is real).
-func fakeKagent(t *testing.T, sse string) (*httptest.Server, *int) {
+// fakeKagent is a scripted A2A controller: it emits the canned SSE frames,
+// counts how many times it was called (so a "no backend call" claim is real),
+// and records the X-User-ID of each call (so distinct sessions can be proven).
+func fakeKagent(t *testing.T, sse string) (*httptest.Server, *int, *[]string) {
 	t.Helper()
 	calls := 0
+	var userIDs []string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
+		userIDs = append(userIDs, r.Header.Get("X-User-ID"))
 		w.Header().Set("Content-Type", "text/event-stream")
 		if _, err := w.Write([]byte(sse)); err != nil {
 			t.Errorf("write sse: %v", err)
 		}
 	}))
 	t.Cleanup(ts.Close)
-	return ts, &calls
+	return ts, &calls, &userIDs
 }
 
-const investigationSSE = `data: {"result":{"type":"tool_call","tool":"k8s_get_resources","args":"pods -n demo-app"}}
+const investigationSSE = `data: {"result":{"kind":"tool-call","tool":"k8s_get_resources","args":"pods -n demo-app"}}
 
-data: {"result":{"type":"tool_result","output":"0/1 Running 7 restarts","observation":"7 restarts in 11 minutes"}}
+data: {"result":{"kind":"tool-result","output":"0/1 Running 7 restarts","observation":"7 restarts in 11 minutes"}}
 
-data: {"result":{"type":"message","text":"forming a hypothesis"}}
+data: {"result":{"kind":"message","role":"agent","parts":[{"kind":"text","text":"forming a hypothesis"}]}}
 
-data: {"result":{"type":"verdict","verdict":{"status":"Diagnosed — unverified","hypothesis":"memory limit 48Mi is below the real working set","killTest":"kubectl -n demo-app get pod -o jsonpath='{..lastState.terminated.reason}'","fix":"git revert HEAD\ngit push"}}}
+data: {"result":{"kind":"message","role":"agent","parts":[{"kind":"data","data":{"verdict":{"status":"Diagnosed — unverified","hypothesis":"memory limit 48Mi is below the real working set","killTest":"kubectl -n demo-app get pod -o jsonpath='{..lastState.terminated.reason}'","fix":"git revert HEAD\ngit push"}}}]}}
 
-data: {"result":{"type":"done","final":true}}
+data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}
 
 `
 
@@ -92,7 +95,7 @@ func indexOrder(t *testing.T, body string, markers ...string) {
 }
 
 func TestAgentAskHappyPath(t *testing.T) {
-	ts, calls := fakeKagent(t, investigationSSE)
+	ts, calls, _ := fakeKagent(t, investigationSSE)
 	s := serverWithKagent(t, ts.URL, true)
 
 	rec := httptest.NewRecorder()
@@ -155,7 +158,7 @@ func TestAgentAskAgentUnreachable(t *testing.T) {
 func TestAgentAskLockedNoBackendCall(t *testing.T) {
 	// The capability is absent from the snapshot. The endpoint must refuse to
 	// call the backend at all — the guard behind the locked affordance.
-	ts, calls := fakeKagent(t, investigationSSE)
+	ts, calls, _ := fakeKagent(t, investigationSSE)
 	s := serverWithKagent(t, ts.URL, false)
 
 	rec := httptest.NewRecorder()
@@ -166,6 +169,76 @@ func TestAgentAskLockedNoBackendCall(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "event: error") {
 		t.Errorf("locked capability should answer with an error event:\n%s", rec.Body.String())
+	}
+}
+
+// emptyStream is an answer made entirely of A2A frames the console doesn't
+// translate (a Task, then a clean terminal) — the exact shape a real controller
+// produces against the console's invented tool-call format if they diverge.
+const emptyStream = `data: {"result":{"kind":"task","id":"t1","status":{"state":"working"}}}
+
+data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}
+
+`
+
+func TestAgentAskSessionIdentity(t *testing.T) {
+	// Each browser session carries a stable cbx_uid; distinct cookies must reach
+	// the agent as distinct identities (the verbatim contract: one session per
+	// resource per browser session). A missing cookie is minted and set.
+	ts, _, userIDs := fakeKagent(t, investigationSSE)
+	s := serverWithKagent(t, ts.URL, true)
+
+	call := func(cookie string) *httptest.ResponseRecorder {
+		req := askRequest(t)
+		if cookie != "" {
+			req.AddCookie(&http.Cookie{Name: "cbx_uid", Value: cookie})
+		}
+		rec := httptest.NewRecorder()
+		HandleAgentAsk(s, rec, req)
+		return rec
+	}
+
+	call("alice")
+	call("bob")
+	if len(*userIDs) < 2 || (*userIDs)[0] == (*userIDs)[1] {
+		t.Fatalf("two browser sessions must reach the agent as distinct identities: %v", *userIDs)
+	}
+	if (*userIDs)[0] != "alice" || (*userIDs)[1] != "bob" {
+		t.Errorf("X-User-ID should carry the browser cookie: %v", *userIDs)
+	}
+
+	// No cookie: the handler mints one, sets it, and uses it as the identity.
+	rec := call("")
+	var set string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "cbx_uid" {
+			set = c.Value
+		}
+	}
+	if set == "" {
+		t.Fatal("a missing cbx_uid cookie must be minted and set")
+	}
+	if got := (*userIDs)[len(*userIDs)-1]; got != set {
+		t.Errorf("minted identity %q must be the one sent to the agent (%q)", set, got)
+	}
+}
+
+func TestAgentAskEmptyStreamSurfacesError(t *testing.T) {
+	// The agent answers, but every frame is an A2A shape the console doesn't
+	// translate (an envelope mismatch). The stream must not end as a silent
+	// "complete" with an empty log — it surfaces a visible error, and no done.
+	ts, _, _ := fakeKagent(t, emptyStream)
+	s := serverWithKagent(t, ts.URL, true)
+
+	rec := httptest.NewRecorder()
+	HandleAgentAsk(s, rec, askRequest(t))
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "event: error") {
+		t.Errorf("an untranslatable stream must surface an error:\n%s", body)
+	}
+	if strings.Contains(body, "event: done") {
+		t.Errorf("a zero-event stream must not report done:\n%s", body)
 	}
 }
 

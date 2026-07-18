@@ -15,20 +15,23 @@ import (
 )
 
 // happyStream is the SSE an agent emits for a clean OOMKill investigation:
-// two tool steps (call + result), a thinking message, a verdict, then done.
-const happyStream = `data: {"result":{"type":"tool_call","tool":"k8s_get_resources","args":"pods -n demo-app"}}
+// two tool steps (call + result), a thinking message, a verdict, then a terminal
+// status-update. Message/verdict/terminal frames use the documented,
+// kind-discriminated A2A envelope; tool-call/tool-result are the modeled shape
+// (#134). The verdict rides an A2A message DataPart.
+const happyStream = `data: {"result":{"kind":"tool-call","tool":"k8s_get_resources","args":"pods -n demo-app"}}
 
-data: {"result":{"type":"tool_result","output":"0/1 Running 7 restarts","observation":"7 restarts in 11 minutes"}}
+data: {"result":{"kind":"tool-result","output":"0/1 Running 7 restarts","observation":"7 restarts in 11 minutes"}}
 
-data: {"result":{"type":"tool_call","tool":"k8s_describe_resource","args":"pod demo-app-x8k2p"}}
+data: {"result":{"kind":"tool-call","tool":"k8s_describe_resource","args":"pod demo-app-x8k2p"}}
 
-data: {"result":{"type":"tool_result","output":"Reason: OOMKilled\nLimits: memory 48Mi","observation":"OOMKilled and the limit is only 48Mi"}}
+data: {"result":{"kind":"tool-result","output":"Reason: OOMKilled\nLimits: memory 48Mi","observation":"OOMKilled and the limit is only 48Mi"}}
 
-data: {"result":{"type":"message","text":"forming a hypothesis"}}
+data: {"result":{"kind":"message","role":"agent","parts":[{"kind":"text","text":"forming a hypothesis"}]}}
 
-data: {"result":{"type":"verdict","verdict":{"status":"Diagnosed — unverified","hypothesis":"memory limit 48Mi is below the real working set","killTest":"kubectl -n demo-app get pod -o jsonpath='{..lastState.terminated.reason}'","fix":"git revert HEAD\ngit push"}}}
+data: {"result":{"kind":"message","role":"agent","parts":[{"kind":"data","data":{"verdict":{"status":"Diagnosed — unverified","hypothesis":"memory limit 48Mi is below the real working set","killTest":"kubectl -n demo-app get pod -o jsonpath='{..lastState.terminated.reason}'","fix":"git revert HEAD\ngit push"}}}]}}
 
-data: {"result":{"type":"done","final":true}}
+data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}
 
 `
 
@@ -113,6 +116,31 @@ func TestStreamUnreachable(t *testing.T) {
 	}
 	if called {
 		t.Error("emit must not be called when the agent is unreachable")
+	}
+}
+
+func TestStreamUnmodeledFramesYieldNothing(t *testing.T) {
+	// A stream of real A2A kinds the console does not (yet) model — a Task and an
+	// artifact-update — followed by a clean terminal. The client emits nothing
+	// (no invented events) and returns cleanly; the handler turns "zero events"
+	// into a visible error so the envelope mismatch can't hide as a silent
+	// success.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		io.WriteString(w, `data: {"result":{"kind":"task","id":"t1","status":{"state":"working"}}}`+"\n\n"+
+			`data: {"result":{"kind":"artifact-update","taskId":"t1","artifact":{"name":"x"}}}`+"\n\n"+
+			`data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}`+"\n\n")
+	}))
+	defer ts.Close()
+
+	c := &Client{base: ts.URL, http: ts.Client()}
+	n := 0
+	err := c.Stream(t.Context(), Request{Prompt: "x"}, func(Event) error { n++; return nil })
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("unmodeled frames must not produce events, got %d", n)
 	}
 }
 

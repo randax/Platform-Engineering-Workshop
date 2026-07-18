@@ -21,6 +21,8 @@ package web
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -62,6 +64,10 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 	if body.Kind == "" {
 		body.Kind = "Application"
 	}
+
+	// Resolve (and mint, if absent) the browser identity BEFORE the SSE headers
+	// — Set-Cookie must precede the first body write.
+	uid := ensureUserID(w, r)
 
 	// SSE headers. X-Accel-Buffering stops any reverse proxy from buffering the
 	// stream (the events must reach the browser as they happen).
@@ -107,9 +113,10 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		Kind:      body.Kind,
 		Name:      body.Name,
 		Prompt:    prompt,
-		UserID:    userID(r),
-		SessionID: sessionID(r, body.Namespace, body.Kind, body.Name),
+		UserID:    uid,
+		SessionID: sessionID(uid, body.Namespace, body.Kind, body.Name),
 	}
+	emitted := 0
 	err := s.Kagent.Stream(r.Context(), req, func(e kagent.Event) error {
 		switch e.Kind {
 		case kagent.KindToolCall:
@@ -121,10 +128,18 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		case kagent.KindVerdict:
 			emit("verdict", s.fragment("cf-verdict", e.Verdict))
 		}
+		emitted++
 		return nil
 	})
 	if err != nil {
 		emit("error", s.fragment("cf-error", "The investigation didn't complete: "+err.Error()))
+		return
+	}
+	// A clean stream that produced nothing means every frame fell through the
+	// translation — almost always an A2A envelope mismatch. Make it visible
+	// rather than ending on a silent "complete" with an empty log (#134).
+	if emitted == 0 {
+		emit("error", s.fragment("cf-error", "The agent finished without any readable steps — its response format may not match this console yet (see issue #134)."))
 		return
 	}
 	emit("done", "")
@@ -184,19 +199,34 @@ func writeSSE(w io.Writer, event, data string) {
 	fmt.Fprint(w, "\n")
 }
 
-// userID is the A2A identity (X-User-ID). Kagent is authless in-cluster; this
-// is a stable per-browser handle, not a credential. The lab is single-user and
-// disposable, so an absent cookie falls back to a fixed identity.
-func userID(r *http.Request) string {
+// ensureUserID resolves the A2A identity (X-User-ID) for this browser session,
+// minting and setting the `cbx_uid` cookie when it is absent so the identity is
+// stable across requests. Kagent is authless in-cluster, so this is a per-browser
+// handle, not a credential. Same cookie idiom as the project selector
+// (HttpOnly, Lax). The cookie must be set before the SSE body is written.
+func ensureUserID(w http.ResponseWriter, r *http.Request) string {
 	if c, err := r.Cookie("cbx_uid"); err == nil && c.Value != "" {
 		return c.Value
 	}
-	return "cloudbox-user"
+	id := mintID()
+	http.SetCookie(w, &http.Cookie{Name: "cbx_uid", Value: id, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	return id
 }
 
-// sessionID scopes one Kagent conversation to one resource per browser session
-// — the seam a later ticket (#140) reuses to continue the same conversation for
+// mintID returns a fresh random per-browser identity; on the vanishingly
+// unlikely rand failure it degrades to a fixed handle rather than erroring.
+func mintID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "cloudbox-user"
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// sessionID scopes one Kagent conversation to one resource per browser session —
+// the (uid, resource) pair, so two browsers get distinct sessions. This is the
+// seam a later ticket (#140) reuses to continue the same conversation for
 // follow-up questions.
-func sessionID(r *http.Request, ns, kind, name string) string {
-	return userID(r) + ":" + ns + ":" + kind + ":" + name
+func sessionID(uid, ns, kind, name string) string {
+	return uid + ":" + ns + ":" + kind + ":" + name
 }
