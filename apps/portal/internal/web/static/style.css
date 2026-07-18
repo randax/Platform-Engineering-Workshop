@@ -520,3 +520,39 @@ pre.code {
 .composed-kind { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
 .composed-note { color: var(--muted); font-size: 0.85rem; }
 .fn-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin: 0.3rem 0 0.6rem; }
+
+/* Case file — the single-shot agent investigation on the Application detail
+   (module 10). Split view: a terminal-style live tool-call log beside a panel
+   filling Status -> Hypothesis -> Kill-test -> Fix. Re-implemented from the
+   winning prototype variant, reusing the existing tokens. */
+.casefile-mount .hint { margin: 0.2rem 0 0.6rem; }
+.casefile { display: grid; grid-template-columns: 1.25fr 0.95fr; gap: 1rem; margin: 0.8rem 0; }
+@media (max-width: 860px) { .casefile { grid-template-columns: 1fr; } }
+.case-log {
+  background: var(--code-bg); color: var(--code-fg); border-radius: var(--r-md);
+  border: 1px solid color-mix(in srgb, #fff 6%, var(--code-bg));
+  font: 0.8rem/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+  padding: 0.8rem 1rem; min-height: 16rem; max-height: 26rem; overflow-y: auto;
+}
+.cf-line { margin: 0.15rem 0; }
+.cf-tool { color: #8ab4ff; }
+.cf-obs { color: var(--warn); margin-left: 1.2rem; }
+.cf-msg { color: var(--code-muted); font-style: italic; }
+.case-side { display: flex; flex-direction: column; gap: 0.8rem; }
+.case-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm); padding: 0.8rem 1rem;
+}
+.case-card h4 {
+  margin: 0 0 0.35rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); font-weight: 650;
+}
+.case-card p { margin: 0.2rem 0; font-size: 0.9rem; }
+.case-card pre.code { margin: 0.35rem 0 0; font-size: 0.78rem; }
+.case-empty { color: var(--muted); font-style: italic; font-size: 0.88rem; }
+.case-card.cf-fail { border-left: 3px solid var(--bad); }
+.cf-locked {
+  color: var(--muted); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 0.7rem 1rem; font-size: 0.9rem;
+}
+.cf-locked .hint { display: block; margin-top: 0.2rem; }
