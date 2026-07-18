@@ -635,6 +635,9 @@ jobs:
           # Deploy half: the ksvc fn-e2efn converges from ImagePullBackOff to
           # Ready once the image lands (localhost:30500 is in Knative's
           # tag-resolution-skip list, so it was admitted immediately).
+          # `kubectl wait` errors immediately on a not-yet-created resource — the
+          # composed ksvc appears a beat after the POST — so poll for existence first.
+          for _ in $(seq 1 24); do kubectl -n demo get "ksvc/fn-${fn}" >/dev/null 2>&1 && break; sleep 5; done
           kubectl -n demo wait --for=condition=Ready "ksvc/fn-${fn}" --timeout=180s \
             || { echo "❌ ksvc fn-${fn} not Ready"; kubectl -n demo describe ksvc "fn-${fn}" | tail -40; exit 1; }
           echo "✅ ksvc fn-${fn} Ready"
@@ -881,6 +884,9 @@ jobs:
             *) echo "❌ Application image = '$img', want localhost:30500/app-${app}:<tag>"; exit 1;;
           esac
           # Deploy half: the composed workload runs and USES its dependencies.
+          # Poll for the ksvc first — `kubectl wait` errors immediately on a
+          # not-yet-created resource, and the compose lands a beat after the POST.
+          for _ in $(seq 1 24); do kubectl -n demo get "ksvc/${app}" >/dev/null 2>&1 && break; sleep 5; done
           kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=300s \
             || { echo "❌ composed ksvc ${app} not Ready"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
           host=$(kubectl -n demo get ksvc "${app}" -o jsonpath='{.status.url}'); host="${host#http://}"
@@ -941,6 +947,9 @@ jobs:
           done
           [ "$ph" = Succeeded ] || { echo "❌ scaffolded build didn't Succeed in time (phase=$ph)"; exit 1; }
           # And it deploys and serves (proves scaffold → build → deploy end to end).
+          # Poll for the ksvc first — `kubectl wait` errors immediately if it isn't
+          # created yet, and the compose lands a beat after the build succeeds.
+          for _ in $(seq 1 24); do kubectl -n demo get "ksvc/${app}" >/dev/null 2>&1 && break; sleep 5; done
           kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=300s \
             || { echo "❌ scaffolded ksvc ${app} not Ready"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
           host=$(kubectl -n demo get ksvc "${app}" -o jsonpath='{.status.url}'); host="${host#http://}"
@@ -973,7 +982,10 @@ jobs:
             --data-urlencode "repo=cloudbox/platform" --data-urlencode "branch=main" \
             --data-urlencode "path=lab/07-ci/app" \
             --data-urlencode "database=1" --data-urlencode "bucket=1"
-          # Wait for the build + the composed ksvc to serve.
+          # Wait for the build + the composed ksvc to serve. Poll for the ksvc
+          # first — `kubectl wait` errors immediately on a not-yet-created resource
+          # (the compose lands a beat after the POST; this exact race flaked here).
+          for _ in $(seq 1 24); do kubectl -n demo get "ksvc/${app}" >/dev/null 2>&1 && break; sleep 5; done
           kubectl -n demo wait --for=condition=Ready "ksvc/${app}" --timeout=360s \
             || { echo "❌ first deploy of ${app} not Ready"; kubectl -n demo describe ksvc "${app}" | tail -30; exit 1; }
           host=$(kubectl -n demo get ksvc "${app}" -o jsonpath='{.status.url}'); host="${host#http://}"
