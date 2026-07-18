@@ -47,13 +47,16 @@ func init() {
 type appRow struct {
 	kube.Application
 	URL         string
-	SourceBuilt bool // built from a Gitea repo → offer Redeploy
+	SourceBuilt bool   // built from a Gitea repo → offer Redeploy
+	Why         string // failing-condition cause when not Ready (DR-0005)
 }
 
 type applicationsData struct {
 	Apps            []appRow
 	Flash           flash
-	ScaffoldEnabled bool // portal has Gitea creds → offer "start from a template"
+	ScaffoldEnabled bool             // portal has Gitea creds → offer "start from a template"
+	Diag            kube.Diagnostics // project-namespace "why unhealthy" (DR-0005)
+	ShowDiag        bool
 }
 
 func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (applicationsData, error) {
@@ -62,16 +65,30 @@ func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (app
 		return applicationsData{}, err
 	}
 	rows := make([]appRow, 0, len(apps))
+	anyUnhealthy := false
 	for _, a := range apps {
 		_, _, _, sourceBuilt := a.Source()
 		row := appRow{Application: a, SourceBuilt: sourceBuilt}
 		if a.Readiness().Class == "ok" {
 			// The sslip.io URL the composed ksvc serves on, via Kourier's NodePort.
 			row.URL = fmt.Sprintf("http://%s.%s.127.0.0.1.sslip.io:31080", a.Metadata.Name, a.Metadata.Namespace)
+		} else {
+			row.Why = a.Why() // the Crossplane cause, shown inline (DR-0005)
+			anyUnhealthy = true
 		}
 		rows = append(rows, row)
 	}
-	return applicationsData{Apps: rows, Flash: fl, ScaffoldEnabled: kube.GiteaConfigured()}, nil
+	data := applicationsData{Apps: rows, Flash: fl, ScaffoldEnabled: kube.GiteaConfigured()}
+	// When something's wrong, add the project-namespace "why" (failing pods +
+	// Warning events) below the table — the cause a describe would show. Best
+	// effort: a diag read error never breaks the page.
+	if anyUnhealthy {
+		if diag, derr := s.Kube.NamespaceDiagnostics(ctx, ns); derr == nil {
+			data.Diag = diag
+			data.ShowDiag = !diag.Empty()
+		}
+	}
+	return data, nil
 }
 
 func handleApplications(s *Server, w http.ResponseWriter, r *http.Request) {

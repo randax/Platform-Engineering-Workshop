@@ -97,10 +97,20 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
             hx-confirm="Delete {{.Metadata.Name}}? This removes the workload, its database and bucket.">Delete</button>
         </td>
       </tr>
+      {{/* The cause, inline under an unhealthy app — the Crossplane condition
+           message (DR-0005). Quiet while it's still converging (.Why is ""). */}}
+      {{if .Why}}<tr class="diag-row"><td colspan="7"><span class="diag-when">why</span> {{.Why}}</td></tr>{{end}}
     {{else}}
       <tr><td colspan="7" class="empty">No applications yet — deploy one below (the golden path from module 04).</td></tr>
     {{end}}
     </tbody>
   </table>
+  {{if .ShowDiag}}
+  <div class="diag-panel">
+    <h3>Diagnostics <small>why an app isn't healthy</small></h3>
+    {{template "diagnostics" .Diag}}
+    <p class="hint">The cause a <code>kubectl describe</code> would show. Tenant-plane fix: push a fix and hit <b>Redeploy</b> (source-built apps), or delete and recreate with a working image.</p>
+  </div>
+  {{end}}
 </div>
 {{end}}

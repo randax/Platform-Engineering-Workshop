@@ -143,6 +143,7 @@ func TestGenerateScreenshots(t *testing.T) {
 		{"component-detail-locked", "component-detail", locked},
 		{"components", "components", sampleComponents()},
 		{"applications", "applications", sampleApplications()},
+		{"applications-diagnostics", "applications", sampleApplicationsUnhealthy()},
 		{"services", "services", functionsData{Rows: sampleServices(), Samples: fnSamples}},
 		{"database-detail", "database-detail", sampleDatabaseDetail()},
 		{"builds", "builds", sampleBuilds()},
@@ -201,13 +202,34 @@ func sampleApplications() applicationsData {
 		return row
 	}
 	// The source-built app carries a repo image + offers Redeploy; the other is
-	// a prebuilt image.
+	// a prebuilt image. This is the healthy "hero" shot — the diagnostics state
+	// gets its own sample (sampleApplicationsUnhealthy) so this one stays clean.
 	src := mk("web", "localhost:30500/app-web:b7", 0, 3, true)
 	src.SourceBuilt = true
 	return applicationsData{Apps: []appRow{
 		src,
 		mk("api", "ghcr.io/acme/api:v2", 1, 5, false),
 	}, ScaffoldEnabled: true}
+}
+
+// sampleApplicationsUnhealthy is the DR-0005 diagnostics state: the api app is
+// stuck on an unpullable image, so the console shows the failing condition
+// inline AND the Diagnostics panel (the cause a describe would show).
+func sampleApplicationsUnhealthy() applicationsData {
+	d := sampleApplications()
+	for i := range d.Apps {
+		if d.Apps[i].Metadata.Name == "api" {
+			d.Apps[i].Status.Conditions = []kube.Condition{{Type: "Ready", Status: "False", Reason: "Creating",
+				Message: "cannot resolve resources: composed Deployment is not Available"}}
+			d.Apps[i].Why = d.Apps[i].Application.Why()
+		}
+	}
+	d.ShowDiag = true
+	d.Diag = kube.Diagnostics{PodTroubles: []kube.PodTrouble{{
+		Pod: "api-00001-deployment-6c9f-8t2wq", Container: "user-container",
+		Reason: "ImagePullBackOff", Message: `Back-off pulling image "ghcr.io/acme/api:v2"`,
+	}}}
+	return d
 }
 
 // sampleComponents mocks the Components list so the screenshot shows the new

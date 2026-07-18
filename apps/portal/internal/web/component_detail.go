@@ -27,6 +27,11 @@ type componentDetailData struct {
 	Status      string
 	StatusClass string // health dot/badge: ok | meh | bad | off
 
+	// Diagnostics — the "why" (DR-0005), shown only when the component isn't
+	// Operational: the failing pods' container states + recent Warning events.
+	Diag     kube.Diagnostics
+	ShowDiag bool
+
 	// Monitoring — populated only when the observability stack is running
 	// (the per-component "unlock": no telemetry, no panel — just a hint).
 	Telemetry  bool
@@ -77,6 +82,16 @@ func handleComponentDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 		data.Status, data.StatusClass = "Degraded", "meh"
 	default:
 		data.Status, data.StatusClass = "Down", "bad"
+	}
+
+	// Diagnose the cause when the component isn't fully healthy (DR-0005) — the
+	// failing pods and Warning events for its namespace. Best-effort: a diag read
+	// error never breaks the page, it just leaves the section empty (hidden).
+	if h.Total > 0 && h.Ready < h.Total {
+		if diag, derr := s.Kube.NamespaceDiagnostics(r.Context(), ns); derr == nil {
+			data.Diag = diag
+			data.ShowDiag = !diag.Empty()
+		}
 	}
 
 	// Gate the Monitoring panel on the observability stack actually running —

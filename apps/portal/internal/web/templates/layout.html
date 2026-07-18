@@ -98,3 +98,33 @@
 {{define "badge"}}{{/* ArgoCD vocabulary: green for good, red for broken, amber for in-between */ -}}
 <span class="badge {{if or (eq . "Healthy") (eq . "Synced")}}ok{{else if or (eq . "Degraded") (eq . "Missing")}}bad{{else}}meh{{end}}">{{.}}</span>
 {{- end}}
+
+{{/* Diagnostics — the read-only "why is this unhealthy?" panel (DR-0005). Takes
+     a kube.Diagnostics; the caller renders it only when there's something to
+     show. Container faults first (the usual root cause: bad image, crash), then
+     recent Warning events. This is the console reading the conditions WITH you. */}}
+{{define "diagnostics"}}
+<div class="diag">
+  {{if .PodTroubles}}
+  <table class="diag-pods">
+    <thead><tr><th>Pod</th><th>Container</th><th>Reason</th><th>Detail</th></tr></thead>
+    <tbody>
+      {{range .PodTroubles}}
+      <tr><td><code>{{.Pod}}</code></td><td><code>{{.Container}}</code></td>
+        <td><span class="badge bad">{{.Reason}}</span></td>
+        <td class="diag-msg">{{.Message}}</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
+  {{if .Warnings}}
+  <ul class="diag-events">
+    {{range .Warnings}}
+    <li><span class="diag-when">{{.Age}}</span> <b>{{.Reason}}</b>
+      <span class="diag-obj">{{.InvolvedObject.Kind}}/{{.InvolvedObject.Name}}</span>
+      <span class="diag-msg">{{.Message}}</span></li>
+    {{end}}
+  </ul>
+  {{end}}
+</div>
+{{end}}
