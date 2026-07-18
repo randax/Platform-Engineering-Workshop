@@ -113,6 +113,10 @@ src: ./pages/module-09.md
 ---
 
 ---
+src: ./pages/module-10.md
+---
+
+---
 src: ./pages/principles.md
 ---
 
