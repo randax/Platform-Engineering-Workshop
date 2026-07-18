@@ -47,8 +47,12 @@ git add gitops/apps && git commit -m "enable cnpg-operator" && git push
 ```
 
 Watch it converge: `kubectl -n argocd get applications -w` (or the ArgoCD UI).
-Disabling is the reverse: `git rm` the file from `apps/`, push, and the root
-app prunes the child Application (which prunes its resources).
+Disabling is the reverse: `git rm` the file from `apps/` and push. The root
+app-of-apps runs with `prune: false` (so a transient/stale sync can't
+cascade-delete your running apps), so it won't remove the child Application for
+you — delete it yourself with `kubectl -n argocd delete application <name>`,
+which prunes its resources. Child apps keep their own `prune: true`, so this
+only affects file-level removal from the root's `apps/`.
 
 Each catalog entry is designed to work when enabled standalone *in module
 order* — the hard dependencies are **backstage → cnpg-operator** (its

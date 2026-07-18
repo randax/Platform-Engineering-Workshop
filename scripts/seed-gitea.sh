@@ -129,7 +129,18 @@ spec:
     server: https://kubernetes.default.svc
   syncPolicy:
     automated:
-      prune: true
+      # prune is DELIBERATELY off on the ROOT app-of-apps. Each module's solve
+      # incrementally adds child Application files to gitops/apps/ and pushes in
+      # rapid succession; the app-of-apps only ever needs to CREATE/UPDATE those
+      # children. With prune:true a transient sync that computes desired state
+      # from a stale repo-server generation (e.g. a failed-child retry loop
+      # pinned to a pre-push revision, more likely under peak runner memory
+      # pressure at module 09) cascade-DELETES the newest child Applications —
+      # tearing whole namespaces (pipeline/portal/knative-eventing) out from
+      # under a running lab. The child apps keep their own prune:true, so
+      # in-app GitOps pruning is unaffected; only file-level removal from
+      # gitops/apps/ now needs a manual "kubectl delete application".
+      prune: false
       selfHeal: true
     retry:
       limit: 5
