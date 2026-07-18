@@ -48,7 +48,7 @@ most portals.
 2. Open **http://localhost:30600** and explore. The nav groups the pages into **Platform**
    (Overview, Components, Access, Workshop, Activity, Billing), **Services** (Applications,
    Databases, Buckets, Functions, Streams, Builds — Applications, Databases and Functions
-   each have a detail page, and Buckets an in-page object browser), and **Capstone** (Gallery) — and none of them is a mock: every row is a live read
+   each have a detail page, and Buckets uses an in-page object browser), and **Capstone** (Gallery) — and none of them is a mock: every row is a live read
    from your cluster (the Workshop page even tracks your module progress, live). For each
    page, answer: *which Kubernetes API is this?* (You installed all of them today.)
 3. **Hand your portal the keys.** The console can *read* everything, but creating
