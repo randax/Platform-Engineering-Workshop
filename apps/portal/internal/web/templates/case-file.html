@@ -1,0 +1,26 @@
+{{/* Case file fragments — streamed to the browser as SSE data payloads by
+     handleAgentAsk (module 10). The tool-call log lines append to #cf-log; the
+     verdict and error fragments replace the side panel #cf-panel. Kept as
+     server-rendered HTML so the hermetic tests assert exactly what ships. */}}
+
+{{/* One tool the agent invoked (a read of the cluster). */}}
+{{define "cf-toolcall"}}<div class="cf-line"><span class="cf-tool">{{.Tool}}</span>({{.Args}})</div>{{end}}
+
+{{/* The agent's one-line read of what a tool returned. */}}
+{{define "cf-toolresult"}}<div class="cf-line cf-obs">↳ {{.Observation}}</div>{{end}}
+
+{{/* A plain agent message ("forming a hypothesis…"). */}}
+{{define "cf-message"}}<div class="cf-line cf-msg">{{.Text}}</div>{{end}}
+
+{{/* The verdict — fills the side panel: Status → Hypothesis → Kill-test → Fix.
+     The Fix is copy-paste git commands only; there is deliberately no button or
+     form here (the agent is read-only, issue #126). */}}
+{{define "cf-verdict"}}
+<div class="case-card"><h4>Status</h4><p>{{if .Status}}<span class="badge bad">{{.Status}}</span>{{else}}<span class="badge meh">Diagnosed — verify it</span>{{end}}</p></div>
+<div class="case-card"><h4>Hypothesis</h4><p>{{.Hypothesis}}</p></div>
+<div class="case-card"><h4>Kill-test — one observation that would falsify it</h4>{{if .KillTest}}<pre class="code">{{.KillTest}}</pre>{{else}}<p class="case-empty">—</p>{{end}}</div>
+<div class="case-card"><h4>Fix (yours to make — via git)</h4>{{if .Fix}}<pre class="code">{{.Fix}}</pre>{{else}}<p class="case-empty">—</p>{{end}}<p class="hint">The agent can't touch your cluster — run these yourself; ArgoCD reconverges.</p></div>
+{{end}}
+
+{{/* A readable failure state — the agent was unreachable or the run failed. */}}
+{{define "cf-error"}}<div class="case-card cf-fail"><h4>Investigation failed</h4><p>{{.}}</p></div>{{end}}

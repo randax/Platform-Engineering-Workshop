@@ -22,6 +22,7 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"cloudbox.io/portal/internal/kagent"
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/logs"
 	"cloudbox.io/portal/internal/metrics"
@@ -59,6 +60,7 @@ func main() {
 		Logs:        logs.New(cfg.VLogsURL),
 		Streams:     nats.New(cfg.NATSMonitorURL),
 		Registry:    registry.New(cfg.ZotURL),
+		Kagent:      kagent.New(cfg.KagentURL),
 		UploaderURL: cfg.UploaderURL,
 		GrafanaURL:  cfg.GrafanaURL,
 		// otelhttp's transport adds a client span AND a `traceparent` header
@@ -85,6 +87,10 @@ func main() {
 	})
 	// Infrastructure-level routes (no nav entry), alongside /healthz.
 	mux.HandleFunc("GET /teapot", bind(srv, web.Teapot))
+	// The Case file agent investigation (module 10) — a cross-cutting endpoint
+	// (any resource kind), streamed as SSE; its own capability gate lives in the
+	// handler, so it sits here rather than under one registry page.
+	mux.HandleFunc("POST /agent/ask", bind(srv, web.HandleAgentAsk))
 	// Projects (PRD-0011): global chrome, not registry pages — the top-bar
 	// selector fragment + switch/create/delete.
 	mux.HandleFunc("GET /project/bar", bind(srv, web.HandleProjectBar))

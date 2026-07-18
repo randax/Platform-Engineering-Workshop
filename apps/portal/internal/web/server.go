@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
+	"cloudbox.io/portal/internal/kagent"
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/logs"
 	"cloudbox.io/portal/internal/metrics"
@@ -28,7 +29,8 @@ type Server struct {
 	Prom        *metrics.Client
 	Logs        *logs.Client
 	Streams     *nats.Client
-	Registry    *reg.Client // Zot OCI registry, read by the Builds page
+	Registry    *reg.Client    // Zot OCI registry, read by the Builds page
+	Kagent      *kagent.Client // Kagent controller (A2A), the Case file investigation (module 10)
 	Tmpl        *template.Template
 	UploaderURL string              // cluster-internal URL of the uploader Knative Service
 	GrafanaURL  string              // browser-facing Grafana base for deep links

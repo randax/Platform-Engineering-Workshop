@@ -44,6 +44,12 @@ type appDetailData struct {
 	Diag     kube.Diagnostics
 	ShowDiag bool
 
+	// Case file — the single-shot agent investigation (module 10). ShowCaseFile
+	// is set for an unhealthy app; AgentAvailable reflects whether the kagent
+	// capability is present (else the affordance renders locked).
+	ShowCaseFile   bool
+	AgentAvailable bool
+
 	// Monitoring — the workload's request rate + latency, best-effort.
 	Telemetry  bool
 	ReqSpark   template.HTML
@@ -93,6 +99,10 @@ func handleApplicationDetail(s *Server, w http.ResponseWriter, r *http.Request) 
 			data.Diag = diag
 			data.ShowDiag = data.Why != "" || !diag.Empty()
 		}
+		// Offer the Case file agent investigation on an unhealthy app (module 10).
+		// It renders locked unless the kagent capability is present.
+		data.ShowCaseFile = true
+		data.AgentAvailable = agentAvailable(s)
 	}
 
 	// The workload's metrics (job = cloudbox-<name>), once observability is on —
