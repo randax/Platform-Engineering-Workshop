@@ -100,7 +100,7 @@ In dependency order:
 
 ```bash
 WORKSHOP="$(git rev-parse --show-toplevel)"
-cd ~/cloudbox-platform   # your Gitea clone
+cd ~/cloudbox-platform   # your Gitea clone from module 02 (used the remote-add path instead? cd into your workshop checkout)
 
 cp gitops/catalog/crossplane.yaml gitops/apps/
 mkdir -p gitops/components/platform-api
