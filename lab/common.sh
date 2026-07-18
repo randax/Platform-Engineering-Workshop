@@ -85,6 +85,22 @@ wait_app() { # <app-name> [timeout-seconds]
   return 1
 }
 
+# wait_exists <ns> <kind/name> [timeout-seconds] — poll until a resource EXISTS.
+# `kubectl wait --for=condition=...` errors immediately on a missing resource
+# (it does not wait for creation), and wait_app now returns on app HEALTH — an
+# app can be Healthy while still OutOfSync with a resource not yet applied. Use
+# this before any `kubectl wait` on a resource an ArgoCD app is expected to create.
+wait_exists() {
+  local ns="$1" obj="$2" timeout="${3:-300}" waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    kubectl -n "$ns" get "$obj" >/dev/null 2>&1 && return 0
+    sleep 5
+    waited=$((waited + 5))
+  done
+  echo "ERROR: $obj never appeared in ns $ns after ${timeout}s" >&2
+  return 1
+}
+
 # wait_for_cr <ns> <resource> [crd] — the demo app can report Synced while
 # SKIPPING a custom resource whose CRD wasn't Established yet
 # (SkipDryRunOnMissingResource), leaving the CR "not found" when a solve script

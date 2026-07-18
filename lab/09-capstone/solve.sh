@@ -22,6 +22,13 @@ wait_app knative-eventing 600
 wait_app portal
 wait_app picture-pipeline 600
 
+# The picture-pipeline app can be Healthy before every resource is applied
+# (wait_app keys on health; sync may lag) — guard each condition-wait with an
+# existence-wait so a not-yet-created resource doesn't hard-fail the wait.
+wait_exists pipeline broker/default
+wait_exists pipeline ksvc/uploader
+wait_exists pipeline ksvc/resizer
+wait_exists pipeline trigger/resize-on-upload
 kubectl -n pipeline wait --for=condition=Ready broker/default --timeout=300s
 # Wait for the subscriber ksvcs BEFORE the trigger. A Knative Trigger only goes
 # Ready once BOTH its broker AND its subscriber (the resizer ksvc) are
@@ -36,6 +43,7 @@ kubectl -n pipeline wait --for=condition=Ready ksvc/uploader ksvc/resizer --time
 kubectl -n pipeline annotate trigger/resize-on-upload \
   cloudbox.io/rereconcile="$(date +%s)" --overwrite >/dev/null 2>&1 || true
 kubectl -n pipeline wait --for=condition=Ready trigger/resize-on-upload --timeout=300s
+wait_exists pipeline job/create-images-bucket
 kubectl -n pipeline wait --for=condition=Complete job/create-images-bucket --timeout=300s
 
 # Wait for the portal UI (the upload path goes browser → portal → uploader).
