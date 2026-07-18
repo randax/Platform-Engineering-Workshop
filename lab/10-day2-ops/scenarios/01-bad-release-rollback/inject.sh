@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Scenario 01 — poison the Git-managed demo-app PORT with a plausible release edit.
+# Scenario 01 — poison the Git-managed demo-web PORT with a plausible release edit.
+#
+# Target: the attendee's OWN platform repo clone (cloudbox/platform in Gitea),
+# path gitops/components/demo/demo-web.yaml — synced into namespace demo by
+# the "demo" Application from module 02 (solutions/module-02/apps/demo.yaml).
+# cloudbox/demo-app is unrelated: it is Go SOURCE for module 07's in-cluster
+# build, has no deploy manifests, and nothing syncs it directly — never target it.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -7,35 +13,45 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$DIR/../../../common.sh"
 
-DEMO_REPO_URL="${DEMO_REPO_URL:-http://gitea_admin:cloudbox123@${GITEA_HOST}/cloudbox/demo-app.git}"
-DEPLOYMENT_PATH="deploy/deployment.yaml"
+COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
+BASELINE_SRC="$DIR/../../baseline/demo-web.yaml"
+CONTAINER_NAME="web"
 POISON_VALUE="8080-canary"
 
-TMP_ROOT="$(mktemp -d)"
-trap 'rm -rf "$TMP_ROOT"' EXIT
-CLONE="$TMP_ROOT/demo-app"
+CLONE="$(gitops_clone)" || exit 1
+TMP_PARENT="$(dirname "$CLONE")"
+trap 'rm -rf "$TMP_PARENT"' EXIT
 
-if ! git clone --quiet --depth 100 --branch main --single-branch \
-  "$DEMO_REPO_URL" "$CLONE" 2>/dev/null; then
-  echo "ERROR: could not clone http://${GITEA_HOST}/cloudbox/demo-app.git — is Gitea running and seeded?" >&2
-  exit 1
-fi
+# --- Setup step: seed the baseline workload the first time this scenario runs.
+# The attendee never hand-copies this file (unlike module 02's welcome.yaml) —
+# inject.sh owns it, seeds it once, then asks the attendee to re-run once
+# ArgoCD has converged, so the fault commit always lands on top of a workload
+# that is actually Ready (a poisoned commit on top of a not-yet-synced
+# Deployment would be indistinguishable from "ArgoCD just hasn't synced yet").
+if [ ! -f "$CLONE/$COMPONENT_PATH" ]; then
+  cp "$BASELINE_SRC" "$CLONE/$COMPONENT_PATH"
+  git -C "$CLONE" add "$COMPONENT_PATH"
+  git -C "$CLONE" -c user.name="cloudbox" -c user.email="cloudbox@localhost" \
+    commit -q -m "chore(demo): seed the demo-web baseline workload"
+  git -C "$CLONE" push -q origin main
+  argocd_refresh demo
 
-if [ ! -f "$CLONE/$DEPLOYMENT_PATH" ]; then
-  echo "ERROR: cloudbox/demo-app has no $DEPLOYMENT_PATH." >&2
-  echo "Enable module 10's packaging/day-2 demo app first, then run ./inject.sh 1 again." >&2
-  exit 1
+  echo "🌱 Seeded $COMPONENT_PATH in cloudbox/platform (module 10's baseline workload)."
+  echo
+  echo "Wait for ArgoCD to converge, then run ./inject.sh 1 again to inject the fault:"
+  echo "  kubectl -n demo rollout status deploy/demo-web"
+  exit 0
 fi
 
 # Idempotency is by construction: the poison value is the injected artifact's
 # marker. Refusing before mutation makes a second injection unable to push.
-if grep -Fq -- "$POISON_VALUE" "$CLONE/$DEPLOYMENT_PATH"; then
+if grep -Fq -- "$POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
   echo "ERROR: scenario 1 already injected — run ./restore.sh 1 first" >&2
   exit 1
 fi
 
-MUTATED="$TMP_ROOT/deployment.yaml"
-if ! awk -v poison="$POISON_VALUE" '
+MUTATED="$TMP_PARENT/demo-web.yaml"
+if ! awk -v poison="$POISON_VALUE" -v target="$CONTAINER_NAME" '
   function indent_of(s, t) {
     t = s
     sub(/[^ ].*$/, "", t)
@@ -58,22 +74,23 @@ if ! awk -v poison="$POISON_VALUE" '
     changed = 1
   }
   function close_env() {
-    if (in_demo && in_env && !port_found) add_port(env_indent)
+    if (in_target && in_env && !port_found) add_port(env_indent)
     in_env = 0
   }
   function close_container() {
     close_env()
-    if (in_demo && !env_seen) {
+    if (in_target && !env_seen) {
       print spaces(container_indent + 2) "env:"
       add_port(container_indent + 2)
     }
-    in_demo = 0
+    in_target = 0
     env_seen = 0
     port_found = 0
     port_pending = 0
   }
   BEGIN {
     container_indent = -1
+    name_pattern = "^[ ]*-[ ]+name:[ ]*[\"\047]?" target "[\"\047]?[ ]*(#.*)?$"
   }
   {
     line = $0
@@ -90,12 +107,12 @@ if ! awk -v poison="$POISON_VALUE" '
         changed = 1
         next
       }
-      print "PORT under the demo-app container is not immediately followed by value:" > "/dev/stderr"
+      print "PORT under the " target " container is not immediately followed by value:" > "/dev/stderr"
       bad = 1
       exit 42
     }
 
-    if (in_demo && in_env && !blank_or_comment(line) && ind <= env_indent)
+    if (in_target && in_env && !blank_or_comment(line) && ind <= env_indent)
       close_env()
 
     if (in_containers && !blank_or_comment(line) && ind <= containers_indent) {
@@ -118,27 +135,27 @@ if ! awk -v poison="$POISON_VALUE" '
     if (in_containers && container_indent >= 0 && ind == container_indent &&
         line ~ /^[ ]*-/) {
       close_container()
-      in_demo = (line ~ /^[ ]*-[ ]+name:[ ]*["\047]?demo-app["\047]?[ ]*(#.*)?$/)
-      if (in_demo) demo_seen = 1
+      in_target = (line ~ name_pattern)
+      if (in_target) target_seen = 1
     }
 
-    if (in_demo && line ~ /^[ ]*env:[ ]*\[[ ]*\][ ]*(#.*)?$/) {
+    if (in_target && line ~ /^[ ]*env:[ ]*\[[ ]*\][ ]*(#.*)?$/) {
       print spaces(ind) "env:"
       env_seen = 1
       add_port(ind)
       next
     }
-    if (in_demo && line ~ /^[ ]*env:[ ]*(#.*)?$/) {
+    if (in_target && line ~ /^[ ]*env:[ ]*(#.*)?$/) {
       env_seen = 1
       in_env = 1
       env_indent = ind
-    } else if (in_demo && line ~ /^[ ]*env:/) {
-      print "unsupported inline env value under the demo-app container" > "/dev/stderr"
+    } else if (in_target && line ~ /^[ ]*env:/) {
+      print "unsupported inline env value under the " target " container" > "/dev/stderr"
       bad = 1
       exit 43
     }
 
-    if (in_demo && in_env &&
+    if (in_target && in_env &&
         line ~ /^[ ]*-[ ]+name:[ ]*["\047]?PORT["\047]?[ ]*(#.*)?$/) {
       port_pending = 1
       port_name_indent = ind
@@ -149,8 +166,8 @@ if ! awk -v poison="$POISON_VALUE" '
   END {
     if (bad) exit 1
     close_container()
-    if (!demo_seen) {
-      print "could not find a container named demo-app" > "/dev/stderr"
+    if (!target_seen) {
+      print "could not find a container named " target > "/dev/stderr"
       exit 1
     }
     if (!changed) {
@@ -158,18 +175,21 @@ if ! awk -v poison="$POISON_VALUE" '
       exit 1
     }
   }
-' "$CLONE/$DEPLOYMENT_PATH" > "$MUTATED"; then
-  echo "ERROR: could not safely update PORT in $DEPLOYMENT_PATH — check the demo-app container's YAML structure" >&2
+' "$CLONE/$COMPONENT_PATH" > "$MUTATED"; then
+  echo "ERROR: could not safely update PORT in $COMPONENT_PATH — check the $CONTAINER_NAME container's YAML structure" >&2
   exit 1
 fi
-mv "$MUTATED" "$CLONE/$DEPLOYMENT_PATH"
+mv "$MUTATED" "$CLONE/$COMPONENT_PATH"
 
-git -C "$CLONE" add "$DEPLOYMENT_PATH"
+# Add the specific path only (never -A): welcome.yaml and anything else the
+# attendee has in gitops/components/demo/ is untouched by construction.
+git -C "$CLONE" add "$COMPONENT_PATH"
 git -C "$CLONE" -c user.name="cloudbox" -c user.email="cloudbox@localhost" \
-  commit -q -m "release: demo-app port-band rollout" \
+  commit -q -m "release: demo-web port-band rollout" \
   -m "Cloudbox-Scenario: day2-01"
 INJECTED_SHA="$(git -C "$CLONE" rev-parse --short HEAD)"
 git -C "$CLONE" push -q origin main
+argocd_refresh demo
 
 echo "💥 Scenario 01-bad-release-rollback injected as commit $INJECTED_SHA."
 echo

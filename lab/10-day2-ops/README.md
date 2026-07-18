@@ -2,21 +2,32 @@
 
 ## The goal
 
-At the end of this module, `cloudbox/demo-app:main` contains a forward revert of the bad
-release, ArgoCD has reconciled that Git history into namespace `demo`, and every
-`demo-app` replica is healthy. `./verify.sh` proves both the repository and live rollout.
+At the end of this module, `gitops/components/demo/demo-web.yaml` in your
+`cloudbox/platform` repo contains a forward revert of the bad release, ArgoCD has
+reconciled that Git history into namespace `demo`, and every `demo-web` replica is
+healthy. `./verify.sh` proves both the repository and the live rollout.
 
 ## Prerequisites and interface contract
 
-This is a stretch module. It expects the cluster module, the GitOps module (module 02),
-and the portal module (module 08). Module 10's setup/catalog step must also be enabled:
-the `cloudbox/demo-app` repository in your in-cluster Gitea must contain a plain
-`apps/v1` Deployment at `deploy/deployment.yaml`, and an ArgoCD Application must sync
-that path directly into namespace `demo`.
+This is a stretch module. Its only prerequisites are the cluster module and the GitOps
+module (module 02) — you need Gitea + ArgoCD running and the `demo` Application
+(`gitops/apps/demo.yaml`, watching `gitops/components/demo/` in your platform repo) from
+module 02 already enabled. Module 10 needs nothing from the build/serverless/portal
+stretch modules (06-09).
 
-A push to `cloudbox/demo-app:main` is therefore the deploy trigger; there is no Knative,
-BuildKit, or rebuild step in this exercise. If `./inject.sh 1` says it cannot find
-`deploy/deployment.yaml`, module 10's day-2 demo app has not been enabled on this cluster.
+The workload this module breaks, `demo-web`, is **owned by this lab, not hand-copied by
+you**: the first time you run `./inject.sh 1`, it seeds
+`gitops/components/demo/demo-web.yaml` (a plain Deployment + Service running the same
+pre-pulled `ghcr.io/knative/helloworld-go` image module 06 uses — no in-cluster build
+required) into your `cloudbox/platform` repo and pushes it, then asks you to wait for
+ArgoCD and run `./inject.sh 1` again to actually inject the fault. A push to
+`cloudbox/platform:main` is the deploy trigger throughout — there is no BuildKit or
+rebuild step in this exercise.
+
+`cloudbox/demo-app` (the repo `scripts/seed-gitea.sh` seeds from `apps/demo-app`) is
+**not** used by this module — it is Go source for module 07's separate in-cluster build
+golden path and carries no deploy manifests. If you find yourself investigating it while
+working this scenario, that's a dead end (see the scenario's spoiler once you're stuck).
 
 ## Why this matters
 
@@ -34,10 +45,11 @@ a repair—ArgoCD self-healing will restore whatever Git says.
 
 | # | Scenario | Needs | Flavor |
 |---|----------|-------|--------|
-| 1 | `01-bad-release-rollback` | module 10 day-2 setup | a plausible release that crashes every new replica |
+| 1 | `01-bad-release-rollback` | module 02's `demo` Application | a plausible release that crashes every new replica |
 
 ```bash
-./inject.sh 1        # push the bad release commit
+./inject.sh 1        # first run: seeds the demo-web baseline, then stops
+./inject.sh 1        # second run (after ArgoCD converges): pushes the bad release commit
 ./restore.sh 1       # apply the canonical Git revert / give up gracefully
 ./restore.sh clean   # revert every currently injected scenario
 ```
@@ -47,14 +59,17 @@ until you have committed to a diagnosis. `fix.sh` is the canonical scripted repa
 
 ## The task
 
-1. Run `./inject.sh 1`, then find the first visible symptom in namespace `demo`.
-2. Write a one-sentence diagnosis before changing anything: “The new pods crash because
+1. Run `./inject.sh 1`. The first run only seeds the `demo-web` baseline and tells you to
+   wait for ArgoCD; run it again once `kubectl -n demo rollout status deploy/demo-web`
+   reports success, to actually push the bad release.
+2. Find the first visible symptom in namespace `demo`.
+3. Write a one-sentence diagnosis before changing anything: “The new pods crash because
    X changed Y.”
-3. Verify or falsify that sentence with live evidence. Follow the pod state to Events,
+4. Verify or falsify that sentence with live evidence. Follow the pod state to Events,
    logs, the Deployment configuration, rollout history, and finally Git history as needed.
-4. Revert the commit that introduced the fault and push the revert to
-   `cloudbox/demo-app:main`. Do not edit or patch the live Deployment.
-5. Run `./verify.sh` and keep investigating until both Git and the live rollout pass.
+5. Revert the commit that introduced the fault and push the revert to
+   `cloudbox/platform:main`. Do not edit or patch the live Deployment.
+6. Run `./verify.sh` and keep investigating until both Git and the live rollout pass.
 
 ## Hints
 
@@ -83,13 +98,16 @@ exits tells you what the application could not do.
 <summary>Hint 3: Connect the process error to the Git change</summary>
 
 Inspect the Deployment's container environment and recent rollout, then compare them
-with the last few commits in `cloudbox/demo-app`:
+with the last few commits to `gitops/components/demo/demo-web.yaml` in a clone of
+`cloudbox/platform` (**not** `cloudbox/demo-app` — that repo is unrelated Go source for
+a different module, see the "Prerequisites" section above):
 
 ```bash
-kubectl -n demo get deploy demo-app \
+kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].env}'
-kubectl -n demo rollout history deploy/demo-app
-git log --oneline -3
+kubectl -n demo rollout history deploy/demo-web
+git clone http://localhost:30300/cloudbox/platform.git && cd platform
+git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
 
