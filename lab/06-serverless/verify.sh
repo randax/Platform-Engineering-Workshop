@@ -7,13 +7,41 @@ ok()   { echo "✅ $1"; }
 fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 
 # --- Knative installed --------------------------------------------------------
-ST="$(kubectl -n argocd get application knative-serving \
-  -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || echo missing)"
-if [ "$ST" = "Synced Healthy" ]; then
-  ok "ArgoCD app 'knative-serving' is Synced/Healthy"
-else
-  fail "knative-serving app is '$ST' — cp gitops/catalog/knative-serving.yaml to gitops/apps/ and push"
-fi
+check_app() { # <name>
+  # HEALTH is the real signal (workloads running); sync is advisory. Poll ~180s so
+  # transient states while the app reconciles under CI load ride out instead of
+  # failing on a single point-in-time sample. knative-serving needs this twice over:
+  #   1. Its steady state is OutOfSync/Healthy — Knative's webhook injects the
+  #      caBundle into its own webhook configs at runtime, so live never matches
+  #      git (see gitops/catalog/knative-serving.yaml). Keying on "Synced Healthy"
+  #      would fail a perfectly working install.
+  #   2. Its cold start is heavy (5 Deployments pulling images), so ArgoCD briefly
+  #      reports Progressing/Degraded while pods fail readiness (connection refused)
+  #      before self-healing to Healthy ~15-20s later.
+  # Mirrors lab/07-ci/verify.sh check_app.
+  local st sync health i
+  for i in $(seq 1 36); do
+    st="$(kubectl -n argocd get application "$1" \
+      -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || echo missing)"
+    # Fast-fail the missing case so an attendee who runs verify.sh before enabling
+    # the catalog item gets instant feedback: allow ~10s (two iterations) for a
+    # just-created app to register, then fall through to the fail below.
+    case "$st" in
+      missing|"missing missing"|"") [ "$i" -ge 2 ] && break ;;
+    esac
+    health="${st##* }"
+    if [ "$health" = "Healthy" ]; then
+      sync="${st%% *}"
+      if [ "$sync" = "Synced" ]; then ok "ArgoCD app '$1' is Synced/Healthy"
+      else ok "ArgoCD app '$1' is Healthy (sync: ${sync:-unknown})"; fi
+      return 0
+    fi
+    sleep 5
+  done
+  fail "knative-serving app is '$st' — cp gitops/catalog/knative-serving.yaml to gitops/apps/ and push"
+}
+
+check_app knative-serving
 
 for d in activator autoscaler controller webhook; do
   if kubectl -n knative-serving wait --for=condition=Available "deploy/$d" --timeout=5s >/dev/null 2>&1; then
