@@ -142,11 +142,15 @@ being in-cluster a sovereignty feature and not just a demo trick?
 - Observability isn't running yet — it's an on-demand capability you enable later from the
   catalog (`gitops/catalog/grafana.yaml` plus the `victoria-*` and `otel-collector` items),
   not part of wave 0. You'll switch it on and find Grafana in the capstone (module 09).
-- Delete `gitops/apps/demo.yaml` from the repo, push, and watch prune remove the `demo`
-  *Application object* — then look again: the namespace and ConfigMap are still there,
-  **orphaned**. Deleting an Application doesn't cascade to its resources unless the
-  Application carries the `resources-finalizer.argocd.argoproj.io` finalizer. Then revert
-  the commit — GitOps rollback is `git revert`, and the orphans get re-adopted.
+- Delete `gitops/apps/demo.yaml` from the repo and push. The root app-of-apps runs with
+  `prune: false` (it only ever *adds* the child Applications each module enables, and
+  auto-pruning the newest child on a transient/stale sync once tore whole namespaces out
+  from under a running lab), so it won't delete the `demo` *Application object* for you —
+  remove it yourself with `kubectl -n argocd delete application demo`. Now look again: the
+  namespace and ConfigMap are still there, **orphaned**. Deleting an Application doesn't
+  cascade to its resources unless the Application carries the
+  `resources-finalizer.argocd.argoproj.io` finalizer. Then restore `demo.yaml` (`git revert`
+  the deletion) — the app-of-apps re-creates the Application and the orphans get re-adopted.
   (Re-run `./verify.sh` after!)
 - Read the root app's manifest: `kubectl -n argocd get app platform -o yaml`. Find the
   sync-wave annotations on the children. What orders what?
