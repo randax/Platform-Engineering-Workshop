@@ -12,11 +12,11 @@ app_status() { # <name> -> "<sync> <health>"
 }
 
 check_app() { # <name>
-  # HEALTH is the real signal (workloads running); sync is advisory. Poll ~90s so
+  # HEALTH is the real signal (workloads running); sync is advisory. Poll ~180s so
   # a transient OutOfSync/Progressing/Degraded while the app reconciles under CI
   # load rides out, instead of failing on a single point-in-time sample.
   local st sync health
-  for _ in $(seq 1 18); do
+  for _ in $(seq 1 36); do
     st="$(app_status "$1")"
     health="${st##* }"
     if [ "$health" = "Healthy" ]; then

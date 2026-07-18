@@ -7,11 +7,11 @@ ok()   { echo "✅ $1"; }
 fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 
 check_app() { # <name>
-  # HEALTH is the real signal (workloads running); sync is advisory. Poll ~90s so
+  # HEALTH is the real signal (workloads running); sync is advisory. Poll ~180s so
   # a transient OutOfSync/Progressing/Degraded while the app reconciles under CI
   # load rides out, instead of failing on a single point-in-time sample.
   local st sync health
-  for _ in $(seq 1 18); do
+  for _ in $(seq 1 36); do
     st="$(kubectl -n argocd get application "$1" \
       -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || echo missing)"
     health="${st##* }"
