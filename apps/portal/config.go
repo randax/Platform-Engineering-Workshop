@@ -30,6 +30,7 @@ type config struct {
 	GrafanaURL     string // browser-facing Grafana for deep links
 	NATSMonitorURL string // NATS monitoring endpoint for the JetStream browser
 	ZotURL         string // cluster-internal Zot registry, read by the Builds page
+	KagentURL      string // Kagent controller (REST + A2A on :8083), the Case file agent
 
 	OTLPEndpoint string // where traces + metrics are pushed
 	ServiceName  string // service.name in traces/metrics
@@ -51,6 +52,7 @@ func loadConfig() config {
 		GrafanaURL:       envOr("GRAFANA_URL", "http://localhost:30030"),
 		NATSMonitorURL:   envOr("NATS_MONITOR_URL", "http://nats.nats.svc.cluster.local:8222"),
 		ZotURL:           envOr("ZOT_URL", "http://zot.zot.svc.cluster.local:5000"),
+		KagentURL:        envOr("KAGENT_URL", "http://kagent-controller.kagent.svc.cluster.local:8083"),
 		OTLPEndpoint:     envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector.observability.svc.cluster.local:4318"),
 		ServiceName:      envOr("OTEL_SERVICE_NAME", "cloudbox-portal"),
 	}
