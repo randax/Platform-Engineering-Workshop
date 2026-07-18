@@ -103,7 +103,12 @@ func (k *Client) DeleteProject(ctx context.Context, name string) error {
 		} `json:"metadata"`
 	}
 	if err := k.get(ctx, "/api/v1/namespaces/"+name, &ns); err != nil {
-		return err
+		// Already gone → nothing to delete. Any other read error can't confirm
+		// this is a project, so refuse rather than blind-delete a namespace.
+		if isNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("couldn't verify %q is a project: %w", name, err)
 	}
 	if ns.Metadata.Labels[ProjectLabel] != "true" {
 		return fmt.Errorf("%q isn't a console project (missing the %s=true label) — refusing to delete it", name, ProjectLabel)

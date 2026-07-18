@@ -118,8 +118,11 @@ func handleUpload(s *Server, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Fragment even on failure — see handleCreateDatabase.
-	data, err := galleryItems(r.Context(), s.Store, fl)
+	// Fragment even on failure — see handleCreateDatabase. Bound the S3 re-list
+	// (the uploader proxy above is already bounded by HTTPClient{Timeout:60s}).
+	ctx, cancel := s3Ctx(r)
+	defer cancel()
+	data, err := galleryItems(ctx, s.Store, fl)
 	if err != nil {
 		s.render(w, "gallery-grid", galleryData{Flash: errorFlash("S3 error: " + err.Error())})
 		return

@@ -177,7 +177,14 @@ func (k *Client) DeleteApplication(ctx context.Context, ns, name string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
-	return k.do(ctx, http.MethodDelete, appPath(ns)+"/"+name, nil, nil)
+	// 404 → already gone: a double-delete or a stale tab is a no-op, not an error.
+	if err := k.do(ctx, http.MethodDelete, appPath(ns)+"/"+name, nil, nil); err != nil {
+		if isNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // ---------------------------------------- deploy from source (app-team CI/CD)
