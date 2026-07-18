@@ -178,7 +178,7 @@ gallery form is just a multipart POST.)
 ./verify.sh
 ```
 
-It checks: both apps Synced/Healthy; the eventing control plane and Broker data plane
+It checks: both apps Healthy (Synced is the happy path; sync is advisory); the eventing control plane and Broker data plane
 are up; Broker `default` and Trigger `resize-on-upload` are Ready; both ksvcs are Ready;
 bucket `images` exists; and — if anything has been uploaded — that every batch of
 originals has produced at least one matching thumbnail. The upload itself needs a human

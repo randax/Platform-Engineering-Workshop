@@ -19,9 +19,9 @@ image: /console/monitoring-dark.png
 
 # A portal is just REST calls
 
-- ~730 lines of Go + htmx. That's all
+- ~6k lines of Go + htmx you can read end to end
 - Reads the K8s API with a ServiceAccount token
-- Read-only role on exactly four resources
+- A scoped read-only role — the surfaces it renders, not read-all
 - The DB form? Creates a `WorkshopDatabase`
 - Module 04 already did the hard part
 
@@ -30,13 +30,13 @@ Shown → a component's live <strong>Monitoring</strong> page: per-component met
 </div>
 
 <div class="mt-4 text-sm opacity-75">
-<span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> the AWS · Azure · GCP Console — except this one is ~730 lines you can read end to end, not a product you log into.
+<span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> the AWS · Azure · GCP Console — except this one is plain Go you can read end to end, not a product you log into.
 </div>
 
 <!--
-Demystification slide. The industry reflex is "portal = Backstage = big adoption project". But mechanically, a portal is a web app making REST calls to the Kubernetes API — and the Cloudbox Console proves it in ~730 lines of Go and htmx (one vendored .js file, no build step).
+Demystification slide. The industry reflex is "portal = Backstage = big adoption project". But mechanically, a portal is a web app making REST calls to the Kubernetes API — and the Cloudbox Console proves it in ~6k lines of plain Go and htmx (one vendored .js file, no build step, no framework), small enough to read end to end.
 
-Walk the architecture in one breath: kube.go authenticates with nothing but the pod's mounted ServiceAccount token; a read-only ClusterRole covers exactly the four resource types it renders (check it: kubectl describe clusterrole portal-read); resources.go lists ArgoCD Applications, CNPG Clusters, and Knative Services as dynamic resources; handlers.go's "New database" form POST builds a WorkshopDatabase object and creates it — about 20 lines that replace a whole portal product's scaffolder, because module 04's XRD and Composition already did the hard part.
+Walk the architecture in one breath: internal/kube/client.go authenticates with nothing but the pod's mounted ServiceAccount token; a scoped read-only ClusterRole covers the surfaces it renders — the ArgoCD apps, CNPG clusters, ksvcs, and pods/nodes/events/workloads it lists, not read-all (check it: kubectl describe clusterrole portal-read); internal/kube/resources.go lists ArgoCD Applications, CNPG Clusters, and Knative Services as dynamic resources; the "New database" form POST in internal/web/databases.go builds a WorkshopDatabase object and creates it — about 20 lines that replace a whole portal product's scaffolder, because module 04's XRD and Composition already did the hard part.
 
 That's the lesson stated on the slide: the portal has no special powers. Your platform already had the API; the portal is a form in front of it.
 
@@ -152,6 +152,8 @@ Builds · Streams · Buckets — each with a live <strong>Monitoring</strong> pa
 
 <!--
 The console isn't one page — it's a front door for every capability the attendee stood up. Each self-service and platform page carries its own Monitoring panel fed by the same VictoriaMetrics/Logs/Traces stack: Builds shows BuildKit's resource use in the builds namespace (watch it spike during a build) above the live Argo Workflows runs; Streams reads JetStream throughput and connections through a prometheus-nats-exporter sidecar (NATS core only speaks JSON on :8222, so the sidecar is what makes it Prometheus-scrapable); Buckets has no exporter to lean on — RustFS exposes no /metrics — so it shows the generic per-namespace pod CPU/memory and says so on the page. The honesty is the point: a real console shows you what it can measure and is upfront about what it can't. Every panel queries the metrics store only on page load (never the 5-second htmx poll) and degrades to "no data yet" when observability is switched off.
+
+One more IA beat worth calling out (DR-0005): lists are for triage, detail pages are for diagnosis. Applications and Functions each have a DETAIL page, and when one isn't Ready the console shows the CAUSE a `kubectl describe` would — the failing conditions, the pod-level trouble (ImagePullBackOff, CrashLoopBackOff…), and an opinionated cause→action hint ("the image can't be pulled — check the tag", "read its logs"). The console reads the conditions *with* you instead of just flashing a red dot.
 -->
 
 ---
@@ -225,7 +227,7 @@ The task: enable portal.yaml (lands in ns portal in seconds — one small Go bin
 
 Star task: create console-db (size small) via the New database form, then prove it with kubectl: the WorkshopDatabase XR, and the composed CNPG cluster booting with -w. Then the governance question: this one didn't go through git — find the evidence, keep the thought for the explain-back.
 
-Finish by actually reading the source — apps/portal/ is five Go files and four templates; ask them to find the 20 lines behind the form. "After today you can read every line of your platform's front door" is the sentence to leave hanging.
+Finish by actually reading the source — apps/portal/ is a few dozen small Go files (internal/kube/client.go for the API, one file per page under internal/web/) and a set of templates; ask them to find the 20 lines behind the form in internal/web/databases.go. "After today you can read every line of your platform's front door" is the sentence to leave hanging.
 
 Also point out the Workshop page they've been watching all day lives in this same binary (workshop.go) — a checklist inferred from live cluster state, ~100 lines.
 -->

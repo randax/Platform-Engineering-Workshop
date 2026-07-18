@@ -127,7 +127,7 @@ cd "$WORKSHOP/lab/07-ci" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: zot and argo-workflows apps Synced/Healthy; Zot's API answering on :30500;
+It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is advisory); Zot's API answering on :30500;
 at least one `build-hello-site-*` workflow **Succeeded**; the `hello-site` image present
 in Zot's catalog; and the hello-site Deployment Available and serving the page.
 

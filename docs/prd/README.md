@@ -70,3 +70,8 @@ Settled architectural choices (not proposals) live here as `DR-NNNN`:
   Tenant self-service is console-direct (k8s API); the platform layer is GitOps; the
   console-as-git-frontend option was evaluated and rejected for this workshop. Governs
   PRD-0011 (projects) and every console create/update/delete.
+- **DR-0005 — Console diagnostics** — per the PRDs-as-issues convention it lives as
+  [issue #114](https://github.com/randax/Platform-Engineering-Workshop/issues/114),
+  not a file here. **Implemented:** an unhealthy resource surfaces the *cause* a
+  `kubectl describe` would — failing conditions, pod trouble (ImagePullBackOff,
+  CrashLoopBackOff…) and a cause→action hint — on its detail page.

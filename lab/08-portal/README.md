@@ -35,8 +35,9 @@ Everything you built so far is APIs and YAML — perfect for platform engineers,
 to everyone else. A portal is how a platform gets *adopted*: one place that answers "what
 exists?" and "how do I get one?". The industry reflex is "portal = Backstage", and
 sometimes that's right (we'll be honest about when, below). But a portal is not magic:
-this one is ~1,300 lines of Go and htmx that read the Kubernetes API with a ServiceAccount
-token. The entire source is in this repo under [`apps/portal/`](../../apps/portal/) —
+this one is a plain Go web server — a few thousand lines of Go and htmx, no framework, no
+React build, no CDN — that reads the Kubernetes API with a ServiceAccount token. The entire
+source is in this repo under [`apps/portal/`](../../apps/portal/) —
 after today you can read every line of your platform's front door. Try saying that about
 most portals.
 
@@ -44,10 +45,12 @@ most portals.
 
 1. Enable `portal.yaml` from the catalog. It lands in ns `portal` and takes seconds — it's
    one small Go binary (compare that to what module 08 used to be…).
-2. Open **http://localhost:30600** and explore. Six pages — Overview, Components,
-   Workshop, Databases, Services, Gallery — and none of them is a mock: every row is a
-   live read from your cluster (the Workshop page even tracks your module progress, live).
-   For each page, answer: *which Kubernetes API is this?* (You installed all of them today.)
+2. Open **http://localhost:30600** and explore. The nav groups the pages into **Platform**
+   (Overview, Components, Access, Workshop, Activity, Billing), **Services** (Applications,
+   Databases, Buckets, Functions, Streams, Builds — the first few with their own detail
+   pages), and **Capstone** (Gallery) — and none of them is a mock: every row is a live read
+   from your cluster (the Workshop page even tracks your module progress, live). For each
+   page, answer: *which Kubernetes API is this?* (You installed all of them today.)
 3. **Hand your portal the keys.** The console can *read* everything, but creating
    databases needs a write grant it deliberately doesn't ship with: grant your portal
    access to the self-service API — copy [`portal-access.yaml`](portal-access.yaml)
@@ -71,26 +74,28 @@ most portals.
 
 ## How it works (read the source!)
 
-The whole portal is eight Go files and seven HTML templates in
-[`apps/portal/`](../../apps/portal/):
+The whole portal is a few dozen small Go files (roughly one per page) and a set of HTML
+templates in [`apps/portal/`](../../apps/portal/) — the `internal/kube/` package reads the
+cluster, `internal/web/` renders the pages. The ones worth opening first:
 
-- **`kube.go`** — talks to the Kubernetes API from inside the pod: the ServiceAccount
-  token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/` is all the auth it
-  has. Check what it's *allowed* to do: `kubectl describe clusterrole portal-read` —
-  read-only on exactly the surfaces it renders, plus the one namespaced Role in `demo`
-  for `workshopdatabases` that *you* granted in step 3. No admin token, no magic.
-- **`resources.go`** — the "platform model": list ArgoCD `Applications`, CNPG `Clusters`,
-  Knative `Services` as dynamic/unstructured resources.
-- **`components.go`** — the Components status page: your platform's own status page,
-  built from Deployment/StatefulSet/DaemonSet readiness per component.
-- **`workshop.go`** — the Workshop page: live module progress inferred from cluster
-  state, one simple rule per module. A hint, not a judge — each lab's `verify.sh`
+- **`internal/kube/client.go`** — talks to the Kubernetes API from inside the pod: the
+  ServiceAccount token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/` is all
+  the auth it has. Check what it's *allowed* to do: `kubectl describe clusterrole
+  portal-read` — read-only on the surfaces it renders (ArgoCD apps, CNPG clusters, ksvcs,
+  pods/nodes/events, workloads), not read-all, plus the one namespaced Role in `demo` for
+  `workshopdatabases` that *you* granted in step 3. No admin token, no magic.
+- **`internal/kube/resources.go`** — the "platform model": list ArgoCD `Applications`, CNPG
+  `Clusters`, Knative `Services` as dynamic/unstructured resources.
+- **`internal/web/components.go`** — the Components status page: your platform's own status
+  page, built from Deployment/StatefulSet/DaemonSet readiness per component.
+- **`internal/web/workshop.go`** — the Workshop page: live module progress inferred from
+  cluster state, one simple rule per module. A hint, not a judge — each lab's `verify.sh`
   stays the authoritative check.
-- **`handlers.go`** — the form POST builds a `WorkshopDatabase` object and creates it via
-  the API — 20 lines that replace a whole portal product's scaffolder, because module 04
-  already did the hard part.
-- **`s3.go`** + the Gallery page — S3 reads against RustFS (this page comes alive in
-  module 09).
+- **`internal/web/databases.go`** — the "New database" form POST builds a `WorkshopDatabase`
+  object and creates it via the API — 20 lines that replace a whole portal product's
+  scaffolder, because module 04 already did the hard part.
+- **`internal/store/s3.go`** + the Gallery page — S3 reads against RustFS (this page comes
+  alive in module 09).
 - **htmx** (one vendored `.js` file, no build step) makes the forms and refreshes work.
 
 ## Build vs. buy: when you'd reach for Backstage instead
@@ -244,6 +249,14 @@ git instead?
   ```
   Deploy `my-app`, watch it turn Ready, and open its `*.sslip.io` URL — the apex of the
   self-service arc, from a form.
+- **Read _why_ something is broken (Diagnostics, DR-0005).** When an Application or Function
+  isn't Ready, open its **detail page**: instead of a bare red dot, the console shows the
+  cause a `kubectl describe` would — the failing conditions, the offending pods' container
+  states (`ImagePullBackOff`, `CrashLoopBackOff`, `OOMKilled`…), and an opinionated
+  next-step hint ("the image can't be pulled — check the tag; for a source-built app,
+  Redeploy once the build has pushed"). The console reads the conditions *with* you. Break
+  it on purpose — deploy at a tag that doesn't exist in Zot — and watch the detail page name
+  the problem. (Lists are for triage; detail pages are for diagnosis.)
 - **Ship your own code (the app-team golden path, PRD-0012).** In *New Application*, switch
   **Source → Build from a repo** and give an in-cluster Gitea repo (`<org>/<repo>` + branch +
   path with a `Dockerfile`). A ready one is seeded for you: **`cloudbox/demo-app`** — a real
@@ -256,8 +269,8 @@ git instead?
   deploy` is the app team's counterpart to the platform team's `git push → ArgoCD → converge`.
   It needs **both** grants (the functions/workflows one from step 3 *and* the applications one
   above); repos are restricted to the in-cluster Gitea (offline + no arbitrary-URL builds).
-  Then close the loop: change the code, push again, and hit **Redeploy** on the app's row — it
-  rebuilds the repo at a fresh image tag and rolls the running app forward (a mutable tag would
+  Then close the loop: change the code, push again, and hit **Redeploy** on the app's **detail
+  page** — it rebuilds the repo at a fresh image tag and rolls the running app forward (a mutable tag would
   leave it pinned to the old image). That's `push → build → deploy` end to end, in the console.
 - **Create projects from the console (grant via git; act via console).** The top-bar
   **Project** selector maps 1:1 to Kubernetes namespaces; "New project" provisions a
@@ -283,4 +296,4 @@ git instead?
   platform now builds and deploys its own front door.
 - The take-home question: your platform has an API (module 04) *and* a portal. Which one
   is the product, and which one is the view? Argue both ways, then read
-  `handlers.go` again and notice how little the portal actually does.
+  `internal/web/databases.go` again and notice how little the portal actually does.

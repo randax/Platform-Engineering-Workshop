@@ -145,7 +145,7 @@ cd "$WORKSHOP/lab/03-data" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: the cnpg-operator and rustfs ArgoCD apps are Synced/Healthy; the CNPG operator
+It checks: the cnpg-operator and rustfs ArgoCD apps are Healthy (Synced is the happy path; sync is advisory); the CNPG operator
 deployment is up; `app-db` reports healthy with 1/1 ready instances; `SELECT 1` actually
 returns 1 from inside the database; RustFS answers S3 on :30900; and bucket `app-assets`
 exists with at least one object.

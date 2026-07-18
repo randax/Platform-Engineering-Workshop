@@ -29,7 +29,8 @@ lab/         00-setup … 09-capstone — outcome + verify.sh + layered hints (+
 solutions/   canonical end-state per module (what catch-up.sh force-pushes to Gitea)
 apps/        first-party Go apps: cloudbox-portal (Console, module 08), uploader +
              resizer (picture pipeline, module 09) — built to GHCR by build-images.yaml
-docs/        RESEARCH.md · PRINCIPLES.md
+docs/        RESEARCH.md · PRINCIPLES.md · STACK.md · HELPERS.md · IDP-PRINCIPLES.md
+             prd/ (PRDs + DR design records) · screenshots/
 slides/      Slidev deck
 .devcontainer/  Codespaces lifeboat — same content when local preflight fails
 ```
