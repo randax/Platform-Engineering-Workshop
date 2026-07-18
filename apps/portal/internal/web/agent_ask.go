@@ -77,18 +77,20 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 	h.Set("Connection", "keep-alive")
 	h.Set("X-Accel-Buffering", "no")
 	flusher, _ := w.(http.Flusher)
-	emit := func(event, fragment string) {
-		writeSSE(w, event, fragment)
+	emit := func(event, fragment string) error {
+		if err := writeSSE(w, event, fragment); err != nil {
+			return err
+		}
 		if flusher != nil {
 			flusher.Flush()
 		}
+		return nil
 	}
 
 	// Capability gate: the affordance renders locked when kagent is absent, so
 	// this is the matching backend guard — refuse to call an agent that isn't
 	// there. (The locked view also never renders a mount that could reach here.)
-	exists, _ := s.currentSnapshot().AppHealthy("kagent")
-	if !exists || s.Kagent == nil {
+	if !agentAvailable(s) {
 		emit("error", s.fragment("cf-error", "The investigation agent isn't enabled. Enable kagent from the catalog."))
 		return
 	}
@@ -118,15 +120,19 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 	}
 	emitted := 0
 	err := s.Kagent.Stream(r.Context(), req, func(e kagent.Event) error {
+		var emitErr error
 		switch e.Kind {
 		case kagent.KindToolCall:
-			emit("tool_call", s.fragment("cf-toolcall", e))
+			emitErr = emit("tool_call", s.fragment("cf-toolcall", e))
 		case kagent.KindToolResult:
-			emit("tool_result", s.fragment("cf-toolresult", e))
+			emitErr = emit("tool_result", s.fragment("cf-toolresult", e))
 		case kagent.KindMessage:
-			emit("message", s.fragment("cf-message", e))
+			emitErr = emit("message", s.fragment("cf-message", e))
 		case kagent.KindVerdict:
-			emit("verdict", s.fragment("cf-verdict", e.Verdict))
+			emitErr = emit("verdict", s.fragment("cf-verdict", e.Verdict))
+		}
+		if emitErr != nil {
+			return emitErr
 		}
 		emitted++
 		return nil
@@ -189,14 +195,22 @@ func (s *Server) fragment(name string, data any) string {
 // writeSSE writes one SSE frame: a named event and an HTML-fragment payload.
 // The fragment is split across `data:` lines (SSE forbids raw newlines in a
 // data field); the browser rejoins them with "\n", preserving multi-line HTML.
-func writeSSE(w io.Writer, event, data string) {
-	fmt.Fprintf(w, "event: %s\n", event)
+// It returns the first write error (e.g. the browser disconnected), so the
+// caller's emit callback can report it up through Stream's emit-error
+// early-exit path instead of writing into a dead connection.
+func writeSSE(w io.Writer, event, data string) error {
+	if _, err := fmt.Fprintf(w, "event: %s\n", event); err != nil {
+		return err
+	}
 	if data != "" {
 		for _, line := range strings.Split(data, "\n") {
-			fmt.Fprintf(w, "data: %s\n", line)
+			if _, err := fmt.Fprintf(w, "data: %s\n", line); err != nil {
+				return err
+			}
 		}
 	}
-	fmt.Fprint(w, "\n")
+	_, err := fmt.Fprint(w, "\n")
+	return err
 }
 
 // ensureUserID resolves the A2A identity (X-User-ID) for this browser session,

@@ -39,6 +39,7 @@
 
   /* code / log surface (kept dark in both themes — a terminal is a terminal) */
   --code-bg: #0d1220; --code-fg: #dfe5f0; --code-muted: #7b8598;
+  --code-accent: #8ab4ff;
 
   /* shape */
   --r-sm: 7px; --r-md: 11px; --r-pill: 999px;
@@ -535,7 +536,7 @@ pre.code {
   padding: 0.8rem 1rem; min-height: 16rem; max-height: 26rem; overflow-y: auto;
 }
 .cf-line { margin: 0.15rem 0; }
-.cf-tool { color: #8ab4ff; }
+.cf-tool { color: var(--code-accent); }
 .cf-obs { color: var(--warn); margin-left: 1.2rem; }
 .cf-msg { color: var(--code-muted); font-style: italic; }
 .case-side { display: flex; flex-direction: column; gap: 0.8rem; }
