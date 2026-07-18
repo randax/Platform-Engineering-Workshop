@@ -7,14 +7,35 @@ FAILED=0
 ok()   { echo "✅ $1"; }
 fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 
+check_app() { # <name>
+  # HEALTH is the real signal (workloads running); sync is advisory. Poll ~180s so
+  # a transient OutOfSync/Progressing/Degraded while the app reconciles under CI
+  # load rides out, instead of failing on a single point-in-time sample.
+  local st sync health i
+  for i in $(seq 1 36); do
+    st="$(kubectl -n argocd get application "$1" \
+      -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || echo missing)"
+    # Fast-fail the missing case: if the app doesn't exist yet, don't stare at the
+    # full 180s poll — an attendee who runs verify.sh before enabling the catalog
+    # item should get instant feedback. Allow ~10s (two iterations) for a
+    # just-created app to register, then fall through to the fail below.
+    case "$st" in
+      missing|"missing missing"|"") [ "$i" -ge 2 ] && break ;;
+    esac
+    health="${st##* }"
+    if [ "$health" = "Healthy" ]; then
+      sync="${st%% *}"
+      if [ "$sync" = "Synced" ]; then ok "ArgoCD app '$1' is Synced/Healthy"
+      else ok "ArgoCD app '$1' is Healthy (sync: ${sync:-unknown})"; fi
+      return 0
+    fi
+    sleep 5
+  done
+  fail "portal app is '$st' — cp gitops/catalog/$1.yaml to gitops/apps/ and push (needs the demo ns + module 04's API)"
+}
+
 # --- The portal app -----------------------------------------------------------
-ST="$(kubectl -n argocd get application portal \
-  -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || echo missing)"
-if [ "$ST" = "Synced Healthy" ]; then
-  ok "ArgoCD app 'portal' is Synced/Healthy"
-else
-  fail "portal app is '$ST' — cp gitops/catalog/portal.yaml to gitops/apps/ and push (needs the demo ns + module 04's API)"
-fi
+check_app portal
 
 if kubectl -n portal wait --for=condition=Available deploy/portal --timeout=5s >/dev/null 2>&1; then
   ok "portal deployment is ready"

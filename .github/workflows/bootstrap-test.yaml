@@ -66,13 +66,36 @@ jobs:
           # Build + push each app under the SAME repo path the gitops manifests
           # request (ghcr.io/randax/cloudbox-*), so the node's mirror lookup hits.
           # localhost push is insecure-by-default in Docker — no daemon config.
+          # Run the four build+push pipelines concurrently — saves ~1-2 min of wall clock.
+          declare -A pid
           for app in portal uploader resizer grafana; do
-            ref="localhost:${MIRROR_PORT}/randax/cloudbox-${app}:v0.1.0"
-            echo "::group::build cloudbox-${app}"
-            docker build -t "${ref}" "apps/${app}"
-            docker push "${ref}"
-            echo "::endgroup::"
+            (
+              ref="localhost:${MIRROR_PORT}/randax/cloudbox-${app}:v0.1.0"
+              docker build -t "${ref}" "apps/${app}"
+              docker push "${ref}"
+            ) >"/tmp/build-${app}.log" 2>&1 &
+            pid[$app]=$!
           done
+          # Collect each subshell's exit status; print its full log inside a
+          # ::group:: only AFTER it finishes, so grouped output stays readable
+          # and non-interleaved. Any failure fails the step, naming the app(s).
+          fail=""
+          for app in portal uploader resizer grafana; do
+            if wait "${pid[$app]}"; then
+              echo "::group::build cloudbox-${app}"
+              cat "/tmp/build-${app}.log"
+              echo "::endgroup::"
+            else
+              fail="${fail:+$fail }${app}"
+              echo "::group::build cloudbox-${app} (FAILED)"
+              cat "/tmp/build-${app}.log"
+              echo "::endgroup::"
+            fi
+          done
+          if [ -n "$fail" ]; then
+            echo "ERROR: image build(s) failed: ${fail}" >&2
+            exit 1
+          fi
 
       - name: Create cluster (Talos + Cilium, wired to the mirror)
         run: ./scripts/create-cluster.sh

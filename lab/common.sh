@@ -78,8 +78,11 @@ wait_app() { # <app-name> [timeout-seconds]
       kubectl -n argocd annotate application platform \
         argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
     fi
-    sleep 10
-    waited=$((waited + 10))
+    # Poll every 5s (not 10s): apps usually flip Healthy between polls, so a
+    # tighter cadence halves the average detection latency across the many
+    # wait_app calls in a run, without touching the timeout budget.
+    sleep 5
+    waited=$((waited + 5))
   done
   echo "ERROR: timed out after ${timeout}s waiting for app '$name' (last: ${st:-missing})" >&2
   return 1
