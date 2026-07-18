@@ -165,3 +165,24 @@ Images used:
 - `docker.io/library/postgres:18.3-alpine`
 - `ghcr.io/kagent-dev/kagent/app:0.9.11` (controller-created Agent Deployment)
 - `ghcr.io/kagent-dev/kagent/skills-init:0.9.11` (controller-created Agent init container)
+
+## Security posture (workshop decisions, reviewed on PR #151)
+
+Two upstream defaults in chart 0.9.11 are kept deliberately — forking the
+vendored render would break VENDOR.md's byte-reproducibility and the
+controller's control-plane duties:
+
+- **Controller RBAC is broad** (`kagent-getter-role` wildcard reads incl.
+  Secrets; `kagent-writer-role` writes on core/apps/batch). Both bind ONLY to
+  the controller ServiceAccount — the control plane that creates/updates the
+  per-Agent Deployments. The *agent's* cluster access (the tool path attendees
+  interact with) is read-only at both layers: `--read-only` on the tool server
+  and the get/list/watch-only `kagent-tools-read-role`.
+- **`AUTH_MODE=unsecure`** (no auth on the controller API; identity is a bare
+  `X-User-ID` header). Mitigation shipped here: `networkpolicy.yaml` denies
+  controller ingress from every namespace except `kagent` itself and `portal`
+  (the Console is the sole intended caller — see spec #133). The limitation is
+  also taught honestly in the module-10 slides.
+
+Rehearsal owns the live checks: a write attempt through the agent's tools is
+actually refused, and the NetworkPolicy doesn't break UI/agent/postgres flows.

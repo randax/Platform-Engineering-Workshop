@@ -101,8 +101,11 @@ ghcr.io/kagent-dev/kagent/controller:0.9.11
 ghcr.io/kagent-dev/kagent/tools:0.2.1
 ghcr.io/kagent-dev/kagent/ui:0.9.11
 docker.io/library/postgres:18.3-alpine
-ghcr.io/kagent-dev/kagent/app:0.9.11 # controller-created at Agent reconcile; static scan misses it, but offline needs it
-ghcr.io/kagent-dev/kagent/skills-init:0.9.11 # controller-created at Agent reconcile; static scan misses it, but offline needs it
+# app + skills-init are controller-created at Agent reconcile; the static scan
+# misses them, but offline needs them (comments must be full-line: crane-check
+# reads entries verbatim and does not strip trailing comments)
+ghcr.io/kagent-dev/kagent/app:0.9.11
+ghcr.io/kagent-dev/kagent/skills-init:0.9.11
 
 # --- Observability v2 (Victoria stack, issue #57) — the on-demand observability
 # capability that REPLACED otel-lgtm: metrics + logs + traces + Grafana, fed by
