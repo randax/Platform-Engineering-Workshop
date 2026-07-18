@@ -42,9 +42,11 @@ runs on your laptop, readable end to end.
    - `kubectl -n pipeline get pods -w`
    - open **http://localhost:30600/gallery** and upload any JPEG/PNG.
 
-   Watch the uploader pod cold-start to receive the file, then — a beat later — the
-   *resizer* appear from nowhere to handle the event. Nothing called it. Count the actors
-   between your browser and that second pod.
+   Watch the uploader pod cold-start to receive the file, then the *resizer* appear from
+   nowhere to handle the event. Nothing called it. The first upload is the slow one: both
+   services start from zero (image pull + boot), so the thumbnail can take up to ~a minute
+   to land — the gallery shows "original uploaded, waiting for the resizer…" until it does.
+   Count the actors between your browser and that second pod.
 3. **Find the results.** Both views of the same bucket:
    - the Gallery (refresh) shows the thumbnail + its metadata (dimensions, dominant color);
    - raw S3: `originals/`, `thumbs/`, and `meta/<key>.json` under bucket `images`
@@ -90,7 +92,11 @@ Follow the event, hop by hop:
    — it logs the S3 key and the Broker's answer (expect `202 Accepted`).
 2. Is the Trigger Ready and pointing at the resizer?
    `kubectl -n pipeline describe trigger resize-on-upload` — check the filter
-   (`type: dev.cloudbox.image.uploaded`) and subscriber.
+   (`type: dev.cloudbox.image.uploaded`) and subscriber. If it stays `NotReady` with reason
+   `BrokerNotConfigured`, it reconciled before the broker was Ready and latched — once the
+   broker and both ksvcs are Ready, nudge it to re-reconcile with any harmless annotation
+   change: `kubectl -n pipeline annotate trigger/resize-on-upload cloudbox.io/rereconcile="$(date +%s)" --overwrite`
+   (exactly what `solve.sh` does).
 3. The Broker's delivery side lives in ns `knative-eventing`:
    `kubectl -n knative-eventing logs deploy/mt-broker-filter --tail=20` and
    `deploy/imc-dispatcher` — delivery errors (and retries) land there.

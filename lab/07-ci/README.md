@@ -29,8 +29,9 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    contains it (it was seeded with the whole workshop repo). Notice the `FROM` line:
    it pulls the base image from *your* Zot, not from Docker Hub — your platform builds
    FROM your own registry, fully offline.
-3. **Seed the base image**: copy the pre-pulled busybox from your machine into YOUR
-   registry (host-side, against Zot's NodePort):
+3. **Seed the base image**: pull busybox into YOUR registry (host-side, against Zot's
+   NodePort). `crane copy` doesn't read your local docker — it's a registry-to-registry
+   copy that pulls busybox from Docker Hub and pushes it straight into Zot:
 
    ```bash
    mise x crane@0.21.7 -- crane copy --insecure \

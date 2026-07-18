@@ -47,16 +47,17 @@ most portals.
    one small Go binary (compare that to what module 08 used to be…).
 2. Open **http://localhost:30600** and explore. The nav groups the pages into **Platform**
    (Overview, Components, Access, Workshop, Activity, Billing), **Services** (Applications,
-   Databases, Buckets, Functions, Streams, Builds — the first few with their own detail
-   pages), and **Capstone** (Gallery) — and none of them is a mock: every row is a live read
+   Databases, Buckets, Functions, Streams, Builds — Applications, Databases and Functions
+   each have a detail page, and Buckets uses an in-page object browser), and **Capstone** (Gallery) — and none of them is a mock: every row is a live read
    from your cluster (the Workshop page even tracks your module progress, live). For each
    page, answer: *which Kubernetes API is this?* (You installed all of them today.)
 3. **Hand your portal the keys.** The console can *read* everything, but creating
    databases needs a write grant it deliberately doesn't ship with: grant your portal
    access to the self-service API — copy [`portal-access.yaml`](portal-access.yaml)
    (in this lab directory) to `gitops/components/demo/` in your Gitea clone and push.
-   Read it first: one Role (create/get/list/delete `workshopdatabases` in ns `demo`) and
-   one RoleBinding to the portal's ServiceAccount. The platform owner grants access —
+   Read it first: one Role (create/get/list/patch/update/delete `workshopdatabases` in ns
+   `demo` — patch/update are what power the Resize action) and one RoleBinding to the
+   portal's ServiceAccount. The platform owner grants access —
    the portal can't grant itself anything.
 4. **The star task.** On the Databases page, use the **New database** form: name it
    `console-db`, size `small`. Then prove it's real, the module-04 way:
@@ -272,6 +273,9 @@ git instead?
   Then close the loop: change the code, push again, and hit **Redeploy** on the app's **detail
   page** — it rebuilds the repo at a fresh image tag and rolls the running app forward (a mutable tag would
   leave it pinned to the old image). That's `push → build → deploy` end to end, in the console.
+  The sibling source, **Start from a template**, is the zero-setup version of this same path:
+  instead of pointing at an existing repo, the console creates a fresh `cloudbox/<name>` repo in
+  Gitea from the `demo-app` template, then builds and deploys it — the zero-to-running path.
 - **Create projects from the console (grant via git; act via console).** The top-bar
   **Project** selector maps 1:1 to Kubernetes namespaces; "New project" provisions a
   namespace *and* binds the portal's tenant grant into it, so the databases/functions/apps
