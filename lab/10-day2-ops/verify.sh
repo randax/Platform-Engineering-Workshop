@@ -95,12 +95,16 @@ else
 
   # Git-clean and live-healthy are separate, unconditional checks. Together they
   # catch a live-only edit: ArgoCD selfHeal makes Git the durable source of truth.
-  if command -v kubectl >/dev/null 2>&1 && \
-    kubectl --request-timeout=3s -n demo rollout status deploy/demo-web \
+  # Reachability is gated fast (3s), then the rollout watch runs WITHOUT
+  # --request-timeout — a short per-request timeout would abort the 60s watch.
+  if ! command -v kubectl >/dev/null 2>&1 || \
+    ! kubectl --request-timeout=3s -n demo get deploy demo-web >/dev/null 2>&1; then
+    fail "cluster unreachable or deploy/demo-web missing — check kubectl access, then run kubectl -n demo get deploy demo-web"
+  elif kubectl -n demo rollout status deploy/demo-web \
       --timeout=60s >/dev/null 2>&1; then
     ok "demo-web rollout is healthy"
   else
-    fail "demo-web rollout is not healthy or the cluster is unreachable — run kubectl -n demo rollout status deploy/demo-web, then fix Git and retry"
+    fail "demo-web rollout is not healthy — run kubectl -n demo rollout status deploy/demo-web, then fix Git and retry"
   fi
 
   POD_STATE=""
