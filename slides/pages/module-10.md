@@ -55,7 +55,7 @@ The pedagogical point of the whole slide: an AI agent is the LAST resort here, n
   <div class="principle">
     <div class="ico"><span class="svgi i-package"></span></div>
     <div class="name">Delivered like every capability</div>
-    <div class="tie" style="opacity:.85"><code>catalog/kagent.yaml</code> → <code>apps/</code> → push → ArgoCD converges. CNCF Sandbox project, pinned in <code>versions.env</code> like everything else; only <code>k8s-agent</code> enabled.</div>
+    <div class="tie" style="opacity:.85"><code>catalog/kagent.yaml</code> → <code>apps/</code> → push → ArgoCD converges. CNCF Sandbox project, pinned in <code>scripts/versions.env</code> like everything else; only <code>k8s-agent</code> enabled.</div>
   </div>
 </div>
 
@@ -83,7 +83,7 @@ Scoping facts worth saying out loud: kagent is a CNCF Sandbox project (accepted 
 - Stock ≤8B models: **single digits to ~16%** in that regime
 - The drop is **~5–16×** for small models — ~2× for GPT-4o-class
 
-<div class="hint" style="font-size:.7em;opacity:.7">Source: BFCL v3 multi-turn — gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html; exact small-model figures via papers using BFCL v3 baselines (see issue #124 for the research trail — treat the digits as indicative, the cliff as robust)</div>
+<div class="hint" style="font-size:.7em;opacity:.7">Source: BFCL v3 multi-turn — https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html; exact small-model figures via papers using BFCL v3 baselines (see issue #124 for the research trail — treat the digits as indicative, the cliff as robust)</div>
 
 <!--
 Every model in this table is fine at a SINGLE well-formed tool call — that's what most benchmarks measure, and it's why a quick demo of a small local model looks deceptively competent. The Berkeley Function-Calling Leaderboard v3 added a multi-turn, state-based category specifically because real agents don't stop after one call — they chain get → describe → logs → events → hypothesis, carrying state across every step. That's exactly the shape of a day-2 diagnosis, and it's exactly where small models fall off a cliff: Qwen3-4B goes from ~80%+ single-turn to ~16% multi-turn; Llama-3.1-8B-Instruct drops to ~5%. GPT-4o-class models drop too — call chains are hard for everyone — but only by roughly 2x, landing at 41–48%, not into single digits.
