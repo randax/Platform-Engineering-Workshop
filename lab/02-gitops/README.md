@@ -30,7 +30,7 @@ platform teams bootstrap clusters.
      `cloudbox/platform` repo.
    - ArgoCD: http://localhost:30080 — username `admin`; get the password from the cluster
      (hint 1). Find the root `platform` Application. What path in the repo does it watch?
-     What two Applications did it already create, and why is that dir called "wave 0"?
+     What single Application did it already create, and why is that dir called "wave 0"?
 
 3. **Make a real change through git.** Clone the repo *from your Gitea* and, using the two
    template files in this lab directory:
@@ -127,8 +127,8 @@ kubectl -n demo get configmap welcome -o yaml
 
 It checks: Gitea answers on :30300 and hosts `cloudbox/platform`; ArgoCD answers on
 :30080; the root `platform` app points at your in-cluster Gitea (not GitHub) and is
-Healthy (Synced is the happy path; sync is advisory); the wave-0 apps (storage +
-observability) are healthy; and your `demo`
+Healthy (Synced is the happy path; sync is advisory); the wave-0 app (storage) is
+healthy; and your `demo`
 app delivered the `welcome` ConfigMap with a real name in it.
 
 ## Explain-back
@@ -139,8 +139,9 @@ being in-cluster a sovereignty feature and not just a demo trick?
 
 ## Going deeper
 
-- Wave-0 installed observability for you. Find Grafana (`kubectl -n observability get svc`),
-  port-forward to it, and look at what your cluster is already reporting.
+- Observability isn't running yet — it's an on-demand capability you enable later from the
+  catalog (`gitops/catalog/grafana.yaml` plus the `victoria-*` and `otel-collector` items),
+  not part of wave 0. You'll switch it on and find Grafana in the capstone (module 09).
 - Delete `gitops/apps/demo.yaml` from the repo, push, and watch prune remove the `demo`
   *Application object* — then look again: the namespace and ConfigMap are still there,
   **orphaned**. Deleting an Application doesn't cascade to its resources unless the

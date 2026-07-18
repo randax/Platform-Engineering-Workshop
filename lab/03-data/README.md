@@ -118,7 +118,7 @@ kubectl -n demo run s3 --rm -i --restart=Never \
 
 ```bash
 WORKSHOP="$(git rev-parse --show-toplevel)"
-cd ~/cloudbox-platform   # your Gitea clone from module 02
+cd ~/cloudbox-platform   # your Gitea clone from module 02 (used the remote-add path instead? cd into your workshop checkout)
 
 cp gitops/catalog/cnpg-operator.yaml gitops/apps/
 cp gitops/catalog/rustfs.yaml       gitops/apps/

@@ -72,7 +72,7 @@ control-plane node is typically `10.5.0.2`.
 - kube-proxy is absent: `kubectl -n kube-system get ds,pods | grep -c kube-proxy` should
   find nothing. Yet `kubectl get svc -A` shows Services with ClusterIPs that work.
 - Ask Cilium who handles Services:
-  `kubectl -n kube-system exec ds/cilium -- cilium-dbg status | grep -i kubeproxy` —
+  `kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status | grep -i kubeproxy` —
   look for `KubeProxyReplacement: True`. eBPF programs attached in the kernel are doing
   what iptables rules used to do.
 - One more: Cilium reaches the API server via `localhost:7445` — that's Talos **KubePrism**,
@@ -95,7 +95,7 @@ talosctl -n 10.5.0.2 services
 kubectl get nodes -o wide
 cilium status --wait
 kubectl -n kube-system get ds                            # cilium yes, kube-proxy: absent
-kubectl -n kube-system exec ds/cilium -- cilium-dbg status | grep -i kubeproxy
+kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status | grep -i kubeproxy
 
 cd lab/01-cluster && ./verify.sh
 ```

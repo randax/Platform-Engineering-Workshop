@@ -31,8 +31,8 @@ From the repository root:
    common: Docker not running, or Docker's memory limit below 10 GB).
 4. Run `./verify.sh` in this directory.
 
-**Hardware reality check:** 16 GB RAM is the absolute minimum (with ≥10 GB allocatable to
-Docker), 32 GB is comfortable. macOS and Linux are fully supported; Windows works via WSL2
+**Hardware reality check:** 16 GB RAM is the absolute minimum (with ≥10 GB and ≥4 CPUs
+allocatable to Docker), 32 GB is comfortable. macOS and Linux are fully supported; Windows works via WSL2
 but is our least-tested platform — if it fights you, use a lifeboat below rather than
 burning workshop time.
 
