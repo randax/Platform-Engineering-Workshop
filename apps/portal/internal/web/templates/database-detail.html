@@ -13,6 +13,13 @@ Crossplane into the CNPG cluster and bucket below (the size decides instances + 
 is an unmanaged CNPG cluster).</p>
 {{end}}
 
+{{if .ShowDiag}}
+<h2>Diagnostics <small>why this database isn't ready</small></h2>
+{{if .Why}}<p class="diag-why">{{.Why}}</p>{{end}}
+{{template "diagnostics" .Diag}}
+<p class="hint">The cause a <code>kubectl describe</code> would show. Tenant-plane fix: resize (a too-small instance) below, or delete and recreate; a stuck compose usually clears once its dependencies settle.</p>
+{{end}}
+
 <h2>Backing Postgres cluster <small>({{.ClusterName}})</small></h2>
 {{with .Cluster}}
 <p class="stats"><b>{{.Status.ReadyInstances}}</b>/<b>{{.Spec.Instances}}</b> instances ready ·

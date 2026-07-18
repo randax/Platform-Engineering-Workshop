@@ -511,3 +511,5 @@ pre.code {
 .diag-row td { color: var(--muted); font-size: 0.85rem; padding-top: 0; border-top: 0; }
 .diag-panel { margin-top: 1rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
 .diag-panel h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+.diag-hint { color: var(--accent); font-size: 0.82rem; margin-top: 0.15rem; }
+.diag-why { color: var(--bad); font-size: 0.9rem; margin: 0.2rem 0 0.5rem; }
