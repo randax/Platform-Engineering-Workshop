@@ -55,7 +55,7 @@ The pedagogical point of the whole slide: an AI agent is the LAST resort here, n
   <div class="principle">
     <div class="ico"><span class="svgi i-package"></span></div>
     <div class="name">Delivered like every capability</div>
-    <div class="tie" style="opacity:.85"><code>catalog/kagent.yaml</code> → <code>apps/</code> → push → ArgoCD converges. CNCF Sandbox project, <b>v0.9.11</b> pinned; only <code>k8s-agent</code> enabled.</div>
+    <div class="tie" style="opacity:.85"><code>catalog/kagent.yaml</code> → <code>apps/</code> → push → ArgoCD converges. CNCF Sandbox project, pinned in <code>versions.env</code> like everything else; only <code>k8s-agent</code> enabled.</div>
   </div>
 </div>
 
@@ -66,7 +66,7 @@ The headline demystification: "an AI agent" sounds like a new category of thing 
 
 And it arrives exactly the way every capability has all day: copy catalog/kagent.yaml to apps/, push to Gitea, ArgoCD syncs it. No new mental model for "how do I turn this on" — the progressive-enable mechanic from module 02 just keeps paying off.
 
-Scoping facts worth saying out loud: kagent is a CNCF Sandbox project (accepted May 2025), pinned at v0.9.11 — the maintained stable line. v0.10 is still an active beta series, and upstream's "latest release" tag misleadingly resolves to one of those betas; that trap is called out with a comment in the single version-pin file. The chart ships ten built-in agents; this module enables exactly one, k8s-agent — the Kubernetes troubleshooting agent — and disables the doc-search tool and kagent's own web UI (scaled to zero), because the Console is the only surface attendees touch.
+Scoping facts worth saying out loud: kagent is a CNCF Sandbox project (accepted May 2025), pinned in scripts/versions.env at the maintained stable 0.9 line, while v0.10 is still an active beta series, and upstream's "latest release" tag misleadingly resolves to one of those betas; that trap is called out with a comment in the single version-pin file. The chart ships ten built-in agents; this module enables exactly one, k8s-agent — the Kubernetes troubleshooting agent — and disables the doc-search tool and kagent's own web UI (scaled to zero), because the Console is the only surface attendees touch.
 -->
 
 ---
@@ -82,6 +82,8 @@ Scoping facts worth saying out loud: kagent is a CNCF Sandbox project (accepted 
 - A seeded fault needs 5–15 chained tool calls
 - Stock ≤8B models: **single digits to ~16%** in that regime
 - The drop is **~5–16×** for small models — ~2× for GPT-4o-class
+
+<div class="hint" style="font-size:.7em;opacity:.7">Source: BFCL v3 multi-turn — gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html; exact small-model figures via papers using BFCL v3 baselines (see issue #124 for the research trail — treat the digits as indicative, the cliff as robust)</div>
 
 <!--
 Every model in this table is fine at a SINGLE well-formed tool call — that's what most benchmarks measure, and it's why a quick demo of a small local model looks deceptively competent. The Berkeley Function-Calling Leaderboard v3 added a multi-turn, state-based category specifically because real agents don't stop after one call — they chain get → describe → logs → events → hypothesis, carrying state across every step. That's exactly the shape of a day-2 diagnosis, and it's exactly where small models fall off a cliff: Qwen3-4B goes from ~80%+ single-turn to ~16% multi-turn; Llama-3.1-8B-Instruct drops to ~5%. GPT-4o-class models drop too — call chains are hard for everyone — but only by roughly 2x, landing at 41–48%, not into single digits.
