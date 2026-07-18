@@ -28,21 +28,29 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"cloudbox.io/portal/internal/kagent"
 	"cloudbox.io/portal/internal/kube"
 )
 
+// allowedKinds is the whitelist of resource kinds the Case file may investigate.
+// The affordance only ever renders on the Application detail page (its mount
+// sends kind="Application"), so that is the only kind we accept — a request for
+// anything else is rejected before it can shape an LLM prompt.
+var allowedKinds = map[string]bool{"Application": true}
+
 // agentAvailable reports whether the Case file affordance can offer a live
-// investigation: the kagent capability is present in the cluster and the client
-// is wired. Otherwise the affordance renders in the locked-capability style.
+// investigation: the kagent capability is present AND Healthy, and the client is
+// wired. While it is still converging (present but not Healthy) the affordance
+// stays locked, matching the console's other capability gating.
 func agentAvailable(s *Server) bool {
 	if s.Kagent == nil {
 		return false
 	}
-	exists, _ := s.currentSnapshot().AppHealthy("kagent")
-	return exists
+	exists, healthy := s.currentSnapshot().AppHealthy("kagent")
+	return exists && healthy
 }
 
 // HandleAgentAsk streams a single-shot investigation of one resource as SSE.
@@ -57,12 +65,15 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if !kube.ValidName(body.Namespace) || !kube.ValidName(body.Name) {
-		http.Error(w, "invalid resource", http.StatusBadRequest)
-		return
-	}
+	// Validate every input that feeds the LLM prompt. Namespace and name must be
+	// DNS-1123 labels (kube.ValidName also bounds their length); kind must be one
+	// the Case file actually investigates. Reject before composing any prompt.
 	if body.Kind == "" {
 		body.Kind = "Application"
+	}
+	if !kube.ValidName(body.Namespace) || !kube.ValidName(body.Name) || !allowedKinds[body.Kind] {
+		http.Error(w, "invalid resource", http.StatusBadRequest)
+		return
 	}
 
 	// Resolve (and mint, if absent) the browser identity BEFORE the SSE headers
@@ -77,6 +88,13 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 	h.Set("Connection", "keep-alive")
 	h.Set("X-Accel-Buffering", "no")
 	flusher, _ := w.(http.Flusher)
+	// Commit the 200 + headers and flush now, before the (possibly slow) upstream
+	// call, so the browser's stream reader leaves "connecting" immediately rather
+	// than blocking on the first agent event.
+	w.WriteHeader(http.StatusOK)
+	if flusher != nil {
+		flusher.Flush()
+	}
 	emit := func(event, fragment string) error {
 		if err := writeSSE(w, event, fragment); err != nil {
 			return err
@@ -87,11 +105,21 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		return nil
 	}
 
-	// Capability gate: the affordance renders locked when kagent is absent, so
-	// this is the matching backend guard — refuse to call an agent that isn't
-	// there. (The locked view also never renders a mount that could reach here.)
-	if !agentAvailable(s) {
+	// Capability gate: the affordance renders locked unless kagent is present AND
+	// Healthy, so this is the matching backend guard — refuse to call an agent
+	// that isn't there (and distinguish "still converging" so the attendee knows
+	// to wait rather than to enable it). The locked view never renders a mount
+	// that could reach here; this defends the endpoint directly.
+	exists, healthy := false, false
+	if s.Kagent != nil {
+		exists, healthy = s.currentSnapshot().AppHealthy("kagent")
+	}
+	switch {
+	case !exists:
 		emit("error", s.fragment("cf-error", "The investigation agent isn't enabled. Enable kagent from the catalog."))
+		return
+	case !healthy:
+		emit("error", s.fragment("cf-error", "The investigation agent is still starting up — give it a moment and try again."))
 		return
 	}
 
@@ -129,7 +157,7 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		case kagent.KindMessage:
 			emitErr = emit("message", s.fragment("cf-message", e))
 		case kagent.KindVerdict:
-			emitErr = emit("verdict", s.fragment("cf-verdict", e.Verdict))
+			emitErr = emit("verdict", s.fragment("cf-verdict", verdictFor(e.Verdict)))
 		}
 		if emitErr != nil {
 			return emitErr
@@ -150,6 +178,52 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	emit("done", "")
+}
+
+// verdictView is the sanitised verdict the cf-verdict fragment renders — same
+// shape as kagent.Verdict, but with the Fix defensively reduced to git commands.
+type verdictView struct {
+	Status     string
+	Hypothesis string
+	KillTest   string
+	Fix        string
+}
+
+// verdictFor builds the render model, running the Fix through sanitizeFix. A nil
+// verdict (shouldn't happen — translate only tags a verdict when one is present)
+// degrades to an empty card rather than panicking.
+func verdictFor(v *kagent.Verdict) verdictView {
+	if v == nil {
+		return verdictView{}
+	}
+	return verdictView{
+		Status:     v.Status,
+		Hypothesis: v.Hypothesis,
+		KillTest:   v.KillTest,
+		Fix:        sanitizeFix(v.Fix),
+	}
+}
+
+// sanitizeFix enforces the contract that the Fix is copy-paste git commands only
+// — a prompt asks for that, it doesn't guarantee it. Each line is kept verbatim
+// if it is blank, a comment, or a `git` command; any other line is rendered
+// COMMENTED OUT with a visible warning, so pasting the whole block can't run a
+// stray `kubectl apply`/`rm`/etc. Nothing is ever dropped silently.
+func sanitizeFix(fix string) string {
+	if strings.TrimSpace(fix) == "" {
+		return fix
+	}
+	lines := strings.Split(fix, "\n")
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		t := strings.TrimSpace(line)
+		if t == "" || strings.HasPrefix(t, "#") || t == "git" || strings.HasPrefix(t, "git ") {
+			out[i] = line
+			continue
+		}
+		out[i] = "# ⚠ not a git command — review before running: " + line
+	}
+	return strings.Join(out, "\n")
 }
 
 // buildInvestigationPrompt turns the resource identity + its diagnostics rollup
@@ -214,17 +288,30 @@ func writeSSE(w io.Writer, event, data string) error {
 	return err
 }
 
+// uidShape is exactly what mintID produces: 32 lowercase hex chars. An incoming
+// cookie that doesn't match (garbage, oversized, injected) is not trusted — it is
+// replaced with a freshly minted identity.
+var uidShape = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
 // ensureUserID resolves the A2A identity (X-User-ID) for this browser session,
-// minting and setting the `cbx_uid` cookie when it is absent so the identity is
-// stable across requests. Kagent is authless in-cluster, so this is a per-browser
-// handle, not a credential. Same cookie idiom as the project selector
-// (HttpOnly, Lax). The cookie must be set before the SSE body is written.
+// minting and setting the `cbx_uid` cookie when it is absent or malformed so the
+// identity is stable across requests and always well-shaped. Kagent is authless
+// in-cluster, so this is a per-browser handle, not a credential. Same cookie
+// idiom as the project selector (HttpOnly, Lax; Secure when the request is TLS).
+// The cookie must be set before the SSE body is written.
 func ensureUserID(w http.ResponseWriter, r *http.Request) string {
-	if c, err := r.Cookie("cbx_uid"); err == nil && c.Value != "" {
+	if c, err := r.Cookie("cbx_uid"); err == nil && uidShape.MatchString(c.Value) {
 		return c.Value
 	}
 	id := mintID()
-	http.SetCookie(w, &http.Cookie{Name: "cbx_uid", Value: id, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "cbx_uid",
+		Value:    id,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+	})
 	return id
 }
 

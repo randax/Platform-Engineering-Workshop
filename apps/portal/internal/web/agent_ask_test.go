@@ -182,9 +182,9 @@ data: {"result":{"kind":"status-update","final":true,"status":{"state":"complete
 `
 
 func TestAgentAskSessionIdentity(t *testing.T) {
-	// Each browser session carries a stable cbx_uid; distinct cookies must reach
-	// the agent as distinct identities (the verbatim contract: one session per
-	// resource per browser session). A missing cookie is minted and set.
+	// Each browser session carries a stable, well-shaped cbx_uid; distinct
+	// cookies must reach the agent as distinct identities (the verbatim contract:
+	// one session per resource per browser session). A missing cookie is minted.
 	ts, _, userIDs := fakeKagent(t, investigationSSE)
 	s := serverWithKagent(t, ts.URL, true)
 
@@ -198,12 +198,14 @@ func TestAgentAskSessionIdentity(t *testing.T) {
 		return rec
 	}
 
-	call("alice")
-	call("bob")
+	alice := strings.Repeat("a", 32) // valid mintID shape (32 lowercase hex)
+	bob := strings.Repeat("b", 32)
+	call(alice)
+	call(bob)
 	if len(*userIDs) < 2 || (*userIDs)[0] == (*userIDs)[1] {
 		t.Fatalf("two browser sessions must reach the agent as distinct identities: %v", *userIDs)
 	}
-	if (*userIDs)[0] != "alice" || (*userIDs)[1] != "bob" {
+	if (*userIDs)[0] != alice || (*userIDs)[1] != bob {
 		t.Errorf("X-User-ID should carry the browser cookie: %v", *userIDs)
 	}
 
@@ -215,11 +217,38 @@ func TestAgentAskSessionIdentity(t *testing.T) {
 			set = c.Value
 		}
 	}
-	if set == "" {
-		t.Fatal("a missing cbx_uid cookie must be minted and set")
+	if !uidShape.MatchString(set) {
+		t.Fatalf("a missing cbx_uid cookie must be minted well-shaped, got %q", set)
 	}
 	if got := (*userIDs)[len(*userIDs)-1]; got != set {
 		t.Errorf("minted identity %q must be the one sent to the agent (%q)", set, got)
+	}
+}
+
+func TestAgentAskReplacesInvalidCookie(t *testing.T) {
+	// A garbage / oversized cookie is not trusted: the handler mints a fresh
+	// well-shaped identity, sets it, and sends THAT to the agent — never the
+	// attacker-controlled value.
+	ts, _, userIDs := fakeKagent(t, investigationSSE)
+	s := serverWithKagent(t, ts.URL, true)
+
+	req := askRequest(t)
+	garbage := "../../etc/passwd" + strings.Repeat("A", 5000)
+	req.AddCookie(&http.Cookie{Name: "cbx_uid", Value: garbage})
+	rec := httptest.NewRecorder()
+	HandleAgentAsk(s, rec, req)
+
+	var set string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "cbx_uid" {
+			set = c.Value
+		}
+	}
+	if !uidShape.MatchString(set) {
+		t.Fatalf("an invalid cookie must be replaced with a well-shaped id, got %q", set)
+	}
+	if got := (*userIDs)[len(*userIDs)-1]; got != set || got == garbage {
+		t.Errorf("agent must receive the minted id (%q), not the garbage cookie (%q)", set, got)
 	}
 }
 
@@ -239,6 +268,84 @@ func TestAgentAskEmptyStreamSurfacesError(t *testing.T) {
 	}
 	if strings.Contains(body, "event: done") {
 		t.Errorf("a zero-event stream must not report done:\n%s", body)
+	}
+}
+
+func TestAgentAskRejectsBadInput(t *testing.T) {
+	// Every input that shapes the LLM prompt is validated; a violation is a 400
+	// that never reaches the agent.
+	ts, calls, _ := fakeKagent(t, investigationSSE)
+	s := serverWithKagent(t, ts.URL, true)
+
+	cases := []map[string]string{
+		{"namespace": "demo-app", "kind": "Secret", "name": "demo-app"},       // kind not whitelisted
+		{"namespace": "Bad NS!", "kind": "Application", "name": "demo-app"},   // non-DNS namespace
+		{"namespace": "demo-app", "kind": "Application", "name": "../escape"}, // non-DNS name
+	}
+	for _, c := range cases {
+		b, _ := json.Marshal(c)
+		req := httptest.NewRequest(http.MethodPost, "/agent/ask", bytes.NewReader(b))
+		rec := httptest.NewRecorder()
+		HandleAgentAsk(s, rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("input %v: status = %d, want 400", c, rec.Code)
+		}
+	}
+	if *calls != 0 {
+		t.Errorf("rejected inputs must never reach the agent, got %d calls", *calls)
+	}
+}
+
+func TestAgentAskConvergingLocked(t *testing.T) {
+	// kagent is present but not yet Healthy (converging): the gate holds, no
+	// backend call, and the message tells the attendee to wait — not to enable it.
+	ts, calls, _ := fakeKagent(t, investigationSSE)
+	s := serverWithKagent(t, ts.URL, true)
+	s.snap = kube.Snapshot{Apps: map[string]kube.ArgoApp{"kagent": fixtureApp("kagent", "Progressing")}}
+	s.snapAt = time.Now()
+
+	rec := httptest.NewRecorder()
+	HandleAgentAsk(s, rec, askRequest(t))
+
+	if *calls != 0 {
+		t.Errorf("a converging agent must make no backend call, got %d", *calls)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "event: error") || !strings.Contains(body, "starting up") {
+		t.Errorf("converging state should surface a 'starting up' error:\n%s", body)
+	}
+}
+
+func TestSanitizeFixCommentsNonGit(t *testing.T) {
+	// The Fix contract is copy-paste git only. A kubectl line must survive
+	// (nothing dropped silently) but be commented out with a visible warning, so
+	// pasting the block can't run it.
+	fix := "git revert HEAD\nkubectl -n demo-app patch deploy demo-app --patch '{}'\n# a note\ngit push"
+	out := sanitizeFix(fix)
+	for _, want := range []string{"git revert HEAD", "git push", "# a note",
+		"# ⚠ not a git command — review before running: kubectl -n demo-app patch"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("sanitizeFix output missing %q:\n%s", want, out)
+		}
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "kubectl") {
+			t.Errorf("a runnable non-git line survived uncommented: %q", line)
+		}
+	}
+}
+
+func TestAgentAskFixRenderedGitOnly(t *testing.T) {
+	// End-to-end: a verdict smuggling a kubectl line streams it commented out.
+	sse := `data: {"result":{"kind":"message","role":"agent","parts":[{"kind":"data","data":{"verdict":{"status":"s","hypothesis":"h","killTest":"k","fix":"git revert HEAD\nkubectl delete ns demo-app"}}}]}}` + "\n\n" +
+		`data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}` + "\n\n"
+	ts, _, _ := fakeKagent(t, sse)
+	s := serverWithKagent(t, ts.URL, true)
+
+	rec := httptest.NewRecorder()
+	HandleAgentAsk(s, rec, askRequest(t))
+	if !strings.Contains(rec.Body.String(), "not a git command") {
+		t.Errorf("smuggled kubectl line must be flagged in the streamed verdict:\n%s", rec.Body.String())
 	}
 }
 

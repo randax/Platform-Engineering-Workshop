@@ -198,72 +198,93 @@ type partData struct {
 	Verdict *Verdict `json:"verdict"`
 }
 
-// errDone is the sentinel a `done` frame raises to stop the scan cleanly.
-var errDone = errors.New("done")
-
 // parseSSE reads text/event-stream frames, JSON-decodes each data payload as a
 // JSON-RPC envelope, translates it to a console Event and hands it to emit.
+//
+// It reads with a bufio.Reader (not a size-capped Scanner) so a single oversized
+// line — a large tool output — can't kill the stream. Individually malformed
+// JSON frames are skipped but counted. The agent's stream must end with the
+// terminal status-update (final:true); reaching EOF before that is reported as
+// an error (with the skipped-frame count), never a silent clean end — otherwise
+// a truncated or mismatched stream would look like a complete investigation.
 func parseSSE(r io.Reader, emit func(Event) error) error {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	br := bufio.NewReader(r)
 	var data strings.Builder
-	dispatch := func() error {
+	var sawFinal bool
+	var malformed int
+
+	// dispatch decodes + emits the accumulated frame; done is true once the
+	// terminal status-update has been seen.
+	dispatch := func() (done bool, err error) {
 		if data.Len() == 0 {
-			return nil
+			return false, nil
 		}
 		payload := data.String()
 		data.Reset()
 		var env rpcEnvelope
 		if err := json.Unmarshal([]byte(payload), &env); err != nil {
-			return nil // skip a malformed frame rather than abort the whole run
+			malformed++ // skip this frame, but remember we lost one
+			return false, nil
 		}
 		if env.Error != nil {
-			return fmt.Errorf("agent error: %s", env.Error.Message)
+			return false, fmt.Errorf("agent error: %s", env.Error.Message)
 		}
 		if env.Result == nil {
-			return nil
+			return false, nil
 		}
-		ev, ok, done := translate(env.Result)
+		ev, ok, d := translate(env.Result)
 		if ok {
 			if err := emit(ev); err != nil {
-				return err
+				return false, err
 			}
 		}
-		if done {
-			return errDone
+		if d {
+			sawFinal = true
+			return true, nil
 		}
-		return nil
+		return false, nil
 	}
-	for sc.Scan() {
-		line := sc.Text()
-		if line == "" { // blank line terminates an event
-			if err := dispatch(); err != nil {
-				if err == errDone {
-					return nil
+
+	for {
+		line, readErr := br.ReadString('\n')
+		trimmed := strings.TrimRight(line, "\r\n") // tolerate CRLF (proxy normalization)
+		switch {
+		case trimmed == "": // blank line terminates the current event
+			done, err := dispatch()
+			if err != nil {
+				return err
+			}
+			if done {
+				return nil
+			}
+		case strings.HasPrefix(trimmed, ":"): // SSE comment / heartbeat
+		default:
+			if v, ok := strings.CutPrefix(trimmed, "data:"); ok {
+				if data.Len() > 0 {
+					data.WriteByte('\n')
 				}
+				data.WriteString(strings.TrimPrefix(v, " "))
+			}
+			// event:/id: field lines are not needed — the payload carries its kind.
+		}
+		if readErr != nil {
+			if readErr != io.EOF {
+				return readErr
+			}
+			// Flush a trailing event that had no terminating blank line.
+			done, err := dispatch()
+			if err != nil {
 				return err
 			}
-			continue
-		}
-		if strings.HasPrefix(line, ":") { // comment/heartbeat
-			continue
-		}
-		if v, ok := strings.CutPrefix(line, "data:"); ok {
-			if data.Len() > 0 {
-				data.WriteByte('\n')
+			if done || sawFinal {
+				return nil
 			}
-			data.WriteString(strings.TrimPrefix(v, " "))
+			if malformed > 0 {
+				return fmt.Errorf("unexpected EOF before final status-update (%d malformed frame(s) skipped)", malformed)
+			}
+			return errors.New("unexpected EOF before final status-update")
 		}
-		// event:/id: lines are not needed — the payload carries its own type.
 	}
-	if err := sc.Err(); err != nil {
-		return err
-	}
-	// Flush a trailing event that had no terminating blank line.
-	if err := dispatch(); err != nil && err != errDone {
-		return err
-	}
-	return nil
 }
 
 // translate maps one A2A result to a console Event. ok is false for frames that

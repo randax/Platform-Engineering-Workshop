@@ -15,13 +15,27 @@
     if (!open) return;
 
     open.addEventListener("click", function () {
-      open.disabled = true;
-      open.textContent = "Investigating…";
       var body = document.getElementById("cf-body");
       if (body) body.hidden = false;
       var log = document.getElementById("cf-log");
       var panel = document.getElementById("cf-panel");
 
+      // A clean (re)start: reset the button, the log, and the panel so a Retry
+      // doesn't stack onto a previous run.
+      open.disabled = true;
+      open.textContent = "Investigating…";
+      if (log) log.innerHTML = "";
+      if (panel) {
+        panel.innerHTML =
+          '<div class="case-card"><h4>Status</h4><p class="case-empty">investigating…</p></div>';
+      }
+
+      // On any failure, let the attendee try again without a page refresh — the
+      // button says what it now does.
+      function offerRetry() {
+        open.disabled = false;
+        open.textContent = "Retry investigation";
+      }
       function fail(msg) {
         if (panel) {
           panel.innerHTML =
@@ -29,7 +43,7 @@
             msg +
             "</p></div>";
         }
-        open.textContent = "Investigation failed";
+        offerRetry();
       }
 
       fetch("/agent/ask", {
@@ -52,7 +66,12 @@
                 done();
                 return;
               }
-              buf += dec.decode(r.value, { stream: true });
+              // Normalize CRLF → LF (a proxy may rewrite line endings) before
+              // splitting on the blank-line frame boundary.
+              buf = (buf + dec.decode(r.value, { stream: true })).replace(
+                /\r\n?/g,
+                "\n"
+              );
               var i;
               while ((i = buf.indexOf("\n\n")) >= 0) {
                 handleFrame(buf.slice(0, i));
@@ -81,9 +100,12 @@
             log.insertAdjacentHTML("beforeend", html);
             log.scrollTop = log.scrollHeight;
           }
-        } else if (event === "verdict" || event === "error") {
+        } else if (event === "verdict") {
           if (panel) panel.innerHTML = html;
-          if (event === "error") open.textContent = "Investigation failed";
+        } else if (event === "error") {
+          if (panel) panel.innerHTML = html;
+          finished = true;
+          offerRetry();
         } else if (event === "done") {
           done();
         }

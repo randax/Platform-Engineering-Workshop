@@ -145,6 +145,66 @@ func TestStreamUnmodeledFramesYieldNothing(t *testing.T) {
 	}
 }
 
+func TestStreamTruncatedBeforeFinal(t *testing.T) {
+	// The stream ends after a real tool step but WITHOUT the terminal
+	// status-update — a dropped connection. That must surface as an error, not a
+	// clean end that looks like a finished investigation.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		io.WriteString(w, `data: {"result":{"kind":"tool-call","tool":"k8s_get_resources","args":"pods"}}`+"\n\n")
+	}))
+	defer ts.Close()
+
+	c := &Client{base: ts.URL, http: ts.Client()}
+	n := 0
+	err := c.Stream(t.Context(), Request{Prompt: "x"}, func(Event) error { n++; return nil })
+	if err == nil || !strings.Contains(err.Error(), "final status-update") {
+		t.Fatalf("truncated stream must error on missing terminal: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("events before the truncation should still have been emitted, got %d", n)
+	}
+}
+
+func TestStreamMalformedCountedInError(t *testing.T) {
+	// A malformed frame is skipped but counted; if the stream then ends without a
+	// terminal, the error names how many frames were lost.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		io.WriteString(w, `data: {not valid json`+"\n\n"+
+			`data: {"result":{"kind":"message","role":"agent","parts":[{"kind":"text","text":"hi"}]}}`+"\n\n")
+	}))
+	defer ts.Close()
+
+	c := &Client{base: ts.URL, http: ts.Client()}
+	err := c.Stream(t.Context(), Request{Prompt: "x"}, func(Event) error { return nil })
+	if err == nil || !strings.Contains(err.Error(), "1 malformed") {
+		t.Fatalf("error should name the malformed-frame count: %v", err)
+	}
+}
+
+func TestStreamOversizedLineSurvives(t *testing.T) {
+	// A single line far larger than the old 1 MB scanner cap (a big tool output)
+	// must not kill the stream.
+	huge := strings.Repeat("x", 2<<20) // 2 MiB
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		io.WriteString(w, `data: {"result":{"kind":"tool-result","output":"`+huge+`","observation":"huge but fine"}}`+"\n\n"+
+			`data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}`+"\n\n")
+	}))
+	defer ts.Close()
+
+	c := &Client{base: ts.URL, http: ts.Client()}
+	var got []Event
+	err := c.Stream(t.Context(), Request{Prompt: "x"}, func(e Event) error { got = append(got, e); return nil })
+	if err != nil {
+		t.Fatalf("oversized line must not fail the stream: %v", err)
+	}
+	if len(got) != 1 || got[0].Observation != "huge but fine" {
+		t.Fatalf("oversized tool-result not parsed: %+v", got)
+	}
+}
+
 func TestStreamAgentError(t *testing.T) {
 	// The agent answers, but the run fails (e.g. the model backend is down):
 	// a JSON-RPC error frame must surface as an error.
