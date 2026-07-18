@@ -28,13 +28,18 @@ restore_one() { # <NN>
 }
 
 restore_all() {
-  local d name NN
+  # Best-effort: a failing scenario must not stop the others from restoring
+  # (set -e would otherwise abort the loop at the first failure).
+  local d name NN failed=0
   for d in "$DIR"/scenarios/[0-9][0-9]-*/; do
     [ -d "$d" ] || continue
     name="$(basename "$d")"
     NN="${name%%-*}"
-    restore_one "$NN"
+    if ! restore_one "$NN"; then
+      failed=1
+    fi
   done
+  return "$failed"
 }
 
 case "${1:-}" in

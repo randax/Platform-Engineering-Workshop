@@ -29,6 +29,9 @@ trap 'rm -rf "$TMP_PARENT"' EXIT
 # that is actually Ready (a poisoned commit on top of a not-yet-synced
 # Deployment would be indistinguishable from "ArgoCD just hasn't synced yet").
 if [ ! -f "$CLONE/$COMPONENT_PATH" ]; then
+  # The dir normally exists from module 02 (welcome.yaml lives there); recreate
+  # it rather than dying on a raw cp error if it was pruned.
+  mkdir -p "$(dirname "$CLONE/$COMPONENT_PATH")"
   cp "$BASELINE_SRC" "$CLONE/$COMPONENT_PATH"
   git -C "$CLONE" add "$COMPONENT_PATH"
   git -C "$CLONE" -c user.name="cloudbox" -c user.email="cloudbox@localhost" \
@@ -108,8 +111,13 @@ if ! awk -v poison="$POISON_VALUE" -v target="$CONTAINER_NAME" '
     line = $0
     ind = indent_of(line)
 
-    # A PORT item is changed only when its immediately adjacent child is value:.
+    # A PORT item is changed only when its next meaningful child is value: —
+    # blank lines and comments in between (attendee-formatted YAML) pass through.
     if (port_pending) {
+      if (blank_or_comment(line)) {
+        print line
+        next
+      }
       if (ind > port_name_indent && line ~ /^[ ]*value:[ ]*/) {
         comment = ""
         if (match(line, /[ ]+#/)) comment = substr(line, RSTART)

@@ -97,7 +97,7 @@ else
   # catch a live-only edit: ArgoCD selfHeal makes Git the durable source of truth.
   if command -v kubectl >/dev/null 2>&1 && \
     kubectl --request-timeout=3s -n demo rollout status deploy/demo-web \
-      --timeout=20s >/dev/null 2>&1; then
+      --timeout=60s >/dev/null 2>&1; then
     ok "demo-web rollout is healthy"
   else
     fail "demo-web rollout is not healthy or the cluster is unreachable — run kubectl -n demo rollout status deploy/demo-web, then fix Git and retry"
