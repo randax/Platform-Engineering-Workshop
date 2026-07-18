@@ -220,6 +220,7 @@ func sampleAppDetail() appDetailData {
 	return appDetailData{
 		Name: "api", Namespace: "demo", Found: true,
 		Readiness:   kube.Readiness{Label: "Creating", Class: "meh"},
+		URL:         "http://api.demo.127.0.0.1.sslip.io:31080",
 		SourceBuilt: true,
 		Repo:        "http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/api.git",
 		Branch:      "main",
@@ -234,6 +235,11 @@ func sampleAppDetail() appDetailData {
 			Pod: "api-00001-deployment-6c9f-8t2wq", Container: "user-container",
 			Reason: "ImagePullBackOff", Message: `Back-off pulling image "ghcr.io/acme/api:v2"`,
 		}}},
+		Telemetry:  true,
+		ReqSpark:   metrics.Sparkline([]float64{0, 1, 2, 1, 3, 2}, "request rate"),
+		LatSpark:   metrics.Sparkline([]float64{40, 55, 48, 60}, "avg latency"),
+		LatNow:     "60 ms",
+		MetricsURL: "#",
 	}
 }
 

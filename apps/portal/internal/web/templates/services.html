@@ -81,7 +81,7 @@ source in-cluster and deploys it.</p>
           <a href="{{.Grafana}}" target="_blank">traces →</a>
           {{/* Delete only for functions in a project namespace — the ones this console has the grant to remove. */}}
           {{if .Deletable}}
-          <button class="danger" hx-delete="/services/{{.Metadata.Name}}" hx-target="#svc-list" hx-swap="outerHTML" hx-confirm="Delete {{.Metadata.Name}}? This removes the Knative Service.">Delete</button>
+          <button class="danger" hx-delete="/services/{{.Metadata.Namespace}}/{{.Metadata.Name}}" hx-target="#svc-list" hx-swap="outerHTML" hx-confirm="Delete {{.Metadata.Name}}? This removes the Knative Service.">Delete</button>
           {{end}}
         </td>
       </tr>
@@ -133,9 +133,11 @@ source in-cluster and deploys it.</p>
   {{/* Invoke wakes a scaled-to-zero function server-side (GET its cluster-local URL). */}}
   <button hx-post="/services/{{.Namespace}}/{{.Name}}/invoke" hx-target="#invoke-result" hx-swap="innerHTML">Invoke</button>
   <a class="btn ghost" href="{{.TracesURL}}" target="_blank">traces →</a>
-  {{if .Deletable}}<button class="danger" hx-delete="/services/{{.Name}}"
-    hx-on::after-request="if(event.detail.successful) window.location='/services'"
-    hx-confirm="Delete {{.Name}}? This removes the Knative Service.">Delete</button>{{end}}
+  {{if .Deletable}}<button class="danger" hx-delete="/services/{{.Namespace}}/{{.Name}}"
+    hx-swap="none"
+    hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Delete-Failed')){this.nextElementSibling.textContent='Delete failed — the function may still exist. Check the Functions list.'}else if(event.detail.successful){window.location='/services'}"
+    hx-confirm="Delete {{.Name}}? This removes the Knative Service.">Delete</button>
+  <span id="fn-detail-delete-flash" class="flash flash-error" role="alert"></span>{{end}}
 </div>
 <div id="invoke-result"></div>
 

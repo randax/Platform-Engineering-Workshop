@@ -143,8 +143,8 @@ func TestTemplatesRender(t *testing.T) {
 				// merged lifecycle: build form + invoke + delete (demo ns only)
 				`hx-post="/services"`,
 				`Build &amp; deploy`,
-				`/services/demo/fn-hello/invoke`, // invoke wakes it server-side
-				`hx-delete="/services/fn-hello"`, // delete offered for demo ns
+				`/services/demo/fn-hello/invoke`,      // invoke wakes it server-side
+				`hx-delete="/services/demo/fn-hello"`, // delete targets the row's own namespace
 			},
 		},
 		"applications": {
@@ -170,17 +170,19 @@ func TestTemplatesRender(t *testing.T) {
 				`ImagePullBackOff`,                     // the pod-trouble cause
 				`hx-post="/applications/api/redeploy"`, // Redeploy lives on the detail now
 				`hx-delete="/applications/api"`,        // delete from the danger zone
+				`polyline`,                             // the monitoring sparkline (Telemetry branch)
+				`api.demo.127.0.0.1.sslip.io`,          // the Ready workload URL
 			},
 		},
 		"function-detail": {
 			data: sampleFnDetail(),
 			want: []string{
-				`Diagnostics`,                    // the "why" (ShowDiag branch)
-				`ImagePullBackOff`,               // the pod-trouble cause
-				`polyline`,                       // the monitoring sparkline (Telemetry branch)
-				`idle · 0 pods`,                  // scale-from-zero
-				`/services/demo/fn-hello/invoke`, // Invoke wakes it server-side
-				`hx-delete="/services/fn-hello"`, // delete (project ns)
+				`Diagnostics`,                         // the "why" (ShowDiag branch)
+				`ImagePullBackOff`,                    // the pod-trouble cause
+				`polyline`,                            // the monitoring sparkline (Telemetry branch)
+				`idle · 0 pods`,                       // scale-from-zero
+				`/services/demo/fn-hello/invoke`,      // Invoke wakes it server-side
+				`hx-delete="/services/demo/fn-hello"`, // delete targets the function's own namespace
 			},
 		},
 		"database-detail": {

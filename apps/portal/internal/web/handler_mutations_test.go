@@ -94,6 +94,69 @@ func TestHandleResizeDatabaseErrorFlash(t *testing.T) {
 	}
 }
 
+// Deleting a function targets the namespace from the URL path, NOT the project
+// cookie. The Functions list is cluster-wide, so a function viewed under project
+// team-a must be deleted from team-a even when the cookie says demo — the bug
+// this guards against silently deleted demo/<name> instead. Assert the k8s
+// DELETE landed on the team-a path despite the cookie.
+func TestHandleDeleteFunctionUsesPathNamespaceNotCookie(t *testing.T) {
+	var deletePath string
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deletePath = r.URL.Path
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		_, _ = w.Write([]byte(`{"items":[]}`)) // the re-list after delete
+	})
+	req := httptest.NewRequest(http.MethodDelete, "/services/team-a/fn-x", nil)
+	req.SetPathValue("namespace", "team-a")
+	req.SetPathValue("name", "fn-x")
+	req.AddCookie(&http.Cookie{Name: "project", Value: "demo"}) // the cookie must NOT win
+	rec := httptest.NewRecorder()
+
+	handleDeleteFunction(srv, rec, req)
+
+	if deletePath == "" {
+		t.Fatal("handler never issued a DELETE to the API")
+	}
+	if !strings.Contains(deletePath, "/namespaces/team-a/") {
+		t.Errorf("DELETE path = %q, want it scoped to the URL namespace team-a, not the cookie's demo", deletePath)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "Deleted fn-x") {
+		t.Errorf("expected the delete flash in the fragment, got:\n%s", body)
+	}
+}
+
+// A failed delete must still be visible: the detail page redirects on any 2xx,
+// so the handler signals failure with the X-Delete-Failed header (the template's
+// hx-on guard reads it to suppress the silent redirect). Success sets no header.
+func TestHandleDeleteFunctionSignalsFailureHeader(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			http.Error(w, `{"message":"forbidden"}`, http.StatusForbidden)
+			return
+		}
+		_, _ = w.Write([]byte(`{"items":[]}`)) // the re-list after delete
+	})
+	req := httptest.NewRequest(http.MethodDelete, "/services/demo/fn-x", nil)
+	req.SetPathValue("namespace", "demo")
+	req.SetPathValue("name", "fn-x")
+	rec := httptest.NewRecorder()
+
+	handleDeleteFunction(srv, rec, req)
+
+	if rec.Header().Get("X-Delete-Failed") != "1" {
+		t.Errorf("expected X-Delete-Failed=1 on a failed delete, got %q", rec.Header().Get("X-Delete-Failed"))
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "Delete failed") {
+		t.Errorf("expected the error flash in the fragment, got:\n%s", body)
+	}
+}
+
 // Creating a project provisions BOTH the namespace and the tenant RoleBinding
 // (two POSTs), sets the active-project cookie, and refreshes.
 func TestHandleCreateProject(t *testing.T) {

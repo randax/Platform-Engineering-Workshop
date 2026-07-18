@@ -32,8 +32,8 @@ func TestFunctionsPageRender(t *testing.T) {
 	for _, want := range []string{
 		"Functions",                                               // heading
 		`hx-post="/services"`, "hello-site", "Build &amp; deploy", // the build form
-		`/services/demo/fn-hello/invoke`, // invoke any listed function
-		`hx-delete="/services/fn-hello"`, // delete offered for the demo function
+		`/services/demo/fn-hello/invoke`,      // invoke any listed function
+		`hx-delete="/services/demo/fn-hello"`, // delete targets the function's own namespace
 	} {
 		if !strings.Contains(h, want) {
 			t.Errorf("functions page missing %q", want)
@@ -41,7 +41,7 @@ func TestFunctionsPageRender(t *testing.T) {
 	}
 	// Delete must NOT be offered for the capstone ksvc in `pipeline` — the
 	// console has no RBAC to remove it, so the button would only 403.
-	if strings.Contains(h, `hx-delete="/services/uploader"`) {
+	if strings.Contains(h, `hx-delete="/services/pipeline/uploader"`) {
 		t.Error("delete must not be offered for non-demo (capstone) functions")
 	}
 
