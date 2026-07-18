@@ -1,0 +1,498 @@
+<title>Console — Ask the agent (prototype)</title>
+<!-- PROTOTYPE — throwaway. Three variants of the "Ask the agent" flow on the
+     demo-app application-detail page, switchable via the floating bar or ←/→.
+     Chrome + CSS lifted from apps/portal/internal/web/static/style.css.
+     Canned scenario: OOMKill crashloop (scenario 2 of issue #127). -->
+<style>
+/* ==== Cloudbox Console style.css (verbatim tokens/components, trimmed to what
+       this page uses) + data-theme overrides for the artifact viewer ==== */
+:root {
+  color-scheme: light dark;
+  --bg: #f6f8fb; --surface: #ffffff; --surface-2: #f2f5f9;
+  --rail-bg: #0d1220; --rail-fg: #e6eaf2; --rail-muted: #8b95a8;
+  --ink: #171e2c; --muted: #5b6472;
+  --line: #e4e8ef; --line-strong: #d3dae4;
+  --accent: #3b6ef6; --accent-hover: #2f5fe0; --accent-fg: #ffffff; --accent-soft: #ecf1fe;
+  --ok: #157f3b; --ok-bg: #e6f6ec; --bad: #c22b2b; --bad-bg: #fdeaea;
+  --warn: #a85906; --warn-bg: #fbf1df; --info: #1d4ed8; --info-bg: #e9effe;
+  --dot-ok: #22c55e; --dot-meh: #f59e0b; --dot-bad: #ef4444; --dot-off: #c3cbd8;
+  --code-bg: #0d1220; --code-fg: #dfe5f0; --code-muted: #7b8598;
+  --r-sm: 7px; --r-md: 11px; --r-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(15,22,41,.05), 0 1px 3px rgba(15,22,41,.04);
+  --shadow-md: 0 2px 6px rgba(15,22,41,.07), 0 10px 26px rgba(15,22,41,.07);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg:#0a0d15; --surface:#131826; --surface-2:#1a2030;
+  --rail-bg:#080b12; --rail-muted:#7a8497;
+  --ink:#e8ecf4; --muted:#9aa4b3; --line:#232a3b; --line-strong:#303850;
+  --accent:#5c86f7; --accent-hover:#729af9; --accent-fg:#0a0d15; --accent-soft:#17203a;
+  --ok:#59d98a; --ok-bg:#0f2419; --bad:#f28585; --bad-bg:#2a1516;
+  --warn:#f4b95a; --warn-bg:#241a0c; --info:#97b6fd; --info-bg:#141d31;
+  --dot-off:#4a5468; --code-bg:#05070c; --code-fg:#d7ddeb;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.5);
+  --shadow-md:0 2px 8px rgba(0,0,0,.5), 0 12px 34px rgba(0,0,0,.4);
+} }
+:root[data-theme="dark"] {
+  --bg:#0a0d15; --surface:#131826; --surface-2:#1a2030;
+  --rail-bg:#080b12; --rail-muted:#7a8497;
+  --ink:#e8ecf4; --muted:#9aa4b3; --line:#232a3b; --line-strong:#303850;
+  --accent:#5c86f7; --accent-hover:#729af9; --accent-fg:#0a0d15; --accent-soft:#17203a;
+  --ok:#59d98a; --ok-bg:#0f2419; --bad:#f28585; --bad-bg:#2a1516;
+  --warn:#f4b95a; --warn-bg:#241a0c; --info:#97b6fd; --info-bg:#141d31;
+  --dot-off:#4a5468; --code-bg:#05070c; --code-fg:#d7ddeb;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.5);
+  --shadow-md:0 2px 8px rgba(0,0,0,.5), 0 12px 34px rgba(0,0,0,.4);
+}
+:root[data-theme="light"] {
+  --bg:#f6f8fb; --surface:#ffffff; --surface-2:#f2f5f9;
+  --rail-bg:#0d1220; --rail-muted:#8b95a8;
+  --ink:#171e2c; --muted:#5b6472; --line:#e4e8ef; --line-strong:#d3dae4;
+  --accent:#3b6ef6; --accent-hover:#2f5fe0; --accent-fg:#ffffff; --accent-soft:#ecf1fe;
+  --ok:#157f3b; --ok-bg:#e6f6ec; --bad:#c22b2b; --bad-bg:#fdeaea;
+  --warn:#a85906; --warn-bg:#fbf1df; --info:#1d4ed8; --info-bg:#e9effe;
+  --dot-off:#c3cbd8; --code-bg:#0d1220; --code-fg:#dfe5f0;
+  --shadow-sm:0 1px 2px rgba(15,22,41,.05), 0 1px 3px rgba(15,22,41,.04);
+  --shadow-md:0 2px 6px rgba(15,22,41,.07), 0 10px 26px rgba(15,22,41,.07);
+}
+* { box-sizing: border-box; }
+body { margin:0; font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color:var(--ink); background:var(--bg); -webkit-font-smoothing:antialiased; }
+a { color: var(--accent); }
+.shell { display:flex; min-height:100vh; }
+.rail { flex:none; width:232px; padding:1.25rem .9rem; background:var(--rail-bg);
+  color:var(--rail-fg); border-right:1px solid color-mix(in srgb, var(--rail-fg) 8%, transparent); }
+.content { flex:1; display:flex; flex-direction:column; min-width:0; }
+.logo { display:flex; align-items:center; gap:.4rem; font-weight:700; font-size:1.02rem;
+  letter-spacing:-.01em; margin-bottom:1.5rem; padding:0 .5rem; }
+.nav-group { margin-bottom:1.15rem; }
+.nav-label { display:block; font-size:.66rem; font-weight:600; text-transform:uppercase;
+  letter-spacing:.1em; color:var(--rail-muted); margin:0 .6rem .4rem; }
+nav a { display:flex; align-items:center; gap:.6rem; color:var(--rail-fg); opacity:.82;
+  text-decoration:none; padding:.36rem .6rem; border-radius:var(--r-sm); font-size:.92rem; }
+nav a:hover { opacity:1; background:color-mix(in srgb, var(--rail-fg) 8%, transparent); }
+nav a[aria-current="page"] { opacity:1; color:#fff;
+  background:color-mix(in srgb, var(--accent) 90%, black 0%); box-shadow:var(--shadow-sm); }
+.nav-locked { display:flex; align-items:center; gap:.6rem; padding:.36rem .6rem;
+  color:var(--rail-muted); opacity:.65; cursor:default; border-radius:var(--r-sm); font-size:.92rem; }
+main { width:100%; max-width:64rem; margin:0 auto; padding:2rem 1.75rem; }
+h1 { margin:.4rem 0; font-size:1.7rem; font-weight:700; letter-spacing:-.02em; }
+h2 { margin:1.75rem 0 .6rem; font-size:1.05rem; font-weight:650; letter-spacing:-.01em; }
+.lede { color:var(--muted); max-width:48rem; }
+.topbar { border-bottom:1px solid var(--line); background:var(--surface); }
+.topbar-inner { display:flex; align-items:center; gap:.6rem; max-width:64rem; margin:0 auto; padding:.5rem 1.75rem; }
+.topbar-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
+.proj-pill { font-weight:600; padding:.22rem .7rem; border:1px solid var(--line-strong);
+  border-radius:var(--r-sm); background:var(--surface-2); font-size:.9rem; }
+.badge { display:inline-block; padding:.12rem .55rem; border-radius:var(--r-pill);
+  font-size:.76rem; font-weight:600; background:var(--surface-2); color:var(--muted); }
+.badge.ok { background:var(--ok-bg); color:var(--ok); }
+.badge.bad { background:var(--bad-bg); color:var(--bad); }
+.badge.meh { background:var(--warn-bg); color:var(--warn); }
+button { font:inherit; font-weight:550; padding:.44rem 1rem; border:none; border-radius:var(--r-sm);
+  background:var(--accent); color:var(--accent-fg); cursor:pointer; }
+button:hover { background:var(--accent-hover); }
+button:focus-visible { outline:none; box-shadow:var(--ring); }
+button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line-strong); }
+button.ghost:hover { background:var(--surface-2); }
+.hint { color:var(--muted); font-size:.8rem; margin:.3rem 0 0; }
+pre.code { background:var(--code-bg); color:var(--code-fg); padding:.85rem 1rem;
+  border-radius:var(--r-md); overflow-x:auto;
+  font:.85rem/1.5 ui-monospace,"SF Mono","Cascadia Code",Menlo,monospace;
+  border:1px solid color-mix(in srgb, #ffffff 6%, var(--code-bg)); }
+.diag { margin:.4rem 0 .8rem; }
+.diag-pods { width:100%; border-collapse:collapse; font-size:.9rem; margin-bottom:.6rem; }
+.diag-pods th { text-align:left; font-weight:600; color:var(--muted); font-size:.72rem;
+  text-transform:uppercase; letter-spacing:.04em; padding:.2rem .6rem .2rem 0; }
+.diag-pods td { padding:.3rem .6rem .3rem 0; border-top:1px solid var(--line); vertical-align:top; }
+.diag-msg { color:var(--muted); font-size:.85rem; word-break:break-word; }
+.diag-hint { color:var(--accent); font-size:.82rem; margin-top:.15rem; }
+.diag-events { list-style:none; padding:0; margin:0; font-size:.88rem; }
+.diag-events li { padding:.25rem 0; border-top:1px solid var(--line); }
+.diag-when { color:var(--muted); font-variant-numeric:tabular-nums; margin-right:.3rem; }
+.diag-obj { color:var(--muted); font-family:ui-monospace,monospace; font-size:.8rem; margin:0 .3rem; }
+footer { text-align:center; color:var(--muted); font-size:.82rem; padding:2.5rem 0 1.25rem; }
+code { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:.88em; }
+
+/* ==== prototype-only styles ==== */
+.pageband { display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; }
+.diag-head { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+
+/* shared: agent identity chip + tool-call rows */
+.agent-chip { display:inline-flex; align-items:center; gap:.4rem; font-size:.76rem; font-weight:600;
+  color:var(--info); background:var(--info-bg); border-radius:var(--r-pill); padding:.12rem .6rem; }
+.toolcall { border-top:1px solid var(--line); font-size:.85rem; }
+.toolcall summary { cursor:pointer; padding:.3rem 0; color:var(--muted); list-style:none; display:flex; gap:.5rem; align-items:baseline; }
+.toolcall summary::-webkit-details-marker { display:none; }
+.toolcall summary::after { content:"▸"; margin-left:auto; color:var(--muted); font-size:.7rem; }
+.toolcall[open] summary::after { content:"▾"; }
+.toolcall code { color:var(--ink); }
+.toolcall pre { margin:.2rem 0 .6rem; padding:.5rem .7rem; background:var(--code-bg); color:var(--code-fg);
+  border-radius:var(--r-sm); font:.76rem/1.5 ui-monospace,Menlo,monospace; overflow-x:auto; white-space:pre-wrap; }
+.tc-obs { color:var(--warn); font-size:.8rem; }
+.thinking { color:var(--muted); font-size:.85rem; font-style:italic; }
+.thinking::after { content:"…"; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity:.3; } }
+@media (prefers-reduced-motion: reduce) { .thinking::after { animation:none; } * { transition:none !important; } }
+
+/* Variant A — verdict card */
+.verdict { background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--info);
+  border-radius:var(--r-md); box-shadow:var(--shadow-sm); padding:1rem 1.2rem; margin:.8rem 0; }
+.verdict h3 { margin:0 0 .3rem; font-size:.95rem; display:flex; align-items:center; gap:.6rem; }
+.verdict .vlabel { font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:650; margin:1rem 0 .25rem; }
+.verify-list { margin:.2rem 0 0; padding-left:1.2rem; font-size:.9rem; }
+.verify-list li { margin:.35rem 0; }
+.verify-list code, .verdict pre { font-size:.8rem; }
+.verdict pre { margin:.3rem 0 0; padding:.55rem .8rem; background:var(--code-bg); color:var(--code-fg);
+  border-radius:var(--r-sm); overflow-x:auto; font-family:ui-monospace,Menlo,monospace; }
+.evidence { border-top:1px dashed var(--line); margin-top:.9rem; padding-top:.5rem; }
+
+/* Variant B — drawer */
+.drawer-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:40; }
+.drawer { position:fixed; top:0; right:0; bottom:0; width:min(460px, 92vw); z-index:41;
+  background:var(--surface); border-left:1px solid var(--line); box-shadow:var(--shadow-md);
+  display:flex; flex-direction:column; }
+.drawer-head { display:flex; align-items:center; gap:.6rem; padding:.8rem 1rem; border-bottom:1px solid var(--line); }
+.drawer-head b { font-size:.95rem; }
+.drawer-x { margin-left:auto; background:none; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; padding:0 .3rem; }
+.drawer-x:hover { color:var(--ink); background:none; }
+.chat { flex:1; overflow-y:auto; padding:1rem; display:flex; flex-direction:column; gap:.7rem; }
+.msg { max-width:92%; border-radius:var(--r-md); padding:.55rem .8rem; font-size:.9rem; }
+.msg.you { align-self:flex-end; background:var(--accent-soft); }
+.msg.agent { align-self:flex-start; background:var(--surface-2); border:1px solid var(--line); }
+.msg.agent.verdictmsg { border-left:3px solid var(--info); background:var(--surface); }
+.msg .toolcall { border-top:none; }
+.msg .toolcall summary { padding:.15rem 0; font-size:.8rem; }
+.chat-tools { align-self:flex-start; width:92%; }
+.drawer-input { display:flex; gap:.5rem; padding:.8rem 1rem; border-top:1px solid var(--line); }
+.drawer-input input { flex:1; font:inherit; color:var(--ink); background:var(--surface);
+  padding:.45rem .6rem; border:1px solid var(--line-strong); border-radius:var(--r-sm); }
+.drawer-input input:focus-visible { outline:none; border-color:var(--accent); box-shadow:var(--ring); }
+.drawer-note { font-size:.75rem; color:var(--muted); padding:0 1rem .7rem; }
+
+/* Variant C — case file */
+.casefile { display:grid; grid-template-columns: 1.25fr .95fr; gap:1rem; margin:.8rem 0; }
+@media (max-width: 860px) { .casefile { grid-template-columns:1fr; } }
+.case-log { background:var(--code-bg); color:var(--code-fg); border-radius:var(--r-md);
+  border:1px solid color-mix(in srgb,#fff 6%, var(--code-bg));
+  font:.8rem/1.6 ui-monospace,"SF Mono",Menlo,monospace; padding:.8rem 1rem;
+  min-height:16rem; max-height:26rem; overflow-y:auto; }
+.case-log .t { color:var(--code-muted); margin-right:.5rem; }
+.case-log .tool { color:#8ab4ff; }
+.case-log .obs { color:#f4b95a; }
+.case-log .verd { color:#59d98a; font-weight:600; }
+.case-log div { margin:.15rem 0; }
+.case-side { display:flex; flex-direction:column; gap:.8rem; }
+.case-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md);
+  box-shadow:var(--shadow-sm); padding:.8rem 1rem; }
+.case-card h4 { margin:0 0 .35rem; font-size:.7rem; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--muted); font-weight:650; }
+.case-card p { margin:.2rem 0; font-size:.9rem; }
+.case-card pre { margin:.35rem 0 0; padding:.5rem .7rem; background:var(--code-bg); color:var(--code-fg);
+  border-radius:var(--r-sm); overflow-x:auto; font:.78rem/1.5 ui-monospace,Menlo,monospace; }
+.case-empty { color:var(--muted); font-style:italic; font-size:.88rem; }
+.case-follow { display:flex; gap:.5rem; margin-top:.6rem; }
+.case-follow input { flex:1; font:inherit; color:var(--ink); background:var(--surface);
+  padding:.45rem .6rem; border:1px solid var(--line-strong); border-radius:var(--r-sm); }
+
+/* contract footnote */
+.contract { margin-top:2.2rem; border-top:1px solid var(--line); padding-top:.8rem; font-size:.9rem; }
+.contract summary { cursor:pointer; color:var(--muted); font-weight:600; }
+.contract table { width:100%; border-collapse:collapse; margin:.6rem 0; font-size:.85rem; }
+.contract td, .contract th { text-align:left; padding:.35rem .6rem .35rem 0; border-top:1px solid var(--line); vertical-align:top; }
+.contract th { color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; }
+
+/* floating variant switcher */
+.protobar { position:fixed; left:50%; transform:translateX(-50%); bottom:1rem; z-index:60;
+  display:flex; align-items:center; gap:.7rem; background:var(--rail-bg); color:var(--rail-fg);
+  border-radius:var(--r-pill); padding:.4rem .6rem; box-shadow:var(--shadow-md);
+  border:1px solid color-mix(in srgb, var(--rail-fg) 15%, transparent); }
+.protobar button { background:none; border:none; color:var(--rail-fg); font-size:1rem; padding:.1rem .5rem; cursor:pointer; }
+.protobar button:hover { background:color-mix(in srgb, var(--rail-fg) 12%, transparent); border-radius:var(--r-pill); }
+.protobar .plabel { font-size:.85rem; font-weight:600; min-width:15rem; text-align:center; }
+.protobar .ptag { font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--rail-muted); }
+.hidden { display:none !important; }
+</style>
+
+<div class="shell">
+<aside class="rail">
+  <span class="logo">⬡ Cloudbox Console</span>
+  <nav>
+    <div class="nav-group"><span class="nav-label">Platform</span>
+      <a href="#">Overview</a>
+      <a href="#">Components</a>
+      <a href="#">Workshop</a>
+    </div>
+    <div class="nav-group"><span class="nav-label">Your project</span>
+      <a href="#" aria-current="page">Applications</a>
+      <a href="#">Databases</a>
+      <a href="#">Buckets</a>
+      <a href="#">Functions</a>
+      <a href="#">Builds</a>
+      <a href="#">Activity</a>
+    </div>
+    <div class="nav-group"><span class="nav-label">Account</span>
+      <a href="#">Access</a>
+      <a href="#">Billing</a>
+    </div>
+  </nav>
+</aside>
+<div class="content">
+<header class="topbar"><div class="topbar-inner">
+  <span class="topbar-label">Project</span><span class="proj-pill">demo ▾</span>
+</div></header>
+<main>
+  <p class="hint"><a href="#">Applications</a> / demo-app</p>
+  <div class="pageband">
+    <h1>demo-app</h1>
+    <span class="badge bad">Degraded</span>
+    <span class="badge ok">Synced</span>
+  </div>
+  <p class="lede">Deployed from <code>cloudbox/demo-app</code> · namespace <code>demo-app</code> · 1 replica wanted, 0 ready</p>
+
+  <section id="diag-section">
+    <div class="diag-head">
+      <h2>Diagnostics <small>— why is this unhealthy?</small></h2>
+      <span id="ask-slot"></span>
+    </div>
+    <div class="diag">
+      <table class="diag-pods">
+        <thead><tr><th>Pod</th><th>Container</th><th>Reason</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>demo-app-7d4bc9f6d-x8k2p</code></td><td><code>app</code></td>
+            <td><span class="badge bad">OOMKilled</span></td>
+            <td class="diag-msg">Last state: terminated (exit 137), 7 restarts in 11m
+              <div class="diag-hint">→ container was killed for exceeding its memory limit — check resources.limits.memory against real usage</div></td>
+          </tr>
+        </tbody>
+      </table>
+      <ul class="diag-events">
+        <li><span class="diag-when">42s</span> <b>BackOff</b><span class="diag-obj">Pod/demo-app-7d4bc9f6d-x8k2p</span><span class="diag-msg">Back-off restarting failed container app in pod demo-app-7d4bc9f6d-x8k2p</span></li>
+        <li><span class="diag-when">3m</span> <b>Unhealthy</b><span class="diag-obj">Pod/demo-app-7d4bc9f6d-x8k2p</span><span class="diag-msg">Readiness probe failed: connection refused</span></li>
+      </ul>
+    </div>
+    <p class="hint">The cause a <code>kubectl describe</code> would show. Your app is fixed on the GitOps plane: edit <code>cloudbox/demo-app</code> and push.</p>
+
+    <!-- variant mount point -->
+    <div id="mount"></div>
+  </section>
+
+  <details class="contract">
+    <summary>Proposed Console → Kagent API contract (all variants)</summary>
+    <table>
+      <tr><th>Piece</th><th>Proposal</th></tr>
+      <tr><td><code>POST /agent/ask</code></td><td>Console → its own backend. Body: <code>{namespace, kind, name, question?}</code>. The portal builds the opening prompt from the resource + its Diagnostics rollup, so the agent starts with the same evidence the panel shows.</td></tr>
+      <tr><td>Portal → Kagent</td><td>First-party Go client against <code>kagent-controller.kagent:8083</code> (A2A). One Kagent session per (resource, browser session); identity via <code>X-User-ID</code>. Portal is the only caller — the authless :8083 stays cluster-internal.</td></tr>
+      <tr><td>Stream to browser</td><td>SSE (htmx <code>sse</code> extension — already server-rendered-friendly). Event types: <code>tool_call</code>, <code>tool_result</code>, <code>message</code>, <code>verdict</code>, <code>done</code>, <code>error</code>.</td></tr>
+      <tr><td>Follow-ups</td><td>Variant A: none (re-ask starts fresh). Variants B/C: <code>POST /agent/ask</code> with the session continues the same Kagent conversation.</td></tr>
+      <tr><td>Guardrail</td><td>Agent is read-only (issue #126). The Console renders fixes as <em>copy-paste git commands</em>, never as an "apply" button.</td></tr>
+    </table>
+  </details>
+</main>
+<footer>your platform, your laptop — JavaZone 2026 · PROTOTYPE (throwaway)</footer>
+</div>
+</div>
+
+<div class="protobar" role="toolbar" aria-label="Prototype variant switcher">
+  <button id="prev" aria-label="Previous variant">←</button>
+  <div><div class="ptag">prototype variant</div><div class="plabel" id="plabel"></div></div>
+  <button id="next" aria-label="Next variant">→</button>
+</div>
+
+<script>
+// ---- canned OOMKill investigation (scenario 2, issue #127) ----
+const STEPS = [
+  {tool:'k8s_get_resources', args:'pods -n demo-app',
+   out:'NAME                        READY  STATUS   RESTARTS      AGE\ndemo-app-7d4bc9f6d-x8k2p    0/1    Running  7 (42s ago)   11m',
+   obs:'7 restarts in 11 minutes — something kills it on a cadence.'},
+  {tool:'k8s_describe_resource', args:'pod demo-app-7d4bc9f6d-x8k2p',
+   out:'Last State:  Terminated\n  Reason:    OOMKilled\n  Exit Code: 137\nLimits:\n  memory: 48Mi\nRequests:\n  memory: 48Mi',
+   obs:'lastState says OOMKilled — and the memory limit is only 48Mi.'},
+  {tool:'k8s_get_pod_logs', args:'demo-app-7d4bc9f6d-x8k2p --previous',
+   out:'2026-07-18T09:41:02Z serving /api/gallery\n2026-07-18T09:41:03Z resizing upload (9.4MB)…\n<log ends abruptly>',
+   obs:'Log ends mid-request — killed while working, not crashing on its own.'},
+  {tool:'k8s_get_events', args:'-n demo-app --field-selector reason=BackOff',
+   out:'42s  Warning  BackOff  Pod/demo-app-7d4bc9f6d-x8k2p  Back-off restarting failed container',
+   obs:'Kubelet restarts it, it OOMs again — a limit problem, not a bug.'},
+];
+const VERDICT = {
+  text:'demo-app is OOMKilled on a ~90s cadence: its memory limit is 48Mi but the app needs well over that when it processes an upload. The limit was lowered to 48Mi by the most recent commit to cloudbox/demo-app ("rightsize demo-app memory"). Reverting that commit should restore a working limit.',
+  verify:[
+    ['The kill reason really is the limit', 'kubectl -n demo-app get pod -o jsonpath=\'{..lastState.terminated.reason}\''],
+    ['The limit really changed in that commit', 'git log -p -1 -- deploy/deployment.yaml'],
+    ['After the fix: restarts stop climbing', 'kubectl -n demo-app get pods -w'],
+  ],
+  fix:'# in your clone of cloudbox/demo-app\ngit revert HEAD        # "rightsize demo-app memory"\ngit push               # ArgoCD reconverges; watch restarts stop'
+};
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const toolHTML = (s, open=false) => `
+  <details class="toolcall"${open?' open':''}>
+    <summary><code>${s.tool}(${esc(s.args)})</code></summary>
+    <pre>${esc(s.out)}</pre>${s.obs?`<div class="tc-obs">↳ ${s.obs}</div>`:''}
+  </details>`;
+const verdictBody = () => `
+  <div class="vlabel">Hypothesis</div>
+  <p style="margin:.1rem 0">${VERDICT.text}</p>
+  <div class="vlabel">Verify before you act — the agent can be confidently wrong</div>
+  <ul class="verify-list">${VERDICT.verify.map(([w,c])=>`<li>${w}:<br><code>${esc(c)}</code></li>`).join('')}</ul>
+  <div class="vlabel">The fix is a git revert (the agent can’t touch your cluster — read-only)</div>
+  <pre>${esc(VERDICT.fix)}</pre>`;
+
+// generic canned streamer: calls render(stepIndexReached, done) progressively
+function stream(onStep, onDone){
+  let i = 0;
+  const tick = () => {
+    if (i < STEPS.length) { onStep(i++); setTimeout(tick, 900); }
+    else onDone();
+  };
+  setTimeout(tick, 700);
+}
+
+const mount = document.getElementById('mount');
+const askSlot = document.getElementById('ask-slot');
+
+// ================= Variant A — Verdict card (single-shot) =================
+function variantA(){
+  askSlot.innerHTML = '<button id="askA">Ask the agent</button>';
+  mount.innerHTML = '';
+  document.getElementById('askA').onclick = () => {
+    const askBtn = document.getElementById('askA');
+    askBtn.disabled = true; askBtn.textContent = 'Agent investigating…';
+    mount.innerHTML = `<div class="verdict"><h3><span class="agent-chip">⬡ k8s-agent</span> Investigating demo-app</h3>
+      <div id="a-tools"></div><div class="thinking" id="a-think">reading the cluster</div></div>`;
+    const tools = document.getElementById('a-tools');
+    stream(i => { tools.insertAdjacentHTML('beforeend', toolHTML(STEPS[i])); },
+      () => {
+        document.getElementById('a-think').remove();
+        mount.querySelector('.verdict h3').innerHTML =
+          '<span class="agent-chip">⬡ k8s-agent</span> Diagnosis <span class="badge meh">hypothesis — verify it</span>';
+        const toolsDone = tools.outerHTML;
+        tools.outerHTML = `${verdictBody()}<div class="evidence"><div class="vlabel">Evidence — ${STEPS.length} read-only tool calls</div>${toolsDone}</div>`;
+        askBtn.disabled = false; askBtn.textContent = 'Ask again';
+      });
+  };
+}
+
+// ================= Variant B — Investigation drawer (chat) =================
+function variantB(){
+  askSlot.innerHTML = '<button id="askB">Ask the agent</button>';
+  mount.innerHTML = '';
+  document.getElementById('askB').onclick = openDrawer;
+  function openDrawer(){
+    mount.innerHTML = `
+      <div class="drawer-backdrop" id="b-back"></div>
+      <div class="drawer" role="dialog" aria-label="Agent investigation">
+        <div class="drawer-head"><span class="agent-chip">⬡ k8s-agent</span><b>demo-app investigation</b>
+          <button class="drawer-x" id="b-x" aria-label="Close">×</button></div>
+        <div class="chat" id="b-chat">
+          <div class="msg you">Why is <b>demo-app</b> degraded?<div class="hint" style="margin-top:.2rem">sent with the Diagnostics rollup attached</div></div>
+        </div>
+        <div class="drawer-note">Read-only agent — it can look, you fix (via git). Verify its answer before acting.</div>
+        <div class="drawer-input"><input id="b-in" placeholder="Follow up — e.g. “what limit should I set?”" disabled>
+          <button id="b-send" disabled>Send</button></div>
+      </div>`;
+    const chat = document.getElementById('b-chat');
+    const close = () => { mount.innerHTML=''; };
+    document.getElementById('b-x').onclick = close;
+    document.getElementById('b-back').onclick = close;
+    chat.insertAdjacentHTML('beforeend','<div class="chat-tools" id="b-tools"></div><div class="thinking" id="b-think">reading the cluster</div>');
+    const tools = document.getElementById('b-tools');
+    stream(i => { tools.insertAdjacentHTML('beforeend', toolHTML(STEPS[i])); chat.scrollTop = chat.scrollHeight; },
+      () => {
+        document.getElementById('b-think').remove();
+        chat.insertAdjacentHTML('beforeend', `<div class="msg agent verdictmsg">${verdictBody()}</div>`);
+        chat.scrollTop = chat.scrollHeight;
+        const inp = document.getElementById('b-in'), send = document.getElementById('b-send');
+        inp.disabled = send.disabled = false; inp.focus();
+        const follow = () => {
+          if (!inp.value.trim()) return;
+          chat.insertAdjacentHTML('beforeend', `<div class="msg you">${esc(inp.value)}</div>`);
+          inp.value=''; chat.scrollTop = chat.scrollHeight;
+          setTimeout(()=> {
+            chat.insertAdjacentHTML('beforeend', `<div class="msg agent">Before the "rightsize" commit the limit was <code>256Mi</code>, and the container's working set peaks around <code>140Mi</code> during an upload. Reverting restores 256Mi — comfortable headroom. If you want to rightsize later, do it from a week of real usage in Grafana, not a guess.</div>`);
+            chat.scrollTop = chat.scrollHeight;
+          }, 1100);
+        };
+        send.onclick = follow;
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') follow(); });
+      });
+  }
+}
+
+// ================= Variant C — Case file (split live investigation) =================
+function variantC(){
+  askSlot.innerHTML = '<button id="askC">Open investigation</button>';
+  mount.innerHTML = '';
+  document.getElementById('askC').onclick = () => {
+    document.getElementById('askC').disabled = true;
+    mount.innerHTML = `
+      <div class="casefile">
+        <div>
+          <div class="case-log" id="c-log"><div><span class="t">09:52:01</span><span class="agent-chip" style="background:transparent;padding:0">⬡ k8s-agent</span> investigating <b>demo-app</b> (read-only)</div></div>
+          <div class="case-follow"><input id="c-in" placeholder="Ask a follow-up…" disabled><button id="c-send" disabled>Ask</button></div>
+        </div>
+        <div class="case-side">
+          <div class="case-card"><h4>Status</h4><p id="c-status"><span class="badge meh">Investigating</span></p></div>
+          <div class="case-card"><h4>Hypothesis</h4><p id="c-hyp" class="case-empty">forming…</p></div>
+          <div class="case-card"><h4>Kill-test — one observation that would falsify it</h4>
+            <div id="c-verify" class="case-empty">waiting for a hypothesis</div></div>
+          <div class="case-card"><h4>Fix (yours to make — via git)</h4><div id="c-fix" class="case-empty">waiting for a verified hypothesis</div></div>
+        </div>
+      </div>`;
+    const log = document.getElementById('c-log');
+    const t0 = ['09:52:03','09:52:05','09:52:08','09:52:10'];
+    stream(i => {
+        const s = STEPS[i];
+        log.insertAdjacentHTML('beforeend',
+          `<div><span class="t">${t0[i]}</span><span class="tool">${s.tool}</span>(${esc(s.args)})</div>`+
+          `<div style="margin-left:1.2rem"><span class="obs">↳ ${s.obs}</span></div>`);
+        log.scrollTop = log.scrollHeight;
+      },
+      () => {
+        log.insertAdjacentHTML('beforeend', `<div><span class="t">09:52:12</span><span class="verd">VERDICT</span> memory limit (48Mi) below real working set — introduced by last commit</div>`);
+        log.scrollTop = log.scrollHeight;
+        document.getElementById('c-status').innerHTML = '<span class="badge bad">Diagnosed — unverified</span>';
+        document.getElementById('c-hyp').outerHTML = `<p id="c-hyp">${VERDICT.text}</p>`;
+        document.getElementById('c-verify').outerHTML = `<div id="c-verify"><p style="font-size:.85rem;margin:0 0 .2rem">If this is <em>wrong</em>, this shows something other than <code>OOMKilled</code>:</p><pre>${esc(VERDICT.verify[0][1])}</pre></div>`;
+        document.getElementById('c-fix').outerHTML = `<div id="c-fix"><pre>${esc(VERDICT.fix)}</pre></div>`;
+        const inp = document.getElementById('c-in'), send = document.getElementById('c-send');
+        inp.disabled = send.disabled = false;
+        const follow = () => {
+          if (!inp.value.trim()) return;
+          log.insertAdjacentHTML('beforeend', `<div><span class="t">09:53:40</span><b>you:</b> ${esc(inp.value)}</div>`);
+          inp.value = ''; log.scrollTop = log.scrollHeight;
+          setTimeout(() => {
+            log.insertAdjacentHTML('beforeend', `<div><span class="t">09:53:42</span><span class="agent-chip" style="background:transparent;padding:0">⬡ k8s-agent</span> previous limit was 256Mi; working set peaks ~140Mi during uploads — the revert restores safe headroom.</div>`);
+            log.scrollTop = log.scrollHeight;
+          }, 1000);
+        };
+        send.onclick = follow;
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') follow(); });
+      });
+  };
+}
+
+// ---- switcher ----
+const VARIANTS = [
+  ['A','Verdict card — one click, one answer', variantA],
+  ['B','Investigation drawer — chat over the page', variantB],
+  ['C','Case file — live log + hypothesis panel', variantC],
+];
+let cur = Math.max(0, VARIANTS.findIndex(v => v[0] === (location.hash.replace('#','') || 'A')));
+function show(i){
+  cur = (i + VARIANTS.length) % VARIANTS.length;
+  const [key,label,fn] = VARIANTS[cur];
+  history.replaceState(null,'','#'+key);
+  document.getElementById('plabel').textContent = `${key} — ${label}`;
+  fn();
+}
+document.getElementById('prev').onclick = () => show(cur-1);
+document.getElementById('next').onclick = () => show(cur+1);
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (e.key === 'ArrowLeft') show(cur-1);
+  if (e.key === 'ArrowRight') show(cur+1);
+});
+show(cur);
+</script>
