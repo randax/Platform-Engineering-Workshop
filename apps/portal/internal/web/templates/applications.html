@@ -137,9 +137,9 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
 {{if .SourceBuilt}}
 <h2>Source <small>deploy-from-source</small></h2>
 <p>Built from <code>{{.Repo}}</code> <small>(branch {{.Branch}})</small>. Change the code, push, then roll it forward:</p>
-<button hx-post="/applications/{{.Name}}/redeploy" hx-swap="none"
-  hx-on::after-request="if(event.detail.successful) setTimeout(function(){location.reload()}, 600)"
+<button hx-post="/applications/{{.Name}}/redeploy" hx-target="#redeploy-flash" hx-swap="innerHTML"
   hx-confirm="Rebuild {{.Name}} from its repo and roll it forward?">Redeploy</button>
+<div id="redeploy-flash"></div>
 {{end}}
 
 <h2>Monitoring <small>last 30 min · the workload</small></h2>

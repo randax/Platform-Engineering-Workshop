@@ -177,11 +177,11 @@ func handleRedeployApplication(s *Server, w http.ResponseWriter, r *http.Request
 	name := r.PathValue("name")
 	ns := s.activeProject(r)
 	fl := redeployApplication(s, r, ns, name)
-	data, err := fetchApplications(r.Context(), s, ns, fl)
-	if err != nil {
-		data = applicationsData{Flash: errorFlash("API error: " + err.Error())}
-	}
-	s.render(w, "app-list", data)
+	// Redeploy lives on the detail page now, so answer with just the flash
+	// (swapped into the detail's #redeploy-flash slot). The rebuild is async and
+	// takes ~1 min, so there is nothing useful to reload immediately — the flash
+	// says to watch the Builds page. No page reload → no timing race.
+	s.render(w, "flash", fl)
 }
 
 func redeployApplication(s *Server, r *http.Request, ns, name string) flash {
