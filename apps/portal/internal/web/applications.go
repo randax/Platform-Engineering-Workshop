@@ -153,6 +153,16 @@ func buildFromRepo(s *Server, r *http.Request, ns, name string, opts kube.AppOpt
 	if branch == "" {
 		branch = "main"
 	}
+	// Defense-in-depth parity with the repo (validated above via GiteaRepoURL):
+	// branch and path flow into the Argo build Workflow (git revision +
+	// workingDir), so validate them after defaulting — the defaults main/"."
+	// pass, hostile whitespace/shell-metachar/traversal values don't.
+	if err := kube.ValidGitBranch(branch); err != nil {
+		return errorFlash("Invalid branch: " + err.Error())
+	}
+	if err := kube.ValidSourcePath(path); err != nil {
+		return errorFlash("Invalid path: " + err.Error())
+	}
 	tag := newBuildTag()
 	if err := s.Kube.CreateAppBuildWorkflow(r.Context(), name, repoURL, branch, path, tag); err != nil {
 		return errorFlash("Couldn't start the build: " + err.Error())

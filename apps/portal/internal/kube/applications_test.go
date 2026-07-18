@@ -159,3 +159,41 @@ func TestBuildApplicationValidation(t *testing.T) {
 		t.Errorf("scale defaults not applied: %s", s)
 	}
 }
+
+// ValidGitBranch guards the branch that becomes the Argo build's git revision:
+// permissive for real branch names, but no whitespace, shell metacharacters or
+// path traversal — parity with the repo's orgRepoRe guard. The default "main"
+// (and the CI rehearsal's branch=main) must pass.
+func TestValidGitBranch(t *testing.T) {
+	for _, ok := range []string{"main", "feature/foo", "release-1.2", "v2.0", "a_b", "topic/sub-topic"} {
+		if err := ValidGitBranch(ok); err != nil {
+			t.Errorf("ValidGitBranch(%q): unexpected rejection: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{
+		"", "..", "../etc", "/abs", "a/", "a b", "a;b", "a$(x)", "-flag",
+		"foo/../bar", ".hidden", "trailing.", "a\tb", "a\nb",
+	} {
+		if err := ValidGitBranch(bad); err == nil {
+			t.Errorf("ValidGitBranch(%q): expected rejection", bad)
+		}
+	}
+}
+
+// ValidSourcePath guards the source subpath that becomes workingDir /src/<path>
+// in the build: a relative subpath only — the default "." and the rehearsal's
+// path=lab/07-ci/app must pass; a leading '/' or any ".." segment is rejected.
+func TestValidSourcePath(t *testing.T) {
+	for _, ok := range []string{".", "sub/dir", "lab/07-ci/app", "svc", "a_b/c-d.e"} {
+		if err := ValidSourcePath(ok); err != nil {
+			t.Errorf("ValidSourcePath(%q): unexpected rejection: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{
+		"", "..", "../etc", "/abs", "foo/../bar", "a b", "a;b", "a$(x)", "sub/..",
+	} {
+		if err := ValidSourcePath(bad); err == nil {
+			t.Errorf("ValidSourcePath(%q): expected rejection", bad)
+		}
+	}
+}
