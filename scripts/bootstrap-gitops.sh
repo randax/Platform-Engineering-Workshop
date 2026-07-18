@@ -110,6 +110,7 @@ kubectl apply --server-side --force-conflicts -n argocd \
   -f "${SCRIPT_DIR}/manifests/argocd-install-${ARGOCD_VERSION}.yaml"
 
 info "Restoring the Application-CRD health check (argocd-cm) so sync waves gate"
+info "  + treating metrics-less HPAs as Healthy (this lab has no metrics-server)"
 kubectl patch configmap argocd-cm -n argocd --type merge --patch-file /dev/stdin <<'EOF'
 data:
   resource.customizations.health.argoproj.io_Application: |
@@ -121,6 +122,26 @@ data:
         hs.status = obj.status.health.status
         if obj.status.health.message ~= nil then
           hs.message = obj.status.health.message
+        end
+      end
+    end
+    return hs
+  # This lab has no metrics-server (observability is VictoriaMetrics/OTel), so
+  # HPAs that key on CPU can't fetch metrics. ArgoCD's default HPA health then
+  # reports Degraded, which cascades to mark the whole owning app Degraded —
+  # e.g. knative-eventing ships broker-ingress/-filter HPAs, so its app flipped
+  # to Degraded over time even though every eventing workload is Running/Ready.
+  # An idle autoscaler is not a broken capability in a single-user lab: report
+  # HPAs Healthy so an unused scaler can't red-flag a working component.
+  resource.customizations.health.autoscaling_HorizontalPodAutoscaler: |
+    hs = {}
+    hs.status = "Healthy"
+    hs.message = ""
+    if obj.status ~= nil and obj.status.conditions ~= nil then
+      for _, c in ipairs(obj.status.conditions) do
+        if c.type == "ScalingActive" and c.status == "False"
+           and c.reason == "FailedGetResourceMetric" then
+          hs.message = "autoscaler idle — no metrics-server in this lab (workloads healthy)"
         end
       end
     end
