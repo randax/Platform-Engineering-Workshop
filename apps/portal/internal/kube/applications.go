@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -200,6 +201,73 @@ func GiteaRepoURL(orgRepo string) (string, error) {
 		return "", fmt.Errorf("repo must be <org>/<repo> in the in-cluster Gitea, got %q", orgRepo)
 	}
 	return giteaBase + "/" + orgRepo + ".git", nil
+}
+
+// The deploy-from-source form carries two more free-text fields besides the
+// repo: the branch (→ the Argo build's git artifact revision) and the source
+// subpath (→ workingDir /src/<path> in the build-and-push WorkflowTemplate).
+// Neither reaches a shell — they land in structured Argo fields — but the repo
+// is validated (orgRepoRe) and these siblings were not, so this closes the
+// input-surface asymmetry: reject whitespace, shell metacharacters and path
+// traversal before the build is submitted. The empty→default (main/".") logic
+// runs in the web layer BEFORE these, so the defaults always validate.
+const maxRefLen = 255
+
+// gitRefRe is the safe character set for a git branch/ref name: alphanumerics
+// plus '.', '_', '-' and '/'. Combined with the reject rules in ValidGitBranch
+// (no leading/trailing '/' or '.', no leading '-', no "..") it stays permissive
+// for real branches (feature/x, release-1.2) while rejecting spaces, shell
+// metacharacters and traversal.
+var gitRefRe = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+
+// srcPathRe is the safe character set for a relative source subpath — the same
+// set as a git ref; ValidSourcePath adds the relative-path rules (no leading
+// '/', no ".." segment).
+var srcPathRe = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+
+// ValidGitBranch checks a git branch/ref used as the Argo build's git revision.
+// The default "main" (applied when the form field is empty) passes.
+func ValidGitBranch(s string) error {
+	switch {
+	case s == "":
+		return fmt.Errorf("branch is empty")
+	case len(s) > maxRefLen:
+		return fmt.Errorf("branch %q is too long", s)
+	case !gitRefRe.MatchString(s):
+		return fmt.Errorf("branch %q may contain only letters, digits, '.', '_', '-' and '/'", s)
+	case strings.HasPrefix(s, "/") || strings.HasSuffix(s, "/"):
+		return fmt.Errorf("branch %q must not start or end with '/'", s)
+	case strings.HasPrefix(s, ".") || strings.HasSuffix(s, "."):
+		return fmt.Errorf("branch %q must not start or end with '.'", s)
+	case strings.HasPrefix(s, "-"):
+		return fmt.Errorf("branch %q must not start with '-'", s)
+	case strings.Contains(s, ".."):
+		return fmt.Errorf("branch %q must not contain '..'", s)
+	}
+	return nil
+}
+
+// ValidSourcePath checks the relative source subpath the build clones into
+// (workingDir /src/<path>). The default "." (applied when the form field is
+// empty) passes; a leading '/' or any ".." segment is rejected so the build
+// can't be pointed outside the cloned repo.
+func ValidSourcePath(s string) error {
+	switch {
+	case s == "":
+		return fmt.Errorf("path is empty")
+	case len(s) > maxRefLen:
+		return fmt.Errorf("path %q is too long", s)
+	case !srcPathRe.MatchString(s):
+		return fmt.Errorf("path %q may contain only letters, digits, '.', '_', '-' and '/'", s)
+	case strings.HasPrefix(s, "/"):
+		return fmt.Errorf("path %q must be relative (no leading '/')", s)
+	}
+	for _, seg := range strings.Split(s, "/") {
+		if seg == ".." {
+			return fmt.Errorf("path %q must not contain a '..' segment", s)
+		}
+	}
+	return nil
 }
 
 // appSourceImage is the built-application image reference. The app- prefix keeps
