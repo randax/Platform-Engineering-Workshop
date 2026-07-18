@@ -63,6 +63,9 @@
           function pump() {
             return reader.read().then(function (r) {
               if (r.done) {
+                // Flush a final frame that arrived without its trailing blank
+                // line (e.g. a proxy dropped it) so its event isn't lost.
+                if (buf.trim() !== "") handleFrame(buf);
                 done();
                 return;
               }

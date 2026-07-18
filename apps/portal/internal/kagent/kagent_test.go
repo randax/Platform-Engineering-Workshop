@@ -6,12 +6,12 @@ package kagent
 // client parses them into the console's event vocabulary.
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
 // happyStream is the SSE an agent emits for a clean OOMKill investigation:
@@ -106,10 +106,18 @@ func TestStreamHappyPath(t *testing.T) {
 	}
 }
 
+// errRoundTripper is a deterministic failing transport — every request errors,
+// so an "unreachable agent" is exercised with no real socket.
+type errRoundTripper struct{}
+
+func (errRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("dial refused (hermetic)")
+}
+
 func TestStreamUnreachable(t *testing.T) {
-	// A base URL that refuses connections → a real, reported failure (the
-	// browser's error state), never a silent empty stream.
-	c := &Client{base: "http://127.0.0.1:1", http: &http.Client{Timeout: time.Second}}
+	// The transport always fails → a real, reported failure (the browser's error
+	// state), never a silent empty stream.
+	c := &Client{base: "http://kagent.invalid", http: &http.Client{Transport: errRoundTripper{}}}
 	called := false
 	err := c.Stream(t.Context(), Request{Prompt: "x"}, func(Event) error { called = true; return nil })
 	if err == nil {

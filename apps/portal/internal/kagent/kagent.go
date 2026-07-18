@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // The built-in k8s troubleshooting agent (research/kagent-current-state §5):
@@ -87,14 +89,23 @@ type Client struct {
 }
 
 // New builds a client against the Kagent controller base URL (injected from
-// config, defaulting to the in-cluster controller Service).
+// config, defaulting to the in-cluster controller Service). The transport is
+// wrapped with otelhttp so each investigation shows up as a client span and
+// propagates trace context, like the other internal clients (see internal/kube).
 func New(baseURL string) *Client {
-	return &Client{
-		base: strings.TrimSuffix(baseURL, "/"),
+	return NewWithHTTPClient(baseURL, &http.Client{
 		// An investigation is a multi-step agent run; give it room, but never
 		// hang a browser forever.
-		http: &http.Client{Timeout: 2 * time.Minute},
-	}
+		Timeout:   2 * time.Minute,
+		Transport: otelhttp.NewTransport(nil),
+	})
+}
+
+// NewWithHTTPClient builds a client with a caller-supplied http.Client — the
+// seam tests use to inject a deterministic (e.g. always-erroring) transport, so
+// no test ever opens a real socket.
+func NewWithHTTPClient(baseURL string, hc *http.Client) *Client {
+	return &Client{base: strings.TrimSuffix(baseURL, "/"), http: hc}
 }
 
 // Stream opens an A2A message/stream against the k8s-agent and calls emit once

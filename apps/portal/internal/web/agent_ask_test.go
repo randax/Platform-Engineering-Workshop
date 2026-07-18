@@ -10,6 +10,7 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -137,11 +138,19 @@ func TestAgentAskHappyPath(t *testing.T) {
 	}
 }
 
+// errRoundTripper is a deterministic failing transport: every request errors, so
+// "controller unreachable" is exercised with no real socket.
+type errRoundTripper struct{}
+
+func (errRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("dial refused (hermetic)")
+}
+
 func TestAgentAskAgentUnreachable(t *testing.T) {
-	// Capability present, but the controller refuses connections → a readable
-	// failure state in the stream (an error event), no verdict.
-	s := serverWithKagent(t, "http://127.0.0.1:1", true)
-	s.Kagent = kagent.New("http://127.0.0.1:1")
+	// Capability present, but the controller is unreachable → a readable failure
+	// state in the stream (an error event), no verdict.
+	s := serverWithKagent(t, "http://unused.invalid", true)
+	s.Kagent = kagent.NewWithHTTPClient("http://kagent.invalid", &http.Client{Transport: errRoundTripper{}})
 
 	rec := httptest.NewRecorder()
 	HandleAgentAsk(s, rec, askRequest(t))
@@ -293,6 +302,40 @@ func TestAgentAskRejectsBadInput(t *testing.T) {
 	}
 	if *calls != 0 {
 		t.Errorf("rejected inputs must never reach the agent, got %d calls", *calls)
+	}
+}
+
+func TestAgentAskBoundsRequestBody(t *testing.T) {
+	// The ask body is capped, and the free-text question is length-limited on
+	// top; both violations are rejected before any upstream call.
+	ts, calls, _ := fakeKagent(t, investigationSSE)
+	s := serverWithKagent(t, ts.URL, true)
+
+	post := func(raw []byte) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/agent/ask", bytes.NewReader(raw))
+		rec := httptest.NewRecorder()
+		HandleAgentAsk(s, rec, req)
+		return rec
+	}
+
+	// A body far over the cap → 413 (MaxBytesReader convention).
+	over := append([]byte(`{"namespace":"demo-app","kind":"Application","name":"demo-app","question":"`),
+		append(bytes.Repeat([]byte("a"), 8<<10), []byte(`"}`)...)...)
+	if rec := post(over); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("oversized body: status = %d, want 413", rec.Code)
+	}
+
+	// A question over the length cap but under the byte cap → 400.
+	body, _ := json.Marshal(map[string]string{
+		"namespace": "demo-app", "kind": "Application", "name": "demo-app",
+		"question": strings.Repeat("q", 2000),
+	})
+	if rec := post(body); rec.Code != http.StatusBadRequest {
+		t.Errorf("over-long question: status = %d, want 400", rec.Code)
+	}
+
+	if *calls != 0 {
+		t.Errorf("bounded-body rejections must never reach the agent, got %d calls", *calls)
 	}
 }
 

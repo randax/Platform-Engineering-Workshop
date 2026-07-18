@@ -24,6 +24,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -33,6 +34,13 @@ import (
 
 	"cloudbox.io/portal/internal/kagent"
 	"cloudbox.io/portal/internal/kube"
+)
+
+// The ask body is four short strings, so it is bounded tightly: the whole
+// request is capped, and the free-text question is length-limited on top.
+const (
+	maxAskBytes    = 4 << 10 // 4 KiB — generous for {namespace, kind, name, question}
+	maxQuestionLen = 1000    // characters of free-text question
 )
 
 // allowedKinds is the whitelist of resource kinds the Case file may investigate.
@@ -61,17 +69,28 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		Name      string `json:"name"`
 		Question  string `json:"question"`
 	}
+	// Bound the request: this body is four short strings, never a payload — cap it
+	// so a malicious or runaway client can't stream unbounded data into the JSON
+	// decoder (prior art: gallery.go's proxied uploads).
+	r.Body = http.MaxBytesReader(w, r.Body, maxAskBytes)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 	// Validate every input that feeds the LLM prompt. Namespace and name must be
 	// DNS-1123 labels (kube.ValidName also bounds their length); kind must be one
-	// the Case file actually investigates. Reject before composing any prompt.
+	// the Case file actually investigates; the free-text question is length-capped.
+	// Reject before composing any prompt.
 	if body.Kind == "" {
 		body.Kind = "Application"
 	}
-	if !kube.ValidName(body.Namespace) || !kube.ValidName(body.Name) || !allowedKinds[body.Kind] {
+	if !kube.ValidName(body.Namespace) || !kube.ValidName(body.Name) ||
+		!allowedKinds[body.Kind] || len(body.Question) > maxQuestionLen {
 		http.Error(w, "invalid resource", http.StatusBadRequest)
 		return
 	}
