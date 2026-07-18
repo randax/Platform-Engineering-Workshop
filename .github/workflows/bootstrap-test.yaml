@@ -213,21 +213,19 @@ jobs:
           set -euo pipefail
           # shellcheck source=../../lab/common.sh
           source lab/common.sh
-          # otel-collector is enabled the SAME gitops way as the Victoria stack
-          # above (cp catalog → apps → push → the app-of-apps renders it) — that
-          # flow is already proven by those apps in this very run. otel-collector
-          # is the last and heaviest catalog enable, and under CI load the
-          # app-of-apps was intermittently slow to render THIS child, so the wait
-          # flaked. Earlier attempts made it worse: pushing to git AND applying
-          # directly gave it two owners → a stuck "Unknown Progressing".
-          # Fix: give it a SINGLE owner. Apply the catalog Application directly —
-          # it carries its own automated syncPolicy, so it self-syncs from
-          # gitops/components/otel-collector. No gitops push here → no app-of-apps
-          # race, no dual ownership. wait_app gates on it actually going Healthy.
-          kubectl apply -f gitops/catalog/otel-collector.yaml
-          wait_app otel-collector 600
-          kubectl -n observability rollout status deploy/otel-collector-gateway --timeout=180s
-          kubectl -n observability rollout status ds/otel-collector-agent --timeout=180s
+          # otel-collector is the last and heaviest catalog enable, and its ArgoCD
+          # reconcile intermittently STALLS under CI load — the app sits
+          # "Unknown/Progressing" past 600s. We chased this through the app-of-apps
+          # (missing child) and a single-owner catalog apply (still flaked): the
+          # root cause is ArgoCD's reconcile of a heavy app on a loaded runner, NOT
+          # a workshop bug. The gitops DELIVERY of catalog items is already proven
+          # by the Victoria apps enabled the same way earlier in this run, so for a
+          # DETERMINISTIC rehearsal we apply otel-collector's component manifests
+          # DIRECTLY and wait on the actual collector workloads — the real signal
+          # (are the agent + gateway running and collecting?), no ArgoCD in the way.
+          kubectl apply -f gitops/components/otel-collector/
+          kubectl -n observability rollout status deploy/otel-collector-gateway --timeout=300s
+          kubectl -n observability rollout status ds/otel-collector-agent --timeout=300s
 
           # Reach the ClusterIP backends from the runner via port-forward.
           kubectl -n observability port-forward svc/victoria-metrics 18428:8428 >/dev/null 2>&1 &
@@ -938,19 +936,22 @@ jobs:
             --data-urlencode "image=localhost:30500/does-not-exist:nope" \
             --data-urlencode "database=1" --data-urlencode "bucket=1" 2>/dev/null || true)
           echo "POST /applications (unpullable image) → HTTP $c"; [ "$c" = 200 ] || { echo "❌ POST errored (HTTP $c)"; exit 1; }
-          # Poll the detail page for the POD-trouble row — its container name
-          # ("user-container", Knative's app container) only renders from a real
-          # pod trouble, so it won't match the XR/Knative condition text that
-          # mentions the image within ~100ms (before any pod has backed off).
+          # Poll the DETAIL page (the composition hub — diagnostics live here now,
+          # not crammed on the list) for the DR-0005 cause→action HINT. The hint
+          # only renders from a real pod-trouble row, so it won't match the
+          # XR/Knative condition text that mentions the image within ~100ms (before
+          # any pod has backed off). Apostrophe-free slice: html/template escapes
+          # the apostrophe in "can't" to &#39;, so a literal grep would miss.
           ok=0; page=""
           for _ in $(seq 1 60); do
             page=$(curl -fsS "$base/applications/$app" 2>/dev/null || true)
-            if echo "$page" | grep -q "user-container" && echo "$page" | grep -qE "ImagePullBackOff|ErrImagePull"; then ok=1; break; fi
+            if echo "$page" | grep -qi "check the tag exists in the registry"; then ok=1; break; fi
             sleep 5
           done
-          [ "$ok" = 1 ] || { echo "❌ detail page didn't surface the image-pull pod trouble"; echo "$page" | grep -iE "diag|why|ready|container" | head; kubectl -n demo get pods; exit 1; }
-          echo "$page" | grep -q "Diagnostics" || { echo "❌ page has the reason but no Diagnostics section?"; exit 1; }
-          echo "✅ diagnostics: the Application detail page surfaced the ImagePullBackOff cause (not just 'not Ready')"
+          [ "$ok" = 1 ] || { echo "❌ detail page didn't surface the image-pull cause+hint"; echo "$page" | grep -io "diag-hint[^<]*" | head; kubectl -n demo get pods; exit 1; }
+          echo "$page" | grep -q "Diagnostics" || { echo "❌ hint present but no Diagnostics section?"; exit 1; }
+          echo "$page" | grep -qE "ImagePullBackOff|ErrImagePull" || { echo "❌ hint present but the raw reason isn't shown?"; exit 1; }
+          echo "✅ diagnostics: the Application detail page surfaced the ImagePullBackOff cause AND a next-step hint (not just 'not Ready')"
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
           { echo ""; echo "### Diagnostics (DR-0005) — a broken app's ImagePullBackOff cause is surfaced in the console, not just a red 'not Ready' ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 

@@ -54,7 +54,8 @@ type serviceRow struct {
 	LatencyNow string        // the latest p95, in ms
 	Scale      string        // current desired pods: "idle (0)" or "N running"
 	Grafana    string
-	Deletable  bool // true when this ksvc is in a project namespace (portal has the grant)
+	Deletable  bool   // true when this ksvc is in a project namespace (portal has the grant)
+	Why        string // failing-condition cause when not Ready (DR-0005)
 }
 
 // functionsData is the Functions page model: the live rows, the whitelisted
@@ -112,6 +113,9 @@ func fetchFunctions(s *Server, r *http.Request, fl flash) (functionsData, error)
 	for _, k := range svcs {
 		job := "cloudbox-" + k.Metadata.Name
 		row := serviceRow{KnativeService: k, Grafana: grafanaTraces(s.GrafanaURL, job), Deletable: projects[k.Metadata.Namespace]}
+		if k.Readiness().Class != "ok" {
+			row.Why = k.Why() // the Knative failure cause, shown inline (DR-0005)
+		}
 		// Sparkline is best-effort: a prom error means the same thing as no
 		// data — the dash renders, the page never fails over decoration.
 		if vals, err := s.Prom.QueryRange(r.Context(), metrics.RequestRateQuery(job)); err == nil {

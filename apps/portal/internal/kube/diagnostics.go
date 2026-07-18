@@ -20,6 +20,27 @@ type PodTrouble struct {
 	Message   string
 }
 
+// Hint maps a container-failure reason to a plain-language likely cause and the
+// next step — the opinionated "what do I do about it" line (DR-0005 slice 2).
+// "" for reasons we have nothing useful to add to (the reason + message already
+// speak for themselves).
+func (t PodTrouble) Hint() string {
+	switch t.Reason {
+	case "ImagePullBackOff", "ErrImagePull", "ErrImageNeverPull", "InvalidImageName":
+		return "The image can't be pulled — check the tag exists in the registry. For a source-built app, Redeploy once the build has pushed."
+	case "CrashLoopBackOff":
+		return "The container starts then exits — read its logs. Usually a bad config or a missing dependency (DATABASE_URL, a bucket) it needs at boot."
+	case "CreateContainerConfigError":
+		return "A referenced Secret or ConfigMap isn't there yet — the workload started before its dependency composed. Give it a moment, or check the name."
+	case "OOMKilled":
+		return "The container ran out of memory and was killed — raise its memory limit."
+	case "RunContainerError", "StartError", "CreateContainerError":
+		return "The container couldn't start — check the command/entrypoint and the logs."
+	default:
+		return ""
+	}
+}
+
 // Diagnostics is the read-only "why" for a namespace: the pods that aren't
 // happy and the recent Warning events. Empty means "nothing obviously wrong"
 // (the workloads may still be starting).
