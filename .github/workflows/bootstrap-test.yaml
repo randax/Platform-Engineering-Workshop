@@ -208,6 +208,43 @@ jobs:
             echo "VictoriaMetrics + VictoriaLogs + VictoriaTraces + Grafana enabled from the catalog and reached Ready. ✅"
           } >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Free memory before the OTel collector (CI-only runner headroom)
+        run: |
+          set -uo pipefail
+          # The OTel collector is the last and heaviest enable; on the 4-CPU/16GB
+          # runner it intermittently starves the node — the control plane restarts
+          # and the whole observability namespace gets evicted (diagnosed in run
+          # 29648053386). The Victoria stack is already deployed (previous step) and
+          # the collector below is applied with kubectl (no ArgoCD in its path), so
+          # ArgoCD's reconcile loop is idle for the duration of the collector
+          # rollout. Park it to give the collector headroom, then restore it right
+          # after (the next step) — the console verify steps further down deploy
+          # golden-path Applications via GitOps and need it back. CI-only:
+          # attendees on their own machines never hit this. Keep argocd-server +
+          # redis UP — the portal's read-only API backs the Components pages the
+          # traces/panel checks below exercise. Do NOT touch argo-workflows or zot:
+          # a later step ("Verify Functions page") builds via Argo Workflows and
+          # pushes to zot.
+          echo "runner memory before: $(free -m | awk '/^Mem:/{print $7}') MiB available"
+
+          # argocd-application-controller (~1.1GiB) is the single biggest lever and
+          # pure reconcile — the whole win is here. Workloads keep running when it
+          # stops (ArgoCD never deletes on scale-down); the Application CRs stay
+          # readable for the portal.
+          kubectl -n argocd scale statefulset argocd-application-controller --replicas=0 2>/dev/null || true
+          for d in argocd-repo-server argocd-applicationset-controller argocd-notifications-controller argocd-dex-server; do
+            kubectl -n argocd scale deploy "$d" --replicas=0 2>/dev/null || true
+          done
+          # Reap finished workflow/job pods that still hold scheduler/memory records.
+          kubectl delete pods --all-namespaces --field-selector=status.phase=Succeeded 2>/dev/null || true
+
+          # Wait for the big controller pod to actually terminate so the kubelet
+          # reclaims the memory before the collector rolls out.
+          kubectl -n argocd wait --for=delete pod \
+            -l app.kubernetes.io/name=argocd-application-controller --timeout=90s 2>/dev/null || true
+          sleep 10
+          echo "runner memory after:  $(free -m | awk '/^Mem:/{print $7}') MiB available"
+
       - name: Verify observability v2 collection (OTel Collector → VM/VLogs/VTraces, #57)
         run: |
           set -euo pipefail
@@ -521,6 +558,22 @@ jobs:
             echo "### Observability v2 — full collection (#57, lgtm-free)"
             echo "OTel Collector (agent DaemonSet + gateway Deployment) enabled; **component** metrics landed in VictoriaMetrics (\`k8s_*\` = ${metrics} series), **component** logs (kube-system) in VictoriaLogs, and **app traces** (cloudbox-portal) in VictoriaTraces. otel-lgtm is gone; the Victoria stack is the whole observability capability. ✅"
           } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Restore ArgoCD after observability (later steps deploy via GitOps)
+        run: |
+          set -uo pipefail
+          # The memory-relief step parked ArgoCD's reconcile loop only for the
+          # collector rollout. Bring it back now: every console verify step below
+          # (Applications #28, deploy-from-source, scaffold, iterate loop) deploys
+          # a golden-path Application through GitOps → ArgoCD → Crossplane, so the
+          # controller must be running again or the composed ksvc never appears.
+          kubectl -n argocd scale statefulset argocd-application-controller --replicas=1 2>/dev/null || true
+          for d in argocd-repo-server argocd-applicationset-controller argocd-notifications-controller argocd-dex-server; do
+            kubectl -n argocd scale deploy "$d" --replicas=1 2>/dev/null || true
+          done
+          kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=180s || true
+          kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=120s || true
+          echo "ArgoCD reconcile loop restored"
 
       - name: Verify Functions page — build source → deploy → invoke → delete (#58)
         run: |
