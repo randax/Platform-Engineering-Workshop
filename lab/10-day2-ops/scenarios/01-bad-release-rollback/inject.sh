@@ -50,6 +50,18 @@ if grep -Fq -- "$POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
   exit 1
 fi
 
+# Cheap guard: the seed step above asks the attendee to wait for ArgoCD before
+# re-running, but nothing enforced that wait — a fault landing on top of a
+# demo-web that isn't Ready yet would be indistinguishable from "ArgoCD just
+# hasn't synced yet". Refuse until at least one replica is ready.
+READY="$(kubectl -n demo get deploy demo-web -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+if [ -z "$READY" ] || [ "$READY" -eq 0 ]; then
+  echo "FAIL: deploy/demo-web in namespace demo has no ready replicas yet." >&2
+  echo "Wait for ArgoCD to converge, then re-run ./inject.sh 1:" >&2
+  echo "  kubectl -n demo rollout status deploy/demo-web" >&2
+  exit 1
+fi
+
 MUTATED="$TMP_PARENT/demo-web.yaml"
 if ! awk -v poison="$POISON_VALUE" -v target="$CONTAINER_NAME" '
   function indent_of(s, t) {
