@@ -139,7 +139,7 @@ spec:
       # tearing whole namespaces (pipeline/portal/knative-eventing) out from
       # under a running lab. The child apps keep their own prune:true, so
       # in-app GitOps pruning is unaffected; only file-level removal from
-      # gitops/apps/ now needs a manual `kubectl delete application`.
+      # gitops/apps/ now needs a manual "kubectl delete application".
       prune: false
       selfHeal: true
     retry:
