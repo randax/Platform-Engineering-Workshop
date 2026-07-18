@@ -36,11 +36,17 @@ func TestScaffoldRepoValidation(t *testing.T) {
 
 func TestGiteaConfigured(t *testing.T) {
 	t.Setenv("GITEA_USER", "")
+	t.Setenv("GITEA_PASSWORD", "")
 	if GiteaConfigured() {
-		t.Error("GiteaConfigured() = true with GITEA_USER unset")
+		t.Error("GiteaConfigured() = true with no creds")
 	}
+	// User without a password is NOT configured — it would 401 at scaffold time.
 	t.Setenv("GITEA_USER", "gitea_admin")
+	if GiteaConfigured() {
+		t.Error("GiteaConfigured() = true with GITEA_USER set but GITEA_PASSWORD empty")
+	}
+	t.Setenv("GITEA_PASSWORD", "secret")
 	if !GiteaConfigured() {
-		t.Error("GiteaConfigured() = false with GITEA_USER set")
+		t.Error("GiteaConfigured() = false with both creds set")
 	}
 }
