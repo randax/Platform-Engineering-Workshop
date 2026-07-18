@@ -947,8 +947,10 @@ jobs:
           done
           [ "$ok" = 1 ] || { echo "❌ console didn't surface the image-pull cause on /applications"; echo "$page" | grep -iE "diagnostic|why|ready|badge" | head; kubectl -n demo get pods; exit 1; }
           echo "$page" | grep -q "Diagnostics" || { echo "❌ page has the reason but no Diagnostics section?"; exit 1; }
-          # DR-0005 slice 2: the cause→action hint must render, not just the raw reason.
-          echo "$page" | grep -qi "image can't be pulled" || { echo "❌ no cause→action hint for the image-pull failure"; exit 1; }
+          # DR-0005 slice 2: the cause→action hint must render, not just the raw
+          # reason. Match an apostrophe-free slice of the hint — html/template
+          # escapes the apostrophe in "can't" to &#39;, so a literal grep misses.
+          echo "$page" | grep -qi "check the tag exists in the registry" || { echo "❌ no cause→action hint for the image-pull failure"; echo "$page" | grep -io "diag-hint[^<]*" | head; exit 1; }
           echo "✅ diagnostics: the console surfaced the ImagePullBackOff cause AND a next-step hint (not just 'not Ready')"
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
           { echo ""; echo "### Diagnostics (DR-0005) — a broken app's ImagePullBackOff cause is surfaced in the console, not just a red 'not Ready' ✅"; } >> "${GITHUB_STEP_SUMMARY}"
