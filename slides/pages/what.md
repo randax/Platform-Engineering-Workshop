@@ -64,16 +64,17 @@ Now the punchline that sets up the table: Kubernetes is a control plane. Operato
 # The core primitives are all open source
 
 <div class="compare">
-
-| Cloud primitive | What you'd rent | What you'll run today |
-|---|---|---|
-| Kubernetes / compute | EKS · AKS · GKE | Talos + Cilium |
-| GitOps delivery | *the mechanic itself* | Gitea + ArgoCD |
-| Managed Postgres | RDS · Cloud SQL · Azure DB | CloudNativePG |
-| Object storage (S3) | S3 · GCS · Blob | RustFS |
-| Self-service infra | Service Catalog · CloudFormation | Crossplane |
-| Observability | CloudWatch · Cloud Ops | Grafana + OpenTelemetry |
-
+<table>
+<thead><tr><th>Cloud primitive</th><th>What you'd rent</th><th>What you'll run today</th></tr></thead>
+<tbody>
+<tr><td>Kubernetes / compute</td><td><Logo name="aws" dim/> <Logo name="azure" dim/> <Logo name="gcp" dim/></td><td><Logo name="talos" label/> <Logo name="cilium" label/></td></tr>
+<tr><td>GitOps delivery</td><td><em>the mechanic itself</em></td><td><Logo name="gitea" label/> <Logo name="argocd" label/></td></tr>
+<tr><td>Managed Postgres</td><td>RDS · Cloud SQL · Azure DB</td><td><Logo name="cloudnativepg" label/></td></tr>
+<tr><td>Object storage (S3)</td><td>S3 · GCS · Blob</td><td><Logo name="rustfs" text="RustFS"/></td></tr>
+<tr><td>Self-service infra</td><td>Service Catalog · CloudFormation</td><td><Logo name="crossplane" label/></td></tr>
+<tr><td>Observability</td><td>CloudWatch · Cloud Ops</td><td><Logo name="grafana" label/> <Logo name="opentelemetry" label/></td></tr>
+</tbody>
+</table>
 </div>
 
 <div class="story mt-3"><span class="tag">BRUKTBY</span> &nbsp;The left column is everything Bruktby rented. The right column is what you'll run for them today — same primitive, minus the bill and the account.</div>
@@ -95,15 +96,16 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 # ...and so is everything above it
 
 <div class="compare">
-
-| Cloud primitive | What you'd rent | What you'll run today |
-|---|---|---|
-| Serverless | Lambda · Cloud Run · Functions | Knative |
-| Messaging / queues | SQS · SNS · Pub/Sub · EventBridge | NATS JetStream |
-| CI / image builds | CodeBuild · Cloud Build | Argo Workflows + BuildKit |
-| Container registry | ECR · Artifact Registry · ACR | Zot |
-| Cloud console | AWS/Azure/GCP Console | Cloudbox Console |
-
+<table>
+<thead><tr><th>Cloud primitive</th><th>What you'd rent</th><th>What you'll run today</th></tr></thead>
+<tbody>
+<tr><td>Serverless</td><td>Lambda · Cloud Run · Functions</td><td><Logo name="knative" label/></td></tr>
+<tr><td>Messaging / queues</td><td>SQS · SNS · Pub/Sub · EventBridge</td><td><Logo name="nats" label="NATS JetStream"/></td></tr>
+<tr><td>CI / image builds</td><td>CodeBuild · Cloud Build</td><td><Logo name="argo-workflows" label="Argo Workflows"/> <Logo name="buildkit" label/></td></tr>
+<tr><td>Container registry</td><td>ECR · Artifact Registry · ACR</td><td><Logo name="zot" text="Zot"/></td></tr>
+<tr><td>Cloud console</td><td><Logo name="aws" dim/> <Logo name="azure" dim/> <Logo name="gcp" dim/></td><td><Logo name="cloudbox" text="Cloudbox"/></td></tr>
+</tbody>
+</table>
 </div>
 
 <div class="mt-4 text-sm opacity-70">The stretch tier — same idea, all the way up the stack.</div>
