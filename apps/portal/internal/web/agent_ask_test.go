@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -398,7 +399,7 @@ func TestBuildInvestigationPrompt(t *testing.T) {
 		Message: "terminated (exit 137)",
 	}}}
 	p := buildInvestigationPrompt("Application", "demo-app", "demo-app",
-		"composed Deployment is not Available", diag, "")
+		"composed Deployment is not Available", diag)
 	for _, want := range []string{
 		"Application", "demo-app", // the resource identity
 		"composed Deployment is not Available", // the condition (why)
@@ -412,6 +413,80 @@ func TestBuildInvestigationPrompt(t *testing.T) {
 	}
 }
 
+func TestAgentAskFollowupReusesSession(t *testing.T) {
+	// A follow-up (a question on the same resource + browser session) must
+	// continue the SAME Kagent session — not open a fresh one — and send just the
+	// question, since the session already holds the opening context.
+	var bodies []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(b))
+		w.Header().Set("Content-Type", "text/event-stream")
+		io.WriteString(w, investigationSSE)
+	}))
+	defer ts.Close()
+	s := serverWithKagent(t, ts.URL, true)
+
+	uid := strings.Repeat("a", 32) // a valid, stable browser identity
+	call := func(question string) {
+		p := map[string]string{"namespace": "demo-app", "kind": "Application", "name": "demo-app"}
+		if question != "" {
+			p["question"] = question
+		}
+		b, _ := json.Marshal(p)
+		req := httptest.NewRequest(http.MethodPost, "/agent/ask", bytes.NewReader(b))
+		req.AddCookie(&http.Cookie{Name: "cbx_uid", Value: uid})
+		HandleAgentAsk(s, httptest.NewRecorder(), req)
+	}
+	call("")                             // the initial investigation
+	call("why was the limit only 48Mi?") // a follow-up on the same resource
+
+	if len(bodies) != 2 {
+		t.Fatalf("want 2 upstream calls, got %d", len(bodies))
+	}
+	// Both A2A requests carry the SAME session id (uid:ns:kind:name) — the
+	// follow-up continues the conversation rather than starting fresh.
+	sess := uid + ":demo-app:Application:demo-app"
+	for i, b := range bodies {
+		if !strings.Contains(b, sess) {
+			t.Errorf("call %d must reuse session %q:\n%s", i, sess, b)
+		}
+	}
+	// The follow-up sends the question and does NOT re-send the opening prompt.
+	if !strings.Contains(bodies[1], "why was the limit only 48Mi?") {
+		t.Errorf("follow-up must carry the question:\n%s", bodies[1])
+	}
+	if strings.Contains(bodies[1], "You are a read-only Kubernetes troubleshooting agent") {
+		t.Errorf("follow-up must not re-send the opening prompt:\n%s", bodies[1])
+	}
+	// ...but the initial call does send the opening prompt.
+	if !strings.Contains(bodies[0], "You are a read-only Kubernetes troubleshooting agent") {
+		t.Errorf("the initial call should send the opening prompt:\n%s", bodies[0])
+	}
+}
+
+func TestAgentAskFollowupErrorPath(t *testing.T) {
+	// A follow-up whose agent is unreachable must surface an error event (which
+	// the browser streams into the log and re-enables the input), never a silent
+	// hang or a fresh verdict.
+	s := serverWithKagent(t, "http://unused.invalid", true)
+	s.Kagent = kagent.NewWithHTTPClient("http://kagent.invalid", &http.Client{Transport: errRoundTripper{}})
+
+	body, _ := json.Marshal(map[string]string{
+		"namespace": "demo", "kind": "Application", "name": "demo", "question": "why was it 48Mi?",
+	})
+	rec := httptest.NewRecorder()
+	HandleAgentAsk(s, rec, httptest.NewRequest(http.MethodPost, "/agent/ask", bytes.NewReader(body)))
+
+	b := rec.Body.String()
+	if !strings.Contains(b, "event: error") {
+		t.Errorf("a failed follow-up must surface an error event:\n%s", b)
+	}
+	if strings.Contains(b, "event: verdict") {
+		t.Errorf("a failed follow-up must not render a verdict:\n%s", b)
+	}
+}
+
 // TestCaseFileView pins the application-detail affordance: the investigation
 // mount when the capability is available, and the locked affordance (with the
 // unlock hint, and NO mount that could trigger a backend call) when it isn't.
@@ -421,17 +496,17 @@ func TestCaseFileView(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 	base := sampleAppDetail() // an unhealthy, source-built app
-	base.ShowCaseFile = true
 
-	// Available: the split-view investigation mount + Open investigation button.
+	// Available: the split-view investigation mount + Open investigation button
+	// + the follow-up input (#140).
 	avail := base
-	avail.AgentAvailable = true
+	avail.CaseFile = caseFile{Show: true, Available: true, Namespace: "demo", Name: "api"}
 	var on bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&on, "application-detail", avail); err != nil {
 		t.Fatalf("render available: %v", err)
 	}
 	h := on.String()
-	for _, want := range []string{"Case file", `id="case-file"`, "Open investigation", "Kill-test"} {
+	for _, want := range []string{"Case file", `id="case-file"`, "Open investigation", "Kill-test", `id="cf-followup"`} {
 		if !strings.Contains(h, want) {
 			t.Errorf("available Case file missing %q", want)
 		}
@@ -439,7 +514,7 @@ func TestCaseFileView(t *testing.T) {
 
 	// Absent: the locked affordance with an unlock hint, and no mount.
 	locked := base
-	locked.AgentAvailable = false
+	locked.CaseFile = caseFile{Show: true, Available: false, Namespace: "demo", Name: "api"}
 	var off bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&off, "application-detail", locked); err != nil {
 		t.Fatalf("render locked: %v", err)

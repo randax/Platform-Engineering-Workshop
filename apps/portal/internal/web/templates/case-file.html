@@ -1,3 +1,42 @@
+{{/* The Case file affordance (module 10) — the SHARED mount every surface that
+     shows an unhealthy resource reuses (Application detail, demo component
+     detail), so there is one copy of this markup. Takes a caseFile view-model
+     (.Show / .Available / .Namespace / .Name). Kind is always "Application" (the
+     only kind /agent/ask accepts). When the capability is absent it renders the
+     locked affordance with the unlock hint — no mount, so nothing can reach the
+     backend. The follow-up form (#cf-followup, disabled until a verdict arrives)
+     continues the same Kagent session; case-file.js drives it. */}}
+{{define "case-file"}}
+{{if .Show}}
+<h2>Case file <small>— investigate with the agent</small></h2>
+{{if .Available}}
+<div id="case-file" class="casefile-mount" data-namespace="{{.Namespace}}" data-kind="Application" data-name="{{.Name}}">
+  <p class="hint">A read-only in-cluster agent reads the cluster and streams its investigation live. You apply the fix via git — it can't touch your cluster.</p>
+  <button id="cf-open" type="button">Open investigation</button>
+  <div class="casefile" id="cf-body" hidden>
+    <div><div class="case-log" id="cf-log"></div></div>
+    <div class="case-side" id="cf-panel">
+      <div class="case-card"><h4>Status</h4><p class="case-empty">investigating…</p></div>
+      <div class="case-card"><h4>Hypothesis</h4><p class="case-empty">forming…</p></div>
+      <div class="case-card"><h4>Kill-test — one observation that would falsify it</h4><p class="case-empty">waiting for a hypothesis</p></div>
+      <div class="case-card"><h4>Fix (yours to make — via git)</h4><p class="case-empty">waiting for a verified hypothesis</p></div>
+    </div>
+  </div>
+  {{/* Follow-ups (#140): enabled once a verdict lands; answers stream into the
+       log while the hypothesis panel stays pinned. */}}
+  <form id="cf-followup" class="cf-followup" hidden>
+    <input id="cf-question" name="question" type="text" autocomplete="off" maxlength="1000"
+           placeholder="Ask a follow-up about this diagnosis…" disabled>
+    <button id="cf-ask" type="submit" disabled>Ask</button>
+  </form>
+</div>
+{{else}}
+<p class="cf-locked">{{icon "lock"}} <b>Investigate with the agent</b> — a read-only in-cluster agent that streams a live investigation and proposes a git fix.
+  <span class="hint">Enable <code>kagent</code> from the catalog to unlock this.</span></p>
+{{end}}
+{{end}}
+{{end}}
+
 {{/* Case file fragments — streamed to the browser as SSE data payloads by
      handleAgentAsk (module 10). The tool-call log lines append to #cf-log; the
      verdict and error fragments replace the side panel #cf-panel. Kept as
