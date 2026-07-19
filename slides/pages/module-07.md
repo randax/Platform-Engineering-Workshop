@@ -6,6 +6,8 @@ layout: section
 
 # CI on your terms: build inside the cluster
 
+<div class="modlogos"><Logo name="argo-workflows" label="Argo Workflows" size="2.6rem"/> <Logo name="buildkit" label size="2.6rem"/> <Logo name="zot" text="Zot" size="2.6rem"/></div>
+
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;They build and ship their own images in-cluster — no Docker Hub, no cloud-build minutes. The pipeline never leaves their cloud.</div>
 
 <!--

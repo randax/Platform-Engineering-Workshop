@@ -6,6 +6,8 @@ layout: section
 
 # The picture pipeline: everything, wired together
 
+<div class="modlogos"><Logo name="knative" label size="2.6rem"/> <Logo name="nats" label size="2.6rem"/> <Logo name="grafana" label size="2.6rem"/></div>
+
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their listing-photo pipeline goes live — upload → resize → gallery, event-driven and traced end to end. Their product, running on their cloud.</div>
 
 <!--

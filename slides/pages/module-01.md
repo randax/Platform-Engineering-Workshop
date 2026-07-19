@@ -6,6 +6,8 @@ layout: section
 
 # Your own cloud: Talos + Cilium
 
+<div class="modlogos"><Logo name="talos" label size="2.6rem"/> <Logo name="cilium" label size="2.6rem"/></div>
+
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their new datacenter is just Docker on this laptop — an immutable OS with no server to SSH into and pet.</div>
 
 <!--
