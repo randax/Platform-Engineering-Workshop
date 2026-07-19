@@ -12,21 +12,28 @@ Closing section — bring the energy back to the front of the room for the last 
 
 # The box, now full
 
-```mermaid {scale: 0.5}
-flowchart TB
-  subgraph laptop["Your laptop — Docker"]
-    subgraph talos["Talos + Cilium Kubernetes ✅ 01"]
-      gitea["Gitea<br>✅ 02"] --> argocd["ArgoCD v3<br>✅ 02"]
-      argocd --> cnpg["CloudNativePG<br>✅ 03"]
-      argocd --> rustfs["RustFS<br>✅ 03"]
-      argocd --> xp["Crossplane v2<br>✅ 04"]
-      argocd --> kn["Knative<br>✅ 06+09"]
-      argocd --> ci["BuildKit + Zot<br>✅ 07"]
-      argocd --> portal["Cloudbox Console<br>✅ 08"]
-      argocd --> obs["Victoria stack<br>✅ traces"]
-    end
-  end
-```
+<div class="arch done">
+  <div class="laptop">
+    <div class="band-title"><Logo name="docker" size="1.3rem"/> Your laptop · Docker — still yours when the lid closes</div>
+    <div class="k8s">
+      <div class="band-title"><Logo name="talos" size="1.3rem"/> <Logo name="cilium" size="1.3rem"/> ✅ Talos + Cilium · Kubernetes — running (01)</div>
+      <div class="engine">
+        <Logo name="gitea" label size="1.7rem"/> <span class="arrow">→</span> <Logo name="argocd" label="Argo CD" size="1.7rem"/>
+        <span class="delivers">✅ every box below, delivered by git (02)</span>
+      </div>
+      <div class="services">
+        <Logo name="cloudnativepg" label="CloudNativePG · 03" size="1.6rem"/>
+        <Logo name="rustfs" text="RustFS" size="1.6rem"/>
+        <Logo name="crossplane" label="Crossplane · 04" size="1.6rem"/>
+        <Logo name="knative" label="Knative · 06+09" size="1.6rem"/>
+        <Logo name="nats" label="NATS · 09" size="1.6rem"/>
+        <Logo name="argo-workflows" label="CI · 07" size="1.6rem"/>
+        <Logo name="cloudbox" text="Cloudbox" size="1.6rem"/>
+        <Logo name="grafana" label="Victoria + OTel" size="1.6rem"/>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!--
 The same diagram from the first ten minutes — but now every box on it is running on the laptops in this room. Walk it once more, fast, in the past tense: "you built an immutable OS layer with no kube-proxy; you gave your cluster its own git server and made git the only way anything changes; you became the RDS team and the S3 team; you shipped a self-service API on Crossplane v2; you debugged it like an SRE and fact-checked an AI agent doing the same; and some of you added serverless, in-cluster CI, a portal you can read, and an event-driven pipeline traced end to end."
@@ -41,16 +48,17 @@ The mental model is the real takeaway: cloud products are software plus an API, 
 # Remember the table? All yours now.
 
 <div class="allgreen">
-
-| Cloud primitive | You're running |
-|---|---|
-| Kubernetes / compute | <span class="svgi i-check" style="color:var(--jz-run)"></span> Talos + Cilium |
-| Managed Postgres | <span class="svgi i-check" style="color:var(--jz-run)"></span> CloudNativePG |
-| Object storage (S3) | <span class="svgi i-check" style="color:var(--jz-run)"></span> RustFS |
-| Self-service infra | <span class="svgi i-check" style="color:var(--jz-run)"></span> Crossplane |
-| Serverless · CI · registry | <span class="svgi i-check" style="color:var(--jz-run)"></span> Knative · Argo Workflows · Zot |
-| Cloud console | <span class="svgi i-check" style="color:var(--jz-run)"></span> Cloudbox Console |
-
+<table>
+<thead><tr><th>Cloud primitive</th><th>You're running</th></tr></thead>
+<tbody>
+<tr><td>Kubernetes / compute</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="talos" label size="1.5rem"/> <Logo name="cilium" label size="1.5rem"/></td></tr>
+<tr><td>Managed Postgres</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudnativepg" label size="1.5rem"/></td></tr>
+<tr><td>Object storage (S3)</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="rustfs" text="RustFS" size="1.5rem"/></td></tr>
+<tr><td>Self-service infra</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="crossplane" label size="1.5rem"/></td></tr>
+<tr><td>Serverless · CI · registry</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="knative" label size="1.5rem"/> <Logo name="argo-workflows" label="Argo Workflows" size="1.5rem"/> <Logo name="zot" text="Zot" size="1.5rem"/></td></tr>
+<tr><td>Cloud console</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudbox" text="Cloudbox" size="1.5rem"/></td></tr>
+</tbody>
+</table>
 </div>
 
 <div class="mt-6 text-xl opacity-80">No account. No bill. No permission.</div>
