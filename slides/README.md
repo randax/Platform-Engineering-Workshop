@@ -28,7 +28,8 @@ slides/
 │   ├── why.md           # the sovereignty hook + architecture diagram
 │   ├── how.md           # module map, lab contract, help, AI policy
 │   ├── module-00.md …   # per-module: section divider → concept → GO slide
-│   │   module-09.md     # (03: MinIO/RustFS interlude · 08: build-vs-buy + Backstage demo)
+│   │   module-10.md     # (03: MinIO/RustFS interlude · 08: build-vs-buy + Backstage demo
+│   │                    #  · 10: escalation ladder + the small-model cliff)
 │   └── closing.md       # what you built, take it home, thanks
 └── styles/index.css     # gradient backgrounds, accent color, badges
 ```
