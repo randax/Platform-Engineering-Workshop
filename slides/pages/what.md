@@ -163,21 +163,28 @@ These four are the transferable skills — the thing they take to work on Monday
 
 # Your cloud, in a box
 
-```mermaid {scale: 0.5}
-flowchart TB
-  subgraph laptop["Your laptop — Docker"]
-    subgraph talos["Talos + Cilium Kubernetes"]
-      gitea["Gitea<br>your cloud's git"] --> argocd["ArgoCD v3<br>app-of-apps"]
-      argocd --> cnpg["CloudNativePG<br>DBaaS"]
-      argocd --> rustfs["RustFS<br>S3 storage"]
-      argocd --> xp["Crossplane v2<br>self-service"]
-      argocd --> kn["Knative<br>serverless"]
-      argocd --> ci["Workflows<br>BuildKit + Zot"]
-      argocd --> portal["Cloudbox<br>Console"]
-      argocd --> obs["Victoria stack<br>+ OTel Collector"]
-    end
-  end
-```
+<div class="arch">
+  <div class="laptop">
+    <div class="band-title"><Logo name="docker" size="1.3rem"/> Your laptop · Docker — the "datacenter"</div>
+    <div class="k8s">
+      <div class="band-title"><Logo name="talos" size="1.3rem"/> <Logo name="cilium" size="1.3rem"/> Talos + Cilium · Kubernetes — no kube-proxy</div>
+      <div class="engine">
+        <Logo name="gitea" label size="1.7rem"/> <span class="arrow">→</span> <Logo name="argocd" label="Argo CD" size="1.7rem"/>
+        <span class="delivers">delivers everything below as a git commit</span>
+      </div>
+      <div class="services">
+        <Logo name="cloudnativepg" label size="1.6rem"/>
+        <Logo name="rustfs" text="RustFS" size="1.6rem"/>
+        <Logo name="crossplane" label size="1.6rem"/>
+        <Logo name="knative" label size="1.6rem"/>
+        <Logo name="nats" label="NATS" size="1.6rem"/>
+        <Logo name="argo-workflows" label="CI · Workflows" size="1.6rem"/>
+        <Logo name="cloudbox" text="Cloudbox" size="1.6rem"/>
+        <Logo name="grafana" label="Victoria + OTel" size="1.6rem"/>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="story mt-2"><span class="tag">BRUKTBY</span> &nbsp;This is the platform you're migrating them to. You'll see this exact diagram at the end — every box green, their photo pipeline live on top.</div>
 
