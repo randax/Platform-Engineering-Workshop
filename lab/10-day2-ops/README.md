@@ -249,7 +249,7 @@ file" on the demo component's page in the Console. This is the module's second h
 same fault, worked twice, with one field changed in between.
 
 **Say the honest-spec line out loud before you start:** beat 1 runs a real model on your
-host, *beside* the whole running cluster. That needs the **32 GB recommended spec**. On
+host, *beside* the whole running cluster. That needs the **32 GB "comfortable" spec from module 00**. On
 the **16 GB minimum spec, beat 1 does not fit next to the running stack** — skip straight
 to "Beat 2" below. That is not a lesser path; it costs no extra RAM, and it's the one
 that actually fits your machine.
@@ -322,9 +322,13 @@ Create the Secret imperatively — an API key is the one thing in this whole wor
 never goes in Git:
 
 ```bash
+export OPENCODE_API_KEY=...   # paste the key you saved during module 00 prep
 kubectl create secret generic kagent-zen -n kagent \
   --from-literal OPENCODE_API_KEY=$OPENCODE_API_KEY
 ```
+
+(If you skip the `export`, `kubectl` happily creates the Secret with an **empty** key
+and beat 2 fails later with an opaque auth error — set it first.)
 
 Then switch the *same* ModelConfig, via git, to Zen's OpenAI-compatible endpoint. Pick
 whichever model is currently marked free at
@@ -353,7 +357,8 @@ git push
 ```
 
 Wait for ArgoCD to converge (`kubectl -n argocd get application kagent`), then open a new
-investigation on the same fault. Same evidence, same read-only tool server — now the
+investigation on the same fault (if you skipped beat 1, inject any scenario from the
+setup table first). Same evidence, same read-only tool server — now the
 verdict comes with a real hypothesis and an explicit kill-test. Verify that kill-test
 against the live cluster yourself, then fix the fault the only way this module ever fixes
 anything: `git revert` and push.
