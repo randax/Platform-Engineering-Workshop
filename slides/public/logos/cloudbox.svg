@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- upper flaps (behind the cloud), folded open like wings -->
+  <path d="M32 18 L26 8 L6 19 L12 29 Z" fill="#5cc5f7"/>
+  <path d="M32 18 L38 8 L58 19 L52 29 Z" fill="#38bdf8"/>
+  <!-- open top: the platform, alive (emerald) -->
+  <path d="M32 18 L12 29 L32 40 L52 29 Z" fill="#10b981"/>
+  <!-- box body -->
+  <path d="M12 29 L32 40 L32 56 L12 45 Z" fill="#38bdf8"/>
+  <path d="M32 40 L52 29 L52 45 L32 56 Z" fill="#0ea5e9"/>
+  <!-- front flaps, folded down over the box -->
+  <path d="M12 29 L8 36 L28 47 L32 40 Z" fill="#5cc5f7"/>
+  <path d="M32 40 L36 47 L56 36 L52 29 Z" fill="#38bdf8"/>
+  <!-- cloud rising out of the box -->
+  <path d="M21 35 C13 35 11 26 18 24 C17 16 28 15 30 22 C33 14 44 16 43 24 C50 24 50 35 43 35 Z"
+        fill="#ffffff" stroke="#0b5a74" stroke-width="1.8" stroke-linejoin="round"/>
+</svg>

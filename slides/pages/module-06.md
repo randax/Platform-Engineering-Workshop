@@ -6,7 +6,6 @@ layout: section
 
 # Serverless: scale from zero, on your hardware
 
-<div class="modlogos"><Logo name="knative" label size="2.6rem"/></div>
 
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their thumbnailer scales to zero — nothing running, nothing to pay, between uploads. Lambda's trick, on hardware they own.</div>
 
