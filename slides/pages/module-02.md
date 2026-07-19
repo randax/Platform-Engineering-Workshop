@@ -6,6 +6,8 @@ layout: section
 
 # GitOps: your cluster gets a git server
 
+<div class="modlogos"><Logo name="gitea" label size="2.6rem"/> <Logo name="argocd" label size="2.6rem"/></div>
+
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Git becomes their only deploy button — every platform change a reviewable commit, nothing tied to GitHub or the venue WiFi.</div>
 
 <!--

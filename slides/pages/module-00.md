@@ -6,6 +6,8 @@ layout: section
 
 # Setup & pre-flight
 
+<div class="modlogos"><Logo name="docker" label size="2.6rem"/> <Logo name="kubernetes" label size="2.6rem"/></div>
+
 <!--
 This is the safety net, not the plan — the prework email asked everyone to do this at home. The next 15 minutes exist for those who didn't, and for machines that changed since.
 
