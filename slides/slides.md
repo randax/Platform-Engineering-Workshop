@@ -30,6 +30,10 @@ layout: cover
 
 <div class="pt-4 text-lg opacity-90">JavaZone 2026 · 4-hour hands-on workshop</div>
 
+<div class="coverlogos">
+  <Logo name="talos" size="1.4rem"/><Logo name="cilium" size="1.4rem"/><Logo name="gitea" size="1.4rem"/><Logo name="argocd" size="1.4rem"/><Logo name="cloudnativepg" size="1.4rem"/><Logo name="crossplane" size="1.4rem"/><Logo name="knative" size="1.4rem"/><Logo name="nats" size="1.4rem"/><Logo name="grafana" size="1.4rem"/><Logo name="opentelemetry" size="1.4rem"/>
+</div>
+
 <div class="pt-6 text-sm leading-relaxed opacity-80">
   <strong>Øyvind Randa</strong> — Software Architect at NextGenTel, Lead Organizer GDG Bergen<br>
   <strong>Hans Kristian Flaatten</strong> — Platform Engineer in Norwegian Government, CNCF Ambassador
