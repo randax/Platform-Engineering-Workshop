@@ -55,7 +55,7 @@ The pedagogical point of the whole slide: an AI agent is the LAST resort here, n
   <div class="principle">
     <div class="ico"><span class="svgi i-package"></span></div>
     <div class="name">Delivered like every capability</div>
-    <div class="tie" style="opacity:.85"><code>catalog/kagent.yaml</code> → <code>apps/</code> → push → ArgoCD converges. CNCF Sandbox project, pinned in <code>scripts/versions.env</code> like everything else; only <code>k8s-agent</code> enabled.</div>
+    <div class="tie" style="opacity:.85"><code>gitops/catalog/kagent.yaml</code> → <code>gitops/apps/</code> → push → ArgoCD converges. CNCF Sandbox project, pinned in <code>scripts/versions.env</code> like everything else; only <code>k8s-agent</code> enabled.</div>
   </div>
 </div>
 
@@ -64,7 +64,7 @@ The pedagogical point of the whole slide: an AI agent is the LAST resort here, n
 <!--
 The headline demystification: "an AI agent" sounds like a new category of thing to operate, but mechanically it's a CRD — same shape as the WorkshopDatabase from module 04 or the Application from module 02. kagent.dev/v1alpha2 Agent describes a system prompt and a toolset; the kagent controller reconciles it into a Deployment running the conversation loop.
 
-And it arrives exactly the way every capability has all day: copy catalog/kagent.yaml to apps/, push to Gitea, ArgoCD syncs it. No new mental model for "how do I turn this on" — the progressive-enable mechanic from module 02 just keeps paying off.
+And it arrives exactly the way every capability has all day: copy gitops/catalog/kagent.yaml to gitops/apps/, push to Gitea, ArgoCD syncs it. No new mental model for "how do I turn this on" — the progressive-enable mechanic from module 02 just keeps paying off.
 
 Scoping facts worth saying out loud: kagent is a CNCF Sandbox project (accepted May 2025), pinned in scripts/versions.env at the maintained stable 0.9 line, while v0.10 is still an active beta series, and upstream's "latest release" tag misleadingly resolves to one of those betas; that trap is called out with a comment in the single version-pin file. The chart ships ten built-in agents; this module enables exactly one, k8s-agent — the Kubernetes troubleshooting agent — and disables the doc-search tool and kagent's own web UI (scaled to zero), because the Console is the only surface attendees touch.
 -->
