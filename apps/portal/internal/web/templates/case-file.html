@@ -1,11 +1,12 @@
 {{/* The Case file affordance (module 10) — the SHARED mount every surface that
-     shows an unhealthy resource reuses (Application detail, demo component
-     detail), so there is one copy of this markup. Takes a caseFile view-model
-     (.Show / .Available / .Namespace / .Name). Kind is always "Application" (the
-     only kind /agent/ask accepts). When the capability is absent it renders the
-     locked affordance with the unlock hint — no mount, so nothing can reach the
-     backend. The follow-up form (#cf-followup, disabled until a verdict arrives)
-     continues the same Kagent session; case-file.js drives it. */}}
+     shows an unhealthy resource reuses, so there is one copy of this markup.
+     Takes a caseFile view-model (.Show / .Available / .Namespace / .Name /
+     .Kind). Kind doubles as the surface discriminator in the Kagent session id:
+     "Application" on the Application detail, "Component" on component detail —
+     the two kinds /agent/ask accepts. When the capability is absent it renders
+     the locked affordance with the unlock hint — no mount, so nothing can reach
+     the backend. The follow-up form (#cf-followup, disabled until a verdict
+     arrives) continues the same Kagent session; case-file.js drives it. */}}
 {{define "case-file"}}
 {{if .Show}}
 <h2>Case file <small>— investigate with the agent</small></h2>
