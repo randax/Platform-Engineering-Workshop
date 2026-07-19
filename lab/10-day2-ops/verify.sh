@@ -21,6 +21,8 @@ SCENARIO_TRAILER="Cloudbox-Scenario: day2-01"
 OOM_POISON_VALUE="16Mi"
 OOM_POISON_MARKER="memory: $OOM_POISON_VALUE"
 OOM_SCENARIO_TRAILER="Cloudbox-Scenario: day2-02"
+IMAGE_POISON_VALUE="docker.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba"
+IMAGE_SCENARIO_TRAILER="Cloudbox-Scenario: day2-03"
 FAILED=0
 
 ok()   { echo "✅ $1"; }
@@ -58,7 +60,7 @@ if [ ! -f "$CLONE/$WELCOME_PATH" ]; then
 fi
 
 if [ ! -f "$CLONE/$COMPONENT_PATH" ]; then
-  fail "cloudbox/platform has no $COMPONENT_PATH — module 10's baseline hasn't been seeded yet; run ./inject.sh 1 or ./inject.sh 2 once to seed it, wait for ArgoCD, then run the same scenario again to inject the fault"
+  fail "cloudbox/platform has no $COMPONENT_PATH — module 10's baseline hasn't been seeded yet; run ./inject.sh 1, 2, or 3 once to seed it, wait for ArgoCD, then run the same scenario again to inject the fault"
   echo
   echo "❌ $FAILED check(s) failed. Follow the FAIL lines above, then run ./verify.sh again."
   exit 1
@@ -115,6 +117,22 @@ elif grep -Fq -- "$OOM_POISON_MARKER" "$CLONE/$COMPONENT_PATH"; then
       fail "Git is poisoned but demo-web restart counts are still zero — watch kubectl -n demo get pods -l app=demo-web -w until the rightsizing commit takes effect"
     fi
   fi
+elif grep -Fq -- "$IMAGE_POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
+  fail "scenario 3 is still present in Git ($COMPONENT_PATH contains $IMAGE_POISON_VALUE) — inspect git log, then run git revert <scenario-commit> && git push"
+
+  # An image-pull failure has no previous process logs: confirm the waiting
+  # reason and send the attendee to pod Events for the registry error.
+  if ! command -v kubectl >/dev/null 2>&1 || \
+    ! kubectl --request-timeout=3s get namespace demo >/dev/null 2>&1; then
+    fail "could not confirm scenario 3's live symptoms — restore cluster access, then run kubectl -n demo get pods -l app=demo-web"
+  else
+    POD_STATE="$(pod_status_sample)"
+    if printf '%s\n' "$POD_STATE" | grep -Eq 'ImagePullBackOff|ErrImagePull'; then
+      ok "scenario 3 confirmed live: a demo-web container is waiting on an image pull"
+    else
+      fail "Git is poisoned but no demo-web container reports ImagePullBackOff or ErrImagePull yet — wait for ArgoCD, then run kubectl -n demo describe pod <pod>"
+    fi
+  fi
 else
   SCENARIO_HISTORY_FOUND=0
   if git -C "$CLONE" log --format='%H' --grep="$SCENARIO_TRAILER" -n 1 | grep -q .; then
@@ -123,6 +141,10 @@ else
   fi
   if git -C "$CLONE" log --format='%H' --grep="$OOM_SCENARIO_TRAILER" -n 1 | grep -q .; then
     ok "scenario 2 fixed: the poison value is absent from cloudbox/platform:main"
+    SCENARIO_HISTORY_FOUND=1
+  fi
+  if git -C "$CLONE" log --format='%H' --grep="$IMAGE_SCENARIO_TRAILER" -n 1 | grep -q .; then
+    ok "scenario 3 fixed: the poison value is absent from cloudbox/platform:main"
     SCENARIO_HISTORY_FOUND=1
   fi
   if [ "$SCENARIO_HISTORY_FOUND" -eq 0 ]; then
@@ -136,6 +158,26 @@ else
     ok "gitops/components/demo/demo-web.yaml matches the module's baseline"
   else
     fail "gitops/components/demo/demo-web.yaml no longer matches lab/10-day2-ops/baseline/demo-web.yaml — diff them and revert any leftover edit"
+  fi
+
+  IMAGE_LINES_FOUND=0
+  NON_GHCR_IMAGE_FOUND=0
+  while IFS= read -r image_line; do
+    IMAGE_LINES_FOUND=1
+    image_value="${image_line#*image:}"
+    image_value="${image_value#"${image_value%%[![:space:]]*}"}"
+    case "$image_value" in
+      ghcr.io/*) ;;
+      *)
+        fail "every demo-web image must start with ghcr.io/ — offending line: $image_line"
+        NON_GHCR_IMAGE_FOUND=1
+        ;;
+    esac
+  done < <(grep -E '^[[:space:]]*image:[[:space:]]*' "$CLONE/$COMPONENT_PATH" || true)
+  if [ "$IMAGE_LINES_FOUND" -eq 0 ]; then
+    fail "no image references were found in $COMPONENT_PATH — restore the module baseline"
+  elif [ "$NON_GHCR_IMAGE_FOUND" -eq 0 ]; then
+    ok "every demo-web image reference uses ghcr.io/"
   fi
 
   # welcome.yaml is the attendee's own module-02 customization (their name goes
