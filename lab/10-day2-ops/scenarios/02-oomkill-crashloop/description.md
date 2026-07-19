@@ -4,11 +4,12 @@
 restarting repeatedly, with the `RESTARTS` count continuing to climb. Describing an
 affected pod shows `Last State: Terminated`, `Reason: OOMKilled`, and `Exit Code: 137`.
 
-**Root cause:** the rightsizing commit added `resources.limits.memory: 16Mi` to the
-`web` container, below what the Go HTTP server binary actually needs at runtime. The
-kernel OOM-killer inside the container's cgroup kills the process when it exceeds that
-limit. Kubelet restarts it, and the process is killed again on the next request burst or
-garbage-collection cycle, producing a cadence rather than a single startup crash.
+**Root cause:** the rightsizing commit set the `web` container's memory allocation to
+`8Mi` — well below what the Go HTTP server binary actually needs to run and serve
+traffic. The kernel OOM-killer inside the container's cgroup kills the process once it
+exceeds that allocation. Kubelet restarts it, and the process is killed again on the
+next request burst or garbage-collection cycle, producing a cadence rather than a single
+startup crash.
 
 **Diagnosis path this teaches:**
 
@@ -18,13 +19,14 @@ garbage-collection cycle, producing a cadence rather than a single startup crash
    reason `OOMKilled` and exit code 137.
 3. Read `lastState.terminated.reason` and the exit code rather than stopping at the
    current `Running` or `CrashLoopBackOff` state.
-4. Compare the `web` container's `resources.limits.memory` with its memory request and
-   actual usage. The 16Mi limit is even below the existing 32Mi request and below the
-   Go binary's real working set.
+4. Compare the `web` container's configured memory allocation against what the Go binary
+   actually needs to run and serve traffic — the 8Mi allocation is far below its real
+   working set.
 5. In a clone of `cloudbox/platform`,
    `git log --oneline -3 -- gitops/components/demo/demo-web.yaml` reveals the recent
    rightsizing commit.
-6. `git show <sha>` confirms that the commit changed only the memory limit.
+6. `git show <sha>` confirms that the commit changed only the `web` container's memory
+   allocation, nothing else.
 
 **Canonical fix:** revert the bad Git commit and push the revert — do not edit the live
 Deployment, because ArgoCD will reconcile it back to Git.

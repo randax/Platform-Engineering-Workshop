@@ -6,7 +6,8 @@
 # the "demo" Application from module 02 (solutions/module-02/apps/demo.yaml).
 # cloudbox/demo-app is unrelated: it is Go SOURCE for module 07's in-cluster
 # build, has no deploy manifests, and nothing syncs it directly — never target it.
-# This scenario owns only image; never change env or resources/limits here.
+# This scenario owns only image; never change env (scenario 1) or resources
+# (scenario 2, the whole requests/limits block — see its inject.sh header).
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

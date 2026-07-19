@@ -10,7 +10,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/../../../common.sh"
 
 COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
-POISON_VALUE="16Mi"
+POISON_VALUE="8Mi"
 POISON_MARKER="memory: $POISON_VALUE"
 SCENARIO_TRAILER="Cloudbox-Scenario: day2-02"
 
@@ -28,13 +28,13 @@ INJECTED_SHA="$(git -C "$CLONE" log --format='%H' \
   --grep="$SCENARIO_TRAILER" -n 1 -- "$COMPONENT_PATH")"
 if [ -z "$INJECTED_SHA" ]; then
   echo "ERROR: $POISON_MARKER is present, but no '$SCENARIO_TRAILER' commit was found." >&2
-  echo "Inspect git log and revert the commit that introduced the memory limit manually." >&2
+  echo "Inspect git log and revert the commit that introduced the tight memory allocation manually." >&2
   exit 1
 fi
 
 if ! git -C "$CLONE" -c user.name="cloudbox" -c user.email="cloudbox@localhost" \
   revert --no-edit "$INJECTED_SHA"; then
-  echo "ERROR: git revert conflicted — inspect the commits after ${INJECTED_SHA:0:12} and revert the memory limit change manually." >&2
+  echo "ERROR: git revert conflicted — inspect the commits after ${INJECTED_SHA:0:12} and revert the memory allocation change manually." >&2
   exit 1
 fi
 REVERT_SHA="$(git -C "$CLONE" rev-parse --short HEAD)"

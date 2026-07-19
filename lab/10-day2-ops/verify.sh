@@ -18,7 +18,7 @@ COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
 BASELINE_SRC="$DIR/baseline/demo-web.yaml"
 POISON_VALUE="8080-canary"
 SCENARIO_TRAILER="Cloudbox-Scenario: day2-01"
-OOM_POISON_VALUE="16Mi"
+OOM_POISON_VALUE="8Mi"
 OOM_POISON_MARKER="memory: $OOM_POISON_VALUE"
 OOM_SCENARIO_TRAILER="Cloudbox-Scenario: day2-02"
 IMAGE_POISON_VALUE="docker.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba"
@@ -66,6 +66,10 @@ if [ ! -f "$CLONE/$COMPONENT_PATH" ]; then
   exit 1
 fi
 
+# First-match reporting is intentional: the three poison markers are
+# disjoint by construction (different fields, never injected together in
+# normal use), so at most one branch is ever expected to be relevant. Order
+# does not encode priority — it's just the order the scenarios were added in.
 if grep -Fq -- "$POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
   fail "scenario 1 is still present in Git ($COMPONENT_PATH contains $POISON_VALUE) — inspect git log, then run git revert <scenario-commit> && git push"
 
@@ -214,7 +218,10 @@ else
   else
     # A periodic OOMKill can be briefly Running at a single snapshot. Sample a
     # second time within a bounded window and require both states to be clean,
-    # with the aggregate restart count not increasing.
+    # with the aggregate restart count not increasing. This is scenario 2's
+    # stability gate specifically — it runs on EVERY green (no-poison-marker)
+    # verify, not just after scenario 2, since it's the only way to catch a
+    # periodic OOMKilled cadence that a single snapshot could miss.
     sleep 15
     POD_STATE_2="$(pod_status_sample)"
     POD_STABLE=1

@@ -164,7 +164,7 @@ kubectl -n demo get pods -l app=demo-web -w
 <summary>Hint 3: Connect the previous process state to the resource budget</summary>
 
 Describe one restarting pod and read `Last State`, `Reason`, and `Exit Code`. Then inspect
-the `web` container's memory request and limit in the Git-managed Deployment:
+the `web` container's configured memory allocation in the Git-managed Deployment:
 
 ```bash
 kubectl -n demo describe pod <pod>
@@ -175,8 +175,8 @@ git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
 
-Compare `resources.limits.memory` with `resources.requests.memory` and with what the Go
-binary actually needs. The current state may be `Running`; the previous terminated state
+Compare the configured memory allocation with what the Go binary actually needs to run
+and serve traffic. The current state may be `Running`; the previous terminated state
 records why kubelet had to restart it.
 </details>
 

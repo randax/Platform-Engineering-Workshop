@@ -6,7 +6,11 @@
 # the "demo" Application from module 02 (solutions/module-02/apps/demo.yaml).
 # cloudbox/demo-app is unrelated: it is Go SOURCE for module 07's in-cluster
 # build, has no deploy manifests, and nothing syncs it directly — never target it.
-# This scenario owns only resources.limits.memory; never change env or image here.
+# This scenario owns the whole resources: block (requests AND limits) of the
+# web container; never change env or image here. It must own both fields: a
+# limit alone below the existing 32Mi request is an invalid pod spec (request
+# > limit is rejected by ValidateResourceRequirements at admission), so the
+# request has to move down with it for the fault to actually reach a pod.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,7 +21,14 @@ source "$DIR/../../../common.sh"
 COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
 BASELINE_SRC="$DIR/../../baseline/demo-web.yaml"
 CONTAINER_NAME="web"
-POISON_VALUE="16Mi"
+# 8Mi is a placeholder tight enough to be implausible for a Go HTTP server;
+# rehearsal should calibrate this against helloworld-go's real RSS. The
+# invariant this scenario asserts is lastState.terminated.reason: OOMKilled —
+# whether the process dies at startup or later under probe/request traffic,
+# that reason (not the exact millisecond it fires) is what verify.sh and the
+# attendee both read, so the precise number matters less than staying tight
+# enough to guarantee an OOM at rehearsal.
+POISON_VALUE="8Mi"
 POISON_MARKER="memory: $POISON_VALUE"
 
 CLONE="$(gitops_clone)" || exit 1
@@ -89,6 +100,9 @@ if ! awk -v poison="$POISON_VALUE" -v target="$CONTAINER_NAME" '
     } else if (!request_child_seen) {
       print "requests under the " target " container is not a populated block map" > "/dev/stderr"
       bad = 1
+    } else if (!memory_rewritten) {
+      print "requests under the " target " container has no memory field to rewrite" > "/dev/stderr"
+      bad = 1
     }
     if (limits_seen) {
       print "resources.limits already exists under the " target " container" > "/dev/stderr"
@@ -106,6 +120,7 @@ if ! awk -v poison="$POISON_VALUE" -v target="$CONTAINER_NAME" '
     resources_seen = 0
     requests_seen = 0
     request_child_seen = 0
+    memory_rewritten = 0
     limits_seen = 0
   }
   BEGIN {
@@ -186,11 +201,28 @@ if ! awk -v poison="$POISON_VALUE" -v target="$CONTAINER_NAME" '
       }
       requests_seen = 1
       request_indent = ind
+      # Own the whole resources: block, not just limits: a limit below the
+      # existing request is an invalid pod spec (rejected at admission), so
+      # requests.memory has to move down to the same tight value below — see
+      # the memory_rewritten check in close_resources for the other half.
       print spaces(ind) "limits:"
       print spaces(ind + 2) "memory: " poison
       changed = 1
     } else if (in_resources && line ~ /^[ ]*limits:/ && ind == resources_indent + 2) {
       limits_seen = 1
+    } else if (in_resources && requests_seen && ind == request_indent + 2 &&
+               line ~ /^[ ]*memory:/) {
+      if (memory_rewritten) {
+        print "requests under the " target " container has more than one memory field" > "/dev/stderr"
+        bad = 1
+        exit 48
+      }
+      request_child_seen = 1
+      memory_rewritten = 1
+      comment = ""
+      if (match(line, /[ ]+#/)) comment = substr(line, RSTART)
+      line = spaces(ind) "memory: " poison comment
+      changed = 1
     } else if (in_resources && requests_seen && ind == request_indent + 2 &&
                line ~ /^[ ]*[A-Za-z0-9_.-]+:[ ]*/) {
       request_child_seen = 1
@@ -211,7 +243,7 @@ if ! awk -v poison="$POISON_VALUE" -v target="$CONTAINER_NAME" '
     if (bad) exit 1
   }
 ' "$CLONE/$COMPONENT_PATH" > "$MUTATED"; then
-  echo "ERROR: could not safely add resources.limits.memory in $COMPONENT_PATH — check the $CONTAINER_NAME container's resources/requests YAML structure" >&2
+  echo "ERROR: could not safely rewrite resources.requests.memory/resources.limits.memory in $COMPONENT_PATH — check the $CONTAINER_NAME container's resources/requests YAML structure" >&2
   exit 1
 fi
 mv "$MUTATED" "$CLONE/$COMPONENT_PATH"
