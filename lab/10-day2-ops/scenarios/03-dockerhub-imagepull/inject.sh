@@ -17,7 +17,13 @@ source "$DIR/../../../common.sh"
 
 COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
 BASELINE_SRC="$DIR/../../baseline/demo-web.yaml"
-POISON_VALUE="docker.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba"
+# Detection is predicate-based, not tied to a specific digest: any image:
+# value referencing docker.io/ (quoted or not) means this scenario is
+# already injected. A future baseline digest bump must not silently break
+# detection, so no digest string is hard-coded here — the awk mutation below
+# is generic for the same reason (it rewrites any ghcr.io/ image found, not
+# one specific string). verify.sh and fix.sh use this same pattern.
+IMAGE_DOCKERHUB_PATTERN="^[[:space:]]*image:[[:space:]]*[\"']?docker\.io/"
 
 CLONE="$(gitops_clone)" || exit 1
 TMP_PARENT="$(dirname "$CLONE")"
@@ -47,10 +53,10 @@ if [ ! -f "$CLONE/$COMPONENT_PATH" ]; then
   exit 0
 fi
 
-# Idempotency is by construction: the exact digest-qualified Docker Hub image
-# is the injected artifact's marker. Refusing before mutation makes a second
-# injection unable to push.
-if grep -Fq -- "$POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
+# Idempotency is by construction: any docker.io/ image reference already
+# present is the injected artifact's marker. Refusing before mutation makes
+# a second injection unable to push.
+if grep -Eq -- "$IMAGE_DOCKERHUB_PATTERN" "$CLONE/$COMPONENT_PATH"; then
   echo "ERROR: scenario 3 already injected — run ./restore.sh 3 first" >&2
   exit 1
 fi
@@ -162,8 +168,13 @@ if ! awk '
         bad = 1
         exit 47
       }
-      if (substr(value, 1, 8) == "ghcr.io/") {
-        sub(/ghcr.io\//, "docker.io/", line)
+      # Tolerate an optional leading quote character (double or single) so a
+      # quoted image scalar is not missed. \047 is the octal escape for a
+      # literal single quote, needed because a literal one here would close
+      # the surrounding bash single-quoted awk program (same technique the
+      # other scenarios use in their name_pattern definitions).
+      if (value ~ /^["\047]?ghcr\.io\//) {
+        sub(/ghcr\.io\//, "docker.io/", line)
         changed++
       }
     }

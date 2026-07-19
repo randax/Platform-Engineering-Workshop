@@ -10,7 +10,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/../../../common.sh"
 
 COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
-POISON_VALUE="docker.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba"
+# Predicate-based, not tied to a specific digest — matches inject.sh's
+# IMAGE_DOCKERHUB_PATTERN (see its header comment for why).
+IMAGE_DOCKERHUB_PATTERN="^[[:space:]]*image:[[:space:]]*[\"']?docker\.io/"
 SCENARIO_TRAILER="Cloudbox-Scenario: day2-03"
 
 CLONE="$(gitops_clone)" || exit 1
@@ -18,7 +20,7 @@ TMP_PARENT="$(dirname "$CLONE")"
 trap 'rm -rf "$TMP_PARENT"' EXIT
 
 if [ ! -f "$CLONE/$COMPONENT_PATH" ] || \
-  ! grep -Fq -- "$POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
+  ! grep -Eq -- "$IMAGE_DOCKERHUB_PATTERN" "$CLONE/$COMPONENT_PATH"; then
   echo "scenario 3 was never injected — skipping"
   exit 0
 fi
@@ -26,7 +28,7 @@ fi
 INJECTED_SHA="$(git -C "$CLONE" log --format='%H' \
   --grep="$SCENARIO_TRAILER" -n 1 -- "$COMPONENT_PATH")"
 if [ -z "$INJECTED_SHA" ]; then
-  echo "ERROR: $POISON_VALUE is present, but no '$SCENARIO_TRAILER' commit was found." >&2
+  echo "ERROR: a docker.io/ image reference is present, but no '$SCENARIO_TRAILER' commit was found." >&2
   echo "Inspect git log and revert the commit that changed the image registry manually." >&2
   exit 1
 fi

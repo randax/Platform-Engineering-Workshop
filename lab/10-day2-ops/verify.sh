@@ -21,7 +21,13 @@ SCENARIO_TRAILER="Cloudbox-Scenario: day2-01"
 OOM_POISON_VALUE="8Mi"
 OOM_POISON_MARKER="memory: $OOM_POISON_VALUE"
 OOM_SCENARIO_TRAILER="Cloudbox-Scenario: day2-02"
-IMAGE_POISON_VALUE="docker.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba"
+# Predicate-based, not tied to a specific digest: any image: value
+# referencing docker.io/ (quoted or not) is scenario 3's marker. A future
+# baseline digest bump must not silently break routing here — matches
+# scenario 3's inject.sh/fix.sh, which use the same pattern for the same
+# reason. docker.io/ appears in no other scenario's markers or the baseline,
+# so this stays disjoint from scenario 1's and scenario 2's routing.
+IMAGE_POISON_PATTERN="^[[:space:]]*image:[[:space:]]*[\"']?docker\.io/"
 IMAGE_SCENARIO_TRAILER="Cloudbox-Scenario: day2-03"
 FAILED=0
 
@@ -121,8 +127,8 @@ elif grep -Fq -- "$OOM_POISON_MARKER" "$CLONE/$COMPONENT_PATH"; then
       fail "Git is poisoned but demo-web restart counts are still zero — watch kubectl -n demo get pods -l app=demo-web -w until the rightsizing commit takes effect"
     fi
   fi
-elif grep -Fq -- "$IMAGE_POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
-  fail "scenario 3 is still present in Git ($COMPONENT_PATH contains $IMAGE_POISON_VALUE) — inspect git log, then run git revert <scenario-commit> && git push"
+elif grep -Eq -- "$IMAGE_POISON_PATTERN" "$CLONE/$COMPONENT_PATH"; then
+  fail "scenario 3 is still present in Git ($COMPONENT_PATH references a docker.io/ image) — inspect git log, then run git revert <scenario-commit> && git push"
 
   # An image-pull failure has no previous process logs: confirm the waiting
   # reason and send the attendee to pod Events for the registry error.
@@ -138,16 +144,19 @@ elif grep -Fq -- "$IMAGE_POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
     fi
   fi
 else
+  # Scoped to COMPONENT_PATH (matching each scenario's own fix.sh) so an
+  # unrelated commit elsewhere in the repo that happens to carry the same
+  # trailer text cannot misreport scenario history.
   SCENARIO_HISTORY_FOUND=0
-  if git -C "$CLONE" log --format='%H' --grep="$SCENARIO_TRAILER" -n 1 | grep -q .; then
+  if git -C "$CLONE" log --format='%H' --grep="$SCENARIO_TRAILER" -n 1 -- "$COMPONENT_PATH" | grep -q .; then
     ok "scenario 1 fixed: the poison value is absent from cloudbox/platform:main"
     SCENARIO_HISTORY_FOUND=1
   fi
-  if git -C "$CLONE" log --format='%H' --grep="$OOM_SCENARIO_TRAILER" -n 1 | grep -q .; then
+  if git -C "$CLONE" log --format='%H' --grep="$OOM_SCENARIO_TRAILER" -n 1 -- "$COMPONENT_PATH" | grep -q .; then
     ok "scenario 2 fixed: the poison value is absent from cloudbox/platform:main"
     SCENARIO_HISTORY_FOUND=1
   fi
-  if git -C "$CLONE" log --format='%H' --grep="$IMAGE_SCENARIO_TRAILER" -n 1 | grep -q .; then
+  if git -C "$CLONE" log --format='%H' --grep="$IMAGE_SCENARIO_TRAILER" -n 1 -- "$COMPONENT_PATH" | grep -q .; then
     ok "scenario 3 fixed: the poison value is absent from cloudbox/platform:main"
     SCENARIO_HISTORY_FOUND=1
   fi
@@ -170,6 +179,17 @@ else
     IMAGE_LINES_FOUND=1
     image_value="${image_line#*image:}"
     image_value="${image_value#"${image_value%%[![:space:]]*}"}"
+    # A quoted scalar (image: "ghcr.io/..." or image: 'ghcr.io/...') must not
+    # false-fail this check: strip one leading and, if present, one trailing
+    # quote character before matching.
+    case "$image_value" in
+      \"*) image_value="${image_value#\"}" ;;
+      \'*) image_value="${image_value#\'}" ;;
+    esac
+    case "$image_value" in
+      *\") image_value="${image_value%\"}" ;;
+      *\') image_value="${image_value%\'}" ;;
+    esac
     case "$image_value" in
       ghcr.io/*) ;;
       *)
