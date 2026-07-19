@@ -36,7 +36,7 @@ fail() { echo "FAIL: $1"; FAILED=$((FAILED + 1)); }
 
 pod_status_sample() {
   kubectl --request-timeout=3s -n demo get pods -l app=demo-web \
-    -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{range .status.containerStatuses[*]}{.name}{":"}{.state.waiting.reason}{":"}{.lastState.terminated.reason}{":"}{.restartCount}{","}{end}{"\n"}{end}' \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{range .status.containerStatuses[*]}{.name}{":"}{.state.waiting.reason}{":"}{.state.terminated.reason}{":"}{.lastState.terminated.reason}{":"}{.restartCount}{","}{end}{"\n"}{end}' \
     2>/dev/null || true
 }
 
