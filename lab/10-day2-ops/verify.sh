@@ -18,10 +18,33 @@ COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
 BASELINE_SRC="$DIR/baseline/demo-web.yaml"
 POISON_VALUE="8080-canary"
 SCENARIO_TRAILER="Cloudbox-Scenario: day2-01"
+OOM_POISON_VALUE="16Mi"
+OOM_POISON_MARKER="memory: $OOM_POISON_VALUE"
+OOM_SCENARIO_TRAILER="Cloudbox-Scenario: day2-02"
 FAILED=0
 
 ok()   { echo "✅ $1"; }
 fail() { echo "FAIL: $1"; FAILED=$((FAILED + 1)); }
+
+pod_status_sample() {
+  kubectl --request-timeout=3s -n demo get pods -l app=demo-web \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{range .status.containerStatuses[*]}{.name}{":"}{.state.waiting.reason}{":"}{.lastState.terminated.reason}{":"}{.restartCount}{","}{end}{"\n"}{end}' \
+    2>/dev/null || true
+}
+
+pod_restart_total() {
+  printf '%s\n' "$1" | awk -F '[:|,]' '
+    { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) total += $i }
+    END { print total + 0 }
+  '
+}
+
+pod_has_high_restarts() {
+  printf '%s\n' "$1" | awk -F '[:|,]' '
+    { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/ && $i > 3) found = 1 }
+    END { exit(found ? 0 : 1) }
+  '
+}
 
 CLONE="$(gitops_clone)" || exit 1
 TMP_PARENT="$(dirname "$CLONE")"
@@ -35,7 +58,7 @@ if [ ! -f "$CLONE/$WELCOME_PATH" ]; then
 fi
 
 if [ ! -f "$CLONE/$COMPONENT_PATH" ]; then
-  fail "cloudbox/platform has no $COMPONENT_PATH — module 10's baseline hasn't been seeded yet; run ./inject.sh 1 once to seed it, wait for ArgoCD, then run ./inject.sh 1 again to inject the fault"
+  fail "cloudbox/platform has no $COMPONENT_PATH — module 10's baseline hasn't been seeded yet; run ./inject.sh 1 or ./inject.sh 2 once to seed it, wait for ArgoCD, then run the same scenario again to inject the fault"
   echo
   echo "❌ $FAILED check(s) failed. Follow the FAIL lines above, then run ./verify.sh again."
   exit 1
@@ -66,11 +89,44 @@ if grep -Fq -- "$POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
       ok "scenario 1 confirmed live: the demo-web rollout is not completing"
     fi
   fi
+elif grep -Fq -- "$OOM_POISON_MARKER" "$CLONE/$COMPONENT_PATH"; then
+  fail "scenario 2 is still present in Git ($COMPONENT_PATH contains $OOM_POISON_MARKER) — inspect git log, then run git revert <scenario-commit> && git push"
+
+  # Periodic OOMKills can leave a Deployment Available, so rollout completion
+  # is not a reliable symptom. Confirm the prior OOMKilled state and a non-zero
+  # restart count instead.
+  if ! command -v kubectl >/dev/null 2>&1 || \
+    ! kubectl --request-timeout=3s get namespace demo >/dev/null 2>&1; then
+    fail "could not confirm scenario 2's live symptoms — restore cluster access, then run kubectl -n demo get pods -l app=demo-web -w"
+  else
+    POD_STATE="$(pod_status_sample)"
+    if printf '%s\n' "$POD_STATE" | grep -Fq 'OOMKilled'; then
+      ok "scenario 2 confirmed live: a demo-web container was OOMKilled"
+    else
+      fail "Git is poisoned but no demo-web container reports a previous OOMKilled termination yet — wait for ArgoCD, then run kubectl -n demo describe pod <pod>"
+    fi
+
+    if printf '%s\n' "$POD_STATE" | awk -F '[:|,]' '
+      { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/ && $i > 0) found = 1 }
+      END { exit(found ? 0 : 1) }
+    '; then
+      ok "scenario 2 confirmed live: a demo-web container has restarted"
+    else
+      fail "Git is poisoned but demo-web restart counts are still zero — watch kubectl -n demo get pods -l app=demo-web -w until the rightsizing commit takes effect"
+    fi
+  fi
 else
+  SCENARIO_HISTORY_FOUND=0
   if git -C "$CLONE" log --format='%H' --grep="$SCENARIO_TRAILER" -n 1 | grep -q .; then
     ok "scenario 1 fixed: the poison value is absent from cloudbox/platform:main"
-  else
-    ok "scenario 1 was never injected (repository is clean)"
+    SCENARIO_HISTORY_FOUND=1
+  fi
+  if git -C "$CLONE" log --format='%H' --grep="$OOM_SCENARIO_TRAILER" -n 1 | grep -q .; then
+    ok "scenario 2 fixed: the poison value is absent from cloudbox/platform:main"
+    SCENARIO_HISTORY_FOUND=1
+  fi
+  if [ "$SCENARIO_HISTORY_FOUND" -eq 0 ]; then
+    ok "day-2 scenarios were never injected (repository is clean)"
   fi
 
   # "Repo clean" means gitops/components/demo/demo-web.yaml matches this
@@ -107,23 +163,48 @@ else
     fail "demo-web rollout is not healthy — run kubectl -n demo rollout status deploy/demo-web, then fix Git and retry"
   fi
 
-  POD_STATE=""
+  POD_STATE_1=""
   if command -v kubectl >/dev/null 2>&1; then
-    POD_STATE="$(kubectl --request-timeout=3s -n demo get pods -l app=demo-web \
-      -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{range .status.containerStatuses[*]}{.state.waiting.reason}{":"}{.restartCount}{","}{end}{"\n"}{end}' \
-      2>/dev/null || true)"
+    POD_STATE_1="$(pod_status_sample)"
   fi
-  if [ -z "$POD_STATE" ]; then
+  if [ -z "$POD_STATE_1" ]; then
     fail "no demo-web pod status was readable — run kubectl -n demo get pods -l app=demo-web and restore cluster access or the workload"
-  elif printf '%s\n' "$POD_STATE" | grep -Fq 'CrashLoopBackOff'; then
-    fail "a demo-web pod is still CrashLoopBackOff — run kubectl -n demo logs <pod> --previous and inspect the Git-managed Deployment"
-  elif printf '%s\n' "$POD_STATE" | awk -F '[:|,]' '
-    { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/ && $i > 3) found = 1 }
-    END { exit(found ? 0 : 1) }
-  '; then
-    fail "a demo-web container has more than 3 restarts — run kubectl -n demo describe pod <pod> and confirm the rollout has stabilized"
   else
-    ok "demo-web pods have no CrashLoopBackOff or high restart counts"
+    # A periodic OOMKill can be briefly Running at a single snapshot. Sample a
+    # second time within a bounded window and require both states to be clean,
+    # with the aggregate restart count not increasing.
+    sleep 15
+    POD_STATE_2="$(pod_status_sample)"
+    POD_STABLE=1
+
+    if [ -z "$POD_STATE_2" ]; then
+      fail "the second demo-web pod-status sample was unreadable — run kubectl -n demo get pods -l app=demo-web and restore cluster access or the workload"
+      POD_STABLE=0
+    else
+      if printf '%s\n%s\n' "$POD_STATE_1" "$POD_STATE_2" | grep -Fq 'CrashLoopBackOff'; then
+        fail "a demo-web pod was CrashLoopBackOff during the 15-second stability window — run kubectl -n demo logs <pod> --previous and inspect the Git-managed Deployment"
+        POD_STABLE=0
+      fi
+      if printf '%s\n%s\n' "$POD_STATE_1" "$POD_STATE_2" | grep -Fq 'OOMKilled'; then
+        fail "a demo-web container showed a previous OOMKilled termination during the 15-second stability window — run kubectl -n demo describe pod <pod> and inspect its memory limit"
+        POD_STABLE=0
+      fi
+      if pod_has_high_restarts "$POD_STATE_1" || pod_has_high_restarts "$POD_STATE_2"; then
+        fail "a demo-web container has more than 3 restarts — run kubectl -n demo describe pod <pod> and confirm the rollout has stabilized"
+        POD_STABLE=0
+      fi
+
+      RESTART_TOTAL_1="$(pod_restart_total "$POD_STATE_1")"
+      RESTART_TOTAL_2="$(pod_restart_total "$POD_STATE_2")"
+      if [ "$RESTART_TOTAL_2" -gt "$RESTART_TOTAL_1" ]; then
+        fail "demo-web restart counts increased during the 15-second stability window — run kubectl -n demo get pods -l app=demo-web -w and inspect the next termination"
+        POD_STABLE=0
+      fi
+    fi
+
+    if [ "$POD_STABLE" -eq 1 ]; then
+      ok "demo-web pods stayed free of CrashLoopBackOff/OOMKilled and restart counts did not increase for 15 seconds"
+    fi
   fi
 fi
 
