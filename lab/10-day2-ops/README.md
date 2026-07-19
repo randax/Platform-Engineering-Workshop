@@ -245,7 +245,7 @@ pushes the new commit. `./solve.sh` reverts every scenario that is currently inj
 
 Every scenario above has a fourth rung on the escalation ladder, beyond the three hints:
 Kagent, the platform's own read-only agent, streaming a live investigation into a "Case
-file" on the affected app's page in the Console. This is the module's second half — the
+file" on the demo component's page in the Console. This is the module's second half — the
 same fault, worked twice, with one field changed in between.
 
 **Say the honest-spec line out loud before you start:** beat 1 runs a real model on your
@@ -299,8 +299,9 @@ did that during module 00.
 ### Beat 1: watch the local model flail — and write down how
 
 Pick any scenario above and inject it (or reuse one you already have live). In the
-Console, open the `demo-web` application's detail page and click **Open investigation**.
-Watch the tool-call log stream.
+Console, open **Components → demo** — the detail page whose Diagnostics panel is
+already showing your broken `demo-web` — and click **Open investigation**. Watch the
+tool-call log stream.
 
 Don't grade it on whether it gets the right answer — it mostly won't. `qwen3:4b` is fine
 at *one* tool call and falls off a cliff the moment an investigation has to chain several
