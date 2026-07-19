@@ -76,6 +76,50 @@ func TestComponentDetailRender(t *testing.T) {
 	}
 }
 
+// TestComponentDetailCaseFile pins the Case file mount on the component detail
+// (the demo namespace's workloads) — the seam that gives lab faults a path into
+// the Console. Same shared affordance as the Application detail: the live mount
+// when the agent is available, the locked hint (no mount) when it isn't.
+func TestComponentDetailCaseFile(t *testing.T) {
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	base := sampleDetail()
+	base.Name, base.Namespace = "Demo workloads", "demo"
+	base.Status, base.StatusClass = "Degraded", "meh"
+	base.ShowDiag = true
+
+	// Available: the shared investigation mount, keyed on the demo namespace, with
+	// a DNS-valid resource name and the follow-up input.
+	avail := base
+	avail.CaseFile = caseFile{Show: true, Available: true, Kind: "Component", Namespace: "demo", Name: "demo"}
+	var on bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&on, "component-detail", avail); err != nil {
+		t.Fatalf("render available: %v", err)
+	}
+	h := on.String()
+	// data-kind="Component" keeps the session distinct from an Application named
+	// like this namespace.
+	for _, want := range []string{"Case file", `id="case-file"`, `data-namespace="demo"`,
+		`data-name="demo"`, `data-kind="Component"`, "Open investigation", `id="cf-followup"`} {
+		if !strings.Contains(h, want) {
+			t.Errorf("component-detail Case file missing %q", want)
+		}
+	}
+
+	// Absent: locked affordance naming kagent, and no mount to reach the backend.
+	locked := base
+	locked.CaseFile = caseFile{Show: true, Available: false, Kind: "Component", Namespace: "demo", Name: "demo"}
+	var off bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&off, "component-detail", locked); err != nil {
+		t.Fatalf("render locked: %v", err)
+	}
+	if l := off.String(); !strings.Contains(l, "kagent") || strings.Contains(l, `id="case-file"`) {
+		t.Errorf("locked component-detail Case file wrong:\n%s", l)
+	}
+}
+
 // TestPanelMonitoringRender guards the three per-component Monitoring panels
 // (#56) added to the Builds / Streams / Buckets pages: each must render its
 // monitor block with a sparkline when telemetry is present, and omit it

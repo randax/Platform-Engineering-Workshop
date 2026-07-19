@@ -10,6 +10,11 @@
 <p class="hint">The cause a <code>kubectl describe</code> would show — container faults and the namespace's Warning events. Platform components are fixed on the GitOps plane: edit <code>gitops/components/{{.Namespace}}</code> (or the catalog file) and push.</p>
 {{end}}
 
+{{/* Case file — the shared agent-investigation affordance (module 10). Offered
+     when this component is unhealthy, giving lab faults (the demo workloads) a
+     path into the Console. See the "case-file" template in case-file.html. */}}
+{{template "case-file" .CaseFile}}
+
 <h2>Monitoring <small>last 30 min · sourced from the OTel stack</small></h2>
 {{if .Telemetry}}
 <div class="monitor">

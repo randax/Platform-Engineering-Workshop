@@ -557,3 +557,13 @@ pre.code {
   border-radius: var(--r-md); padding: 0.7rem 1rem; font-size: 0.9rem;
 }
 .cf-locked .hint { display: block; margin-top: 0.2rem; }
+/* Follow-up questions (#140): a single input under the split view, enabled once a
+   verdict lands; the attendee's question echoes into the log as a cf-you line. */
+.cf-followup { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
+.cf-followup input {
+  flex: 1; font: inherit; color: var(--ink); background: var(--surface);
+  padding: 0.45rem 0.6rem; border: 1px solid var(--line-strong); border-radius: var(--r-sm);
+}
+.cf-followup input:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+.cf-followup input:disabled { background: var(--surface-2); color: var(--muted); }
+.cf-you { color: var(--code-fg); font-weight: 600; margin-top: 0.4rem; }

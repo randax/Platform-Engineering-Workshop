@@ -123,31 +123,9 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
 <p class="hint">The cause a <code>kubectl describe</code> would show. Tenant-plane fix: {{if .SourceBuilt}}push a fix and hit <b>Redeploy</b> below{{else}}delete and recreate with a working image{{end}}.</p>
 {{end}}
 
-{{/* Case file — the single-shot agent investigation (module 10). Offered on an
-     unhealthy app; when the kagent capability is absent it renders in the
-     console's locked-affordance style with the unlock hint (no mount, so
-     nothing can reach the backend). */}}
-{{if .ShowCaseFile}}
-<h2>Case file <small>— investigate with the agent</small></h2>
-{{if .AgentAvailable}}
-<div id="case-file" class="casefile-mount" data-namespace="{{.Namespace}}" data-kind="Application" data-name="{{.Name}}">
-  <p class="hint">A read-only in-cluster agent reads the cluster and streams its investigation live. You apply the fix via git — it can't touch your cluster.</p>
-  <button id="cf-open" type="button">Open investigation</button>
-  <div class="casefile" id="cf-body" hidden>
-    <div><div class="case-log" id="cf-log"></div></div>
-    <div class="case-side" id="cf-panel">
-      <div class="case-card"><h4>Status</h4><p class="case-empty">investigating…</p></div>
-      <div class="case-card"><h4>Hypothesis</h4><p class="case-empty">forming…</p></div>
-      <div class="case-card"><h4>Kill-test — one observation that would falsify it</h4><p class="case-empty">waiting for a hypothesis</p></div>
-      <div class="case-card"><h4>Fix (yours to make — via git)</h4><p class="case-empty">waiting for a verified hypothesis</p></div>
-    </div>
-  </div>
-</div>
-{{else}}
-<p class="cf-locked">{{icon "lock"}} <b>Investigate with the agent</b> — a read-only in-cluster agent that streams a live investigation and proposes a git fix.
-  <span class="hint">Enable <code>kagent</code> from the catalog to unlock this.</span></p>
-{{end}}
-{{end}}
+{{/* Case file — the shared agent-investigation affordance (module 10), offered on
+     an unhealthy app. See the "case-file" template in case-file.html. */}}
+{{template "case-file" .CaseFile}}
 
 <h2>Composed resources <small>what this app wired together</small></h2>
 <table class="composed"><tbody>

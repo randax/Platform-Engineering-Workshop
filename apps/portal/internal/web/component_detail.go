@@ -32,6 +32,12 @@ type componentDetailData struct {
 	Diag     kube.Diagnostics
 	ShowDiag bool
 
+	// Case file — the agent investigation affordance (module 10), offered when
+	// this component is unhealthy. Closes the seam where lab faults (the demo
+	// namespace's workloads) had no path into the Console. Same shared "case-file"
+	// template as the Application detail.
+	CaseFile caseFile
+
 	// Monitoring — populated only when the observability stack is running
 	// (the per-component "unlock": no telemetry, no panel — just a hint).
 	Telemetry  bool
@@ -87,12 +93,20 @@ func handleComponentDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 	// Diagnose the cause when the component isn't fully healthy (DR-0005) — the
 	// failing pods and Warning events for its namespace. Best-effort: a diag read
 	// error never breaks the page, it just leaves the section empty (hidden).
-	if h.Total > 0 && h.Ready < h.Total {
+	unhealthy := h.Total > 0 && h.Ready < h.Total
+	if unhealthy {
 		if diag, derr := s.Kube.NamespaceDiagnostics(r.Context(), ns); derr == nil {
 			data.Diag = diag
 			data.ShowDiag = !diag.Empty()
 		}
 	}
+	// Offer the Case file agent investigation on an unhealthy component (module
+	// 10) — the path lab faults (the demo workloads) take into the Console. Kind
+	// "Component" keeps this session distinct from any Application named like the
+	// namespace. The resource name is the namespace itself: a DNS-valid identifier
+	// the /agent/ask contract accepts, and the agent's evidence comes from that
+	// namespace's diagnostics rollup regardless.
+	data.CaseFile = caseFileFor(s, unhealthy, "Component", ns, ns)
 
 	// Gate the Monitoring panel on the observability stack actually running —
 	// no point querying VM/VLogs (and paying their timeouts) when nothing is
