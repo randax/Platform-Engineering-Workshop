@@ -13,9 +13,10 @@ metadata:
 rules:
   - apiGroups: [platform.cloudbox.io]
     resources: [workshopdatabases]
-    # patch/update let the console *resize* a database (merge-patch spec.size);
-    # create/delete are the rest of the lifecycle. Still scoped to `demo` only.
-    verbs: [create, get, list, patch, update, delete]
+    # patch lets the console *resize* a database (it sends a JSON merge patch
+    # of spec.size — no full-object update path exists in the portal, so no
+    # update verb). create/delete are the rest of the lifecycle; `demo` only.
+    verbs: [create, get, list, patch, delete]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
