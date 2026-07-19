@@ -46,28 +46,31 @@ const (
 )
 
 // allowedKinds is the whitelist of resource kinds the Case file may investigate.
-// The affordance only ever renders on the Application detail page (its mount
-// sends kind="Application"), so that is the only kind we accept — a request for
-// anything else is rejected before it can shape an LLM prompt.
-var allowedKinds = map[string]bool{"Application": true}
+// Each mounting surface passes its own kind so the Kagent session id differs by
+// surface (Application detail → "Application", the demo component detail →
+// "Component"): without that, a component whose namespace equals an Application's
+// name would collide onto one shared session. Anything else is rejected before
+// it can shape an LLM prompt.
+var allowedKinds = map[string]bool{"Application": true, "Component": true}
 
 // caseFile is the view-model for the shared Case file affordance (module 10),
 // rendered by the "case-file" template. One value describes which resource to
 // investigate and whether the agent is available — so every surface that shows an
 // unhealthy resource (the Application detail, the demo component detail) mounts
-// the SAME affordance without duplicating its markup. Kind is always
-// "Application" (the only kind /agent/ask accepts), so the template hardcodes it.
+// the SAME affordance without duplicating its markup. Kind is the surface
+// discriminator (see allowedKinds) and is rendered into data-kind.
 type caseFile struct {
 	Show      bool   // offer it at all — the resource is unhealthy
 	Available bool   // kagent present + Healthy → live mount; otherwise locked
+	Kind      string // "Application" | "Component" — the session/prompt discriminator
 	Namespace string // resource namespace (must be a DNS-1123 label)
 	Name      string // resource name (must be a DNS-1123 label)
 }
 
 // caseFileFor builds the affordance model: shown when the resource is unhealthy,
 // live when the agent capability is available.
-func caseFileFor(s *Server, unhealthy bool, ns, name string) caseFile {
-	return caseFile{Show: unhealthy, Available: agentAvailable(s), Namespace: ns, Name: name}
+func caseFileFor(s *Server, unhealthy bool, kind, ns, name string) caseFile {
+	return caseFile{Show: unhealthy, Available: agentAvailable(s), Kind: kind, Namespace: ns, Name: name}
 }
 
 // agentAvailable reports whether the Case file affordance can offer a live
@@ -163,21 +166,29 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Compose the message. A follow-up (#140) continues the existing session,
-	// which already holds the opening context, so it sends just the question. The
-	// opening investigation sends the full prompt built from the resource + its
-	// diagnostics rollup — the same evidence the panel shows. Best-effort
-	// diagnostics: a read error just yields a leaner opening prompt, never an error.
+	// Compose the message. A genuine follow-up (#140 — a non-blank question)
+	// continues the existing session, which already holds the opening context, so
+	// it sends the question wrapped in only minimal invariant framing (resource
+	// identity + the read-only/output guardrails) — never the full diagnostics
+	// rollup — so a direct or out-of-order API call still can't start an
+	// uncontextualised session. A blank/whitespace question is an opening request:
+	// the full prompt built from the resource + its diagnostics rollup (the same
+	// evidence the panel shows). Best-effort diagnostics: a read error just yields
+	// a leaner opening prompt, never an error.
 	var prompt string
-	if body.Question != "" {
-		prompt = body.Question
+	if question := strings.TrimSpace(body.Question); question != "" {
+		prompt = buildFollowupPrompt(body.Kind, body.Namespace, body.Name, question)
 	} else {
 		var diag kube.Diagnostics
 		var why string
 		if s.Kube != nil {
 			diag, _ = s.Kube.NamespaceDiagnostics(r.Context(), body.Namespace)
-			if app, err := s.Kube.GetApplication(r.Context(), body.Namespace, body.Name); err == nil && app != nil {
-				why = app.Why()
+			// Only an Application maps to a Crossplane XR; a Component is a
+			// namespace of workloads with no such object to read a condition from.
+			if body.Kind == "Application" {
+				if app, err := s.Kube.GetApplication(r.Context(), body.Namespace, body.Name); err == nil && app != nil {
+					why = app.Why()
+				}
 			}
 		}
 		prompt = buildInvestigationPrompt(body.Kind, body.Namespace, body.Name, why, diag)
@@ -271,14 +282,37 @@ func sanitizeFix(fix string) string {
 	return strings.Join(out, "\n")
 }
 
+// resourcePhrase names the thing under investigation honestly, per surface. A
+// Component is a namespace of platform workloads, not an Application XR, so it is
+// phrased as such rather than mislabelled "the Application".
+func resourcePhrase(kind, ns, name string) string {
+	if kind == "Component" {
+		return fmt.Sprintf("the workloads of platform component %q in namespace %q", name, ns)
+	}
+	return fmt.Sprintf("the %s %q in namespace %q", kind, name, ns)
+}
+
+// buildFollowupPrompt frames a follow-up question with only the invariant context
+// the session needs — the resource identity + the read-only and output-shape
+// guardrails — but NOT the opening diagnostics rollup (the session already holds
+// it). This keeps a genuine follow-up lean while ensuring a direct/out-of-order
+// API call can't start an uncontextualised, unguarded session.
+func buildFollowupPrompt(kind, ns, name, question string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Continuing the read-only investigation of %s.\n\n", resourcePhrase(kind, ns, name))
+	fmt.Fprintf(&b, "Follow-up question: %s\n\n", question)
+	b.WriteString("Answer using read-only tools only; give any fix as copy-paste git commands the operator runs themselves — never apply changes to the cluster yourself.\n")
+	return b.String()
+}
+
 // buildInvestigationPrompt turns the resource identity + its diagnostics rollup
 // into the agent's OPENING prompt — the same evidence the Diagnostics panel
 // shows, plus the read-only guardrail and the required answer shape
 // (Status → Hypothesis → Kill-test → Fix as copy-paste git commands). Follow-up
-// questions bypass this: they continue the session with just the question.
+// questions bypass this (see buildFollowupPrompt).
 func buildInvestigationPrompt(kind, ns, name, why string, diag kube.Diagnostics) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "You are a read-only Kubernetes troubleshooting agent. Investigate why the %s %q in namespace %q is unhealthy.\n\n", kind, name, ns)
+	fmt.Fprintf(&b, "You are a read-only Kubernetes troubleshooting agent. Investigate %s and explain why it is unhealthy.\n\n", resourcePhrase(kind, ns, name))
 	if why != "" {
 		fmt.Fprintf(&b, "The platform's status condition says: %s\n\n", why)
 	}

@@ -10,7 +10,7 @@
 {{if .Show}}
 <h2>Case file <small>— investigate with the agent</small></h2>
 {{if .Available}}
-<div id="case-file" class="casefile-mount" data-namespace="{{.Namespace}}" data-kind="Application" data-name="{{.Name}}">
+<div id="case-file" class="casefile-mount" data-namespace="{{.Namespace}}" data-kind="{{.Kind}}" data-name="{{.Name}}">
   <p class="hint">A read-only in-cluster agent reads the cluster and streams its investigation live. You apply the fix via git — it can't touch your cluster.</p>
   <button id="cf-open" type="button">Open investigation</button>
   <div class="casefile" id="cf-body" hidden>

@@ -101,11 +101,12 @@ func handleComponentDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// Offer the Case file agent investigation on an unhealthy component (module
-	// 10) — the path lab faults (the demo workloads) take into the Console. The
-	// resource name is the namespace itself: a DNS-valid identifier the /agent/ask
-	// contract accepts, and the agent's evidence comes from that namespace's
-	// diagnostics rollup regardless.
-	data.CaseFile = caseFileFor(s, unhealthy, ns, ns)
+	// 10) — the path lab faults (the demo workloads) take into the Console. Kind
+	// "Component" keeps this session distinct from any Application named like the
+	// namespace. The resource name is the namespace itself: a DNS-valid identifier
+	// the /agent/ask contract accepts, and the agent's evidence comes from that
+	// namespace's diagnostics rollup regardless.
+	data.CaseFile = caseFileFor(s, unhealthy, "Component", ns, ns)
 
 	// Gate the Monitoring panel on the observability stack actually running —
 	// no point querying VM/VLogs (and paying their timeouts) when nothing is

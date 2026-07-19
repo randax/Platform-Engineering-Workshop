@@ -61,6 +61,9 @@
             function finish(ok) {
               if (ended) return;
               ended = true;
+              // Stop the background pump loop from consuming the rest of the
+              // stream once we've settled (error event, early exit).
+              reader.cancel().catch(function () {});
               resolve({ ok: ok, errored: errored });
             }
             function handleFrame(frame) {
@@ -97,9 +100,13 @@
                   return;
                 }
                 // Normalize CRLF → LF (a proxy may rewrite line endings) before
-                // splitting on the blank-line frame boundary.
+                // splitting on the blank-line frame boundary. Match only the full
+                // \r\n: on the concatenated buffer a boundary-split pair is
+                // reassembled before replacement, so a lone \r from a chunk edge
+                // is never mistaken for a line ending (nothing we talk to emits
+                // lone-CR framing).
                 buf = (buf + dec.decode(r.value, { stream: true })).replace(
-                  /\r\n?/g,
+                  /\r\n/g,
                   "\n"
                 );
                 var i;

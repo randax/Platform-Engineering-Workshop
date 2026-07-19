@@ -99,7 +99,7 @@ func handleApplicationDetail(s *Server, w http.ResponseWriter, r *http.Request) 
 		}
 		// Offer the Case file agent investigation on an unhealthy app (module 10).
 		// It renders locked unless the kagent capability is present.
-		data.CaseFile = caseFileFor(s, true, ns, name)
+		data.CaseFile = caseFileFor(s, true, "Application", ns, name)
 	}
 
 	// The workload's metrics (job = cloudbox-<name>), once observability is on —

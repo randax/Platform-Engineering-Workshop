@@ -93,14 +93,16 @@ func TestComponentDetailCaseFile(t *testing.T) {
 	// Available: the shared investigation mount, keyed on the demo namespace, with
 	// a DNS-valid resource name and the follow-up input.
 	avail := base
-	avail.CaseFile = caseFile{Show: true, Available: true, Namespace: "demo", Name: "demo"}
+	avail.CaseFile = caseFile{Show: true, Available: true, Kind: "Component", Namespace: "demo", Name: "demo"}
 	var on bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&on, "component-detail", avail); err != nil {
 		t.Fatalf("render available: %v", err)
 	}
 	h := on.String()
+	// data-kind="Component" keeps the session distinct from an Application named
+	// like this namespace.
 	for _, want := range []string{"Case file", `id="case-file"`, `data-namespace="demo"`,
-		`data-name="demo"`, "Open investigation", `id="cf-followup"`} {
+		`data-name="demo"`, `data-kind="Component"`, "Open investigation", `id="cf-followup"`} {
 		if !strings.Contains(h, want) {
 			t.Errorf("component-detail Case file missing %q", want)
 		}
@@ -108,7 +110,7 @@ func TestComponentDetailCaseFile(t *testing.T) {
 
 	// Absent: locked affordance naming kagent, and no mount to reach the backend.
 	locked := base
-	locked.CaseFile = caseFile{Show: true, Available: false, Namespace: "demo", Name: "demo"}
+	locked.CaseFile = caseFile{Show: true, Available: false, Kind: "Component", Namespace: "demo", Name: "demo"}
 	var off bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&off, "component-detail", locked); err != nil {
 		t.Fatalf("render locked: %v", err)
