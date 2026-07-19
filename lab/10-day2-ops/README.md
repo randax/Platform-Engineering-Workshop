@@ -313,22 +313,30 @@ spirit as module 05's "the agent claimed X" exercise.
 
 ### Beat 2: one `ModelConfig` push, and it actually diagnoses
 
+Beat 2 is this module's **documented exception to the offline-after-pre-pull rule** —
+the one place in the workshop that needs the venue network (decided and recorded in the
+module spec: small local models genuinely can't do multi-step triage, and on 16 GB
+machines beat 1 doesn't fit at all). If the network is down, beat 1 still works on
+32 GB machines, and the module's scenario path needs no network anywhere.
+
 Sign up for a free [OpenCode Zen](https://opencode.ai/auth) key during module 00 prep if
 you haven't yet (see that module's README). "Free" here is explicit and time-boxed —
 Zen's free models are labeled **"for a limited time."** If they're gone by the time you
 read this, skip straight to the fallback paragraph below.
 
 Create the Secret imperatively — an API key is the one thing in this whole workshop that
-never goes in Git:
+never goes in Git (and `read -s` below keeps it out of your shell history too):
 
 ```bash
-export OPENCODE_API_KEY=...   # paste the key you saved during module 00 prep
+read -rsp 'OpenCode API key: ' OPENCODE_API_KEY; echo
 kubectl create secret generic kagent-zen -n kagent \
-  --from-literal OPENCODE_API_KEY=$OPENCODE_API_KEY
+  --from-literal="OPENCODE_API_KEY=$OPENCODE_API_KEY"
+unset OPENCODE_API_KEY
 ```
 
-(If you skip the `export`, `kubectl` happily creates the Secret with an **empty** key
-and beat 2 fails later with an opaque auth error — set it first.)
+(The prompt hides what you type. If you paste nothing, `kubectl` happily creates the
+Secret with an **empty** key and beat 2 fails later with an opaque auth error — check
+with `kubectl -n kagent get secret kagent-zen -o jsonpath='{.data}'` if in doubt.)
 
 Then switch the *same* ModelConfig, via git, to Zen's OpenAI-compatible endpoint. Pick
 whichever model is currently marked free at
@@ -364,8 +372,8 @@ against the live cluster yourself, then fix the fault the only way this module e
 anything: `git revert` and push.
 
 **No Zen key, or the free tier is gone?** Same shape, your own key. Create the Secret the
-same way (`kubectl create secret generic kagent-byo -n kagent --from-literal
-API_KEY=$YOUR_KEY`), then set `apiKeySecret: kagent-byo` / `apiKeySecretKey: API_KEY` in
+same way (`kubectl create secret generic kagent-byo -n kagent --from-literal="API_KEY=$YOUR_KEY"`
+— one line, quoted), then set `apiKeySecret: kagent-byo` / `apiKeySecretKey: API_KEY` in
 the ModelConfig and either `provider: Anthropic` with a current Claude model and
 `anthropic: {}`, or `provider: OpenAI` with a current GPT model and `openAI: {}` — no
 `baseUrl` needed for either; that field only exists to redirect the generic OpenAI
