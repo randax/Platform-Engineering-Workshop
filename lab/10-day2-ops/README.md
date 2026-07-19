@@ -41,6 +41,11 @@ applies: **the agent gets eyes; Git keeps the hands**. Whether a human or agent 
 cause, `git revert` and push is the only durable write path. A live `kubectl edit` is not
 a repair—ArgoCD self-healing will restore whatever Git says.
 
+Work through at least one scenario by hand first — that's where the triage muscle memory
+lives. Once you've done that, "Escalate to the agent" below reruns the same kind of
+investigation through Kagent, the platform's own read-only agent, in two beats: a fully
+offline model that flails, then a one-line `ModelConfig` change that fixes it.
+
 ## The setup
 
 | # | Scenario | Needs | Flavor |
@@ -235,6 +240,131 @@ Git repair are in
 Mechanically, `./restore.sh 3` finds the traced registry commit, runs `git revert`, and
 pushes the new commit. `./solve.sh` reverts every scenario that is currently injected.
 </details>
+
+## Escalate to the agent: beat 1 (flail) → beat 2 (diagnose)
+
+Every scenario above has a fourth rung on the escalation ladder, beyond the three hints:
+Kagent, the platform's own read-only agent, streaming a live investigation into a "Case
+file" on the affected app's page in the Console. This is the module's second half — the
+same fault, worked twice, with one field changed in between.
+
+**Say the honest-spec line out loud before you start:** beat 1 runs a real model on your
+host, *beside* the whole running cluster. That needs the **32 GB recommended spec**. On
+the **16 GB minimum spec, beat 1 does not fit next to the running stack** — skip straight
+to "Beat 2" below. That is not a lesser path; it costs no extra RAM, and it's the one
+that actually fits your machine.
+
+### Enable Kagent and point it at your platform
+
+If you haven't already, turn the capability on the same way as every other one in this
+workshop — copy the catalog entry into `gitops/apps/` and push:
+
+```bash
+git clone http://localhost:30300/cloudbox/platform.git && cd platform
+cp gitops/catalog/kagent.yaml gitops/apps/
+git add gitops/apps/kagent.yaml
+git commit -m "enable kagent"
+git push
+```
+
+Wait for `kubectl -n argocd get application kagent` to report `Synced`/`Healthy`, then
+check what shipped: `kubectl -n kagent get modelconfig default-model-config -o yaml`. It
+defaults to host-side Ollama running `qwen3:4b`, reached at `host.docker.internal:11434`.
+
+**macOS and WSL2 (Docker Desktop, OrbStack): nothing else to do.** That address already
+resolves inside the containers your cluster nodes run in.
+
+**Native Linux Docker has no `host.docker.internal`.** This is the same host-vs-container
+addressing problem `cloudbox-mirror` already solved for you in module 00 (see
+`mirror_host_endpoint()` in `scripts/lib.sh`), showing up a second time for a second
+reason: "the host" means something different depending on how Docker virtualizes your
+network, and every capability that needs to reach out of the cluster hits this once. Fix
+it the same GitOps way as every other change in this module — one field, in the same
+clone:
+
+```bash
+$EDITOR gitops/components/kagent/kagent.yaml   # find `kind: ModelConfig`, then `ollama:`
+#   host: host.docker.internal:11434   ->   host: 10.5.0.1:11434
+git add gitops/components/kagent/kagent.yaml
+git commit -m "kagent: Ollama host is the Linux bridge gateway, not host.docker.internal"
+git push
+```
+
+`10.5.0.1` is `TALOS_SUBNET_GATEWAY` in `scripts/versions.env` — the exact address
+`mirror_host_endpoint()` resolves to on native Linux for the same reason.
+
+Ollama itself needs to be running on your host with `qwen3:4b` pulled — `cloudbox-init.sh`
+did that during module 00.
+
+### Beat 1: watch the local model flail — and write down how
+
+Pick any scenario above and inject it (or reuse one you already have live). In the
+Console, open the `demo-web` application's detail page and click **Open investigation**.
+Watch the tool-call log stream.
+
+Don't grade it on whether it gets the right answer — it mostly won't. `qwen3:4b` is fine
+at *one* tool call and falls off a cliff the moment an investigation has to chain several
+(get → describe → logs → events → hypothesis), which every real fault requires.
+**Write down exactly how it fails** — a loop that repeats the same `kubectl get`, a
+thread it drops after the third tool call, a hypothesis stated with no evidence behind
+it, a malformed follow-up. That sentence is beat 1's deliverable, not a diagnosis — same
+spirit as module 05's "the agent claimed X" exercise.
+
+### Beat 2: one `ModelConfig` push, and it actually diagnoses
+
+Sign up for a free [OpenCode Zen](https://opencode.ai/auth) key during module 00 prep if
+you haven't yet (see that module's README). "Free" here is explicit and time-boxed —
+Zen's free models are labeled **"for a limited time."** If they're gone by the time you
+read this, skip straight to the fallback paragraph below.
+
+Create the Secret imperatively — an API key is the one thing in this whole workshop that
+never goes in Git:
+
+```bash
+kubectl create secret generic kagent-zen -n kagent \
+  --from-literal OPENCODE_API_KEY=$OPENCODE_API_KEY
+```
+
+Then switch the *same* ModelConfig, via git, to Zen's OpenAI-compatible endpoint. Pick
+whichever model is currently marked free at
+[opencode.ai/docs/zen](https://opencode.ai/docs/zen/) (at the time of writing:
+`deepseek-v4-flash-free`, `mimo-v2.5-free`, `nemotron-3-ultra-free`):
+
+```bash
+cd platform   # the same clone from above, or a fresh `git clone .../cloudbox/platform.git`
+$EDITOR gitops/components/kagent/kagent.yaml   # find `kind: ModelConfig`, replace spec:
+```
+
+```yaml
+spec:
+  provider: OpenAI
+  model: deepseek-v4-flash-free
+  apiKeySecret: kagent-zen
+  apiKeySecretKey: OPENCODE_API_KEY
+  openAI:
+    baseUrl: "https://opencode.ai/zen/v1"
+```
+
+```bash
+git add gitops/components/kagent/kagent.yaml
+git commit -m "kagent: switch beat 2 to OpenCode Zen"
+git push
+```
+
+Wait for ArgoCD to converge (`kubectl -n argocd get application kagent`), then open a new
+investigation on the same fault. Same evidence, same read-only tool server — now the
+verdict comes with a real hypothesis and an explicit kill-test. Verify that kill-test
+against the live cluster yourself, then fix the fault the only way this module ever fixes
+anything: `git revert` and push.
+
+**No Zen key, or the free tier is gone?** Same shape, your own key. Create the Secret the
+same way (`kubectl create secret generic kagent-byo -n kagent --from-literal
+API_KEY=$YOUR_KEY`), then set `apiKeySecret: kagent-byo` / `apiKeySecretKey: API_KEY` in
+the ModelConfig and either `provider: Anthropic` with a current Claude model and
+`anthropic: {}`, or `provider: OpenAI` with a current GPT model and `openAI: {}` — no
+`baseUrl` needed for either; that field only exists to redirect the generic OpenAI
+provider at Zen's endpoint instead of OpenAI's own. Full field reference:
+[kagent supported providers](https://kagent.dev/docs/kagent/supported-providers).
 
 ## Check your work
 

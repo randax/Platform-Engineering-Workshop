@@ -36,6 +36,19 @@ allocatable to Docker), 32 GB is comfortable. macOS and Linux are fully supporte
 but is our least-tested platform — if it fights you, use a lifeboat below rather than
 burning workshop time.
 
+## Optional: sign up for OpenCode Zen (module 10 prep)
+
+Module 10 (stretch) has a second beat that swaps a flailing local AI model for a free
+hosted one — grab the key now while you have good WiFi, it takes two minutes and nothing
+else in the workshop depends on it. Sign in at [opencode.ai/auth](https://opencode.ai/auth)
+and copy your API key somewhere safe. (Signing up currently asks for billing details as
+part of the standard flow — the models module 10 uses are free, but don't be surprised by
+the form.) You'll paste the key into a Kubernetes Secret when you get to module 10, never
+into git.
+
+Skip this if you're not sure you'll reach module 10 — it ships a documented fallback for
+any personal Claude or OpenAI key, and its free tier is explicitly time-limited anyway.
+
 ## If your laptop says no: the lifeboats
 
 - **Pair up.** The workshop is fully doable as a pair on one machine — arguably better,
