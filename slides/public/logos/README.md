@@ -26,7 +26,6 @@ each project's own brand assets or a permissive icon set.
 | `nats.svg` | NATS | CNCF artwork (color icon) |
 | `opentelemetry.svg` | OpenTelemetry | CNCF artwork (color icon) |
 | `cloudnativepg.svg` | CloudNativePG | CNCF artwork (color icon) |
-| `containerd.svg` | containerd | CNCF artwork (color icon) |
 | `gitea.svg` | Gitea | go-gitea/gitea `public/assets/img/logo.svg` |
 | `grafana.svg` | Grafana | devicon (grafana-original) |
 | `docker.svg` | Docker | devicon (docker-original) |
