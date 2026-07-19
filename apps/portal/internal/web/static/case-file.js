@@ -57,10 +57,11 @@
           var buf = "";
           var ended = false;
           return new Promise(function (resolve) {
+            var errored = false; // a server `error` fragment was shown
             function finish(ok) {
               if (ended) return;
               ended = true;
-              resolve({ ok: ok });
+              resolve({ ok: ok, errored: errored });
             }
             function handleFrame(frame) {
               var event = "message";
@@ -78,6 +79,7 @@
                 else appendLog(html);
                 if (onVerdict) onVerdict();
               } else if (event === "error") {
+                errored = true;
                 if (route === "panel" && panel) panel.innerHTML = html;
                 else appendLog(html);
                 finish(false);
@@ -108,7 +110,11 @@
                 return pump();
               });
             }
-            pump();
+            // A mid-stream read failure (connection drop) must reach the failure
+            // path, not leave the promise unsettled and the UI stuck.
+            pump().catch(function () {
+              finish(false);
+            });
           });
         })
         .catch(function () {
@@ -142,7 +148,10 @@
         } else {
           open.disabled = false;
           open.textContent = "Retry investigation";
-          if (panel && !gotVerdict) {
+          // Only write the generic failure when NEITHER a verdict nor a specific
+          // server error fragment reached the panel — otherwise we'd clobber the
+          // agent's own message with "Could not reach the agent."
+          if (panel && !gotVerdict && !res.errored) {
             panel.innerHTML =
               '<div class="case-card cf-fail"><h4>Investigation failed</h4><p>Could not reach the agent.</p></div>';
           }
