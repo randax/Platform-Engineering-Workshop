@@ -1,0 +1,12 @@
+local-path-provisioner.yaml
+otel-lgtm.yaml
+cnpg-operator.yaml
+rustfs.yaml
+crossplane.yaml
+knative-serving.yaml
+zot.yaml
+argo-workflows.yaml
+portal.yaml
+knative-eventing.yaml
+picture-pipeline.yaml
+kagent.yaml

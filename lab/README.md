@@ -23,10 +23,11 @@ reached.)
 | 07 | [In-cluster CI: Workflows + BuildKit + Zot](07-ci/) | stretch | demo + self-paced | An image built *inside* your cluster, pushed to *your* registry, running as a pod |
 | 08 | [Portal: the Cloudbox Console](08-portal/) | stretch | self-paced + demo | Create a database through a portal *you can read the source of* — plus a Backstage presenter demo |
 | 09 | [Capstone: the picture pipeline](09-capstone/) | stretch | self-paced finale | Upload a photo → a resizer that didn't exist scales from zero → thumbnail, metadata, and the whole chain as one trace |
+| 10 | [Day-2 operations: roll back a bad release](10-day2-ops/) | stretch | self-paced | You used `git revert` — the only durable fix — to recover the release, with kagent optionally assisting the diagnosis |
 
 Core = 00–05. Stretch modules are for the fast 20% and for home; the core path never
 depends on them — but they build on each other: 09 (capstone) needs 06 and 08, and 08's
-star task needs 04's platform API. `./scripts/catch-up.sh <module>` bridges any gap.
+star task needs 04's platform API, while 10 only needs 02. `./scripts/catch-up.sh <module>` bridges any gap.
 
 ## How every module works
 
