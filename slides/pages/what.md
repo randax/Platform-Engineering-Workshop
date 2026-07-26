@@ -103,7 +103,7 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 <tr><td>Messaging / queues</td><td>SQS · SNS · Pub/Sub · EventBridge</td><td><Logo name="nats" label="NATS JetStream"/></td></tr>
 <tr><td>CI / image builds</td><td>CodeBuild · Cloud Build</td><td><Logo name="argo-workflows" label="Argo Workflows"/> <Logo name="buildkit" label/></td></tr>
 <tr><td>Container registry</td><td>ECR · Artifact Registry · ACR</td><td><Logo name="zot" text="Zot"/></td></tr>
-<tr><td>Cloud console</td><td><Logo name="aws" dim/> <Logo name="azure" dim/> <Logo name="gcp" dim/></td><td><Logo name="cloudbox" text="Cloudbox"/></td></tr>
+<tr><td>Cloud console</td><td><Logo name="aws" dim/> <Logo name="azure" dim/> <Logo name="gcp" dim/></td><td><Logo name="cloudbox" label/></td></tr>
 </tbody>
 </table>
 </div>
@@ -179,7 +179,7 @@ These four are the transferable skills — the thing they take to work on Monday
         <Logo name="knative" label size="1.6rem"/>
         <Logo name="nats" label="NATS" size="1.6rem"/>
         <Logo name="argo-workflows" label="CI · Workflows" size="1.6rem"/>
-        <Logo name="cloudbox" text="Cloudbox" size="1.6rem"/>
+        <Logo name="cloudbox" label size="1.6rem"/>
         <Logo name="grafana" label="Victoria + OTel" size="1.6rem"/>
       </div>
     </div>

@@ -33,7 +33,7 @@ const DISPLAY = {
   cloudnativepg: 'CloudNativePG', cnpg: 'CloudNativePG', crossplane: 'Crossplane',
   grafana: 'Grafana', opentelemetry: 'OpenTelemetry', otel: 'OpenTelemetry',
   knative: 'Knative', nats: 'NATS', buildkit: 'BuildKit', zot: 'Zot',
-  victoriametrics: 'VictoriaMetrics', docker: 'Docker', containerd: 'containerd',
+  victoriametrics: 'VictoriaMetrics', docker: 'Docker', cloudbox: 'Cloudbox', containerd: 'containerd',
   aws: 'AWS', amazonwebservices: 'AWS', azure: 'Azure', microsoftazure: 'Azure',
   gcp: 'Google Cloud', googlecloud: 'Google Cloud',
 }

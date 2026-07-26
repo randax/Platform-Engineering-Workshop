@@ -6,7 +6,7 @@ layout: section
 
 # The Cloudbox Console: a portal you can read
 
-<div class="modlogos"><Logo name="cloudbox" text="Cloudbox" size="2.6rem"/> <Logo name="kubernetes" label size="2.6rem"/></div>
+<div class="modlogos"><Logo name="cloudbox" label size="2.6rem"/> <Logo name="kubernetes" label size="2.6rem"/></div>
 
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their platform team gets a front door — a console they can read every line of, not a product they log into.</div>
 

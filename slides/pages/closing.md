@@ -28,7 +28,7 @@ Closing section — bring the energy back to the front of the room for the last 
         <Logo name="knative" label="Knative · 06+09" size="1.6rem"/>
         <Logo name="nats" label="NATS · 09" size="1.6rem"/>
         <Logo name="argo-workflows" label="CI · 07" size="1.6rem"/>
-        <Logo name="cloudbox" text="Cloudbox" size="1.6rem"/>
+        <Logo name="cloudbox" label size="1.6rem"/>
         <Logo name="grafana" label="Victoria + OTel" size="1.6rem"/>
       </div>
     </div>
@@ -56,7 +56,7 @@ The mental model is the real takeaway: cloud products are software plus an API, 
 <tr><td>Object storage (S3)</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="rustfs" text="RustFS" size="1.5rem"/></td></tr>
 <tr><td>Self-service infra</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="crossplane" label size="1.5rem"/></td></tr>
 <tr><td>Serverless · CI · registry</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="knative" label size="1.5rem"/> <Logo name="argo-workflows" label="Argo Workflows" size="1.5rem"/> <Logo name="zot" text="Zot" size="1.5rem"/></td></tr>
-<tr><td>Cloud console</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudbox" text="Cloudbox" size="1.5rem"/></td></tr>
+<tr><td>Cloud console</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudbox" label size="1.5rem"/></td></tr>
 </tbody>
 </table>
 </div>
