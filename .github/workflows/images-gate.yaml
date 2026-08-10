@@ -39,28 +39,15 @@ jobs:
       - name: Every pinned image exists upstream
         run: |
           set -euo pipefail
-          # TEMPORARY exception (issue #7): refs matching this glob only WARN
-          # instead of failing the gate. cloudbox-{portal,uploader,resizer} are
-          # published and public (crane-verified 2026-08-10) and are held to the
-          # same standard as every other ref; cloudbox-grafana joined the build
-          # matrix after apps-v0.1.0 was tagged, so it has never been published.
-          # DELETE THE NEXT LINE once it is published and flipped public — with
-          # the glob unset the gate fails for it like everything else.
-          PENDING_GLOB='ghcr.io/randax/cloudbox-grafana:*'
-
-          fail=0; warn=0
+          fail=0
           while IFS= read -r ref; do
             if crane manifest "${ref}" >/dev/null 2>&1; then
               echo "ok  ${ref}"
-            # shellcheck disable=SC2053  # unquoted RHS: glob match is intended
-            elif [[ -n "${PENDING_GLOB:-}" && "${ref}" == ${PENDING_GLOB} ]]; then
-              echo "::warning::PENDING (issue #7): ${ref}"
-              warn=$((warn + 1))
             else
               echo "::error::MISSING upstream: ${ref}"
               fail=$((fail + 1))
             fi
           done < <(grep -vE '^\s*(#|\[|$)' scripts/images.txt)
           echo "---"
-          echo "${fail} missing, ${warn} pending"
+          echo "${fail} missing"
           exit "${fail}"
