@@ -57,8 +57,11 @@ spec:
     spec:
       containers:
         # Built by CI from apps/uploader (multi-arch). Must be in the
-        # pre-pull list (scripts/images.txt).
+        # pre-pull list (scripts/images.txt). The tag is rewritten by
+        # release-please in the release PR — keep the annotations.
+        # x-release-please-start-version
         - image: ghcr.io/randax/cloudbox-uploader:v0.1.0
+        # x-release-please-end-version
           env:
             # WORKSHOP-GRADE CREDENTIALS, committed on purpose (ephemeral
             # lab sandbox) — must match the rustfs component.
@@ -96,8 +99,11 @@ spec:
     spec:
       containers:
         # Built by CI from apps/resizer (multi-arch). Must be in the
-        # pre-pull list (scripts/images.txt).
+        # pre-pull list (scripts/images.txt). The tag is rewritten by
+        # release-please in the release PR — keep the annotations.
+        # x-release-please-start-version
         - image: ghcr.io/randax/cloudbox-resizer:v0.1.0
+        # x-release-please-end-version
           env:
             - name: S3_ENDPOINT
               value: http://rustfs-svc.rustfs.svc.cluster.local:9000

@@ -13,8 +13,12 @@
 #   - every build pushes the git SHA tag (traceable, immutable);
 #   - the pinned :v<version> tag is published only for a real release — normally
 #     driven by release-please via workflow_call (see release-please.yaml), with
-#     a manual `apps-v*` tag push kept as an escape hatch. A plain branch push
-#     builds but does NOT push a version tag the manifests pin.
+#     a manual `apps-v*` tag push, or `gh workflow run build-images.yaml
+#     -f version=<x.y.z>`, kept as escape hatches. A plain branch push builds
+#     but does NOT push a version tag the manifests pin.
+#
+# The version the manifests pin is NOT edited by hand: release-please's
+# extra-files rewrite every pinned ref in the release PR (release-please-config.json).
 # =============================================================================
 name: Build app images
 
@@ -39,8 +43,15 @@ on:
       - "apps/**"
       - ".github/workflows/build-images.yaml"
   # Escape hatch: tag pushes combined with path filters can be finicky, and
-  # sometimes you just need to rebuild.
+  # sometimes you just need to rebuild. Same `version` input as workflow_call,
+  # so `gh workflow run build-images.yaml -f version=0.1.0` republishes the
+  # pinned tag by hand; leave it empty to only rebuild the SHA tag.
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Optional release version without the v (e.g. 0.1.0) — publishes :v<version>. Empty: build only."
+        type: string
+        required: false
 
 # Serialize runs per ref so an old build can't finish last and overwrite a
 # newer tag push out of order.
@@ -115,14 +126,17 @@ jobs:
       - name: Compute image tags
         id: tags
         env:
-          # release-please passes 0.1.0; a manual apps-v0.1.0 tag yields the same.
+          # The `inputs` context is populated for BOTH workflow_call and
+          # workflow_dispatch (and evaluates to empty for push), so one
+          # expression covers release-please and the manual dispatch. A manual
+          # apps-v0.1.0 tag push yields the same version via GITHUB_REF below.
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           IMG="ghcr.io/randax/cloudbox-${{ matrix.app }}"
           TAGS="${IMG}:${{ github.sha }}"
           VERSION=""
           if [[ -n "${INPUT_VERSION}" ]]; then
-            VERSION="v${INPUT_VERSION}"                 # release-please (workflow_call)
+            VERSION="v${INPUT_VERSION}"                 # workflow_call / workflow_dispatch
           elif [[ "${GITHUB_REF}" == refs/tags/apps-v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/apps-}"      # manual tag escape hatch → vX.Y.Z
           fi

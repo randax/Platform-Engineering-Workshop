@@ -131,15 +131,26 @@ ghcr.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e
 
 # --- Wave 3: Cloudbox Console + picture pipeline (modules 08/09)
 # First-party apps, built multi-arch from apps/ by .github/workflows/
-# build-images.yaml. ⚠️ NOT yet published to GHCR as of 2026-07-14 —
-# publish (run the workflow) before rehearsal, then verify with crane.
+# build-images.yaml and released by release-please (see scripts/README.md).
+# Published and PUBLIC on GHCR — anonymous crane pull verified 2026-08-10.
+# The version below is rewritten by release-please in the release PR; the
+# annotation comments around it are load-bearing, do not remove them.
+# x-release-please-start-version
 ghcr.io/randax/cloudbox-portal:v0.1.0
 ghcr.io/randax/cloudbox-uploader:v0.1.0
 ghcr.io/randax/cloudbox-resizer:v0.1.0
+# x-release-please-end-version
 # Custom Grafana: stock Grafana + native VictoriaMetrics datasource plugins
 # baked in (apps/grafana/Dockerfile, #65). Built by the same build-images.yaml.
 # The base image (docker.io/grafana/grafana above) is now only a BUILD input.
+# ⚠️ NOT published: this image joined the build matrix after apps-v0.1.0 was
+# tagged, so no such GHCR package exists yet (404 as of 2026-08-10). The next
+# release publishes it, after which a human must flip the new package to
+# public — the one step CI cannot do. Tracked by issue #7; until then
+# .github/workflows/images-gate.yaml only warns for this ref.
+# x-release-please-start-version
 ghcr.io/randax/cloudbox-grafana:v0.1.0
+# x-release-please-end-version
 
 # --- Wave 3: Backstage (CNOE prebuilt image, tag pinned by gitops/catalog)
 # linux/amd64 only — Apple Silicon runs it emulated. Its database is a CNPG

@@ -108,3 +108,27 @@ resolving. Export `GITHUB_TOKEN` (or `GH_TOKEN`) to avoid the unauthenticated
 GitHub API rate limit. Bumping a pin stays a deliberate decision — the script
 reports, it never edits.
 
+## Releasing the first-party images
+
+The `ghcr.io/randax/cloudbox-*` entries in [`images.txt`](images.txt) are the
+only pins **we** produce, and they are the one kind you never bump by hand:
+
+1. Change something under `apps/`, merge to `main` with a conventional commit.
+2. release-please keeps a release PR open with the next version and the
+   changelog.
+3. That PR also rewrites every pinned `cloudbox-*` ref in the repo —
+   `images.txt`, the gitops components, the lab 04 example — through the
+   `extra-files` list in `release-please-config.json`. The `x-release-please`
+   start/end block comments around those refs are load-bearing — see
+   [`images.txt`](images.txt) for the exact spelling. They are **full-line**
+   comments on purpose: `check-consistency.sh` and the image gate read
+   `images.txt` entries verbatim and only strip full-line comments.
+4. Merging the PR tags `apps-v<version>` and publishes the multi-arch
+   `:v<version>` images to GHCR.
+5. **Still manual:** the first publish of a *new* image creates a private GHCR
+   package, and its visibility cannot be set from CI — flip it to public at
+   `https://github.com/users/randax/packages/container/<image>/settings`. Once
+   per image, not per release.
+
+Details, including the escape hatches for republishing without a release, are
+in [`apps/README.md`](../apps/README.md#releasing-the-images).

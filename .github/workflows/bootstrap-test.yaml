@@ -741,7 +741,9 @@ jobs:
           kubectl apply -f lab/08-portal/portal-applications-access.yaml
           base=http://localhost:30600
           app=e2eapp
+          # x-release-please-start-version
           img=ghcr.io/randax/cloudbox-uploader:v0.1.0
+          # x-release-please-end-version
           c=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST "$base/applications" \
             --data-urlencode "name=$app" --data-urlencode "image=$img" \
             --data-urlencode "min=0" --data-urlencode "max=3" \

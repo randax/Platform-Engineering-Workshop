@@ -3,13 +3,18 @@
 | | |
 |---|---|
 | Source | `apps/uploader` + `apps/resizer` **in this repo** — nothing vendored from upstream; the manifest is ours |
-| Images | `ghcr.io/randax/cloudbox-uploader:v0.1.0`, `ghcr.io/randax/cloudbox-resizer:v0.1.0` (multi-arch) — **PENDING**: built and pushed by this repo's CI from `apps/`; not yet on GHCR as of 2026-07-14. Verify with `crane manifest` once CI has run, then add to `scripts/images.txt`. `public.ecr.aws/aws-cli/aws-cli:2.27.49` (bucket Job) is pinned and verified pullable (crane, 2026-07-14) — already in the pre-pull list for module 03. |
+| Images | `ghcr.io/randax/cloudbox-uploader:v0.1.0`, `ghcr.io/randax/cloudbox-resizer:v0.1.0` (multi-arch) — built and pushed by this repo's CI from `apps/`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. `public.ecr.aws/aws-cli/aws-cli:2.27.49` (bucket Job) is pinned and verified pullable (crane, 2026-07-14) — already in the pre-pull list for module 03. |
 | File | `picture-pipeline.yaml` |
 
 ## Re-vendor
 
-Nothing to re-vendor. New app versions: bump the image tags here and in
-`scripts/images.txt` after CI pushes them.
+Nothing to re-vendor, and no tag to bump by hand: release-please's release PR
+rewrites the pinned tags in `picture-pipeline.yaml`, in `scripts/images.txt`
+and everywhere else, and merging it publishes the images. See
+`apps/README.md` → "Releasing the images". The tags in the table above are
+the exception: a markdown table row cannot carry the block annotations, so
+this file is not a release-please extra-file — its version is prose, kept
+honest by review.
 
 ## Design decisions recorded here
 

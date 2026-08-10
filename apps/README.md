@@ -11,16 +11,22 @@ actually needs:
 | [`resizer/`](resizer/) | Capstone pipeline, back half: receives the CloudEvent from the broker, writes a 320px thumbnail to `thumbs/` and an analysis JSON to `meta/`. | Event-driven autoscaling: watch its pod appear from zero when an upload lands. |
 
 Images (multi-arch, amd64 + arm64) are published to GHCR by
-[`build-images.yaml`](../.github/workflows/build-images.yaml) — **run it once
-before the workshop** (push an `apps-v*` tag to publish the pinned version;
-see the PENDING note in `scripts/images.txt`) — and pre-pulled by
-`cloudbox-init.sh`:
+[`build-images.yaml`](../.github/workflows/build-images.yaml), driven by
+release-please (see [Releasing the images](#releasing-the-images)), and
+pre-pulled by `cloudbox-init.sh`:
 
+<!-- x-release-please-start-version -->
 ```
 ghcr.io/randax/cloudbox-portal:v0.1.0
 ghcr.io/randax/cloudbox-uploader:v0.1.0
 ghcr.io/randax/cloudbox-resizer:v0.1.0
 ```
+<!-- x-release-please-end-version -->
+
+A fourth image, `ghcr.io/randax/cloudbox-grafana`, is built from
+[`grafana/`](grafana/) by the same workflow (stock Grafana plus the native
+VictoriaMetrics datasource plugins). It joined the build matrix after
+`apps-v0.1.0` was tagged, so it has no published version yet — issue #7.
 
 > **You do not need Go for the workshop.** The platform deploys these prebuilt
 > images; the source is here for reading, tinkering after the workshop, and as
@@ -160,8 +166,8 @@ net.
 
 - **GitHub Actions** ([`.github/workflows/build-images.yaml`](../.github/workflows/build-images.yaml)):
   vet + test on every PR touching `apps/**`; buildx multi-arch builds pushed
-  to GHCR on pushes to `main` (SHA tag only) and on `apps-v*` tags (SHA tag
-  plus the pinned version tag — the only way the pinned tag moves).
+  to GHCR on pushes to `main` (SHA tag only) and, for a release, the pinned
+  `:v<version>` tag as well — see [Releasing the images](#releasing-the-images).
 - **In-cluster CI (module 07):** the same Dockerfiles build with the rootless
   BuildKit + Zot registry running inside your cluster — point the module 07
   workflow at any of these directories and push the result to
@@ -171,6 +177,39 @@ net.
 All three Dockerfiles are the same shape: pinned `golang` alpine build stage
 (same Go minor as the modules' `go.mod` — the CI guard enforces this),
 static `CGO_ENABLED=0` binary, `FROM scratch` final image, non-root UID.
+
+## Releasing the images
+
+The four images are versioned as one bundle and released by release-please.
+Nothing here is edited by hand — including the pinned tags:
+
+1. Change something under `apps/` and merge it to `main` with a conventional
+   commit (`fix:` → patch, `feat:` → minor, `!`/`BREAKING CHANGE` → major).
+2. [`release-please.yaml`](../.github/workflows/release-please.yaml) keeps a
+   **release PR** open with the next version and the generated
+   `apps/CHANGELOG.md`. Nothing is published until a human merges it.
+3. That PR also rewrites **every pinned `ghcr.io/randax/cloudbox-*:v…` ref in
+   the repo** — the gitops components, the lab example, the pre-pull list, this
+   file — via the `extra-files` list in
+   [`release-please-config.json`](../release-please-config.json). The
+   `x-release-please` start/end block comments around those refs are what makes
+   that work; do not remove them. (Never write those markers out verbatim in a
+   file that is itself an extra-file — a stray "start" with no matching "end"
+   puts the rest of the file in the block and rewrites unrelated versions.)
+4. Merging the PR creates the `apps-v<version>` tag and calls
+   `build-images.yaml`, which pushes the multi-arch `:v<version>` images.
+5. **The one manual step:** a brand-new GHCR package is created *private*,
+   and package visibility has no REST endpoint — CI cannot flip it.
+   After the first publish of a new image, open
+   `https://github.com/users/randax/packages/container/<image>/settings` and
+   set the visibility to public. Existing packages keep their setting, so this
+   is once per image, not once per release. Until then
+   [`images-gate.yaml`](../.github/workflows/images-gate.yaml) warns instead of
+   failing for that ref.
+
+Escape hatches, when release-please is not the right tool: push an `apps-v*`
+tag by hand, or run `gh workflow run build-images.yaml -f version=<x.y.z>`.
+Neither updates the pinned refs — only the release PR does that.
 
 ## Vendored assets
 

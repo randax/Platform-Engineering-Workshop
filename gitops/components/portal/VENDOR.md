@@ -3,14 +3,18 @@
 | | |
 |---|---|
 | Source | `apps/portal` **in this repo** — nothing vendored from upstream; the manifest is ours |
-| Image | `ghcr.io/randax/cloudbox-portal:v0.1.0` (multi-arch) — **PENDING**: built and pushed by this repo's CI from `apps/portal`; not yet on GHCR as of 2026-07-14. Verify with `crane manifest` once CI has run, then add to `scripts/images.txt`. |
+| Image | `ghcr.io/randax/cloudbox-portal:v0.1.0` (multi-arch) — built and pushed by this repo's CI from `apps/portal`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. |
 | File | `portal.yaml` |
 
 ## Re-vendor
 
-Nothing to re-vendor. To ship a new portal version: bump the tag in
-`apps/portal` CI, wait for the GHCR push, update the image tag in
-`portal.yaml` and in `scripts/images.txt`, push.
+Nothing to re-vendor, and nothing to bump by hand. Merge a conventional
+commit under `apps/portal`; release-please's release PR bumps the tag in
+`portal.yaml`, in `scripts/images.txt` and everywhere else it is pinned,
+and merging it publishes the images. See `apps/README.md` → "Releasing the
+images". The tag in the table above is the exception: a markdown table row
+cannot carry the block annotations, so this file is not a release-please
+extra-file — its version is prose, kept honest by review.
 
 ## Design decisions recorded here
 

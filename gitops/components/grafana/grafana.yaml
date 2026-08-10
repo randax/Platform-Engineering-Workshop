@@ -111,7 +111,11 @@ spec:
         - name: grafana
           # Custom image: stock Grafana 12.4.5 + the native VictoriaMetrics
           # datasource plugins baked in (apps/grafana/Dockerfile, #65).
+          # The tag is rewritten by release-please in the release PR — keep the
+          # annotations, and keep the base-image version OUT of the block.
+          # x-release-please-start-version
           image: "ghcr.io/randax/cloudbox-grafana:v0.1.0"
+          # x-release-please-end-version
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

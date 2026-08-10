@@ -14,7 +14,9 @@ kind: Application
 metadata:
   name: my-app
 spec:
+  # x-release-please-start-version
   image: ghcr.io/randax/cloudbox-uploader:v0.1.0
+  # x-release-please-end-version
   replicas:
     min: 0        # scale-to-zero
     max: 3

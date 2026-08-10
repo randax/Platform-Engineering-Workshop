@@ -63,8 +63,11 @@ spec:
                   spec:
                     containers:
                         # Patched from spec.image. The base default is a real,
-                        # pre-pulled image so the manifest is valid on its own.
+                        # pre-pulled image so the manifest is valid on its own
+                        # (tag rewritten by release-please — keep the annotations).
+                        # x-release-please-start-version
                       - image: ghcr.io/randax/cloudbox-uploader:v0.1.0
+                        # x-release-please-end-version
                         env:
                           # [0] DB connection string. secretKeyRef.name is
                           # patched to "<name>-pg-app" (the deterministic CNPG

@@ -77,8 +77,11 @@ spec:
       containers:
         - name: portal
           # Built by CI from apps/portal (multi-arch). Must be in the
-          # pre-pull list (scripts/images.txt).
+          # pre-pull list (scripts/images.txt). The tag is rewritten by
+          # release-please in the release PR — keep the annotations.
+          # x-release-please-start-version
           image: ghcr.io/randax/cloudbox-portal:v0.1.0
+          # x-release-please-end-version
           env:
             # The uploader is a cluster-local Knative Service in the
             # pipeline namespace — this is its ksvc cluster-local URL
