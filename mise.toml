@@ -97,6 +97,10 @@ run = "cd slides && npm run dev -- --presenter"
 # Utility
 # =============================================================================
 
+[tasks.upstream]
+description = "🔭 Maintainer: check every pin against upstream (needs internet)"
+run = "./scripts/check-upstream.sh"
+
 [tasks.help]
 description = "❓ Show all available tasks"
 run = "mise tasks ls"

@@ -13,12 +13,17 @@ on their own laptops. Working offline after image pre-pull is a hard requirement
 - **docs/PRINCIPLES.md** — 15 design rules every lab and script must follow
   (outcome-oriented labs, verify.sh exit-0 contract, layered hints, offline-first,
   honest specs). When a lab violates a principle, fix the lab.
+- **docs/MAINTENANCE.md** — the pin-rot runbook: the four mechanized checks, how to
+  bump a pin and what to re-vendor with it. Read it before any "update the versions"
+  work; do not re-derive that process.
 
 ## Repository layout
 
 ```
 scripts/     dev-setup.sh · cloudbox-init.sh · install.sh --check · create-cluster.sh
              bootstrap-gitops.sh · seed-gitea.sh · catch-up.sh <module> · kind-fallback.sh
+             check-consistency.sh (internal drift) · check-upstream.sh + upstream.list
+             (are we behind upstream? maintainer-only, needs internet)
 gitops/      apps/       ArgoCD app-of-apps root — what is actually enabled
              catalog/    available capabilities (attendees copy catalog/<x>.yaml → apps/)
              components/ per-component manifests/values, sync-waved
@@ -27,6 +32,7 @@ solutions/   canonical end-state per module (what catch-up.sh force-pushes to Gi
 apps/        first-party Go apps: cloudbox-portal (Console, module 08), uploader +
              resizer (picture pipeline, module 09) — built to GHCR by build-images.yaml
 docs/        RESEARCH.md · PRINCIPLES.md · STACK.md · HELPERS.md · IDP-PRINCIPLES.md
+             MAINTENANCE.md (pin-rot runbook)
              prd/ (PRDs + DR design records) · screenshots/
 slides/      Slidev deck
 .devcontainer/  Codespaces lifeboat — same content when local preflight fails

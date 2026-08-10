@@ -1,0 +1,153 @@
+# =============================================================================
+# CloudBox — declarative inventory of UPSTREAM sources for every version pin.
+#
+# scripts/check-consistency.sh answers "do our files agree with each other?".
+# This file answers the other half: "has any pin fallen BEHIND upstream?" —
+# read by scripts/check-upstream.sh (a MAINTAINER tool; it needs internet and
+# is never part of the attendee flow).
+#
+# It deliberately contains NO version numbers: every row says where the pin
+# currently lives, so versions.env / mise.toml / images.txt stay the single
+# source of truth (principle 14).
+#
+# Format — one row per tracked artifact, fields separated by "|":
+#
+#   name | latest-kind | latest-locator | pin-source | track
+#
+#   name            short kebab-case id, unique
+#
+#   latest-kind     github-release  GitHub /releases/latest for <owner>/<repo>.
+#                                   With a `track` it lists /releases instead
+#                                   (up to 3 pages) and picks the highest
+#                                   matching version.
+#                   github-tag      list /tags (up to 3 pages), highest semver.
+#                                   Use where upstream mismarks prereleases as
+#                                   "latest" (kagent) or publishes no releases.
+#                   helm-index      locator is <repo-url>#<chart-name>; reads
+#                                   <repo-url>/index.yaml.
+#                   registry-tag    locator is an image repo; `crane ls`.
+#
+#   pin-source      env:VAR                   variable in scripts/versions.env
+#                   mise:<tool-key>           [tools] key in mise.toml
+#                   image:<repo>              tag pinned for that repo in
+#                                             scripts/images.txt (digest stripped)
+#                   chart:<path>#<chart>      `helm.sh/chart: <chart>-<version>`
+#                                             label in a rendered manifest
+#                   file:<path>#<sed-regex>   escape hatch, one capture group.
+#                                             The regex may not contain "|" or
+#                                             "#" (field separators).
+#
+#   track           empty or "*" = any newer version counts as drift.
+#                   Otherwise an extended regex matched against the upstream
+#                   version with a leading "v" stripped — used for deliberate
+#                   holds (CNPG 1.28.x) and for filtering prereleases out of
+#                   tag/index listings. Document every hold in a comment above
+#                   the row.
+#
+# Comment lines start with "#"; blank lines are ignored.
+# =============================================================================
+
+# --- Tooling (mise.toml + versions.env + the CI-pinned linters) --------------
+mise                     | github-release | jdx/mise                                        | env:MISE_VERSION                             |
+talos                    | github-release | siderolabs/talos                                | env:TALOS_VERSION                            |
+# KUBERNETES_VERSION is what Talos ships by default — bump it WITH talos, not
+# ahead of it. mise.toml's kubectl pin is asserted equal by check-consistency.sh.
+kubectl                  | github-release | kubernetes/kubernetes                           | env:KUBERNETES_VERSION                       |
+helm                     | github-release | helm/helm                                       | mise:helm                                    |
+kind                     | github-release | kubernetes-sigs/kind                            | mise:kind                                    |
+kind-node-image          | registry-tag   | docker.io/kindest/node                          | image:docker.io/kindest/node                 |
+crane                    | github-release | google/go-containerregistry                     | mise:crane                                   |
+cilium-cli               | github-release | cilium/cilium-cli                               | mise:aqua:cilium/cilium-cli                  |
+jq                       | github-release | jqlang/jq                                       | mise:jq                                      |
+registry                 | registry-tag   | docker.io/library/registry                      | image:docker.io/library/registry             |
+kubeconform              | github-release | yannh/kubeconform                               | file:.github/workflows/ci.yaml#KUBECONFORM_VERSION:[[:space:]]*(v[0-9][^[:space:]]*) |
+
+# --- Platform: cluster + GitOps core -----------------------------------------
+# The Cilium chart index carries -pre/-rc entries; only stable releases count.
+cilium-chart             | helm-index     | https://helm.cilium.io#cilium                   | env:CILIUM_VERSION                           | ^[0-9]+\.[0-9]+\.[0-9]+$
+gitea-chart              | helm-index     | https://dl.gitea.com/charts/#gitea              | env:GITEA_CHART_VERSION                      |
+argocd                   | github-release | argoproj/argo-cd                                | env:ARGOCD_VERSION                           |
+local-path-provisioner   | github-release | rancher/local-path-provisioner                  | env:LOCAL_PATH_PROVISIONER_VERSION           |
+
+# --- Platform: data services -------------------------------------------------
+# DELIBERATE HOLD: CNPG is pinned to the mature 1.28.x minor (see
+# gitops/components/cnpg-operator/VENDOR.md) — 1.29/1.30 exist and are ignored
+# on purpose; this row only reports newer 1.28 patches.
+cnpg                     | github-release | cloudnative-pg/cloudnative-pg                   | image:ghcr.io/cloudnative-pg/cloudnative-pg  | ^1\.28\.
+rustfs-chart             | helm-index     | https://charts.rustfs.com#rustfs                | chart:gitops/components/rustfs/rustfs.yaml#rustfs |
+# RustFS is beta by design (RESEARCH.md §2) — prereleases are in scope here.
+rustfs-image             | registry-tag   | docker.io/rustfs/rustfs                         | image:docker.io/rustfs/rustfs                |
+zot                      | github-release | project-zot/zot                                 | image:ghcr.io/project-zot/zot                |
+zot-chart                | helm-index     | https://zotregistry.dev/helm-charts#zot         | chart:gitops/components/zot/zot.yaml#zot     |
+
+# --- Platform: self-service, serverless, builds, messaging -------------------
+crossplane-chart         | helm-index     | https://charts.crossplane.io/stable#crossplane  | chart:gitops/components/crossplane/crossplane.yaml#crossplane |
+knative-serving          | github-release | knative/serving                                 | file:gitops/components/knative-serving/serving-core.yaml#app.kubernetes.io/version: "([0-9][^"]*)" |
+knative-eventing         | github-release | knative/eventing                                | env:KNATIVE_EVENTING_VERSION                 |
+# Envoy backports patches to old minors, so /releases/latest can point BACKWARDS;
+# read the tag list and take the highest stable instead.
+envoy                    | github-tag     | envoyproxy/envoy                                | image:docker.io/envoyproxy/envoy             | ^[0-9]+\.[0-9]+\.[0-9]+$
+argo-workflows           | github-release | argoproj/argo-workflows                         | image:quay.io/argoproj/workflow-controller   |
+buildkit                 | github-release | moby/buildkit                                   | image:docker.io/moby/buildkit                |
+nats                     | github-release | nats-io/nats-server                             | image:docker.io/library/nats                 |
+prometheus-nats-exporter | github-release | nats-io/prometheus-nats-exporter                | image:docker.io/natsio/prometheus-nats-exporter |
+
+# --- Day-2 AI agent ----------------------------------------------------------
+# kagent does not mark v0.10.0-beta*/rc* tags as prereleases, so /releases/latest
+# resolves to a beta (see versions.env). Read tags, stable-only.
+kagent                   | github-tag     | kagent-dev/kagent                               | env:KAGENT_VERSION                           | ^[0-9]+\.[0-9]+\.[0-9]+$
+
+# --- Observability (Victoria stack + OTel Collector) -------------------------
+victoria-metrics         | github-release | VictoriaMetrics/VictoriaMetrics                 | image:docker.io/victoriametrics/victoria-metrics |
+victoria-logs            | github-release | VictoriaMetrics/VictoriaLogs                    | image:docker.io/victoriametrics/victoria-logs |
+victoria-traces          | github-release | VictoriaMetrics/VictoriaTraces                  | image:docker.io/victoriametrics/victoria-traces |
+grafana                  | github-release | grafana/grafana                                 | image:docker.io/grafana/grafana              |
+otel-collector-contrib   | github-release | open-telemetry/opentelemetry-collector-releases | image:docker.io/otel/opentelemetry-collector-contrib |
+
+# --- Lab workload images -----------------------------------------------------
+# aws/aws-cli publishes no GitHub releases, and the repo still carries v1 tags.
+aws-cli                  | github-tag     | aws/aws-cli                                     | image:public.ecr.aws/aws-cli/aws-cli         | ^2\.
+
+# =============================================================================
+# Deliberately NOT tracked — DERIVED from something that IS tracked above, or
+# not expressible as a version comparison. Bump these by re-vendoring their
+# parent, never on their own.
+#
+#   Talos release (`talosctl images default`)
+#     ghcr.io/siderolabs/kubelet, registry.k8s.io/kube-{apiserver,controller-
+#     manager,scheduler}, etcd, coredns/coredns, pause,
+#     networking/kube-network-policies
+#   Cilium chart
+#     quay.io/cilium/{cilium,operator-generic,cilium-envoy} (digest-pinned by
+#     `helm template`)
+#   Gitea chart
+#     docker.gitea.com/gitea (the chart's appVersion)
+#   ArgoCD release manifest
+#     ghcr.io/dexidp/dex, public.ecr.aws/docker/library/redis
+#   CNPG release
+#     ghcr.io/cloudnative-pg/postgresql (default image compiled into the
+#     operator; the Backstage database pins the same tag)
+#   local-path-provisioner manifest
+#     docker.io/library/busybox (helper pod image)
+#   knative releases
+#     every gcr.io/knative-releases/... digest (serving, eventing, kourier) —
+#     they come out of the vendored release YAMLs
+#   kagent chart
+#     ghcr.io/kagent-dev/kagent/{tools,ui,app,skills-init},
+#     docker.io/library/postgres:18.3-alpine (chart default)
+#
+#   docker.io/library/postgres:18-alpine — module 05's fault lab pins the
+#     floating minor tag on purpose (the scenario needs "a postgres", not a
+#     specific patch).
+#   ghcr.io/knative/helloworld-go — upstream publishes only :latest, so we pin
+#     a digest; there is no version to compare.
+#   ghcr.io/cnoe-io/backstage-app — pinned to a CNOE git SHA
+#     (gitops/components/backstage/VENDOR.md), not a semver tag. Re-verify by
+#     hand against cnoe-io/stacks `ref-implementation/backstage`.
+#   ghcr.io/randax/cloudbox-{portal,uploader,resizer,grafana} — first-party,
+#     built from apps/ by .github/workflows/build-images.yaml.
+#   mise.toml node = "24" — major-pinned on purpose (Slidev only); any 24.x is
+#     acceptable, so "behind" is meaningless.
+#   docker.io/library/busybox:1.37.00 (lab/05 fault injection) — deliberately
+#     broken, never bumped.
+# =============================================================================

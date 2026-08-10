@@ -1,0 +1,123 @@
+# =============================================================================
+# Upstream drift check — has any pin fallen BEHIND upstream?
+#
+# The other two mechanized checks answer different questions:
+#   ci.yaml (consistency)  — do our files agree with each OTHER?
+#   images-gate.yaml       — does every pinned image still EXIST upstream?
+# This one answers "is there something newer?", so the re-verify pass before a
+# rehearsal is a report to read, not an afternoon of tab-opening.
+#
+# It never edits a pin and never fails the build: drift is a decision, not a
+# regression. The signal is a single long-lived issue (label: upstream-drift)
+# whose body is rewritten on every run, plus the run's Summary page.
+# =============================================================================
+name: Upstream check
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"   # weekly, Monday 05:17 UTC (after the image gate)
+  pull_request:
+    paths:
+      - 'scripts/upstream.list'
+      - 'scripts/check-upstream.sh'
+      - '.github/workflows/upstream-check.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Pins vs upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write        # upserts the drift issue
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install crane + jq (pinned via mise)
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" sh
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          echo "${HOME}/.local/share/mise/shims" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/mise" trust
+          "${HOME}/.local/bin/mise" install crane jq
+
+      - name: Check every pin against upstream
+        id: check
+        env:
+          # Raises the GitHub API rate limit from 60/h to 1000/h — the script
+          # makes ~30 calls, so unauthenticated runs are one retry from failing.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Report, never gate: a non-zero exit here would only mean "upstream
+          # moved". Hard errors are visible as `error` rows in the table.
+          ./scripts/check-upstream.sh | tee /tmp/upstream.txt || true
+          {
+            echo '## Pins vs upstream'
+            echo
+            echo '```'
+            cat /tmp/upstream.txt
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upsert the drift issue
+        # PRs get the Summary page only — no issue churn from a manifest edit.
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          TITLE="Upstream version drift"
+          LABEL="upstream-drift"
+
+          # Idempotent: --force turns "already exists" into a no-op update.
+          gh label create "${LABEL}" \
+            --color FBCA04 \
+            --description "Pins that have fallen behind upstream (automated)" \
+            --force >/dev/null
+
+          {
+            echo "Automated report from \`scripts/check-upstream.sh\` — rewritten on every run."
+            echo "Nothing here is a regression: bumping is a deliberate decision."
+            echo
+            echo '```'
+            cat /tmp/upstream.txt
+            echo '```'
+            echo
+            echo "## How to act on this"
+            echo
+            echo "1. Bump the pin where it actually lives (\`scripts/versions.env\`, \`mise.toml\`,"
+            echo "   \`scripts/images.txt\`, or the component's rendered manifest)."
+            echo "2. Re-vendor the component if it ships a chart or release YAML — each"
+            echo "   \`gitops/components/*/VENDOR.md\` carries its own re-vendor recipe and the"
+            echo "   workshop curation to re-apply."
+            echo "3. \`./scripts/check-consistency.sh\` must stay green, then let"
+            echo "   \`bootstrap-test.yaml\` prove the full attendee flow."
+            echo
+            echo "Deliberate holds (CNPG 1.28.x, kagent stable-only, …) are encoded as \`track\`"
+            echo "regexes in \`scripts/upstream.list\` — if a row nags about a version we do not"
+            echo "want, fix the row, not the pin."
+            echo
+            echo "_[Run log](${RUN_URL})_"
+          } > /tmp/issue-body.md
+
+          NUMBER="$(gh issue list --repo "${REPO}" --state open --label "${LABEL}" \
+                      --json number --jq '.[0].number // empty')"
+
+          if [[ -n "${NUMBER}" ]]; then
+            gh issue edit "${NUMBER}" --repo "${REPO}" \
+              --title "${TITLE}" --body-file /tmp/issue-body.md
+            echo "updated issue #${NUMBER}"
+          else
+            gh issue create --repo "${REPO}" \
+              --title "${TITLE}" --label "${LABEL}" --body-file /tmp/issue-body.md
+          fi

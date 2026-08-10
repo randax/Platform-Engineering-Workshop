@@ -14,6 +14,11 @@
 #   5. version-pinned artifacts referenced by versions.env actually exist
 #      (vendored ArgoCD manifest, vendored Cilium + Gitea chart .tgz files,
 #      local-path version in the gitops component)
+#   6. every row in scripts/upstream.list still resolves to a real pin, so the
+#      upstream-drift manifest cannot rot when a file moves
+#
+# Offline and fast — the upstream comparison itself lives in the maintainer-only
+# ./scripts/check-upstream.sh, which needs internet.
 #
 # Usage:
 #   ./scripts/check-consistency.sh
@@ -156,6 +161,26 @@ if [[ -f "scripts/manifests/gitea-${GITEA_CHART_VERSION}.tgz" ]]; then
 else
   bad "scripts/manifests/gitea-${GITEA_CHART_VERSION}.tgz missing — re-vendor: helm pull gitea --repo ${GITEA_HELM_REPO} --version ${GITEA_CHART_VERSION} -d scripts/manifests/"
 fi
+
+# --- 6. every upstream.list row resolves to a current pin ----------------------
+# Offline: --pins-only reads versions.env / mise.toml / images.txt / rendered
+# manifests and never touches the network. Catches a rotted pin-source (file
+# renamed, variable dropped, image line rewritten) long before the maintainer
+# runs the network check.
+before_fail=${FAILURES}
+rows=0
+while IFS=$'\t' read -r up_name up_pin; do
+  [[ -n "${up_name}" ]] || continue
+  rows=$((rows + 1))
+  [[ -n "${up_pin}" ]] \
+    || bad "upstream.list row '${up_name}' resolves to no pin — its pin-source moved; fix scripts/upstream.list"
+done <<<"$(./scripts/check-upstream.sh --pins-only || true)"
+# rows==0 means the helper itself died (missing jq, unreadable list) — without
+# this the loop would simply not run and the check would pass silently.
+[[ "${rows}" -gt 0 ]] \
+  || bad "check-upstream.sh --pins-only produced no rows — the check could not run"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "all ${rows} upstream.list rows resolve to a current pin"
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then

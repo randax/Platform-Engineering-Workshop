@@ -53,10 +53,12 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |
 | `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` + `gitops/components` state to Gitea, then run the module's post-steps; `--rebuild` for the full nuke-and-rebuild |
 | `kind-fallback.sh` | Same cluster shape on kind + Cilium (loses the Talos content, gains robustness) |
-| `check-consistency.sh` | Drift detection between everything that must agree: solutions↔catalog copies, deployed images ⊆ `images.txt`, `versions.env`↔`mise.toml`, devcontainer pins. Runs in CI on every push |
+| `check-consistency.sh` | Drift detection between everything that must agree: solutions↔catalog copies, deployed images ⊆ `images.txt`, `versions.env`↔`mise.toml`, devcontainer pins, `upstream.list` pin-sources. Offline; runs in CI on every push |
+| `check-upstream.sh` | **Maintainer only, needs internet** — reports which pins have fallen *behind* upstream (`ok`/`patch`/`minor`/`major`). Reads `upstream.list`; never edits a pin. `--strict`, `--json`, `--only <name>` |
 | `lib.sh` | Shared logging/helpers — sourced by every script |
 | `versions.env` | Every version pin, in one place |
 | `images.txt` | Every image the workshop uses, pinned, split into `[host]` and `[mirror]` sections |
+| `upstream.list` | Where each pin comes from upstream (GitHub release/tag, Helm index, registry tag) and where it is currently written down — the manifest `check-upstream.sh` reads |
 | `manifests/` | Vendored, pinned upstream manifests (ArgoCD install.yaml) so the venue needs no internet. local-path-provisioner is applied straight from `gitops/components/` — one copy, no drift |
 
 ## Why a local registry mirror?
@@ -85,3 +87,24 @@ a stale mirror can never break the cluster, it just costs bandwidth.
 - **Everything is pinned** — no `:latest` anywhere. Bump pins in
   `versions.env` + `mise.toml` + `images.txt` together, and re-verify with
   `./scripts/install.sh --check` and CI
+
+## Maintenance: keeping the pins honest
+
+Two mechanized checks, deliberately split:
+
+```bash
+./scripts/check-consistency.sh   # offline: do our own files still agree?
+./scripts/check-upstream.sh      # online:  has any pin fallen behind upstream?
+mise run upstream                # the same thing, via mise
+```
+
+`check-upstream.sh` is a **maintainer** tool — it needs internet and is never
+part of the attendee flow. It resolves every pin from where it actually lives
+and compares it with the newest upstream version, so the "verified <date>,
+re-verify before the conference" pass is a table you read, not an afternoon of
+manual lookups. Adding or moving a pin means adding or fixing its row in
+[`upstream.list`](upstream.list); `check-consistency.sh` fails if a row stops
+resolving. Export `GITHUB_TOKEN` (or `GH_TOKEN`) to avoid the unauthenticated
+GitHub API rate limit. Bumping a pin stays a deliberate decision — the script
+reports, it never edits.
+
