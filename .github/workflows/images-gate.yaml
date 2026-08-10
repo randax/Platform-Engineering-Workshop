@@ -7,7 +7,9 @@ name: Image gate
 
 on:
   pull_request:
-    paths: ['scripts/images.txt', '.github/workflows/images-gate.yaml']
+    # versions.env: the gate sources MIRROR_ARCH_EXEMPT from it, so exemption
+    # policy changes must re-run the gate too.
+    paths: ['scripts/images.txt', 'scripts/versions.env', '.github/workflows/images-gate.yaml']
   schedule:
     - cron: "43 4 * * 1"   # weekly, Monday 04:43 UTC
   workflow_dispatch:
