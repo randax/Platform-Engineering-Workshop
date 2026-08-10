@@ -154,6 +154,7 @@ else
   # Parse images.txt (same format as cloudbox-init.sh)
   section=""
   host_missing=0; mirror_missing=0; host_total=0; mirror_total=0
+  arch_probe_path=""
 
   # Is the mirror registry up at all?
   if mirror_running && curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1; then
@@ -195,6 +196,30 @@ else
       "http://localhost:${MIRROR_PORT}/v2/${repo}/manifests/${ref}"
   }
 
+  # check_mirror_arch <repo-path-with-tag> — tag-pinned mirror content is
+  # copied for ONE architecture (cloudbox-init.sh uses crane --platform), and a
+  # wrong-arch mirror is worse than a missing one: it still SERVES manifests,
+  # so the cluster's registry fallback never triggers and pods crashloop with
+  # exec-format errors — offline, at the venue. Fetch one representative tag
+  # manifest, follow its config blob, and compare .architecture to this
+  # machine. Index manifests (a mirror populated all-arch by an older
+  # cloudbox-init.sh) carry every architecture and pass by construction.
+  # Returns 1 only on a proven mismatch; indeterminate probes pass.
+  check_mirror_arch() {
+    local path="$1" repo="${1%%:*}" ref="${1##*:}" manifest media cfg img_arch
+    [[ -n "${arch:-}" ]] || return 0
+    manifest="$(curl -fsS \
+      -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+      "http://localhost:${MIRROR_PORT}/v2/${repo}/manifests/${ref}" 2>/dev/null)" || return 0
+    media="$(jq -r '.mediaType // ""' <<<"${manifest}")"
+    [[ "${media}" == *image.index* || "${media}" == *manifest.list* ]] && return 0
+    cfg="$(jq -r '.config.digest // ""' <<<"${manifest}")"
+    [[ -z "${cfg}" ]] && return 0
+    img_arch="$(curl -fsS "http://localhost:${MIRROR_PORT}/v2/${repo}/blobs/${cfg}" 2>/dev/null \
+      | jq -r '.architecture // ""')" || return 0
+    [[ -z "${img_arch}" || "${img_arch}" == "${arch}" ]]
+  }
+
   while IFS= read -r line; do
     line="${line%%#*}"; line="$(echo "${line}" | xargs)"
     [[ -z "${line}" ]] && continue
@@ -215,6 +240,8 @@ else
       if ! check_mirror_image "$(strip_registry "${line}")"; then
         fail "missing from mirror: ${line}"
         mirror_missing=$((mirror_missing + 1))
+      elif [[ -z "${arch_probe_path}" && "${line}" != *@sha256:* ]]; then
+        arch_probe_path="$(strip_registry "${line}")"
       fi
     fi
   done < "${SCRIPT_DIR}/images.txt"
@@ -229,6 +256,13 @@ else
       ok "Mirror images: ${mirror_total}/${mirror_total} present"
     else
       check_fail "Mirror images: $((mirror_total - mirror_missing))/${mirror_total} present — run ./scripts/cloudbox-init.sh"
+    fi
+    if [[ -n "${arch_probe_path}" ]]; then
+      if check_mirror_arch "${arch_probe_path}"; then
+        ok "Mirror content matches this machine's architecture (${arch:-unknown})"
+      else
+        check_fail "Mirror was populated for a different CPU architecture than this machine (${arch:-unknown}) — re-run ./scripts/cloudbox-init.sh on THIS machine"
+      fi
     fi
   fi
 fi

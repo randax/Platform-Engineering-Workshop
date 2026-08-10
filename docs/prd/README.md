@@ -29,7 +29,8 @@ authz theory). The workshop already carries ~10 tools.
 
 An earlier reading put the worker at "3.8 GiB used, ~2.2 GiB free." That number
 was inflated — it came from `docker stats`, which counts reclaimable page cache
-(mostly from pulling ~8–10 GB of images), not the real working set. The true
+(mostly from pulling what was then a ~15–20 GB all-arch image set), not the
+real working set. The true
 idle floor is being re-measured via the kubelet summary API (`workingSetBytes`).
 **None of the verdicts above hinge on RAM** — they rest on time, complexity, and
 teaching focus — but the correction matters: the two we're building (Dex ~40 MiB +

@@ -41,10 +41,26 @@ jobs:
           set -euo pipefail
           fail=0
           while IFS= read -r ref; do
-            if crane manifest "${ref}" >/dev/null 2>&1; then
+            if ! manifest="$(crane manifest "${ref}" 2>/dev/null)"; then
+              echo "::error::MISSING upstream: ${ref}"
+              fail=$((fail + 1))
+            elif [[ "${ref}" == *@sha256:* ]]; then
+              echo "ok  ${ref} (digest pin — mirrored byte-for-byte)"
+            # Tag pins are mirrored per-arch by cloudbox-init.sh (crane copy
+            # --platform), which ERRORS on an index missing that platform — a
+            # single-arch index pin would fail only on attendees' machines of
+            # the other arch. Require both linux/amd64 and linux/arm64 in every
+            # tag-pinned index. Bare (non-index) manifests pass: crane copies
+            # them as-is regardless of --platform (e.g. the amd64-only
+            # Backstage image, which Apple Silicon runs emulated by design).
+            elif jq -e '
+                if (.mediaType // "" | test("image.index|manifest.list")) then
+                  ([.manifests[].platform | select(.os == "linux").architecture]
+                   | (index("amd64") and index("arm64")))
+                else true end' >/dev/null <<<"${manifest}"; then
               echo "ok  ${ref}"
             else
-              echo "::error::MISSING upstream: ${ref}"
+              echo "::error::tag pin lacks linux/amd64 or linux/arm64: ${ref} (cloudbox-init.sh --platform copy would fail on the missing arch)"
               fail=$((fail + 1))
             fi
           done < <(grep -vE '^\s*(#|\[|$)' scripts/images.txt)
