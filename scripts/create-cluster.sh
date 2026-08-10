@@ -67,9 +67,9 @@ patches=(--config-patch "${CNI_PATCH}")
 # skipFallback:false means nodes fall back to the real registry on a MISS, so a
 # stale or incomplete mirror just costs bandwidth. One caveat: tag-pinned
 # mirror content is arch-specific (cloudbox-init.sh copies with --platform),
-# and a mirror populated on a different-arch machine still answers — no miss,
+# and a mirror populated for a different architecture still answers — no miss,
 # no fallback, exec-format crashloops instead. install.sh --check catches that
-# case by verifying the mirror's architecture before the workshop.
+# case by verifying every tag pin's architecture before the workshop.
 if mirror_running; then
   MIRROR_ENDPOINT="$(mirror_host_endpoint)"
   info "Image mirror detected — nodes will pull via ${MIRROR_ENDPOINT}"

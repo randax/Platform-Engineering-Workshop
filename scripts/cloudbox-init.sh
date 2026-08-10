@@ -55,11 +55,15 @@ docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
 need crane
 
 # The platform the cluster nodes actually run. The Talos "nodes" are containers
-# on THIS host's Docker engine, so their CPU architecture is this host's — there
-# is no cross-architecture case to support, and nothing here may be hard-coded
-# (CI runs amd64, most laptops in the room are arm64).
-node_arch="$(detect_arch)" \
-  || die "Unsupported CPU architecture '$(uname -m)' — the workshop needs x86_64 or arm64."
+# on THIS host's Docker engine, so their CPU architecture is the DAEMON's — and
+# that is what this must read, not uname -m: an x86_64 Rosetta shell on Apple
+# Silicon (or a context pointing at a remote daemon) would otherwise mirror
+# amd64 images for arm64 node containers, and install.sh --check — which
+# compares the mirror against the same daemon arch — would flag the mirror this
+# script had just built. Nothing here may be hard-coded (CI runs amd64, most
+# laptops in the room are arm64).
+node_arch="$(docker_server_arch)" \
+  || die "Docker reports an unsupported architecture '$(docker version -f '{{.Server.Arch}}' 2>/dev/null)' — the workshop needs amd64 or arm64."
 NODE_PLATFORM="linux/${node_arch}"
 
 IMAGES_FILE="${SCRIPT_DIR}/images.txt"

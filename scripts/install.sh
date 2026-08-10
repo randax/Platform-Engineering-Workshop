@@ -154,7 +154,11 @@ else
   # Parse images.txt (same format as cloudbox-init.sh)
   section=""
   host_missing=0; mirror_missing=0; host_total=0; mirror_total=0
-  arch_probe_path=""
+  mirror_arch_bad=0
+  # The DAEMON's arch — what the node containers run — not uname -m (an x86_64
+  # Rosetta shell on Apple Silicon reports the wrong one). Empty on failure:
+  # the arch checks then pass open rather than guessing.
+  mirror_arch="$(docker_server_arch || true)"
 
   # Is the mirror registry up at all?
   if mirror_running && curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1; then
@@ -200,14 +204,16 @@ else
   # copied for ONE architecture (cloudbox-init.sh uses crane --platform), and a
   # wrong-arch mirror is worse than a missing one: it still SERVES manifests,
   # so the cluster's registry fallback never triggers and pods crashloop with
-  # exec-format errors — offline, at the venue. Fetch one representative tag
-  # manifest, follow its config blob, and compare .architecture to this
-  # machine. Index manifests (a mirror populated all-arch by an older
-  # cloudbox-init.sh) carry every architecture and pass by construction.
+  # exec-format errors — offline, at the venue. Fetch the tag's manifest,
+  # follow its config blob, and compare .architecture to the Docker daemon's.
+  # Index manifests (a mirror populated all-arch by an older cloudbox-init.sh)
+  # carry every architecture and pass by construction. Every tag pin is
+  # checked — a partially re-run mirror can mix architectures, so one
+  # representative sample is not enough. Two localhost GETs per image, cheap.
   # Returns 1 only on a proven mismatch; indeterminate probes pass.
   check_mirror_arch() {
-    local path="$1" repo="${1%%:*}" ref="${1##*:}" manifest media cfg img_arch
-    [[ -n "${arch:-}" ]] || return 0
+    local repo="${1%%:*}" ref="${1##*:}" manifest media cfg img_arch
+    [[ -n "${mirror_arch}" ]] || return 0
     manifest="$(curl -fsS \
       -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
       "http://localhost:${MIRROR_PORT}/v2/${repo}/manifests/${ref}" 2>/dev/null)" || return 0
@@ -217,7 +223,7 @@ else
     [[ -z "${cfg}" ]] && return 0
     img_arch="$(curl -fsS "http://localhost:${MIRROR_PORT}/v2/${repo}/blobs/${cfg}" 2>/dev/null \
       | jq -r '.architecture // ""')" || return 0
-    [[ -z "${img_arch}" || "${img_arch}" == "${arch}" ]]
+    [[ -z "${img_arch}" || "${img_arch}" == "${mirror_arch}" ]]
   }
 
   while IFS= read -r line; do
@@ -237,11 +243,13 @@ else
       fi
     elif [[ "${section}" == "mirror" && "${mirror_up}" == "true" ]]; then
       mirror_total=$((mirror_total + 1))
-      if ! check_mirror_image "$(strip_registry "${line}")"; then
+      mirror_path="$(strip_registry "${line}")"
+      if ! check_mirror_image "${mirror_path}"; then
         fail "missing from mirror: ${line}"
         mirror_missing=$((mirror_missing + 1))
-      elif [[ -z "${arch_probe_path}" && "${line}" != *@sha256:* ]]; then
-        arch_probe_path="$(strip_registry "${line}")"
+      elif [[ "${line}" != *@sha256:* ]] && ! check_mirror_arch "${mirror_path}"; then
+        fail "wrong architecture in mirror: ${line}"
+        mirror_arch_bad=$((mirror_arch_bad + 1))
       fi
     fi
   done < "${SCRIPT_DIR}/images.txt"
@@ -257,12 +265,10 @@ else
     else
       check_fail "Mirror images: $((mirror_total - mirror_missing))/${mirror_total} present — run ./scripts/cloudbox-init.sh"
     fi
-    if [[ -n "${arch_probe_path}" ]]; then
-      if check_mirror_arch "${arch_probe_path}"; then
-        ok "Mirror content matches this machine's architecture (${arch:-unknown})"
-      else
-        check_fail "Mirror was populated for a different CPU architecture than this machine (${arch:-unknown}) — re-run ./scripts/cloudbox-init.sh on THIS machine"
-      fi
+    if [[ ${mirror_arch_bad} -gt 0 ]]; then
+      check_fail "${mirror_arch_bad} mirror image(s) are for a different CPU architecture than Docker runs (${mirror_arch:-unknown}) — re-run ./scripts/cloudbox-init.sh on THIS machine"
+    elif [[ -n "${mirror_arch}" && ${mirror_total} -gt 0 && ${mirror_missing} -eq 0 ]]; then
+      ok "Mirror content matches Docker's architecture (${mirror_arch})"
     fi
   fi
 fi
