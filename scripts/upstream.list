@@ -101,7 +101,10 @@ kagent                   | github-tag     | kagent-dev/kagent                   
 victoria-metrics         | github-release | VictoriaMetrics/VictoriaMetrics                 | image:docker.io/victoriametrics/victoria-metrics |
 victoria-logs            | github-release | VictoriaMetrics/VictoriaLogs                    | image:docker.io/victoriametrics/victoria-logs |
 victoria-traces          | github-release | VictoriaMetrics/VictoriaTraces                  | image:docker.io/victoriametrics/victoria-traces |
-grafana                  | github-release | grafana/grafana                                 | image:docker.io/grafana/grafana              |
+# Stock Grafana is not in images.txt: it is only the FROM line of
+# apps/grafana/Dockerfile (a build input for ghcr.io/randax/cloudbox-grafana),
+# so the pin is read straight out of that Dockerfile.
+grafana                  | github-release | grafana/grafana                                 | file:apps/grafana/Dockerfile#FROM grafana/grafana:([0-9]+\.[0-9]+\.[0-9]+) |
 otel-collector-contrib   | github-release | open-telemetry/opentelemetry-collector-releases | image:docker.io/otel/opentelemetry-collector-contrib |
 
 # --- Lab workload images -----------------------------------------------------

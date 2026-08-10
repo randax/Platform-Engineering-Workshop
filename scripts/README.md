@@ -11,7 +11,7 @@ the repo-root `mise.toml`); shared helpers live in [`lib.sh`](lib.sh).
 
 ```bash
 ./scripts/dev-setup.sh          # 1. install pinned CLI tools via mise
-./scripts/cloudbox-init.sh      # 2. pre-pull ~15-20 GB of images + start the local mirror
+./scripts/cloudbox-init.sh      # 2. pre-pull ~8 GB of images + start the local mirror
 ./scripts/install.sh --check    # 3. pre-flight check — must be all green ✅
 ```
 
@@ -67,7 +67,11 @@ The Talos "nodes" are Docker containers with their **own containerd inside** —
 the host Docker image cache is invisible to them. `cloudbox-init.sh` therefore
 runs a plain OCI registry (`cloudbox-mirror`, data in a Docker volume, so it
 survives cluster rebuilds) and copies every cluster image into it with crane,
-preserving repository paths and digests. `create-cluster.sh` points the Talos
+preserving repository paths and digests. Tag-only images are mirrored for your
+machine's CPU architecture only; images pinned by digest are copied whole,
+every architecture, because the pinned digest **is** the manifest index's
+digest and the nodes resolve it against the mirror by that exact digest.
+`create-cluster.sh` points the Talos
 `machine.registries.mirrors` at it — with fallback to the real registries, so
 a stale mirror can never break the cluster, it just costs bandwidth.
 

@@ -84,7 +84,7 @@ You build it in [module 08](lab/08-portal) and it comes fully alive in the
 
 ## Prerequisites — do this BEFORE the conference
 
-Conference WiFi carries keystrokes, not gigabytes. The setup downloads 15–20 GB of
+Conference WiFi carries keystrokes, not gigabytes. The setup downloads roughly 8 GB of
 container images. **Run all three steps at home, on a network you trust:**
 
 ```bash
@@ -93,7 +93,7 @@ git clone https://github.com/randax/Platform-Engineering-Workshop.git
 cd Platform-Engineering-Workshop
 
 ./scripts/dev-setup.sh        # 1. install the pinned CLI tools (via mise)
-./scripts/cloudbox-init.sh    # 2. pre-pull all pinned images (15–20 GB — be patient)
+./scripts/cloudbox-init.sh    # 2. pre-pull all pinned images (~8 GB — be patient)
 ./scripts/install.sh --check  # 3. preflight: prints ✅/❌ for everything
 ```
 

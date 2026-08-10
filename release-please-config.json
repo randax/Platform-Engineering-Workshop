@@ -9,15 +9,38 @@
       "component": "apps",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        { "type": "generic", "path": "/scripts/images.txt" },
-        { "type": "generic", "path": "/gitops/components/portal/portal.yaml" },
-        { "type": "generic", "path": "/gitops/components/picture-pipeline/picture-pipeline.yaml" },
-        { "type": "generic", "path": "/gitops/components/grafana/grafana.yaml" },
-        { "type": "generic", "path": "/gitops/components/application-xr/composition.yaml" },
-        { "type": "generic", "path": "/lab/04-self-service/examples/my-application.yaml" },
-        { "type": "generic", "path": "/apps/portal/internal/web/templates/applications.html" },
-        { "type": "generic", "path": "/apps/README.md" },
-        { "type": "generic", "path": "/.github/workflows/bootstrap-test.yaml" }
+        {
+          "type": "generic",
+          "path": "/scripts/images.txt"
+        },
+        {
+          "type": "generic",
+          "path": "/gitops/components/portal/portal.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "/gitops/components/picture-pipeline/picture-pipeline.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "/gitops/components/grafana/grafana.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "/gitops/components/application-xr/composition.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "/lab/04-self-service/examples/my-application.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "/apps/portal/internal/web/templates/applications.html"
+        },
+        {
+          "type": "generic",
+          "path": "/apps/README.md"
+        }
       ]
     }
   }

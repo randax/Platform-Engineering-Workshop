@@ -23,7 +23,11 @@
 #   ./scripts/cloudbox-init.sh --skip-model-pull  # do not pull the optional Ollama model
 #   ./scripts/cloudbox-init.sh -y --skip-model-pull
 #
-# Expect ~15–20 GB of downloads. Run this at home, not at the venue!
+# Expect roughly 8 GB of downloads (7.5 GB on arm64, 7.7 GB on amd64).
+# Cluster images are mirrored for THIS machine's CPU architecture only; the
+# refs pinned by digest still carry every architecture, and are most of what
+# is left (see the copy loop below for why that is not optional).
+# Run this at home, not at the venue!
 # Safe to re-run: already-present images are skipped quickly.
 # =============================================================================
 set -euo pipefail
@@ -45,6 +49,14 @@ done
 need docker "Install Docker Desktop / OrbStack / docker-ce first."
 docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
 need crane
+
+# The platform the cluster nodes actually run. The Talos "nodes" are containers
+# on THIS host's Docker engine, so their CPU architecture is this host's — there
+# is no cross-architecture case to support, and nothing here may be hard-coded
+# (CI runs amd64, most laptops in the room are arm64).
+node_arch="$(detect_arch)" \
+  || die "Unsupported CPU architecture '$(uname -m)' — the workshop needs x86_64 or arm64."
+NODE_PLATFORM="linux/${node_arch}"
 
 IMAGES_FILE="${SCRIPT_DIR}/images.txt"
 [[ -f "${IMAGES_FILE}" ]] || die "Missing ${IMAGES_FILE}"
@@ -74,7 +86,8 @@ total=$(( ${#host_images[@]} + ${#mirror_images[@]} ))
 
 step "CloudBox image pre-pull"
 echo "  ${#host_images[@]} host images + ${#mirror_images[@]} cluster images = ${total} total"
-warn "This downloads roughly 15–20 GB. Make sure you have ${MIN_DISK_FREE_GB} GB free disk"
+echo "  cluster images are mirrored for ${NODE_PLATFORM} (digest-pinned refs keep every architecture)"
+warn "This downloads roughly 8 GB. Make sure you have ${MIN_DISK_FREE_GB} GB free disk"
 warn "and are on a good connection (home/office — NOT conference WiFi)."
 if [[ "${ASSUME_YES}" != "true" ]]; then
   confirm "Continue?" || die "Aborted."
@@ -137,9 +150,36 @@ curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 \
   || die "Mirror registry did not become ready on localhost:${MIRROR_PORT}"
 
 # --- 3. Copy cluster images into the mirror ----------------------------------------
-# crane copies manifests byte-for-byte (digests preserved, all architectures),
-# which `docker pull && docker push` would break for digest-pinned images.
-step "Copying cluster images into the mirror (crane, digests preserved)"
+# crane is used instead of `docker pull && docker push` because it copies
+# manifests byte-for-byte, so digest-pinned refs stay valid inside the mirror.
+#
+# Which architectures get copied is decided per ref, and both branches matter:
+#
+#   TAG-ONLY refs are copied for ${NODE_PLATFORM} only.
+#     Without --platform, crane copies the WHOLE manifest index — s390x,
+#     ppc64le, riscv64, 386, arm/v7 and the other of amd64/arm64 — none of
+#     which this laptop can execute. That was about half the pre-pull:
+#     registry.k8s.io/pause is 0.3 MB for one platform and 573 MB as a full
+#     index. Deleting the --platform flag breaks nothing visibly; it just
+#     doubles the download. Do not delete it.
+#
+#   DIGEST-PINNED refs (…@sha256:…) are copied whole, every architecture.
+#     For a multi-arch image the pinned digest is the digest of the INDEX.
+#     `crane copy --platform` stores only the child manifest, under a
+#     different digest, so the index digest would not exist in the mirror —
+#     a Talos node asking for …@sha256:<index> gets a 404 and, because
+#     create-cluster.sh sets skipFallback: false, silently pulls from the
+#     internet instead. That works at home and hangs on conference WiFi,
+#     which is the exact failure this script exists to prevent. The foreign
+#     architectures those refs drag along are the price of the offline
+#     guarantee; the alternative (push the original index but only the one
+#     child's blobs) was tested and rejected — containerd 2.x fetches every
+#     child manifest in an index regardless of platform and errors out on the
+#     missing ones.
+#
+# If --platform copy fails (an index with no manifest for this architecture),
+# fall back to copying everything: fatter, but never a missing image offline.
+step "Copying cluster images into the mirror (crane, ${NODE_PLATFORM} + pinned indexes)"
 CRANE_LOG="$(mktemp)"
 trap 'rm -f "${CRANE_LOG}"' EXIT
 i=0
@@ -149,12 +189,26 @@ for image in "${mirror_images[@]}"; do
   path="$(strip_registry "${image}")"
   dest="localhost:${MIRROR_PORT}/${path%%@*}"   # crane derives no tag from digests;
   [[ "${path}" == *@sha256:* && "${path}" != *:*@* ]] && dest="${dest}:pinned"
-  echo "  [${i}/${#mirror_images[@]}] ${image}"
-  if ! crane copy --insecure "${image}" "${dest}" >/dev/null 2>"${CRANE_LOG}"; then
-    fail "      copy failed: ${image}"
-    tail -n 3 "${CRANE_LOG}" | sed 's/^/      | /'
-    failed+=("${image}")
+
+  copy_args=(--insecure)
+  if [[ "${image}" == *@sha256:* ]]; then
+    echo "  [${i}/${#mirror_images[@]}] ${image} (full index — digest-pinned)"
+  else
+    copy_args+=(--platform "${NODE_PLATFORM}")
+    echo "  [${i}/${#mirror_images[@]}] ${image}"
   fi
+
+  if crane copy "${copy_args[@]}" "${image}" "${dest}" >/dev/null 2>"${CRANE_LOG}"; then
+    continue
+  fi
+  if [[ ${#copy_args[@]} -gt 1 ]] \
+     && crane copy --insecure "${image}" "${dest}" >/dev/null 2>"${CRANE_LOG}"; then
+    warn "      no ${NODE_PLATFORM} manifest — copied every architecture instead"
+    continue
+  fi
+  fail "      copy failed: ${image}"
+  tail -n 3 "${CRANE_LOG}" | sed 's/^/      | /'
+  failed+=("${image}")
 done
 
 echo

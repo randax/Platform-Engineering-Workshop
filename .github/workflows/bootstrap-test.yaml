@@ -741,9 +741,12 @@ jobs:
           kubectl apply -f lab/08-portal/portal-applications-access.yaml
           base=http://localhost:30600
           app=e2eapp
-          # x-release-please-start-version
+          # An opaque fixture string: the console echoes it back into the XR's
+          # spec.image and we assert it round-trips. Nothing pulls it, so this
+          # deliberately does NOT track the release — and it could not anyway,
+          # since GITHUB_TOKEN is not permitted to write .github/workflows/**
+          # (release-please fails at tree creation if you try).
           img=ghcr.io/randax/cloudbox-uploader:v0.1.0
-          # x-release-please-end-version
           c=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST "$base/applications" \
             --data-urlencode "name=$app" --data-urlencode "image=$img" \
             --data-urlencode "min=0" --data-urlencode "max=3" \
