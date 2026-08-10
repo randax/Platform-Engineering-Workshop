@@ -86,7 +86,9 @@ file cannot silently retire a check.
    it. Everything deployed must appear in `scripts/images.txt` or
    `check-consistency.sh` fails — that is the offline guarantee. A **tag** pin
    must publish both linux/amd64 and linux/arm64 (cloudbox-init.sh mirrors tag
-   pins per-arch and errors on an index missing the host's platform);
+   pins per-arch and errors on an index missing the host's platform), unless
+   the repo is listed in `MIRROR_ARCH_EXEMPT` in `versions.env` — deliberately
+   single-arch, runs emulated (Backstage);
    `images-gate.yaml` enforces this, so an upstream that drops an arch shows up
    in the weekly report, not on an attendee's laptop.
 4. **`./scripts/check-consistency.sh`** must be green before the PR.
