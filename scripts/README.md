@@ -11,7 +11,7 @@ the repo-root `mise.toml`); shared helpers live in [`lib.sh`](lib.sh).
 
 ```bash
 ./scripts/dev-setup.sh          # 1. install pinned CLI tools via mise
-./scripts/cloudbox-init.sh      # 2. pre-pull ~8 GB of images + start the local mirror
+./scripts/cloudbox-init.sh      # 2. pre-pull ~7.5 GB of images + start the local mirror
 ./scripts/install.sh --check    # 3. pre-flight check — must be all green ✅
 ```
 

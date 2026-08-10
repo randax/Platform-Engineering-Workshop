@@ -82,5 +82,5 @@ fi
 
 ok "All tools installed and verified."
 info "Next steps (still at home, on good internet):"
-echo "   1. ./scripts/cloudbox-init.sh      # pre-pull all workshop images (~8 GB)"
+echo "   1. ./scripts/cloudbox-init.sh      # pre-pull all workshop images (~7.5 GB)"
 echo "   2. ./scripts/install.sh --check    # full pre-flight check"

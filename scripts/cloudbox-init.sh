@@ -23,7 +23,8 @@
 #   ./scripts/cloudbox-init.sh --skip-model-pull  # do not pull the optional Ollama model
 #   ./scripts/cloudbox-init.sh -y --skip-model-pull
 #
-# Expect roughly 8 GB of downloads (7.5 GB on arm64, 7.7 GB on amd64).
+# Expect ~7.5 GB of downloads on arm64, ~7.7 GB on amd64 (compressed layer
+# bytes, measured 2026-08-11 against the pinned refs in images.txt).
 # Cluster images are mirrored for THIS machine's CPU architecture only; the
 # refs pinned by digest still carry every architecture, and are most of what
 # is left (see the copy loop below for why that is not optional).
@@ -87,7 +88,7 @@ total=$(( ${#host_images[@]} + ${#mirror_images[@]} ))
 step "CloudBox image pre-pull"
 echo "  ${#host_images[@]} host images + ${#mirror_images[@]} cluster images = ${total} total"
 echo "  cluster images are mirrored for ${NODE_PLATFORM} (digest-pinned refs keep every architecture)"
-warn "This downloads roughly 8 GB. Make sure you have ${MIN_DISK_FREE_GB} GB free disk"
+warn "This downloads ~7.5 GB (arm64) / ~7.7 GB (amd64). Make sure you have ${MIN_DISK_FREE_GB} GB free disk"
 warn "and are on a good connection (home/office — NOT conference WiFi)."
 if [[ "${ASSUME_YES}" != "true" ]]; then
   confirm "Continue?" || die "Aborted."
