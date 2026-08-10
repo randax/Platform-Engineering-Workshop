@@ -39,6 +39,8 @@ jobs:
       - name: Every pinned image exists upstream
         run: |
           set -euo pipefail
+          # MIRROR_ARCH_EXEMPT: repos allowed to be single-arch (run emulated).
+          source scripts/versions.env
           fail=0
           while IFS= read -r ref; do
             if ! manifest="$(crane manifest "${ref}" 2>/dev/null)"; then
@@ -47,23 +49,32 @@ jobs:
             elif [[ "${ref}" == *@sha256:* ]]; then
               echo "ok  ${ref} (digest pin — mirrored byte-for-byte)"
             # Tag pins are mirrored per-arch by cloudbox-init.sh (crane copy
-            # --platform), which ERRORS on an index missing that platform — a
-            # single-arch index pin would fail only on attendees' machines of
-            # the other arch. Require both linux/amd64 and linux/arm64 in every
-            # tag-pinned index. Bare (non-index) manifests pass: crane copies
-            # them as-is regardless of --platform (e.g. the amd64-only
-            # Backstage image, which Apple Silicon runs emulated by design).
-            elif jq -e '
-                if (.mediaType // "" | test("image.index|manifest.list")) then
-                  ([.manifests[].platform | select(.os == "linux").architecture]
-                   | (index("amd64") and index("arm64")))
-                else true end' >/dev/null <<<"${manifest}"; then
-              echo "ok  ${ref}"
+            # --platform), so every tag-pinned index must carry both
+            # linux/amd64 and linux/arm64 — a single-arch pin would fail only
+            # on attendees' machines of the other arch. Bare (non-index)
+            # manifests are inherently single-arch (crane copies them as-is,
+            # install.sh cannot tell them from a wrong-arch copy) and are
+            # allowed only for repos in MIRROR_ARCH_EXEMPT (versions.env),
+            # which run emulated by design (Backstage).
+            elif jq -e '(.mediaType // "" | test("image.index|manifest.list"))' >/dev/null <<<"${manifest}"; then
+              if jq -e '[.manifests[].platform | select(.os == "linux").architecture]
+                        | (index("amd64") and index("arm64"))' >/dev/null <<<"${manifest}"; then
+                echo "ok  ${ref}"
+              else
+                echo "::error::tag pin lacks linux/amd64 or linux/arm64: ${ref} (cloudbox-init.sh --platform copy would fail on the missing arch)"
+                fail=$((fail + 1))
+              fi
             else
-              echo "::error::tag pin lacks linux/amd64 or linux/arm64: ${ref} (cloudbox-init.sh --platform copy would fail on the missing arch)"
-              fail=$((fail + 1))
+              repo="${ref#*/}"; repo="${repo%%:*}"   # strip registry host + tag
+              case " ${MIRROR_ARCH_EXEMPT:-} " in
+                *" ${repo} "*)
+                  echo "ok  ${ref} (bare single-arch manifest — MIRROR_ARCH_EXEMPT)" ;;
+                *)
+                  echo "::error::tag pin is a bare single-arch manifest and not in MIRROR_ARCH_EXEMPT (versions.env): ${ref}"
+                  fail=$((fail + 1)) ;;
+              esac
             fi
           done < <(grep -vE '^\s*(#|\[|$)' scripts/images.txt)
           echo "---"
-          echo "${fail} missing"
+          echo "${fail} failing ref(s)"   # missing upstream, or wrong architecture
           exit "${fail}"
