@@ -211,6 +211,15 @@ else
   # checked — a partially re-run mirror can mix architectures, so one
   # representative sample is not enough. Two localhost GETs per image, cheap.
   # Returns 1 only on a proven mismatch; indeterminate probes pass.
+  # Repos in MIRROR_ARCH_EXEMPT (versions.env) are skipped at the call site:
+  # intentionally single-arch images (Backstage) that run emulated would
+  # otherwise fail every Apple Silicon attendee's preflight.
+  mirror_arch_exempt() {
+    case " ${MIRROR_ARCH_EXEMPT} " in
+      *" ${1%%:*} "*) return 0 ;;
+    esac
+    return 1
+  }
   check_mirror_arch() {
     local repo="${1%%:*}" ref="${1##*:}" manifest media cfg img_arch
     [[ -n "${mirror_arch}" ]] || return 0
@@ -247,7 +256,8 @@ else
       if ! check_mirror_image "${mirror_path}"; then
         fail "missing from mirror: ${line}"
         mirror_missing=$((mirror_missing + 1))
-      elif [[ "${line}" != *@sha256:* ]] && ! check_mirror_arch "${mirror_path}"; then
+      elif [[ "${line}" != *@sha256:* ]] && ! mirror_arch_exempt "${mirror_path}" \
+          && ! check_mirror_arch "${mirror_path}"; then
         fail "wrong architecture in mirror: ${line}"
         mirror_arch_bad=$((mirror_arch_bad + 1))
       fi
