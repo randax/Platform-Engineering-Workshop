@@ -10,9 +10,11 @@
 #   Lines starting with # are comments. Every reference is pinned (tag and/or
 #   digest) — :latest silently defeats pre-pulling (principle 2/14).
 #
-# Verified against upstream registries 2026-07-13. The [mirror] component list
-# must track what gitops/ actually deploys — re-verify against gitops/ and
-# re-pin in late August.
+# Verified against upstream registries 2026-08-11 — the pre-event re-verify
+# pass: every ref below resolved, and every tag pin carries both linux/amd64 and
+# linux/arm64 (the images-gate.yaml predicate, run over the whole file). The
+# [mirror] component list must track what gitops/ actually deploys, which
+# check-consistency.sh enforces on every push.
 # =============================================================================
 
 [host]

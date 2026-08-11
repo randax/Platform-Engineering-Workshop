@@ -2,8 +2,8 @@
 # CloudBox — JavaZone 2026: Cloud on Your Terms
 #
 # Tool pins for the workshop. Everything is pinned (principle 14) — versions
-# verified 2026-07-13, re-verify late August. Keep in sync with
-# scripts/versions.env when bumping.
+# verified 2026-08-11 (the pre-event pass; `helm` is held at 3.21.3 on purpose).
+# Keep in sync with scripts/versions.env when bumping.
 #
 #   mise install        # install all tools below
 #   mise tasks ls       # list workshop tasks

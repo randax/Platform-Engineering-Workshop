@@ -4,8 +4,8 @@ The reference behind the workshop's ["The stack — and why"](../slides/pages/st
 slides. For each platform component: what we run, what we rejected, and the tradeoff we
 took. The authoritative per-component detail lives in each
 `gitops/components/*/VENDOR.md`; this is the cross-cutting summary. Versions are the pins
-in the manifests and [`scripts/versions.env`](../scripts/versions.env) as of 2026-07-15 —
-re-verify before the final `javazone-2026` tag.
+in the manifests and [`scripts/versions.env`](../scripts/versions.env), re-verified against
+upstream on 2026-08-11 (the pre-event pass; `helm` is held at 3.21.3 on purpose).
 
 Every pick is optimised for the **same three constraints**, not for abstract "best in
 class": it must fit a **16 GB laptop**, run **fully offline** at a venue with hostile WiFi,

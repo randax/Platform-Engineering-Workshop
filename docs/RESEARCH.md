@@ -1,8 +1,9 @@
 # Research Grounding — JavaZone 2026 Workshop
 
 Researched 2026-07-13 via parallel web-research agents with adversarial verification of
-load-bearing claims against primary sources. Version numbers are as of this date — re-verify
-in late August before the final pin.
+load-bearing claims against primary sources. Version numbers were re-verified against
+upstream on **2026-08-11** (the pre-event pass) and are current as of that date, with one
+deliberate hold: `helm` stays at 3.21.3.
 
 ## 1. Talos-in-Docker + Cilium — **GO**
 
