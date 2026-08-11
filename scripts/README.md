@@ -47,7 +47,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `dev-setup.sh` | Install mise (with consent) + all pinned CLI tools, verify versions |
 | `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`; start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it |
 | `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
-| `create-cluster.sh` | `talosctl cluster create docker` (Talos v1.13.6, 1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm |
+| `create-cluster.sh` | `talosctl cluster create docker` (Talos v1.13.8, 1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm |
 | `destroy-cluster.sh` | `talosctl cluster destroy` + kubeconfig cleanup; `--purge-mirror` also removes the image mirror |
 | `bootstrap-gitops.sh` | local-path-provisioner + Gitea (single-pod SQLite, push-to-create) + ArgoCD (vendored manifest, NodePort 30080, Application health check) |
 | `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |

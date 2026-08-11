@@ -3,7 +3,7 @@
 # create-cluster.sh — module 1: create the CloudBox Talos cluster
 #
 # What it does:
-#   1. talosctl cluster create docker — Talos v1.13.6, 1 controlplane +
+#   1. talosctl cluster create docker — Talos v1.13.8, 1 controlplane +
 #      1 worker, raised memory limits, CNI and kube-proxy disabled
 #      (Cilium replaces both), workshop NodePorts published on localhost
 #   2. Points the nodes' registry mirrors at the local cloudbox-mirror

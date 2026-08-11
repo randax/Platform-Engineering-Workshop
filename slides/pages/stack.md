@@ -21,7 +21,7 @@ Ground rule to state once, up front: nothing here is "best in class" in the abst
 <table>
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
-<tr><td>K8s OS</td><td><span class="we"><Logo name="talos" size="1.3rem"/> <b>Talos v1.13.6</b></span></td><td>kubeadm · minikube · kind</td><td>No shell, no SSH, no drift — you lose the escape hatch on purpose</td></tr>
+<tr><td>K8s OS</td><td><span class="we"><Logo name="talos" size="1.3rem"/> <b>Talos v1.13.8</b></span></td><td>kubeadm · minikube · kind</td><td>No shell, no SSH, no drift — you lose the escape hatch on purpose</td></tr>
 <tr><td>CNI + proxy</td><td><span class="we"><Logo name="cilium" size="1.3rem"/> <b>Cilium 1.19.5</b></span></td><td>flannel + kube-proxy</td><td>eBPF datapath, kube-proxy-free — needs kernel ≥5.10</td></tr>
 </tbody>
 </table>
@@ -36,7 +36,7 @@ Ground rule to state once, up front: nothing here is "best in class" in the abst
 </div>
 
 <!--
-Talos is the biggest identity shift of the day (module 01 goes deep). The pin matters: v1.13.6, never 1.12.x — cni:none docker clusters hung on readiness until the v1.13.0 fix (talos#12885). Default node memory limit is 2048 MB and the stack won't fit, so the scripts raise it (4096 CP / 6144 worker).
+Talos is the biggest identity shift of the day (module 01 goes deep). The pin matters: v1.13.8, never 1.12.x — cni:none docker clusters hung on readiness until the v1.13.0 fix (talos#12885). Default node memory limit is 2048 MB and the stack won't fit, so the scripts raise it (4096 CP / 6144 worker).
 
 Cilium tradeoff to name honestly: eBPF wants a modern kernel — Docker Desktop macOS ships 6.10, WSL2 6.6, both fine; the risk platform is exotic Linux firewalld/nftables setups. We keep kube-proxy-free for the wow factor but the fallback keeps kube-proxy to remove a nested-cgroup variable — robustness vs. wow is a real dial here.
 -->

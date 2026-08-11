@@ -10,9 +10,9 @@
 # =============================================================================
 
 [tools]
-# Talos v1.13.6 — never 1.12.x (cni:none docker clusters hang, talos#12885)
-"aqua:siderolabs/talos" = "1.13.6"
-# kubectl matches the Kubernetes version Talos v1.13.6 ships
+# Talos v1.13.8 — never 1.12.x (cni:none docker clusters hang, talos#12885)
+"aqua:siderolabs/talos" = "1.13.8"
+# kubectl matches the Kubernetes version Talos v1.13.8 ships
 kubectl = "1.36.2"
 helm = "3.21.3"
 # kind — only for scripts/kind-fallback.sh

@@ -26,7 +26,7 @@ in-cluster git server and a GitOps engine delivering the entire platform on top:
 ```text
 your laptop
 └── Docker (≥10 GB allocated)
-    └── Talos v1.13.6 cluster (1 control plane + 1 worker)
+    └── Talos v1.13.8 cluster (1 control plane + 1 worker)
         ├── Cilium 1.19 (eBPF CNI)
         ├── Gitea (in-cluster git — this is your cloud's git server)
         ├── ArgoCD v3.4 ── app-of-apps w/ sync waves ──────┐

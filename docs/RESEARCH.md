@@ -6,7 +6,7 @@ in late August before the final pin.
 
 ## 1. Talos-in-Docker + Cilium — **GO**
 
-- **Pin Talos v1.13.6** (talosctl AND `--image ghcr.io/siderolabs/talos:v1.13.6`).
+- **Pin Talos v1.13.8** (talosctl AND `--image ghcr.io/siderolabs/talos:v1.13.8`).
   **Never v1.12.x**: `cni: none` docker clusters hung on readiness checks until the fix in
   v1.13.0 ([talos#12885](https://github.com/siderolabs/talos/issues/12885), PR #12896).
 - CLI changed in v1.12: it is now `talosctl cluster create docker` (subcommand), with
@@ -29,7 +29,7 @@ in late August before the final pin.
   (and get a genuinely novel workshop).
 - Fallback: **scripted kind + Cilium** (officially documented Cilium dev env, strictly more
   robust; loses the Talos content). Keep it in the repo.
-- Talos v1.13.6 ships Kubernetes 1.36.2 — satisfies Knative's ≥1.34 requirement.
+- Talos v1.13.8 ships Kubernetes 1.36.2 — satisfies Knative's ≥1.34 requirement.
 
 ## 2. Object storage: RustFS — **conditional GO**, SeaweedFS is Plan B
 

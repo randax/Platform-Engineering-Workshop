@@ -17,23 +17,23 @@
 
 [host]
 # Talos node container (1 CP + 1 worker run this image)
-ghcr.io/siderolabs/talos:v1.13.6
+ghcr.io/siderolabs/talos:v1.13.8
 # The local pull-through mirror itself
 docker.io/library/registry:3.1.1
 # kind fallback node image (only used by kind-fallback.sh — kept warm anyway)
 docker.io/kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
 
 [mirror]
-# --- Talos / Kubernetes system images (from `talosctl images default`, v1.13.6)
+# --- Talos / Kubernetes system images (from `talosctl images default`, v1.13.8)
 # flannel is omitted (cni: none) and kube-proxy is omitted (proxy disabled).
 ghcr.io/siderolabs/kubelet:v1.36.2
 registry.k8s.io/kube-apiserver:v1.36.2
 registry.k8s.io/kube-controller-manager:v1.36.2
 registry.k8s.io/kube-scheduler:v1.36.2
 registry.k8s.io/etcd:v3.6.12
-registry.k8s.io/coredns/coredns:v1.14.2
+registry.k8s.io/coredns/coredns:v1.14.6
 registry.k8s.io/pause:3.10.1
-registry.k8s.io/networking/kube-network-policies:v1.0.0
+registry.k8s.io/networking/kube-network-policies:v1.1.0
 
 # --- Cilium 1.19.5 (digests from `helm template cilium/cilium --version 1.19.5`)
 quay.io/cilium/cilium:v1.19.5@sha256:20fbbc14ac20b55a292c0dcda5571bf31cde30a7dbc68c29db3e709390ab0732

@@ -16,7 +16,7 @@ these picks flip — reading the tradeoff is the transferable skill, not memoris
 
 | Component | Chosen | Rejected alternative | Why |
 |---|---|---|---|
-| K8s OS | **Talos Linux** v1.13.6 (K8s 1.36.2) | kubeadm · minikube · kind | Immutable, API-only OS — no shell, no SSH, no package manager, no drift. kind stays as the strictly-more-robust fallback. |
+| K8s OS | **Talos Linux** v1.13.8 (K8s 1.36.2) | kubeadm · minikube · kind | Immutable, API-only OS — no shell, no SSH, no package manager, no drift. kind stays as the strictly-more-robust fallback. |
 | CNI + service proxy | **Cilium** 1.19.5 | flannel + kube-proxy | eBPF datapath, kube-proxy-free — no O(services) iptables, identity-based policy, Hubble. |
 | Git server | **Gitea** 1.26.1 (in-cluster) | external GitHub / GitLab | Offline, self-contained write-path; no per-IP NAT rate-limits; attendees can actually push. |
 | GitOps engine | **ArgoCD** v3.4.5, app-of-apps | Flux · manual kubectl | Drift detection + self-heal; app-of-apps is the one-cluster shape; plain `install.yaml` teaches better than Helm. |
@@ -44,7 +44,7 @@ managed over a gRPC API — the machine is a declarative resource, reconciled li
 kubeadm/minikube give you a general-purpose distro you must harden and that can drift; kind
 gives you a mutable node you can shell into — which is exactly what Talos refuses to be. The
 tradeoff is deliberate: you give up the SSH escape hatch to get zero drift and a tiny attack
-surface. Pinned **v1.13.6, never 1.12.x** (`cni: none` docker clusters hung on readiness
+surface. Pinned **v1.13.8, never 1.12.x** (`cni: none` docker clusters hung on readiness
 until the v1.13.0 fix, talos#12885); default node memory (2048 MB) won't fit the stack, so
 the scripts raise it (4096 MB control-plane / 6144 MB worker). **kind + Cilium is the
 rehearsed fallback** in-repo — strictly more robust, loses only the Talos content.
