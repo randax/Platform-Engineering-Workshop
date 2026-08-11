@@ -47,7 +47,7 @@ the whole thing, matching the rustfs / nats treatment.
 Bump the tag, then re-resolve the digest:
 
 ```sh
-mise x crane@0.21.7 -- crane digest docker.io/victoriametrics/victoria-metrics:v1.149.0
+mise x crane@0.21.9 -- crane digest docker.io/victoriametrics/victoria-metrics:v1.149.0
 ```
 
 This is a hand-written component, so "re-vendor" means: diff the new binary's

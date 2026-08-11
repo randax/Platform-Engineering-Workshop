@@ -34,7 +34,7 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    copy that pulls busybox from Docker Hub and pushes it straight into Zot:
 
    ```bash
-   mise x crane@0.21.7 -- crane copy --insecure \
+   mise x crane@0.21.9 -- crane copy --insecure \
      docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
    ```
 
@@ -103,7 +103,7 @@ git add . && git commit -m "module 07: zot + argo-workflows" && git push
 # wait for both apps Healthy in ArgoCD
 
 # seed YOUR registry with the pre-pulled base image (host → Zot NodePort)
-mise x crane@0.21.7 -- crane copy --insecure \
+mise x crane@0.21.9 -- crane copy --insecure \
   docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
 
 kubectl create -f "$WORKSHOP/lab/07-ci/workflow-run.yaml"

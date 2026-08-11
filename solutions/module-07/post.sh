@@ -19,7 +19,7 @@ fi
 
 # 2a. Seed Zot with the base image the Dockerfile builds FROM
 #     (zot.zot.svc.cluster.local:5000/library/busybox). Idempotent.
-mise x crane@0.21.7 -- crane copy --insecure \
+mise x crane@0.21.9 -- crane copy --insecure \
   docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
 
 WF_NAME="$(kubectl create -f "$REPO_ROOT/lab/07-ci/workflow-run.yaml" -o jsonpath='{.metadata.name}')"

@@ -18,7 +18,7 @@ helm = "3.21.3"
 # kind — only for scripts/kind-fallback.sh
 kind = "0.32.0"
 # crane — mirrors pinned images (host arch for tag pins, full index for digest pins)
-crane = "0.21.7"
+crane = "0.21.9"
 # cilium CLI — lab 01 uses `cilium status` to inspect the CNI
 "aqua:cilium/cilium-cli" = "0.19.7"
 # jq — JSON plumbing in verify scripts and lab hints

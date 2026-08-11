@@ -10,7 +10,7 @@
 # GF_PATHS_PLUGINS=/opt/grafana-plugins so Grafana loads them from here (read-only
 # is fine — Grafana only reads plugins).
 #
-# NB: VictoriaTraces has no signed Grafana datasource plugin yet, so traces stay
+# NB: the Grafana catalog publishes no VictoriaTraces datasource at all, so traces stay
 # on the built-in Jaeger datasource (now with the per-trace Node Graph enabled).
 FROM grafana/grafana:13.1.3@sha256:ab5cb380e3ff3172d6c8bd2e7cfd31cce977d2881b260e1f5bc089bf0b759b43
 

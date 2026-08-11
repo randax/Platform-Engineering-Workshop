@@ -830,7 +830,7 @@ jobs:
           # An in-cluster build pod can't reach the internet (offline cluster), so
           # the demo app's golang builder base must be in Zot — seed it the same
           # way module 07 seeds busybox (host-side crane against Zot's NodePort).
-          mise x crane@0.21.7 -- crane copy --insecure \
+          mise x crane@0.21.9 -- crane copy --insecure \
             public.ecr.aws/docker/library/golang:1.25-alpine \
             localhost:30500/library/golang:1.25-alpine
           echo "✅ seeded the golang builder base into Zot"

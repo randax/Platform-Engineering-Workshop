@@ -107,7 +107,7 @@ equivalent).
 Bump the tag, then re-resolve the digest:
 
 ```sh
-mise x crane@0.21.7 -- crane digest docker.io/otel/opentelemetry-collector-contrib:0.158.0
+mise x crane@0.21.9 -- crane digest docker.io/otel/opentelemetry-collector-contrib:0.158.0
 ```
 
 Keep the `image:` in both collector manifests and the entry in

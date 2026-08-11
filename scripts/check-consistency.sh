@@ -150,6 +150,19 @@ done
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "control-plane images pre-pulled for KUBERNETES_VERSION ${KUBERNETES_VERSION}"
 
+# Labs, solutions and CI reach for crane with an explicit `mise x crane@<ver>`
+# rather than the shim. That version must equal mise.toml's crane pin: dev-setup
+# installs only what mise.toml lists, so a mismatched `mise x crane@…` would try
+# to download a second crane — at the venue, offline, mid-lab.
+crane_mise="$(mise_pin 'crane')"
+bad_crane="$(git grep -hoE 'crane@[0-9][0-9.]*' -- . 2>/dev/null \
+  | sort -u | grep -v "^crane@${crane_mise}$" || true)"
+if [[ -z "${bad_crane}" ]]; then
+  ok "every 'mise x crane@…' matches the mise.toml crane pin (${crane_mise})"
+else
+  bad "crane pin drift: mise.toml has ${crane_mise} but the tree also references $(echo "${bad_crane}" | tr '\n' ' ')— dev-setup only installs the mise.toml version, so the others need a download"
+fi
+
 # --- 4. MISE_VERSION inline copy in devcontainer.json --------------------------
 if grep -q "MISE_VERSION=${MISE_VERSION} " .devcontainer/devcontainer.json; then
   ok "devcontainer MISE_VERSION matches versions.env (${MISE_VERSION})"

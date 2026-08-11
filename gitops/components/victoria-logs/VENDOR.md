@@ -55,7 +55,7 @@ its own `/select/logsql/*` paths. The Loki-compatible shim
 ## Re-vendor
 
 ```sh
-mise x crane@0.21.7 -- crane digest docker.io/victoriametrics/victoria-logs:v1.52.0
+mise x crane@0.21.9 -- crane digest docker.io/victoriametrics/victoria-logs:v1.52.0
 ```
 
 Keep the `image:` in `victoria-logs.yaml` and `scripts/images.txt` in lockstep

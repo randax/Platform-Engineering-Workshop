@@ -25,7 +25,7 @@ wait_exists builds workflowtemplate/build-and-push 180
 # 2. Seed YOUR registry with the (pre-pulled) base image — the app's Dockerfile
 #    builds FROM zot.zot.svc.cluster.local:5000, so the platform never touches
 #    an external registry. Host-side crane against Zot's NodePort (plain HTTP).
-mise x crane@0.21.7 -- crane copy --insecure \
+mise x crane@0.21.9 -- crane copy --insecure \
   docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
 
 # 3. Build inside the cluster.

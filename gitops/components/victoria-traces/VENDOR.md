@@ -57,7 +57,7 @@ It's new (v0.10.x), so the two workshop-critical risks are managed explicitly:
 Bump the tag, then re-resolve the digest:
 
 ```sh
-mise x crane@0.21.7 -- crane digest docker.io/victoriametrics/victoria-traces:v0.10.0
+mise x crane@0.21.9 -- crane digest docker.io/victoriametrics/victoria-traces:v0.10.0
 ```
 
 VictoriaTraces is pre-1.0, so a minor bump can break things — this is a

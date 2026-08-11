@@ -35,8 +35,8 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
   - Both native plugins load from `/opt/grafana-plugins` via `GF_PATHS_PLUGINS`,
     NOT the default `/var/lib/grafana/plugins` — the `data` emptyDir mounts over
     `/var/lib/grafana` and would shadow anything there.
-  - **VictoriaTraces** as a **Jaeger** datasource (no signed native plugin exists
-    yet) →
+  - **VictoriaTraces** as a **Jaeger** datasource (the Grafana catalog publishes
+    no VictoriaTraces datasource at all — checked 2026-08-11) →
     `http://victoria-traces.observability.svc.cluster.local:10428/select/jaeger`.
     VTraces exposes a Jaeger-compatible query API, so we use the **built-in
     Jaeger type** (again no plugin, offline rule) — Jaeger-style trace search,
@@ -74,7 +74,7 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
 ## Re-vendor
 
 ```sh
-mise x crane@0.21.7 -- crane digest docker.io/grafana/grafana:13.1.3
+mise x crane@0.21.9 -- crane digest docker.io/grafana/grafana:13.1.3
 ```
 
 Bumping the base image means editing the `FROM` line in `apps/grafana/Dockerfile`
