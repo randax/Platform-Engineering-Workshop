@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Component | VictoriaLogs 1.24.0 — single-node log database (observability rework, issue #57 — replaces otel-lgtm's Loki) |
-| Image | `docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs` — `sha256:1ec31ddccc39dc9ead2607cddbf2829be1eb5ad39890e72bba26b359be20801d` (crane, 2026-07-15) |
+| Component | VictoriaLogs 1.52.0 — single-node log database (observability rework, issue #57 — replaces otel-lgtm's Loki) |
+| Image | `docker.io/victoriametrics/victoria-logs:v1.52.0` — `sha256:47b820890d64c4575a2a0a46415dcd8a4fd59a0f1fcd6a377693d7aea639442e` (crane, 2026-08-11) |
 | Source | Official image, https://hub.docker.com/r/victoriametrics/victoria-logs · docs https://docs.victoriametrics.com/victorialogs/ |
 | Files | `victoria-logs.yaml` (PVC + Service + Deployment) |
 
@@ -27,31 +27,35 @@ doesn't need. Hand-written minimal (one Deployment, one PVC, one Service).
   `readOnlyRootFilesystem`, `seccompProfile: RuntimeDefault`; `fsGroup` chowns
   the volume so no initContainer — identical hardening to nats / VictoriaMetrics.
 - **Resources**: requests 50m / 256Mi, limit 512Mi.
+- **The image is distroless from 1.52.0 on** — no shell, so `kubectl exec -- sh`
+  into this pod does not work. Use `kubectl debug` (or read the logs) when
+  troubleshooting. Nothing in the repo execs into it.
 
-## Caveat: queried from Grafana via the built-in **Loki** datasource
+## Tag form: no `-victorialogs` suffix
 
-Grafana (see `../grafana/`) provisions VictoriaLogs as a **Loki-type**
-datasource, not a dedicated one. Why:
+Releases up to v1.24.0 carried a `-victorialogs` suffix (it disambiguated
+VictoriaLogs releases inside the shared VictoriaMetrics repo). VictoriaLogs
+moved to its own repo, `github.com/VictoriaMetrics/VictoriaLogs`, at v1.26.0 and
+the suffix was dropped — `v1.24.0-victorialogs` is the last tag that ever had
+it. The **repository is unchanged** (`docker.io/victoriametrics/victoria-logs`);
+only the tag form is now bare, e.g. `v1.52.0`. Do not re-introduce the suffix:
+there is no `v1.52.0-victorialogs`.
 
-- A dedicated `victoriametrics-logs-datasource` Grafana plugin exists, but
-  installing it needs an internet fetch at Grafana boot — that breaks the
-  workshop's **offline rule** (everything pre-pulled, nothing fetched at the
-  venue). We won't ship an internet-at-boot plugin.
-- VictoriaLogs therefore rides Grafana's **built-in Loki datasource** (core, no
-  plugin), because VLogs implements a Loki-compatible query API.
-- The datasource `url` is `http://victoria-logs.observability.svc.cluster.local:9428`
-  as specified for issue #57. **Caveat:** VictoriaLogs serves its Loki-compatible
-  query endpoints under the `/select/loki/api/v1/*` prefix, so if the Loki
-  datasource doesn't resolve LogsQL/Loki queries against the bare `:9428` base,
-  point its URL at `.../select` (Grafana then appends `/loki/api/v1/...`). This
-  is the one spot in the Victoria stack that may need a per-Grafana-version
-  nudge; revisit when the stack graduates from coexistence to replacing
-  otel-lgtm.
+## Queried from Grafana via the **native** VictoriaLogs datasource
+
+Grafana (see `../grafana/`) provisions VictoriaLogs through the native
+`victoriametrics-logs-datasource` plugin, which is **baked into
+`ghcr.io/randax/cloudbox-grafana`** at build time (`apps/grafana/Dockerfile`,
+#65) — nothing is fetched at Grafana boot, so the offline rule holds. The
+datasource `url` is the bare
+`http://victoria-logs.observability.svc.cluster.local:9428`; the plugin appends
+its own `/select/logsql/*` paths. The Loki-compatible shim
+(`/select/loki/api/v1/*`) is no longer used by anything in this repo.
 
 ## Re-vendor
 
 ```sh
-mise x crane@0.21.7 -- crane digest docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs
+mise x crane@0.21.7 -- crane digest docker.io/victoriametrics/victoria-logs:v1.52.0
 ```
 
 Keep the `image:` in `victoria-logs.yaml` and `scripts/images.txt` in lockstep

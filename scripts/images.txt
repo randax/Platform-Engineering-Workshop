@@ -113,7 +113,7 @@ ghcr.io/kagent-dev/kagent/skills-init:0.9.11
 # capability that REPLACED otel-lgtm: metrics + logs + traces + Grafana, fed by
 # the OTel Collector below.
 docker.io/victoriametrics/victoria-metrics:v1.147.0@sha256:40ea45a6d14b6ad9f2f1fff597309d456ff9885d77d8d1da5fd559b251db9987
-docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs@sha256:1ec31ddccc39dc9ead2607cddbf2829be1eb5ad39890e72bba26b359be20801d
+docker.io/victoriametrics/victoria-logs:v1.52.0@sha256:47b820890d64c4575a2a0a46415dcd8a4fd59a0f1fcd6a377693d7aea639442e
 docker.io/victoriametrics/victoria-traces:v0.9.4@sha256:de1f0ce3916692236a711b58e48c65cc4138bfaa4e36324cfa25206e5485b187
 # Grafana itself is ghcr.io/randax/cloudbox-grafana below. Stock
 # docker.io/grafana/grafana is deliberately NOT listed: it is only the FROM

@@ -1,11 +1,10 @@
 ---
-# VictoriaLogs 1.24.0 — single-node log database (observability rework, issue #57).
+# VictoriaLogs 1.52.0 — single-node log database (observability rework, issue #57).
 # The logs store of the Victoria stack that replaced otel-lgtm's Loki.
 # Listens on :9428:
 #   - OTLP logs ingest → POST /insert/opentelemetry/v1/logs
-#   - LogsQL query     → GET  /select/logsql/query
-#   - Loki-compatible query API (used by Grafana's Loki datasource, see
-#     grafana/VENDOR.md) under /select/loki/api/v1/*
+#   - LogsQL query     → GET  /select/logsql/query  (what Grafana's native
+#     victoriametrics-logs-datasource and the Console's log tail both use)
 # Part of the on-demand observability capability (namespace observability).
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -52,7 +51,7 @@ metadata:
   labels:
     app.kubernetes.io/name: victoria-logs
     app.kubernetes.io/instance: victoria-logs
-    app.kubernetes.io/version: "1.24.0"
+    app.kubernetes.io/version: "1.52.0"
 spec:
   replicas: 1
   # Recreate (not RollingUpdate): the data PVC is ReadWriteOnce, so a second
@@ -81,7 +80,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: victoria-logs
-          image: "docker.io/victoriametrics/victoria-logs:v1.24.0-victorialogs@sha256:1ec31ddccc39dc9ead2607cddbf2829be1eb5ad39890e72bba26b359be20801d"
+          image: "docker.io/victoriametrics/victoria-logs:v1.52.0@sha256:47b820890d64c4575a2a0a46415dcd8a4fd59a0f1fcd6a377693d7aea639442e"
           imagePullPolicy: IfNotPresent
           args:
             - -storageDataPath=/victoria-logs-data
