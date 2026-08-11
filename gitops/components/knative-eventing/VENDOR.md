@@ -17,6 +17,11 @@ done
 
 ## Workshop curation applied (re-apply after re-vendoring)
 
+This list is **complete and mechanically verified**: `diff <pristine-upstream>
+<vendored>` produces nothing outside the items below. `eventing-crds.yaml`
+carries **no** curation — it is byte-identical to upstream. Re-verify the same
+way after every re-vendor.
+
 1. **Halved every Deployment container's cpu/memory *requests*** in
    `eventing-core.yaml` and `mt-channel-broker.yaml` (limits untouched) —
    same k0s-blog small-cluster pattern as knative-serving. Resulting
@@ -26,8 +31,28 @@ done
    `in-memory-channel.yaml` ships no requests upstream — **added 25m/32Mi
    requests to imc-controller and imc-dispatcher** (no limits) so the
    scheduler accounts for them. `request-reply` ships no requests either.
+2. **`config-observability` (in `eventing-core.yaml`)**: six real config
+   keys wiring eventing's own telemetry to the OTel Collector (#65).
+   **A literal re-vendor silently drops all six** — everything inside
+   `_example` is inert documentation — and the capstone's trace waterfall
+   then breaks apart at the async Broker hop:
 
-That is the only curation: no images repointed, no services exposed —
+   | key | value |
+   |---|---|
+   | `tracing-protocol` | `http/protobuf` |
+   | `tracing-endpoint` | `http://otel-collector.observability.svc.cluster.local:4318/v1/traces` |
+   | `tracing-sampling-rate` | `1` |
+   | `metrics-protocol` | `http/protobuf` |
+   | `metrics-endpoint` | `http://otel-collector.observability.svc.cluster.local:4318/v1/metrics` |
+   | `metrics-export-interval` | `60s` |
+
+   Tracing is what makes the Broker hop its own span *and*
+   propagates `traceparent` across the async event hop, so
+   uploader → resizer stays ONE connected trace and forms a service-graph
+   edge. The endpoints are the current collector, not the removed otel-lgtm
+   `jaeger-collector` the `_example` still names.
+
+Those are the only curations: no images repointed, no services exposed —
 eventing is control-plane + in-cluster data-plane only (the Broker ingress
 is `broker-ingress.knative-eventing.svc.cluster.local`, ClusterIP).
 

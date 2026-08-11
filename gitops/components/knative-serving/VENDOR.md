@@ -18,24 +18,77 @@ curl -sL -o kourier.yaml \
 
 ## Workshop curation applied (re-apply after re-vendoring)
 
-1. **Halved every Deployment container's cpu/memory *requests*** in
-   `serving-core.yaml` and `kourier.yaml` (limits untouched) — the k0s-blog
-   small-cluster pattern; drops idle footprint to ~0.6 GiB. Script used
-   (state-machine over `requests:` blocks): halve `NNNm`/`NNNMi` quantities.
-   Resulting requests: activator 150m/30Mi, autoscaler+controller 50m/50Mi,
-   webhook 50m/50Mi, kourier controller+gateway 100m/100Mi.
-2. **`config-network`**: `ingress-class: "kourier.ingress.networking.knative.dev"`.
-3. **`config-deployment`**: `registries-skipping-tag-resolving:
+This list is **complete and mechanically verified**: `diff <pristine-upstream>
+<vendored>` produces nothing outside the items below. `serving-crds.yaml`
+carries **no** curation — it is byte-identical to upstream. Re-verify the same
+way after every re-vendor; anything in the diff that is not on this list is
+either a new upstream change or a curation someone forgot to write down.
+
+### `serving-core.yaml`
+
+1. **Halved every Deployment container's cpu/memory *requests*** (limits
+   untouched) — the k0s-blog small-cluster pattern; drops idle footprint to
+   ~0.6 GiB. Script used (state-machine over `requests:` blocks): halve
+   `NNNm`/`NNNMi` quantities. Resulting requests: activator 150m/30Mi,
+   autoscaler + controller 50m/50Mi, webhook 50m/50Mi.
+2. **`config-deployment`**: `registries-skipping-tag-resolving:
    "zot.zot.svc.cluster.local:5000,localhost:30500,127.0.0.1:30500,ghcr.io"`
    — the controller must not try to digest-resolve images in the in-cluster
    registry / its NodePort aliases. `ghcr.io` is on the list because tag
    resolution runs from the controller pod, bypassing the node registry
    mirror (offline-breaking at the venue); drop it once the first-party
    images are published and digest-pinned (issue #7).
-4. **Service `kourier` (kourier-system)**: `LoadBalancer` → `NodePort` with
-   `nodePort: 31080` on port 80 (no LB implementation in Talos-in-Docker).
-5. **Pinned Envoy**: `docker.io/envoyproxy/envoy:v1.37-latest` (floating!) →
-   `v1.37.2` (verified on Docker Hub 2026-07-13).
+3. **`config-domain`**: add the data key `127.0.0.1.sslip.io: ""`, and delete
+   the ConfigMap's `metadata.annotations` block (upstream ships only
+   `knative.dev/example-checksum` there).
+   **Do not skip this one.** Without the domain key, `config-domain` holds
+   only `_example`, Knative falls back to `svc.cluster.local`, that domain is
+   cluster-local and *not* served by the external Kourier NodePort, and every
+   ksvc URL 404s — module 06 fails. With it, ksvc URLs become
+   `http://<name>.<ns>.127.0.0.1.sslip.io`, reachable on `:31080` via a `Host`
+   header and directly in a browser (sslip.io resolves to 127.0.0.1). Found
+   by rehearsal-in-CI, commit `a0687a2`. The annotation deletion arrived in
+   that same commit; it is inert (the checksum only guards `_example`, which
+   we do not touch) and is preserved as-is rather than re-litigated during a
+   version bump — the other two curated ConfigMaps keep their annotation.
+4. **`config-network`**: `ingress-class:
+   "kourier.ingress.networking.knative.dev"` — Kourier is the only ingress
+   implementation installed.
+5. **`config-observability`**: nine real config keys wiring Knative's own
+   telemetry to the OTel Collector (#65). **Do not skip this one either** —
+   everything inside `_example` is inert documentation, so a literal
+   re-vendor silently drops all nine and module 09's trace waterfall loses
+   the activator / queue-proxy hops. The endpoints are the *current*
+   collector, not the removed otel-lgtm services the `_example` still names:
+
+   | key | value |
+   |---|---|
+   | `tracing-protocol` | `http/protobuf` |
+   | `tracing-endpoint` | `http://otel-collector.observability.svc.cluster.local:4318/v1/traces` |
+   | `tracing-sampling-rate` | `1` |
+   | `metrics-protocol` | `http/protobuf` |
+   | `metrics-endpoint` | `http://otel-collector.observability.svc.cluster.local:4318/v1/metrics` |
+   | `metrics-export-interval` | `60s` |
+   | `request-metrics-protocol` | `http/protobuf` |
+   | `request-metrics-endpoint` | `http://otel-collector.observability.svc.cluster.local:4318/v1/metrics` |
+   | `request-metrics-export-interval` | `60s` |
+
+   Since 1.22 this ConfigMap — not the deprecated `config-tracing` — is where
+   tracing lives. The request-metrics keys are what measure the serverless
+   story (per-revision RPS, concurrency, scale-from-zero).
+
+### `kourier.yaml`
+
+6. **Halved requests** the same way: `net-kourier-controller` and
+   `3scale-kourier-gateway` both 200m/200Mi → **100m/100Mi** (limits
+   untouched).
+7. **Pinned Envoy**: `docker.io/envoyproxy/envoy:v1.37-latest` (floating!) →
+   `v1.37.2` (verified on Docker Hub 2026-07-13), with a comment at the
+   change site saying why.
+8. **Service `kourier` (kourier-system)**: `type: LoadBalancer` → `NodePort`
+   with `nodePort: 31080` on the `http2` port (no LB implementation in
+   Talos-in-Docker). The `https` port gets no nodePort. A comment at the
+   change site shows the `curl -H 'Host: …' http://localhost:31080` form.
 
 Notes:
 - `serving-core.yaml` includes the CRDs too; applying both crds+core is
