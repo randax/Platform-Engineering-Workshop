@@ -50,9 +50,6 @@
 # --- Tooling (mise.toml + versions.env + the CI-pinned linters) --------------
 mise                     | github-release | jdx/mise                                        | env:MISE_VERSION                             |
 talos                    | github-release | siderolabs/talos                                | env:TALOS_VERSION                            |
-# KUBERNETES_VERSION is what Talos ships by default — bump it WITH talos, not
-# ahead of it. mise.toml's kubectl pin is asserted equal by check-consistency.sh.
-kubectl                  | github-release | kubernetes/kubernetes                           | env:KUBERNETES_VERSION                       |
 helm                     | github-release | helm/helm                                       | mise:helm                                    |
 kind                     | github-release | kubernetes-sigs/kind                            | mise:kind                                    |
 kind-node-image          | registry-tag   | docker.io/kindest/node                          | image:docker.io/kindest/node                 |
@@ -123,6 +120,18 @@ aws-cli                  | github-tag     | aws/aws-cli                         
 # parent, never on their own.
 #
 #   Talos release (`talosctl images default`)
+#     KUBERNETES_VERSION in versions.env, and with it mise.toml's kubectl pin.
+#     This is the row that most looks like it belongs above and does not: the
+#     number is not ours to choose. create-cluster.sh passes it as
+#     --kubernetes-version, so it must be exactly what `talosctl images default`
+#     reports for TALOS_VERSION. Tracking kubernetes/kubernetes here would report
+#     drift on every upstream patch and invite raising it on its own — which pulls
+#     four control-plane images that are not in the mirror while every other check
+#     stays green (they exist upstream; mise.toml bumps in lockstep). The
+#     constraint is enforced instead of reported: check-consistency.sh asserts
+#     that images.txt carries kubelet + kube-{apiserver,controller-manager,
+#     scheduler} at exactly v${KUBERNETES_VERSION}, so a lone bump fails CI.
+#     Bump it by re-deriving from Talos, never by reading a Kubernetes release.
 #     ghcr.io/siderolabs/kubelet, registry.k8s.io/kube-{apiserver,controller-
 #     manager,scheduler}, etcd, coredns/coredns, pause,
 #     networking/kube-network-policies

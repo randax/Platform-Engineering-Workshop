@@ -9,7 +9,9 @@
 #   2. every image reference in gitops/, lab/, solutions/ YAML — and every
 #      --image= ref in scripts/, lab/, solutions/ shell scripts — is covered
 #      by scripts/images.txt (the offline pre-pull guarantee)
-#   3. versions.env pins match mise.toml tool pins
+#   3. versions.env pins match mise.toml tool pins, and the control-plane images
+#      pre-pulled for KUBERNETES_VERSION are the ones create-cluster.sh will ask
+#      Talos for
 #   4. MISE_VERSION matches the inline copy in .devcontainer/devcontainer.json
 #   5. version-pinned artifacts referenced by versions.env actually exist
 #      (vendored ArgoCD manifest, vendored Cilium + Gitea chart .tgz files,
@@ -128,6 +130,25 @@ if [[ "${kubectl_mise}" == "${KUBERNETES_VERSION}" ]]; then
 else
   bad "kubectl pin drift: versions.env ${KUBERNETES_VERSION} vs mise.toml ${kubectl_mise}"
 fi
+
+# KUBERNETES_VERSION is DERIVED from the Talos release, not independently
+# choosable: create-cluster.sh passes it as --kubernetes-version, so the nodes
+# pull registry.k8s.io/kube-{apiserver,controller-manager,scheduler} and
+# ghcr.io/siderolabs/kubelet at exactly that tag. Raising it without re-deriving
+# images.txt from `talosctl images default` makes those four refs miss the
+# offline mirror — and every other check here would stay green, because the
+# images do exist upstream and mise.toml can be bumped in lockstep. So assert
+# the real invariant: what we ASK Talos for is what we PRE-PULL.
+before_fail=${FAILURES}
+for cp_repo in ghcr.io/siderolabs/kubelet \
+               registry.k8s.io/kube-apiserver \
+               registry.k8s.io/kube-controller-manager \
+               registry.k8s.io/kube-scheduler; do
+  grep -qx "${cp_repo}:v${KUBERNETES_VERSION}" scripts/images.txt \
+    || bad "control-plane image ${cp_repo}:v${KUBERNETES_VERSION} is not in scripts/images.txt — KUBERNETES_VERSION was raised without re-deriving the pre-pull list from \`talosctl images default\` (bump it WITH Talos, never ahead of it)"
+done
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "control-plane images pre-pulled for KUBERNETES_VERSION ${KUBERNETES_VERSION}"
 
 # --- 4. MISE_VERSION inline copy in devcontainer.json --------------------------
 if grep -q "MISE_VERSION=${MISE_VERSION} " .devcontainer/devcontainer.json; then
