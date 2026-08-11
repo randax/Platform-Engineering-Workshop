@@ -29,7 +29,10 @@
 # refs pinned by digest still carry every architecture, and are most of what
 # is left (see the copy loop below for why that is not optional).
 # Run this at home, not at the venue!
-# Safe to re-run: already-present images are skipped quickly.
+# Safe to re-run: already-present images are skipped quickly. Note: the
+# registry never garbage-collects, so re-running over a mirror populated by an
+# older all-arch run keeps the old blobs — delete the Docker volume
+# (docker volume rm cloudbox-mirror-data) first to reclaim that space.
 # =============================================================================
 set -euo pipefail
 
@@ -52,11 +55,15 @@ docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
 need crane
 
 # The platform the cluster nodes actually run. The Talos "nodes" are containers
-# on THIS host's Docker engine, so their CPU architecture is this host's — there
-# is no cross-architecture case to support, and nothing here may be hard-coded
-# (CI runs amd64, most laptops in the room are arm64).
-node_arch="$(detect_arch)" \
-  || die "Unsupported CPU architecture '$(uname -m)' — the workshop needs x86_64 or arm64."
+# on THIS host's Docker engine, so their CPU architecture is the DAEMON's — and
+# that is what this must read, not uname -m: an x86_64 Rosetta shell on Apple
+# Silicon (or a context pointing at a remote daemon) would otherwise mirror
+# amd64 images for arm64 node containers, and install.sh --check — which
+# compares the mirror against the same daemon arch — would flag the mirror this
+# script had just built. Nothing here may be hard-coded (CI runs amd64, most
+# laptops in the room are arm64).
+node_arch="$(docker_server_arch)" \
+  || die "Docker reports an unsupported architecture '$(docker version -f '{{.Server.Arch}}' 2>/dev/null)' — the workshop needs amd64 or arm64."
 NODE_PLATFORM="linux/${node_arch}"
 
 IMAGES_FILE="${SCRIPT_DIR}/images.txt"
@@ -96,7 +103,7 @@ fi
 
 # --- 0. Preflight: every ref must exist upstream ---------------------------------
 # `crane manifest` is a cheap API call per ref — a missing image should cost
-# seconds here, not surface 15 GB into a multi-hour pull.
+# seconds here, not surface hours into a 7.5 GB pull.
 step "Preflight: checking that all ${total} refs exist upstream"
 missing=()
 for image in "${host_images[@]}" "${mirror_images[@]}"; do
@@ -163,6 +170,11 @@ curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 \
 #     registry.k8s.io/pause is 0.3 MB for one platform and 573 MB as a full
 #     index. Deleting the --platform flag breaks nothing visibly; it just
 #     doubles the download. Do not delete it.
+#
+#     --platform filters INDEX manifests only: a bare single-arch manifest
+#     (e.g. the amd64-only Backstage image) is copied as-is, whatever its
+#     architecture. This is a size optimization, not an architecture
+#     validation — install.sh --check is what validates the mirror's arch.
 #
 #   DIGEST-PINNED refs (…@sha256:…) are copied whole, every architecture.
 #     For a multi-arch image the pinned digest is the digest of the INDEX.

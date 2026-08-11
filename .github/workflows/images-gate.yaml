@@ -7,7 +7,9 @@ name: Image gate
 
 on:
   pull_request:
-    paths: ['scripts/images.txt', '.github/workflows/images-gate.yaml']
+    # versions.env: the gate sources MIRROR_ARCH_EXEMPT from it, so exemption
+    # policy changes must re-run the gate too.
+    paths: ['scripts/images.txt', 'scripts/versions.env', '.github/workflows/images-gate.yaml']
   schedule:
     - cron: "43 4 * * 1"   # weekly, Monday 04:43 UTC
   workflow_dispatch:
@@ -39,15 +41,42 @@ jobs:
       - name: Every pinned image exists upstream
         run: |
           set -euo pipefail
+          # MIRROR_ARCH_EXEMPT: repos allowed to be single-arch (run emulated).
+          source scripts/versions.env
           fail=0
           while IFS= read -r ref; do
-            if crane manifest "${ref}" >/dev/null 2>&1; then
-              echo "ok  ${ref}"
-            else
+            if ! manifest="$(crane manifest "${ref}" 2>/dev/null)"; then
               echo "::error::MISSING upstream: ${ref}"
               fail=$((fail + 1))
+            elif [[ "${ref}" == *@sha256:* ]]; then
+              echo "ok  ${ref} (digest pin — mirrored byte-for-byte)"
+            # Tag pins are mirrored per-arch by cloudbox-init.sh (crane copy
+            # --platform), so every tag-pinned index must carry both
+            # linux/amd64 and linux/arm64 — a single-arch pin would fail only
+            # on attendees' machines of the other arch. Bare (non-index)
+            # manifests are inherently single-arch (crane copies them as-is,
+            # install.sh cannot tell them from a wrong-arch copy) and are
+            # allowed only for repos in MIRROR_ARCH_EXEMPT (versions.env),
+            # which run emulated by design (Backstage).
+            elif jq -e '(.mediaType // "" | test("image.index|manifest.list"))' >/dev/null <<<"${manifest}"; then
+              if jq -e '[.manifests[].platform | select(.os == "linux").architecture]
+                        | (index("amd64") and index("arm64"))' >/dev/null <<<"${manifest}"; then
+                echo "ok  ${ref}"
+              else
+                echo "::error::tag pin lacks linux/amd64 or linux/arm64: ${ref} (cloudbox-init.sh --platform copy would fail on the missing arch)"
+                fail=$((fail + 1))
+              fi
+            else
+              repo="${ref#*/}"; repo="${repo%%:*}"   # strip registry host + tag
+              case " ${MIRROR_ARCH_EXEMPT:-} " in
+                *" ${repo} "*)
+                  echo "ok  ${ref} (bare single-arch manifest — MIRROR_ARCH_EXEMPT)" ;;
+                *)
+                  echo "::error::tag pin is a bare single-arch manifest and not in MIRROR_ARCH_EXEMPT (versions.env): ${ref}"
+                  fail=$((fail + 1)) ;;
+              esac
             fi
           done < <(grep -vE '^\s*(#|\[|$)' scripts/images.txt)
           echo "---"
-          echo "${fail} missing"
+          echo "${fail} failing ref(s)"   # missing upstream, or wrong architecture
           exit "${fail}"

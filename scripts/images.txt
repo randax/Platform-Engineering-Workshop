@@ -153,7 +153,9 @@ ghcr.io/randax/cloudbox-grafana:v0.1.0
 # x-release-please-end-version
 
 # --- Wave 3: Backstage (CNOE prebuilt image, tag pinned by gitops/catalog)
-# linux/amd64 only — Apple Silicon runs it emulated. Its database is a CNPG
+# linux/amd64 only — Apple Silicon runs it emulated, and install.sh --check
+# skips the mirror arch check for it (MIRROR_ARCH_EXEMPT in versions.env).
+# Its database is a CNPG
 # cluster using the postgresql image pinned above. Presenter demo in
 # module 08; stays pre-pulled so attendees can run it at home.
 ghcr.io/cnoe-io/backstage-app:9232d633b2698fffa6d0a73b715e06640d170162

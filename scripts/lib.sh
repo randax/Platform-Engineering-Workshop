@@ -85,6 +85,21 @@ detect_arch() {
   esac
 }
 
+# docker_server_arch — the Docker DAEMON's architecture (amd64/arm64), which is
+# what the cluster node containers run. Can differ from uname -m: an x86_64
+# Rosetta shell on Apple Silicon, or a context pointing at a remote daemon.
+# Anything arch-sensitive about images (the mirror!) must use this, not
+# detect_arch. Fails when the daemon is unreachable or reports an unknown arch.
+docker_server_arch() {
+  local a
+  a="$(docker version -f '{{.Server.Arch}}' 2>/dev/null)" || return 1
+  case "${a}" in
+    x86_64|amd64)  echo "amd64" ;;
+    arm64|aarch64) echo "arm64" ;;
+    *) return 1 ;;
+  esac
+}
+
 # is_wsl2 — true when running inside Windows Subsystem for Linux.
 is_wsl2() {
   [[ -f /proc/version ]] && grep -qi microsoft /proc/version
