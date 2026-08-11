@@ -14,7 +14,7 @@
 "aqua:siderolabs/talos" = "1.13.8"
 # kubectl matches the Kubernetes version Talos v1.13.8 ships
 kubectl = "1.36.2"
-helm = "3.21.3"
+helm = "4.2.3"
 # kind — only for scripts/kind-fallback.sh
 kind = "0.32.0"
 # crane — mirrors pinned images (host arch for tag pins, full index for digest pins)

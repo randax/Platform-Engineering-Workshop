@@ -155,6 +155,53 @@ in an index regardless of platform. Passing at home, failing at the venue.
 | Backstage is amd64-only | Upstream ships it that way; Apple Silicon runs it emulated. Listed in `MIRROR_ARCH_EXEMPT`. Under Colima it may need `--vm-type vz --vz-rosetta`. |
 | `docker.io/grafana/grafana` vanished from `images.txt` | It was only the `FROM` line in `apps/grafana/Dockerfile`, consumed by CI. No pod ever pulled it. The deployed image is `ghcr.io/randax/cloudbox-grafana`. |
 
+## WATCH — helm 4 on the apply path
+
+`helm` is pinned to **4.2.3**, used by three real `helm upgrade --install` calls
+(Cilium in `create-cluster.sh` and `kind-fallback.sh`, Gitea in
+`bootstrap-gitops.sh`). Renders were verified identical to 3.21.3 — crossplane
+and gitea byte-for-byte, cilium differing only by three empty-string ConfigMap
+keys that helm 4 strips as null chart defaults, functionally inert.
+
+The untested part is **apply**, not render. helm 4 defaults `--server-side` to
+`auto`, which for a *fresh* release — every workshop cluster — resolves to
+server-side apply. All three invocations therefore pass **`--server-side=false`**
+explicitly, keeping helm 3's proven client-side path, so this is a
+same-behaviour-newer-binary bump rather than a behaviour change.
+
+**This is the first thing to revert if module 01 or 02 misbehaves** — set
+`helm = "3.21.3"` in `mise.toml` and drop the three flags. Nothing in the repo
+needs a helm 4 feature.
+
+**Retire the flags when:** a full `bootstrap-test` is green with them removed.
+
+## TRAP — Grafana must not be allowed to phone home at boot
+
+`GF_INSTALL_PLUGINS=""` only empties the *user* install list. Grafana separately
+background-installs drilldown apps compiled into the binary — 4 on 12.4.5, **6
+on 13.1.3** — which offline means six failed calls to grafana.com per pod start,
+each landing as `level=error … read-only file system`. `GF_PLUGINS_PREINSTALL_DISABLED=true`
+removes all of it. Do not delete that env var; it was already needed at 12.4.5
+and 13 made it worse.
+
+Related, deliberate: `victoriametrics-logs-datasource` is held at **0.29.0**
+though 0.30.1/0.31.0 exist — all three declare `>=10.4.0`, so nothing forces a
+move and holding keeps the Grafana major a one-variable change.
+
+## WATCH — smaller things the rehearsal settles
+
+| What | Why it matters |
+|---|---|
+| **NATS 2.14 liveness** | 2.14 surfaces filestore I/O errors in `/healthz`, which our liveness probe reads. A full `local-path` PVC now **CrashLoops** the pod where 2.12 stayed silently up. |
+| **BuildKit v0.32.2, module 07** | New variable is runc v1.4.3 under rootlesskit on the Talos kernel. Fails at daemon start if at all — unambiguous. |
+| **zot v2.1.20 under chart 0.1.122** | The chart still declares appVersion v2.1.18; we override the image tag deliberately. Check anonymous push and the search/UI extensions on `:30500`. |
+| **Grafana Explore deep-link** | `/explore?schemaVersion=1&orgId=1&panes={…}` is a frontend URL contract with no stability guarantee. Datasources and queries verified on 13.1.3; that pane rendering *prefilled* needs one human click. |
+| **OTel 0.158.0 deprecation WARNs** | Expect 5 gateway / 3 agent `alias is deprecated` warnings. Attendees will read them in module 09 — consider pre-empting in the lab text. Legacy IDs stay on purpose: renaming makes the config unloadable on 0.149.0, breaking rollback. |
+
+**Rollback hazards:** downgrading the OTel Collector below 0.156 needs
+`/var/lib/otelcol` wiped. The kagent whitespace normalization produces a large
+git diff that is a cluster no-op.
+
 ## TRAP — release-please cannot write `.github/workflows/**`
 
 `GITHUB_TOKEN` is not permitted to modify workflow files. Adding one to

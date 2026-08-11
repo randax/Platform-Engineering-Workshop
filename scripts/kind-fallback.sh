@@ -99,7 +99,14 @@ step "Installing Cilium ${CILIUM_VERSION} (CNI + kube-proxy replacement)"
 # Same install as the Talos path minus the Talos-specific values (no KubePrism,
 # no cgroup/securityContext overrides — kind doesn't need them).
 helm repo add cilium "${CILIUM_HELM_REPO}" --force-update >/dev/null
+# --server-side=false pins helm 3's client-side apply. helm 4 defaults this to
+# "auto", which for a FRESH release (every workshop cluster) resolves to
+# server-side apply — a behaviour change on the one path `helm template`
+# cannot exercise. Nothing here needs server-side; keeping the proven path
+# makes this a same-behaviour-newer-binary bump. Drop the flag once a full
+# bootstrap-test has been green with it removed.
 helm upgrade --install cilium cilium/cilium \
+  --server-side=false \
   --version "${CILIUM_VERSION}" \
   --namespace kube-system \
   --set ipam.mode=kubernetes \

@@ -50,7 +50,14 @@ step "Installing Gitea (chart ${GITEA_CHART_VERSION}, vendored) — your cloud's
 # Single-pod mode: SQLite + in-memory cache/session, no HA subcharts. This is
 # a workshop git server for ~1 user, not a production forge — and that is fine.
 # Values are fed on stdin (-f -) to keep everything in this one readable file.
+# --server-side=false pins helm 3's client-side apply. helm 4 defaults this to
+# "auto", which for a FRESH release (every workshop cluster) resolves to
+# server-side apply — a behaviour change on the one path `helm template`
+# cannot exercise. Nothing here needs server-side; keeping the proven path
+# makes this a same-behaviour-newer-binary bump. Drop the flag once a full
+# bootstrap-test has been green with it removed.
 helm upgrade --install gitea \
+  --server-side=false \
   "${SCRIPT_DIR}/manifests/gitea-${GITEA_CHART_VERSION}.tgz" \
   --namespace gitea --create-namespace \
   -f - <<EOF
