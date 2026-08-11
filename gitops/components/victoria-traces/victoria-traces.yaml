@@ -1,9 +1,9 @@
 ---
-# VictoriaTraces 0.9.4 — single-node trace database (observability rework, #57).
+# VictoriaTraces 0.10.0 — single-node trace database (observability rework, #57).
 # The traces third of the Victoria stack; replaces otel-lgtm's Tempo. Built on
 # top of VictoriaLogs internally (spans stored as structured logs), but exposes
 # a Jaeger-compatible query API — so Grafana talks to it with the built-in
-# Jaeger datasource (no plugin, offline-safe; same trick as VLogs↔Loki).
+# Jaeger datasource (no plugin to bake in, unlike VMetrics/VLogs).
 # Listens on :10428:
 #   - OTLP traces ingest → POST /insert/opentelemetry/v1/traces
 #   - Jaeger Query API   → GET  /select/jaeger/api/*  (Grafana Jaeger datasource)
@@ -52,7 +52,7 @@ metadata:
   labels:
     app.kubernetes.io/name: victoria-traces
     app.kubernetes.io/instance: victoria-traces
-    app.kubernetes.io/version: "0.9.4"
+    app.kubernetes.io/version: "0.10.0"
 spec:
   replicas: 1
   # Recreate (not RollingUpdate): the data PVC is ReadWriteOnce, so a second
@@ -81,7 +81,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: victoria-traces
-          image: "docker.io/victoriametrics/victoria-traces:v0.9.4@sha256:de1f0ce3916692236a711b58e48c65cc4138bfaa4e36324cfa25206e5485b187"
+          image: "docker.io/victoriametrics/victoria-traces:v0.10.0@sha256:66e784a595c4a88e5b1dfab5d153dea442cf1caaeae4d67839c550414c33b3b0"
           imagePullPolicy: IfNotPresent
           args:
             - -storageDataPath=/victoria-traces-data

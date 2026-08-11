@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Component | OTel Collector 0.149.0 — the collection layer of the Victoria stack ([issue #57](https://github.com/randax/Platform-Engineering-Workshop/issues/57), Stage 2 — closes the "only 3 apps push anything" gap) |
-| Image | `docker.io/otel/opentelemetry-collector-contrib:0.149.0` — `sha256:0fba96233274f6d665ac8831ad99dfe6479a9a20459f6e2719c0d20945773b46` (crane, 2026-07-15; linux/amd64 + arm64) |
+| Component | OTel Collector 0.158.0 — the collection layer of the Victoria stack ([issue #57](https://github.com/randax/Platform-Engineering-Workshop/issues/57), Stage 2 — closes the "only 3 apps push anything" gap) |
+| Image | `docker.io/otel/opentelemetry-collector-contrib:0.158.0` — `sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5` (crane, 2026-08-11; linux/amd64 + arm64) |
 | Source | Official image, https://hub.docker.com/r/otel/opentelemetry-collector-contrib · docs https://opentelemetry.io/docs/collector/ |
 | Files | `rbac.yaml`, `collector-agent.yaml` (DaemonSet), `collector-gateway.yaml` (Deployment + Service) |
 
@@ -50,7 +50,12 @@ Two collectors, split by what each signal needs:
   - `otlp` (4317/4318) — the apps (portal/uploader/resizer) push their OTLP
     traces + metrics here; it replaced otel-lgtm's OTLP endpoint. Exposed via the
     `otel-collector` Service.
-  - Exports: metrics → VM, logs → VLogs.
+  - `spanmetrics` + `servicegraph` **connectors** — they read the trace stream and
+    emit metrics into the metrics pipeline: `span.calls` / `span.duration` (RED)
+    and `traces_service_graph_request_{total,client,server}` (the edges of the
+    module-09 service map). `bootstrap-test.yaml` asserts both series families
+    exist, so they are load-bearing for CI as well as for the capstone.
+  - Exports: traces → VTraces, metrics → VM, logs → VLogs.
 
 Both export over plain HTTP (`otlphttp`, explicit full `*_endpoint` paths) to
 `victoria-metrics:8428/opentelemetry/v1/metrics` and
@@ -79,14 +84,47 @@ equivalent).
   Victoria backends.
 - **Replaced otel-lgtm**: the apps + the Victoria stack now route all telemetry
   through this collector; the single otel-lgtm pod is gone (#57).
+- **We keep the legacy component IDs on purpose.** Upstream is renaming component
+  types to snake_case with deprecated aliases: `filelog` → `file_log` and
+  `otlphttp` → `otlp_http` (already warning at 0.149.0), plus `kubeletstats` →
+  `kubelet_stats`, `spanmetrics` → `span_metrics`, `servicegraph` →
+  `service_graph` (new warnings at 0.158.0). The aliases still resolve; the cost
+  is five `alias is deprecated` WARN lines at gateway startup and three at agent
+  startup, which module 09 attendees will see in `kubectl logs`. Renaming would
+  make the config unloadable on 0.149.0, i.e. it would break rollback, so the
+  rename waits until the aliases are actually removed.
+- **`collector.instance.id` on spanmetrics (new at 0.158.0).** The
+  `connector.spanmetrics.includeCollectorInstanceID` gate went beta/on by
+  default, so `span.calls` / `span.duration` now carry a per-collector-instance
+  UUID label. Metric names, types and units are unchanged, and every consumer in
+  this repo aggregates (`sum(…)`, `count({__name__=~…})`), so nothing breaks —
+  but a *raw* panel will show one line per gateway restart. `exclude_dimensions:
+  [ collector.instance.id ]` under `spanmetrics:` restores the old shape if a lab
+  ever needs raw series.
 
 ## Re-vendor
 
 Bump the tag, then re-resolve the digest:
 
 ```sh
-mise x crane@0.21.7 -- crane digest docker.io/otel/opentelemetry-collector-contrib:0.149.0
+mise x crane@0.21.7 -- crane digest docker.io/otel/opentelemetry-collector-contrib:0.158.0
 ```
 
 Keep the `image:` in both collector manifests and the entry in
 `scripts/images.txt` in lockstep (`check-consistency.sh` enforces it).
+
+The config is hand-written, so validate it against the new binary rather than
+hoping. Extract `config.yaml` from each ConfigMap and run the release's own
+`otelcol-contrib validate --config=file:<path>`; the gateway config must exit 0,
+and the agent config fails only on environment-only points (the `/var/lib/otelcol`
+hostPath and the in-cluster ServiceAccount CA for `kubeletstats`) — that failure
+must be *byte-identical* to the old version's, otherwise something schema-level
+moved. Also diff `otelcol-contrib components` between the two versions: a
+component we use disappearing from that list is a hard blocker. 0.149.0 → 0.158.0
+passed all of this with no config edit.
+
+**Watch on rollback**, not on upgrade: at 0.156.0 `filelog.protobufCheckpointEncoding`
+went beta/on, so the offsets in the `/var/lib/otelcol` hostPath become protobuf.
+0.158.0 reads the old JSON fine, but a downgrade below 0.156 on a cluster that
+already ran 0.158 needs that directory wiped. Fresh `talosctl cluster create`
+clusters are unaffected.

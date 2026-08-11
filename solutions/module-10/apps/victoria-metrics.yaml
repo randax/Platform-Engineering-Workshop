@@ -1,4 +1,4 @@
-# VictoriaMetrics 1.147.0 — single-node TSDB (observability rework, issue #57).
+# VictoriaMetrics 1.149.0 — single-node TSDB (observability rework, issue #57).
 # Metrics backend for the Victoria stack: OTLP ingest at :8428
 # /opentelemetry/v1/metrics, Prometheus remote-write /api/v1/write, PromQL
 # /api/v1/query. In-cluster: victoria-metrics.observability.svc:8428.

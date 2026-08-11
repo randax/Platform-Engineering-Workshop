@@ -1,4 +1,4 @@
-# OTel Collector 0.149.0 — the collection layer of the Victoria stack (#57,
+# OTel Collector 0.158.0 — the collection layer of the Victoria stack (#57,
 # Stage 2). Two collectors, plain manifests (no Operator, no cert-manager —
 # see the issue-57 decision comment):
 #   - agent   (DaemonSet)  → filelog + kubeletstats  → VictoriaLogs / VM

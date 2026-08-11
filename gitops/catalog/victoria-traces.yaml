@@ -1,4 +1,4 @@
-# VictoriaTraces 0.9.4 — single-node trace database (observability rework, #57).
+# VictoriaTraces 0.10.0 — single-node trace database (observability rework, #57).
 # Traces backend for the Victoria stack: OTLP ingest at :10428
 # /insert/opentelemetry/v1/traces, Jaeger query API at /select/jaeger.
 # In-cluster: victoria-traces.observability.svc:10428. Replaces otel-lgtm's Tempo.
