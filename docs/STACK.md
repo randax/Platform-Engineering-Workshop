@@ -25,7 +25,7 @@ these picks flip — reading the tradeoff is the transferable skill, not memoris
 | OCI registry | **Zot** v2.1.18 | Harbor · Docker registry:2 | One CNCF-native binary with search + UI; Harbor is a Postgres/Redis/Trivy/ChartMuseum fleet. |
 | Storage class | **local-path-provisioner** v0.0.37 | Longhorn · Ceph/Rook CSI | Node-local hostPath, one Deployment — no replication/snapshots needed for one node. |
 | Self-service API | **Crossplane** v2.3.3 | Helm/operators · Crossplane v1 | Namespaced XRs (no Claims) compose arbitrary K8s resources directly — one YAML → whole stack. |
-| Serverless | **Knative** Serving v1.22.1 + Eventing v1.22.2 (Kourier) | plain Deployments · KEDA | Scale-to-zero with request buffering + CloudEvents broker/trigger; it's what Cloud Run is built on. |
+| Serverless | **Knative** Serving v1.23.0 + Eventing v1.23.0 (Kourier) | plain Deployments · KEDA | Scale-to-zero with request buffering + CloudEvents broker/trigger; it's what Cloud Run is built on. |
 | In-cluster CI | **Argo Workflows** v4.0.7 + **BuildKit** v0.31.1 | Tekton · external/cloud CI | Rootless in-cluster image builds → your own Zot, no cloud minutes; Kaniko was archived June 2025. |
 | Durable messaging | **NATS** 2.12.12 + JetStream | Kafka · RabbitMQ | The durable streaming primitive in ~15 MB of Go vs. GBs of JVM/Erlang + coordination. |
 | Metrics store | **VictoriaMetrics** 1.147.0 | Prometheus | PromQL-compatible, columnar TSDB + `vmrange` histograms — far less RAM for the same series. |

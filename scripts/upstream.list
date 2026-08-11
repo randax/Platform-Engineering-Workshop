@@ -86,7 +86,13 @@ knative-serving          | github-release | knative/serving                     
 knative-eventing         | github-release | knative/eventing                                | env:KNATIVE_EVENTING_VERSION                 |
 # Envoy backports patches to old minors, so /releases/latest can point BACKWARDS;
 # read the tag list and take the highest stable instead.
-envoy                    | github-tag     | envoyproxy/envoy                                | image:docker.io/envoyproxy/envoy             | ^[0-9]+\.[0-9]+\.[0-9]+$
+# DELIBERATE HOLD on the 1.37 minor: we do not track Envoy for its own sake — we
+# freeze the exact patch that net-kourier floats as `v1.37-latest` in the
+# kourier.yaml we vendor. net-kourier ships `v1.37-latest` for both knative-v1.22.1
+# and knative-v1.23.0, so 1.37 is the only Envoy line Kourier is tested against;
+# taking 1.38/1.39 would run the Kourier data plane on an untested minor for a
+# cosmetic drift row. Widen this regex when net-kourier itself moves off v1.37.
+envoy                    | github-tag     | envoyproxy/envoy                                | image:docker.io/envoyproxy/envoy             | ^1\.37\.
 argo-workflows           | github-release | argoproj/argo-workflows                         | image:quay.io/argoproj/workflow-controller   |
 buildkit                 | github-release | moby/buildkit                                   | image:docker.io/moby/buildkit                |
 nats                     | github-release | nats-io/nats-server                             | image:docker.io/library/nats                 |

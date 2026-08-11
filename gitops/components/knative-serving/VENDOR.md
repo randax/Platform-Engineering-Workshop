@@ -3,17 +3,17 @@
 | | |
 |---|---|
 | Source | https://github.com/knative/serving + https://github.com/knative-extensions/net-kourier |
-| Version | **knative-v1.22.1** for all three files (releases 2026-06-02; verified 2026-07-13) |
+| Version | **knative-v1.23.0** for all three files (serving + net-kourier; verified 2026-07-13) |
 | Files | `serving-crds.yaml`, `serving-core.yaml`, `kourier.yaml` |
 
 ## Re-vendor
 
 ```sh
-BASE=https://github.com/knative/serving/releases/download/knative-v1.22.1
+BASE=https://github.com/knative/serving/releases/download/knative-v1.23.0
 curl -sL -o serving-crds.yaml $BASE/serving-crds.yaml
 curl -sL -o serving-core.yaml $BASE/serving-core.yaml
 curl -sL -o kourier.yaml \
-  https://github.com/knative-extensions/net-kourier/releases/download/knative-v1.22.1/kourier.yaml
+  https://github.com/knative-extensions/net-kourier/releases/download/knative-v1.23.0/kourier.yaml
 ```
 
 ## Workshop curation applied (re-apply after re-vendoring)
@@ -83,14 +83,43 @@ either a new upstream change or a curation someone forgot to write down.
    `3scale-kourier-gateway` both 200m/200Mi → **100m/100Mi** (limits
    untouched).
 7. **Pinned Envoy**: `docker.io/envoyproxy/envoy:v1.37-latest` (floating!) →
-   `v1.37.2` (verified on Docker Hub 2026-07-13), with a comment at the
-   change site saying why.
+   `v1.37.5` (verified on Docker Hub 2026-07-13), with a comment at the
+   change site saying why. Stay on the **1.37 minor** — that is the only
+   Envoy line net-kourier is tested against; `scripts/upstream.list` carries
+   a `^1\.37\.` track regex so the weekly report stops proposing 1.39.
 8. **Service `kourier` (kourier-system)**: `type: LoadBalancer` → `NodePort`
    with `nodePort: 31080` on the `http2` port (no LB implementation in
    Talos-in-Docker). The `https` port gets no nodePort. A comment at the
    change site shows the `curl -H 'Host: …' http://localhost:31080` form.
 
+9. **Envoy `stats_listener` bound back to IPv4-any.** net-kourier#1455
+   (new in 1.23.0) changed the `kourier-bootstrap` ConfigMap's *static*
+   stats listener from `address: 0.0.0.0` to `address: "::"` +
+   `ipv4_compat: true`, for dual-stack clusters. We revert it to the 1.22.1
+   form (`0.0.0.0`, no `ipv4_compat`).
+   **Why:** a static listener is bound by Envoy at process start, so a bind
+   failure is fatal — not degraded. If the gateway pod's netns has no usable
+   IPv6 stack, `3scale-kourier-gateway` crashloops and **module 06 loses all
+   ingress**; the readiness probe is on `:8081` (a dynamic xDS listener) and
+   would never even be reached, so the symptom is a CrashLoopBackOff with an
+   "Address family not supported" / bind error in `kubectl logs`.
+   Talos-in-Docker with Cilium and IPv6 disabled is exactly the environment
+   where that can bite, and **it cannot be settled by reading YAML — it needs
+   a live cluster.** Port 9000 is only the admin/stats endpoint (a Prometheus
+   scrape target, see the pod annotations); nothing in the workshop reaches
+   it over IPv6, so restoring the IPv4 address costs nothing.
+   **Drop this curation** once the cluster is dual-stack, or once a rehearsal
+   proves `"::"` binds in our pod netns.
+   ⚠️ **Top rehearsal watch item for module 06** — see the note below.
+
 Notes:
+- **Rehearsal watch item (module 06):** bring up `knative-serving` +
+  `kourier-system`, confirm `3scale-kourier-gateway` reaches Running (not
+  CrashLoopBackOff), then `curl -H 'Host: hello.demo.127.0.0.1.sslip.io'
+  http://localhost:31080`. If the gateway is healthy, additionally check
+  whether `"::"` would have worked (`kubectl -n kourier-system exec
+  deploy/3scale-kourier-gateway -- cat /proc/net/if_inet6`); if it would,
+  curation 9 can be retired at the next re-vendor.
 - `serving-core.yaml` includes the CRDs too; applying both crds+core is
   upstream's documented flow and idempotent under server-side apply.
 - Knative control-plane images are `gcr.io/knative-releases/...@sha256:...`

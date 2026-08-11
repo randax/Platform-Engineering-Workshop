@@ -115,7 +115,7 @@ in late August before the final pin.
   image (`ghcr.io/cnoe-io/backstage-app`)** ships working software templates wired to
   Gitea + ArgoCD — exactly our loop. 1.5–2 GiB (+ its Postgres); `NODE_ENV=production`.
   Run as the **last** module so low-RAM attendees lose nothing; presenter instance as fallback.
-- **Knative Serving v1.22.1** (v1.23 lands ~2026-07-28; pin one). Kourier ingress, halve the
+- **Knative Serving v1.23.0** (released; pinned together with Eventing v1.23.0). Kourier ingress, halve the
   default requests (official k0s blog pattern) → ~0.6 GiB. Set
   `registries-skipping-tag-resolving` for the local registry. Avoid Gateway API mode with
   Cilium (not in conformance matrix). No published Talos+Knative report — smoke-test.

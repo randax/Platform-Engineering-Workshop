@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | Source | https://github.com/knative/eventing |
-| Version | **knative-v1.22.2** for all four files (released 2026-06-16; verified 2026-07-14). Same minor as the vendored knative-serving (v1.22.1) — eventing 1.22.x had one more patch release than serving. |
+| Version | **knative-v1.23.0** for all four files (verified 2026-07-14). Same version as the vendored knative-serving — at 1.23.0 the two releases finally line up (1.22.x had eventing one patch ahead of serving). |
 | Files | `eventing-crds.yaml`, `eventing-core.yaml`, `in-memory-channel.yaml`, `mt-channel-broker.yaml` |
 
 ## Re-vendor
 
 ```sh
-BASE=https://github.com/knative/eventing/releases/download/knative-v1.22.2
+BASE=https://github.com/knative/eventing/releases/download/knative-v1.23.0
 for f in eventing-crds.yaml eventing-core.yaml in-memory-channel.yaml mt-channel-broker.yaml; do
   curl -sL -o $f $BASE/$f
 done
@@ -61,16 +61,16 @@ is `broker-ingress.knative-eventing.svc.cluster.local`, ClusterIP).
 All `gcr.io/knative-releases/knative.dev/eventing/cmd/...@sha256:...` —
 must be in the pre-pull list (`scripts/images.txt`):
 
-- `.../cmd/controller@sha256:866896c0d955ec7774e6c85e6349e034470ccb3317d34f08b3273c950c59eb39` (eventing-controller)
-- `.../cmd/webhook@sha256:b116f58ff8b3b8d2c03d96ebefa32f7d66715d07e31528c3cbdf0bbc9626e85e` (eventing-webhook)
-- `.../cmd/jobsink@sha256:bd23e8d8cef444bba1873efc629fed5785257fa3a3ceb0621a2ec8ac5a19a3cc` (job-sink)
-- `.../cmd/mtping@sha256:963722f316ec570fcaf116363c2e0f6fc1bd3fbbed8e25ae1eefee9b930bb091` (pingsource-mt-adapter)
-- `.../cmd/requestreply@sha256:f4d194097b43865e396f54b4fd94f779a2ed96c9691a3a8de4740722e5535804` (request-reply)
-- `.../cmd/in_memory/channel_controller@sha256:0855eba113da71ebd433ca5e7c583ba2601c4d55e0c52ca0d6ab19edfbed1513` (imc-controller)
-- `.../cmd/in_memory/channel_dispatcher@sha256:aa39224456b80b2734729450a9eb6076b13e008060a522436e2475b1ca9b058e` (imc-dispatcher)
-- `.../cmd/broker/filter@sha256:9080a69414303816e82886ea2b280a01f5c0fd1e0cadad06283450bc2b39d78b` (mt-broker-filter)
-- `.../cmd/broker/ingress@sha256:8b14a777da20f25d477c367ffdd26dec31fdb3d14bd50c99134ef527c540fbe1` (mt-broker-ingress)
-- `.../cmd/mtchannel_broker@sha256:9ea2a9c99843614f544738c01b6d4e2e0fa5b06722aa50380f18b8af80918f59` (mt-broker-controller)
+- `.../cmd/controller@sha256:dd385d5632b8ce1a49c45421a3a11db91837c8fb12ea56c7ebde4f9aad2e825c` (eventing-controller)
+- `.../cmd/webhook@sha256:3f6dfc52cfaf0b5a8e0c098f83f60eb237d3b8bfbbd4d0faea7c08fad98a1215` (eventing-webhook)
+- `.../cmd/jobsink@sha256:bb9777c85adbf4238e60f9e99f236cc9224b92baaa68a115867e88d086eede1f` (job-sink)
+- `.../cmd/mtping@sha256:2fc8713fb4807df0f5d8f9506d03c16c168eed61f19c04e04092266248bd0353` (pingsource-mt-adapter)
+- `.../cmd/requestreply@sha256:0e9e6d121e9bcd57b01beb33124bb5387b70d4820caebe326264db92db1e1336` (request-reply)
+- `.../cmd/in_memory/channel_controller@sha256:4cf6f399bc42a3a36676d62f3a684a07a88948a6de4a1b7a377c44116696707b` (imc-controller)
+- `.../cmd/in_memory/channel_dispatcher@sha256:950eb883f04cd6f0329757cb200c180d0f1bbebc436c6eb9135138be633b3ae5` (imc-dispatcher)
+- `.../cmd/broker/filter@sha256:d7bb470ad790a9460c9a6b526d73a9b87a16ab9b94094745bc59a97507f0f466` (mt-broker-filter)
+- `.../cmd/broker/ingress@sha256:d5bfc081eb9dccb47eb15f9971f0b3d8a24d0224573315a46d4afd87074b84ab` (mt-broker-ingress)
+- `.../cmd/mtchannel_broker@sha256:e600b78ee63225b3ab905fc3daf1f73772e8756b26ca5ace26fbaf4d81d3f8e5` (mt-broker-controller)
 
 Notes:
 - `eventing-core.yaml` includes the CRDs too; applying crds+core is

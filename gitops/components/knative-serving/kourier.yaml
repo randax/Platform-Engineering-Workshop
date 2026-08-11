@@ -20,7 +20,7 @@ metadata:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/name: knative-serving
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
 
 ---
 # Copyright 2020 The Knative Authors
@@ -45,7 +45,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 data:
   envoy-bootstrap.yaml: |
@@ -70,6 +70,18 @@ data:
         - name: stats_listener
           address:
             socket_address:
+              # Workshop curation: net-kourier#1455 (1.23.0) moved this static
+              # listener from 0.0.0.0 to "::" + ipv4_compat for dual-stack
+              # clusters. Ours is IPv4-only (Talos-in-Docker, Cilium with IPv6
+              # off). A STATIC listener that cannot bind is fatal at startup,
+              # so an unusable IPv6 stack in the pod netns would crashloop
+              # 3scale-kourier-gateway and take ALL of module 06's ingress with
+              # it — the readiness probe is on :8081 and would never be
+              # reached. Nothing here consumes the stats port over IPv6 (it is
+              # a Prometheus scrape target, see the pod annotations below), so
+              # restoring the 1.22.1 address costs nothing and removes the
+              # failure mode. Drop this curation if the cluster ever goes
+              # dual-stack, or once a rehearsal proves "::" binds.
               address: 0.0.0.0
               port_value: 9000
           filter_chains:
@@ -174,7 +186,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 data:
   _example: |
@@ -325,7 +337,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -335,7 +347,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 rules:
   - apiGroups: [""]
@@ -367,7 +379,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -401,7 +413,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 spec:
   strategy:
@@ -423,7 +435,7 @@ spec:
         app: net-kourier-controller
     spec:
       containers:
-        - image: gcr.io/knative-releases/knative.dev/net-kourier/cmd/kourier@sha256:01abd2070ccf8680885c47990e42c05c09e30bc8595d9246f4dcd37f2220a2a2
+        - image: gcr.io/knative-releases/knative.dev/net-kourier/cmd/kourier@sha256:eedfe3938f1efa93230863099f96400a0567909d383a585021f8727fa3a6cf0b
           name: controller
           env:
             # CERTS_SECRET_NAMESPACE and CERTS_SECRET_NAME can also be configured from a ConfigMap.
@@ -493,7 +505,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 spec:
   ports:
@@ -532,7 +544,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 spec:
   strategy:
@@ -567,8 +579,10 @@ spec:
           env:
             - name: DRAIN_TIME_SECONDS
               value: "15"
-          # Workshop curation: pinned (upstream ships floating v1.37-latest)
-          image: docker.io/envoyproxy/envoy:v1.37.2
+          # Workshop curation: pinned (upstream ships floating v1.37-latest).
+          # Stay on the 1.37 minor — that is the only Envoy line net-kourier
+          # tests against; scripts/upstream.list has a ^1\.37\. track regex.
+          image: docker.io/envoyproxy/envoy:v1.37.5
           name: kourier-gateway
           ports:
             - name: http2-external
@@ -654,7 +668,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 spec:
   ports:
@@ -683,7 +697,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 spec:
   ports:
@@ -707,7 +721,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 spec:
   minReplicas: 1
@@ -733,7 +747,7 @@ metadata:
   labels:
     networking.knative.dev/ingress-provider: kourier
     app.kubernetes.io/component: net-kourier
-    app.kubernetes.io/version: "1.22.1"
+    app.kubernetes.io/version: "1.23.0"
     app.kubernetes.io/name: knative-serving
 spec:
   minAvailable: 80%
