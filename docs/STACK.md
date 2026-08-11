@@ -21,7 +21,7 @@ these picks flip — reading the tradeoff is the transferable skill, not memoris
 | Git server | **Gitea** 1.27.0 (in-cluster) | external GitHub / GitLab | Offline, self-contained write-path; no per-IP NAT rate-limits; attendees can actually push. |
 | GitOps engine | **ArgoCD** v3.5.0, app-of-apps | Flux · manual kubectl | Drift detection + self-heal; app-of-apps is the one-cluster shape; plain `install.yaml` teaches better than Helm. |
 | Managed Postgres | **CloudNativePG** 1.28.4 (PG 18.4) | bitnami/stock Postgres · cloud RDS | A real control loop (primary+replica, failover, backup) — the operator *is* the "managed" service. |
-| Object storage (S3) | **RustFS** 1.0.0-beta.8 | MinIO | Apache-2.0, single ~90 MB Rust binary; MinIO's community edition was discontinued for proprietary AIStor. SeaweedFS is Plan B. |
+| Object storage (S3) | **RustFS** 1.0.0-rc.1 | MinIO | Apache-2.0, single ~90 MB Rust binary; MinIO's community edition was discontinued for proprietary AIStor. SeaweedFS is Plan B. |
 | OCI registry | **Zot** v2.1.18 | Harbor · Docker registry:2 | One CNCF-native binary with search + UI; Harbor is a Postgres/Redis/Trivy/ChartMuseum fleet. |
 | Storage class | **local-path-provisioner** v0.0.37 | Longhorn · Ceph/Rook CSI | Node-local hostPath, one Deployment — no replication/snapshots needed for one node. |
 | Self-service API | **Crossplane** v2.3.3 | Helm/operators · Crossplane v1 | Namespaced XRs (no Claims) compose arbitrary K8s resources directly — one YAML → whole stack. |
@@ -95,7 +95,7 @@ its open-source community edition was gutted through 2025–26 (console removed 
 binaries stopped Oct 2025, repo archived April 2026) in favour of the proprietary AIStor —
 the exact roadmap-capture risk this workshop is about. **State it correctly**: MinIO never
 relicensed, and RustFS is an *independent* Apache-2.0 reimplementation, **not** a MinIO
-"successor". The tradeoff is maturity: RustFS is at 1.0.0-beta.8, presigned GET/PUT work but
+"successor". The tradeoff is maturity: RustFS is at 1.0.0-rc.1, presigned GET/PUT work but
 presigned POST doesn't, IAM is console-first, and its security history is rough — acceptable
 for an ephemeral lab sandbox and teachable material. **SeaweedFS is the rehearsed Plan B**
 (single-pod `allInOne`, stronger IAM) with explicit mid-August switch triggers in

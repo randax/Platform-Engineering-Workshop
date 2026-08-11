@@ -57,8 +57,10 @@ ghcr.io/cloudnative-pg/cloudnative-pg:1.28.4
 # Default postgres image compiled into CNPG 1.28.4 (pkg/versions/versions.go);
 # also pinned explicitly by the Backstage database in gitops/
 ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
-# RustFS — Docker Hub only (no GHCR mirror upstream); beta by design, see RESEARCH.md §2
-docker.io/rustfs/rustfs:1.0.0-beta.8
+# RustFS — Docker Hub only (no GHCR mirror upstream); prerelease by design, see
+# RESEARCH.md §2. 1.0.0-rc.1 needs the log-flood workaround documented in
+# gitops/components/rustfs/VENDOR.md (upstream rustfs/rustfs#5927).
+docker.io/rustfs/rustfs:1.0.0-rc.1
 ghcr.io/project-zot/zot:v2.1.18
 
 # --- Wave 2: self-service, serverless, builds

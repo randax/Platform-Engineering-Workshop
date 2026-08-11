@@ -1,4 +1,4 @@
-# RustFS 1.0.0-beta.8, standalone single-pod S3 (module 3: object storage).
+# RustFS 1.0.0-rc.1, standalone single-pod S3 (module 3: object storage).
 # S3 endpoint: rustfs-svc.rustfs:9000 (NodePort http://localhost:30900),
 # console :9001. Credentials (workshop-grade): cloudbox / cloudbox123.
 #

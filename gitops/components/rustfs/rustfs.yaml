@@ -6,10 +6,10 @@ metadata:
   name: rustfs
   namespace: rustfs
   labels:
-    helm.sh/chart: rustfs-0.8.0
+    helm.sh/chart: rustfs-1.0.0-rc.1
     app.kubernetes.io/name: rustfs
     app.kubernetes.io/instance: rustfs
-    app.kubernetes.io/version: "1.0.0-beta.8"
+    app.kubernetes.io/version: "1.0.0-rc.1"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -42,7 +42,25 @@ data:
   RUSTFS_CONSOLE_ADDRESS: ":9001"
   RUSTFS_CONSOLE_ENABLE: "true"
   RUSTFS_OBS_LOG_DIRECTORY: ""
-  RUSTFS_OBS_LOGGER_LEVEL: "info"
+  # WORKAROUND for upstream bug rustfs/rustfs#5927 — REMOVE the filter suffix
+  # (back to plain "info") once that issue is fixed and we bump past it.
+  # 1.0.0-rc.1's `nsscanner_disk` span in `rustfs_scanner::scanner_io` omits
+  # `set_disks` from its #[tracing::instrument] skip list, so a Vec<Arc<Disk>>
+  # is Debug-rendered into EVERY span line — 332,800 bytes per line, several
+  # times a second, and worst on single-disk standalone deployments, which is
+  # exactly our topology. Measured here, idle with ~240 objects in the store:
+  # 1.0.0-beta.8 3.3 MiB/h vs 1.0.0-rc.1 ~30,030 MiB/h (~29 GiB/h). RustFS is
+  # on from module 03 to the end of the workshop, and RUSTFS_OBS_LOG_DIRECTORY
+  # is "" so it all goes to stdout → the node's container log → the OTel
+  # Collector's filelog receiver → VictoriaLogs.
+  # This value is a tracing EnvFilter directive, not a bare level: it keeps
+  # INFO for all of RustFS (still ~15k INFO lines of real S3/startup logging
+  # for the labs to read) and demotes ONLY the one buggy module. Measured
+  # effect: 30,030 MiB/h → 5.72 MiB/h (~5,250x), longest log line
+  # 332,800 B → 9,313 B, ~15,700 INFO lines still there.
+  # A bare "warn" also stops the flood but silences RustFS entirely, which is
+  # the wrong trade in a workshop that teaches observability and debugging.
+  RUSTFS_OBS_LOGGER_LEVEL: "info,rustfs_scanner::scanner_io=warn"
   RUSTFS_OBS_ENVIRONMENT: "development"
   RUSTFS_REGION: "us-east-1"
   RUSTFS_VOLUMES: "/data"
@@ -77,10 +95,10 @@ metadata:
   name: rustfs-svc
   namespace: rustfs
   labels:
-    helm.sh/chart: rustfs-0.8.0
+    helm.sh/chart: rustfs-1.0.0-rc.1
     app.kubernetes.io/name: rustfs
     app.kubernetes.io/instance: rustfs
-    app.kubernetes.io/version: "1.0.0-beta.8"
+    app.kubernetes.io/version: "1.0.0-rc.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   type: ClusterIP
@@ -102,10 +120,10 @@ metadata:
   name: rustfs
   namespace: rustfs
   labels:
-    helm.sh/chart: rustfs-0.8.0
+    helm.sh/chart: rustfs-1.0.0-rc.1
     app.kubernetes.io/name: rustfs
     app.kubernetes.io/instance: rustfs
-    app.kubernetes.io/version: "1.0.0-beta.8"
+    app.kubernetes.io/version: "1.0.0-rc.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
@@ -124,6 +142,7 @@ spec:
         app.kubernetes.io/name: rustfs
         app.kubernetes.io/instance: rustfs
     spec:
+      serviceAccountName: rustfs
       imagePullSecrets:
         []
       affinity:
@@ -153,7 +172,7 @@ spec:
               mountPath: /data
       containers:
         - name: rustfs
-          image: "rustfs/rustfs:1.0.0-beta.8"
+          image: "rustfs/rustfs:1.0.0-rc.1"
           command: ["/usr/bin/rustfs"]
           imagePullPolicy: IfNotPresent
           securityContext:

@@ -31,7 +31,7 @@ one `git clean` from oblivion.
 | Bet | Verdict |
 |---|---|
 | Talos-in-Docker + Cilium | **GO** — pin Talos v1.13.8 (never 1.12.x), raise node memory limits, scripted kind+Cilium fallback |
-| RustFS | **Conditional GO** — pin ≥1.0.0-beta.8, standalone mode; SeaweedFS is the rehearsed Plan B with explicit switch triggers (mid-Aug) |
+| RustFS | **Conditional GO** — pin ≥1.0.0-rc.1, standalone mode; SeaweedFS is the rehearsed Plan B with explicit switch triggers (mid-Aug) |
 | GitOps write path | **In-cluster Gitea** (single-pod SQLite, push-create, seeded by Job); ArgoCD v3.5.x pinned, app-of-apps + sync waves; never point at GitHub |
 | In-cluster builds | Kaniko is dead → **rootless BuildKit** + Zot registry; needs PSA-privileged build namespace on Talos; unrehearsed combo — spike early |
 | Crossplane | **v2** (claims gone; compositions emit CNPG `Cluster` directly) — simpler to teach than v1 ever was |

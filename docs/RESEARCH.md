@@ -33,8 +33,10 @@ in late August before the final pin.
 
 ## 2. Object storage: RustFS — **conditional GO**, SeaweedFS is Plan B
 
-- RustFS is at **1.0.0-beta.8** (2026-06-10); no GA yet (roadmap said ~July 2026).
-  Apache 2.0. Official Helm chart `rustfs/rustfs` 0.8.0 via https://charts.rustfs.com.
+- RustFS is at **1.0.0-rc.1**; no GA yet (roadmap said ~July 2026). Apache 2.0.
+  Official Helm chart `rustfs/rustfs` 1.0.0-rc.1 via https://charts.rustfs.com.
+  rc.1 carries an open log-flood regression (rustfs/rustfs#5927) that the
+  component works around at source — see `gitops/components/rustfs/VENDOR.md`.
 - Config for the workshop: `mode.standalone.enabled=true`, `mode.distributed.enabled=false`
   (distributed 4-pod is the default!), `ingress.enabled=false` (port-forward), creds via
   `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` env. ~90 MB idle, arm64 OK, runs as UID 10001.
