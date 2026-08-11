@@ -104,7 +104,7 @@ s3ls() {
       aws --endpoint-url http://localhost:30900 s3api head-bucket --bucket my-db-assets 2>/dev/null
   else
     kubectl -n demo run "verify-s3-$$" --rm -i --restart=Never --quiet \
-      --image=public.ecr.aws/aws-cli/aws-cli:2.27.49 \
+      --image=public.ecr.aws/aws-cli/aws-cli:2.36.20 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
       --env AWS_REGION=us-east-1 \
       -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 \

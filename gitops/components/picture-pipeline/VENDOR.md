@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Source | `apps/uploader` + `apps/resizer` **in this repo** — nothing vendored from upstream; the manifest is ours |
-| Images | `ghcr.io/randax/cloudbox-uploader:v0.1.0`, `ghcr.io/randax/cloudbox-resizer:v0.1.0` (multi-arch) — built and pushed by this repo's CI from `apps/`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. `public.ecr.aws/aws-cli/aws-cli:2.27.49` (bucket Job) is pinned and verified pullable (crane, 2026-07-14) — already in the pre-pull list for module 03. |
+| Images | `ghcr.io/randax/cloudbox-uploader:v0.1.0`, `ghcr.io/randax/cloudbox-resizer:v0.1.0` (multi-arch) — built and pushed by this repo's CI from `apps/`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. `public.ecr.aws/aws-cli/aws-cli:2.36.20` (bucket Job) is pinned and verified pullable, amd64+arm64 (crane, 2026-08-11) — already in the pre-pull list for module 03. |
 | File | `picture-pipeline.yaml` |
 
 ## Re-vendor

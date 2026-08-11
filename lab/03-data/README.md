@@ -100,7 +100,7 @@ wants the uploaded object too, not just the bucket):
 
 ```bash
 kubectl -n demo run s3 --rm -i --restart=Never \
-  --image=public.ecr.aws/aws-cli/aws-cli:2.27.49 \
+  --image=public.ecr.aws/aws-cli/aws-cli:2.36.20 \
   --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
   --env AWS_REGION=us-east-1 \
   --command -- /bin/sh -c '

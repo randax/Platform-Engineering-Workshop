@@ -125,7 +125,7 @@ docker.io/otel/opentelemetry-collector-contrib:0.149.0@sha256:0fba96233274f6d665
 
 # --- Lab workload images (modules 3, 4, 6)
 # aws-cli: bucket tooling in modules 03/04 (public.ecr.aws is in the mirror map)
-public.ecr.aws/aws-cli/aws-cli:2.27.49
+public.ecr.aws/aws-cli/aws-cli:2.36.20
 # Standalone postgres for module 05's fault scenarios — the OFFICIAL image
 # (its docker-entrypoint honors POSTGRES_PASSWORD; the CNPG image does not).
 docker.io/library/postgres:18-alpine
