@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Component | Grafana 12.4.5 — dashboards for the Victoria stack (observability rework, issue #57) |
-| Image | `docker.io/grafana/grafana:12.4.5` — `sha256:26b8f35a9e4e4431995cf64c3f396505a4faf17bcfc19f9ed84943ec6bfd5ecd` (crane, 2026-07-15) |
+| Component | Grafana 13.1.3 — dashboards for the Victoria stack (observability rework, issue #57) |
+| Image | `docker.io/grafana/grafana:13.1.3` — `sha256:ab5cb380e3ff3172d6c8bd2e7cfd31cce977d2881b260e1f5bc089bf0b759b43` (crane, 2026-08-11; linux/amd64 + arm64 + arm). **Build input only** — the deployed image is `ghcr.io/randax/cloudbox-grafana`, so this ref lives in `apps/grafana/Dockerfile`, not `scripts/images.txt`. |
 | Source | Official image, https://hub.docker.com/r/grafana/grafana · docs https://grafana.com/docs/grafana/latest/ |
 | Files | `grafana.yaml` (ConfigMap + Service + Deployment), `service-nodeport.yaml` (workshop addition) |
 
@@ -45,7 +45,18 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
   `Viewer`) — the workshop Grafana is open, workshop-grade on purpose. The
   login form is left available so an admin (default `admin`/`admin`, ephemeral
   lab) can still edit. Sign-up disabled; analytics/update checks disabled so
-  nothing phones home at boot (offline rule); `GF_INSTALL_PLUGINS=""`.
+  nothing phones home at boot (offline rule); `GF_INSTALL_PLUGINS=""` **and**
+  `GF_PLUGINS_PREINSTALL_DISABLED=true`.
+- **`GF_PLUGINS_PREINSTALL_DISABLED=true` — the second half of the offline rule.**
+  `GF_INSTALL_PLUGINS=""` only empties the *user* install list. Grafana separately
+  background-installs a list of drilldown apps compiled into the binary
+  (`grafana-{lokiexplore,pyroscope,exploretraces,metricsdrilldown}-app`; 13.1.3
+  adds `elasticsearch` + `zipkin`, which the image already bundles). Offline those
+  are six failing calls to grafana.com per pod start, and because the root
+  filesystem is read-only each one lands as `level=error … read-only file system`
+  in logs attendees are asked to read. Verified on 13.1.3: with the flag set,
+  zero `plugin.backgroundinstaller` lines, zero errors, same 54 plugins loaded,
+  all three datasources still provisioned.
 - **NodePort 30030** (`service-nodeport.yaml`, a workshop addition, not
   upstream): browser reaches Grafana at `http://localhost:30030`, the canonical
   observability port (freed when the old single-pod stack was retired —
@@ -63,8 +74,33 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
 ## Re-vendor
 
 ```sh
-mise x crane@0.21.7 -- crane digest docker.io/grafana/grafana:12.4.5
+mise x crane@0.21.7 -- crane digest docker.io/grafana/grafana:13.1.3
 ```
 
-Keep the `image:` in `grafana.yaml` and `scripts/images.txt` in lockstep
-(`check-consistency.sh` enforces it).
+Bumping the base image means editing the `FROM` line in `apps/grafana/Dockerfile`
+(tag **and** digest) — `scripts/upstream.list` reads the `grafana` pin straight
+out of that line, so keep it greppable as `FROM grafana/grafana:<x.y.z>@sha256:…`.
+
+**Re-resolve both baked-in plugins at the same time.** They were pinned against a
+specific Grafana version, and the catalog records a `grafanaDependency` range per
+plugin version:
+
+```sh
+curl -s https://grafana.com/api/plugins/victoriametrics-metrics-datasource/versions \
+  | jq -r '.items[] | "\(.version)\t\(.grafanaDependency)"' | head
+curl -s https://grafana.com/api/plugins/victoriametrics-logs-datasource/versions \
+  | jq -r '.items[] | "\(.version)\t\(.grafanaDependency)"' | head
+```
+
+At Grafana 13.1.3 (checked 2026-08-11): metrics **0.25.2** is the newest release
+and its range ends in an unbounded `>=12.2.5`, so it covers 13.x unchanged. Logs
+**0.29.0** is *held* — 0.30.1 and 0.31.0 exist and all three declare `>=10.4.0`,
+so the hold is deliberate (keep the Grafana major bump a one-variable change),
+not a compatibility limit. Both load `signature: valid, angularDetected: false`
+on 13.1.3.
+
+The deployed image is `ghcr.io/randax/cloudbox-grafana`, whose tag in
+`grafana.yaml` and `scripts/images.txt` is rewritten by release-please inside the
+`x-release-please` block comments — never hand-edit those refs. Stock
+`docker.io/grafana/grafana` is deliberately **absent** from `scripts/images.txt`:
+it is a CI build input, never pulled by a node.

@@ -29,10 +29,10 @@ these picks flip — reading the tradeoff is the transferable skill, not memoris
 | In-cluster CI | **Argo Workflows** v4.0.7 + **BuildKit** v0.31.1 | Tekton · external/cloud CI | Rootless in-cluster image builds → your own Zot, no cloud minutes; Kaniko was archived June 2025. |
 | Durable messaging | **NATS** 2.12.12 + JetStream | Kafka · RabbitMQ | The durable streaming primitive in ~15 MB of Go vs. GBs of JVM/Erlang + coordination. |
 | Metrics store | **VictoriaMetrics** 1.147.0 | Prometheus | PromQL-compatible, columnar TSDB + `vmrange` histograms — far less RAM for the same series. |
-| Log store | **VictoriaLogs** 1.52.0 | Loki | Loki-compatible query API, single node, minimal RAM. |
+| Log store | **VictoriaLogs** 1.52.0 | Loki | LogsQL via its own native Grafana plugin, single node, minimal RAM. |
 | Trace store | **VictoriaTraces** 0.9.4 | Grafana Tempo | Jaeger-compatible API; one vendor for metrics/logs/traces (built on VictoriaLogs internally). |
 | Telemetry collection | **OTel Collector (contrib)** 0.149.0 | (otel-lgtm had none) | Agent DaemonSet + gateway: filelog/kubeletstats/k8s_cluster/prometheus/OTLP — a real collection layer. |
-| Dashboards | **Grafana** 12.4.5 | (part of the LGTM blob) | Built-in Prometheus/Loki/Jaeger datasources, no plugins to fetch → stays offline. |
+| Dashboards | **Grafana** 13.1.3 | (part of the LGTM blob) | Native MetricsQL/LogsQL datasource plugins baked into the image, nothing fetched at boot → stays offline. |
 | Observability (whole) | **Victoria stack + OTel Collector** | kube-prometheus-stack · single-pod otel-lgtm · full LGTM · OTel Demo | Assembled from readable parts, ~1 GiB on-demand where the alternatives want several GB (or ~6 GB). |
 
 ## Per-component notes

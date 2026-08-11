@@ -123,9 +123,11 @@ in late August before the final pin.
   Cilium (not in conformance matrix). No published Talos+Knative report — smoke-test.
 - **Observability: the Victoria stack + OTel Collector**, enabled on-demand from the catalog
   (not wave-0). Stores: **VictoriaMetrics** (:8428, Prometheus query API — replaces Prometheus),
-  **VictoriaLogs** (:9428, Loki-compatible API — replaces Loki), **VictoriaTraces** (:10428,
-  **Jaeger**-compatible API — replaces Tempo). **Grafana** (:30030 NodePort) wires all three as
-  built-in datasources (Prometheus/Loki/Jaeger types, no plugins — offline rule). The collection
+  **VictoriaLogs** (:9428, LogsQL — replaces Loki), **VictoriaTraces** (:10428,
+  **Jaeger**-compatible API — replaces Tempo). **Grafana** (:30030 NodePort) wires the first two
+  through their native VictoriaMetrics datasource plugins, baked into
+  `ghcr.io/randax/cloudbox-grafana` at build time (#65), and VictoriaTraces through the built-in
+  Jaeger type — nothing is fetched at boot (offline rule). The collection
   layer otel-lgtm never had: an **OTel Collector** agent DaemonSet (filelog → VictoriaLogs,
   kubeletstats → VictoriaMetrics) plus a gateway Deployment (k8s_cluster + prometheus scrape →
   VictoriaMetrics; OTLP receiver on :4317/:4318). Skip kube-prometheus-stack (heavy, no traces),

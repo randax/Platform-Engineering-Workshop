@@ -147,14 +147,14 @@ Knative: Kourier ingress (not Gateway API — not in Cilium's conformance matrix
 
 <div class="mt-5 text-sm opacity-80">
 
-**NATS JetStream** gives durable streams on a PVC for a rounding error of Kafka's RAM. The observability layer is the sharpest tradeoff: **OTel Collector** (agent DaemonSet + gateway) feeding **VictoriaMetrics** (PromQL), **VictoriaLogs** (Loki API) and **VictoriaTraces** (Jaeger API), fronted by **Grafana** with *built-in* datasources — no plugins to fetch, so it stays offline. VM's columnar TSDB + `vmrange` histograms hold the whole thing to **~1 GiB** where kube-prometheus-stack or a full Grafana LGTM would want several — and unlike single-pod otel-lgtm, there's a *real* collector, so more than three apps actually emit telemetry.
+**NATS JetStream** gives durable streams on a PVC for a rounding error of Kafka's RAM. The observability layer is the sharpest tradeoff: **OTel Collector** (agent DaemonSet + gateway) feeding **VictoriaMetrics** (PromQL), **VictoriaLogs** (LogsQL) and **VictoriaTraces** (Jaeger API), fronted by **Grafana** with the native VictoriaMetrics/VictoriaLogs datasource plugins *baked into the image* — nothing fetched at boot, so it stays offline. VM's columnar TSDB + `vmrange` histograms hold the whole thing to **~1 GiB** where kube-prometheus-stack or a full Grafana LGTM would want several — and unlike single-pod otel-lgtm, there's a *real* collector, so more than three apps actually emit telemetry.
 
 </div>
 
 <!--
-Pins: NATS 2.12.12; VictoriaMetrics 1.147.0, VictoriaLogs 1.52.0, VictoriaTraces 0.9.4, Grafana 12.4.5, OTel Collector contrib 0.149.0. Observability is on-demand — enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
+Pins: NATS 2.12.12; VictoriaMetrics 1.147.0, VictoriaLogs 1.52.0, VictoriaTraces 0.9.4, Grafana 13.1.3, OTel Collector contrib 0.149.0. Observability is on-demand — enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
 
-The four things we rejected, precisely: kube-prometheus-stack (heavy, and no traces at all); single-pod otel-lgtm (no real Collector — only the three instrumented apps push anything, which is the gap #57 closed); full Grafana LGTM = Loki+Tempo+Mimir (GBs); and the OTel Demo (~6 GB). "Assembled, not a blob" is the honest description: OTel Collector contrib for filelog/kubeletstats/k8s_cluster receivers, three Victoria single-node stores, Grafana wiring them as Prometheus/Loki/Jaeger datasources — every piece readable, and the whole thing an on-demand ~1 GiB.
+The four things we rejected, precisely: kube-prometheus-stack (heavy, and no traces at all); single-pod otel-lgtm (no real Collector — only the three instrumented apps push anything, which is the gap #57 closed); full Grafana LGTM = Loki+Tempo+Mimir (GBs); and the OTel Demo (~6 GB). "Assembled, not a blob" is the honest description: OTel Collector contrib for filelog/kubeletstats/k8s_cluster receivers, three Victoria single-node stores, Grafana wiring them as native MetricsQL/LogsQL plugins plus the built-in Jaeger type — every piece readable, and the whole thing an on-demand ~1 GiB.
 -->
 
 ---
