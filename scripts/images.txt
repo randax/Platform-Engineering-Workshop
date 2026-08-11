@@ -35,10 +35,10 @@ registry.k8s.io/coredns/coredns:v1.14.6
 registry.k8s.io/pause:3.10.1
 registry.k8s.io/networking/kube-network-policies:v1.1.0
 
-# --- Cilium 1.19.5 (digests from `helm template cilium/cilium --version 1.19.5`)
-quay.io/cilium/cilium:v1.19.5@sha256:20fbbc14ac20b55a292c0dcda5571bf31cde30a7dbc68c29db3e709390ab0732
-quay.io/cilium/operator-generic:v1.19.5@sha256:be848a365776e07d0c5a895eda7aec928ddc52a5a1fa2f432fd7a286609e1db4
-quay.io/cilium/cilium-envoy:v1.36.8-1781157951-a7f42a3390781539911b5b9107881b35ecc4e752@sha256:326f872e19ce8aa45170efbf583b3f301586ba3feead14b864676d4baf3b45ed
+# --- Cilium 1.20.0 (digests from `helm template cilium/cilium --version 1.20.0`)
+quay.io/cilium/cilium:v1.20.0@sha256:383968cd5e8873f7976fa76aa6196045643558f4cc9518a207b9335cb24a0e93
+quay.io/cilium/operator-generic:v1.20.0@sha256:80744a8cc7c91c2f9e6347629406844eb35d79b30a732c6d41c15b17232a74f3
+quay.io/cilium/cilium-envoy:v1.37.5-1782911245-7cffc778c923f68a77954a53b1a98d6b5353f004@sha256:583057dd4f7d54cd41efff3c413aa0b148ac201f522e2c3336851fa89c78b039
 
 # --- Gitea (chart 12.6.0, rootless single-pod)
 docker.gitea.com/gitea:1.26.1-rootless

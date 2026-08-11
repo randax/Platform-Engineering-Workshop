@@ -20,7 +20,7 @@ in late August before the final pin.
   securityContext capability lists; if kube-proxy-free: `kubeProxyReplacement=true`,
   `k8sServiceHost=localhost`, `k8sServicePort=7445` (KubePrism). Keeping kube-proxy enabled
   removes a nested-cgroup variable — robustness vs. wow-factor tradeoff.
-- Cilium stable 1.19.5; Talos docs use 1.18.x — either fine. Kernel needs ≥5.10:
+- Cilium stable 1.20.0; Talos docs use 1.18.x — either fine. Kernel needs ≥5.10:
   Docker Desktop macOS ships 6.10 ✅, WSL2 ships 6.6 ✅ but **WSL2 is the least-verified
   platform for this combo — must test explicitly**. Linux: warn about firewalld/nftables
   ([talos#13609](https://github.com/siderolabs/talos/issues/13609), Fedora, open).

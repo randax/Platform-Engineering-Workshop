@@ -22,7 +22,7 @@ Ground rule to state once, up front: nothing here is "best in class" in the abst
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
 <tr><td>K8s OS</td><td><span class="we"><Logo name="talos" size="1.3rem"/> <b>Talos v1.13.8</b></span></td><td>kubeadm · minikube · kind</td><td>No shell, no SSH, no drift — you lose the escape hatch on purpose</td></tr>
-<tr><td>CNI + proxy</td><td><span class="we"><Logo name="cilium" size="1.3rem"/> <b>Cilium 1.19.5</b></span></td><td>flannel + kube-proxy</td><td>eBPF datapath, kube-proxy-free — needs kernel ≥5.10</td></tr>
+<tr><td>CNI + proxy</td><td><span class="we"><Logo name="cilium" size="1.3rem"/> <b>Cilium 1.20.0</b></span></td><td>flannel + kube-proxy</td><td>eBPF datapath, kube-proxy-free — needs kernel ≥5.10</td></tr>
 </tbody>
 </table>
 

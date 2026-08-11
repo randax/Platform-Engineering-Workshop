@@ -20,7 +20,7 @@ kind = "0.32.0"
 # crane — mirrors pinned images (host arch for tag pins, full index for digest pins)
 crane = "0.21.7"
 # cilium CLI — lab 01 uses `cilium status` to inspect the CNI
-"aqua:cilium/cilium-cli" = "0.19.5"
+"aqua:cilium/cilium-cli" = "0.19.7"
 # jq — JSON plumbing in verify scripts and lab hints
 jq = "1.8.2"
 # node — only for the Slidev presentation
