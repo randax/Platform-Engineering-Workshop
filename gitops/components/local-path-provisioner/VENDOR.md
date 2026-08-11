@@ -3,18 +3,33 @@
 | | |
 |---|---|
 | Source | https://github.com/rancher/local-path-provisioner |
-| Version | **v0.0.36** (latest release, 2026-05-08; verified 2026-07-13) |
+| Version | **v0.0.37** (latest release; verified 2026-08-11) |
 | File | `local-path-storage.yaml` |
 
 ## Re-vendor
 
 ```sh
 curl -sL -o local-path-storage.yaml \
-  https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.36/deploy/local-path-storage.yaml
+  https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.37/deploy/local-path-storage.yaml
 ```
+
+## Upstream change in v0.0.37 — the Deployment now has probes
+
+v0.0.37's entire upstream diff is a health server: a `health` container port
+(8080), `HEALTH_PORT=8080`, and startup (`/health`, 5s delay, 5s period,
+12 failures ≈ 60s grace), liveness (`/health`) and readiness (`/ready`) probes.
+That matters here because this is the **wave-0 gate**:
+`scripts/bootstrap-gitops.sh` installs this component imperatively and then
+`wait_rollout`s it before Gitea (whose PVC needs the storage class), so the
+Deployment now only reports Ready once its health server answers. A slow or
+unhappy health server stalls everything after module 02 — loud and early, but
+worth watching in rehearsal.
 
 ## Workshop curation applied (re-apply after re-vendoring)
 
+0. **Namespace label `pod-security.kubernetes.io/enforce: privileged`** — the
+   provisioner's helper pods mount hostPath volumes and Talos enforces PSA
+   `baseline` cluster-wide; without the label every PVC hangs Pending.
 1. **StorageClass `local-path` is the cluster default** — added annotation
    `storageclass.kubernetes.io/is-default-class: "true"`.
 2. **Talos path**: `nodePathMap` changed from `/opt/local-path-provisioner`
@@ -28,6 +43,8 @@ curl -sL -o local-path-storage.yaml \
    Deployment (upstream ships none) — same small-cluster requests
    convention as the other components, no limits.
 
-Images used (all pinned, verified pullable 2026-07-13):
-- `docker.io/rancher/local-path-provisioner:v0.0.36`
-- `docker.io/library/busybox:1.37.0` (PVC setup/teardown helper pod)
+Images used (all pinned, verified pullable 2026-08-11):
+- `docker.io/rancher/local-path-provisioner:v0.0.37`
+  (`sha256:e757967a5ec338f6a9b371c5a9688bedaa8c3578ea3dd4db329ea0084be0a86f`)
+- `docker.io/library/busybox:1.37.0` (PVC setup/teardown helper pod) — unchanged;
+  upstream still ships the helper pod unpinned.

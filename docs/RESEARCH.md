@@ -55,7 +55,8 @@ in late August before the final pin.
 
 ## 3. GitOps: ArgoCD v3 + in-cluster Gitea — the write-path answer
 
-- **ArgoCD v3.4.5** current; v3.5 GA expected ~August (don't chase it). Pin an exact patch.
+- **ArgoCD v3.5.0** current (v3.5 went GA in August 2026; v3.4.5 was the pre-event
+  pin). Pin an exact patch.
   Install with `kubectl apply --server-side --force-conflicts` (ApplicationSet CRD exceeds
   client-side annotation limits since 3.3). Plain install.yaml beats Helm for teaching.
 - v3 vs v2 gotchas for demos: logs RBAC enforced by default (read-only demo users need

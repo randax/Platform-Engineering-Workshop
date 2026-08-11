@@ -40,16 +40,16 @@ quay.io/cilium/cilium:v1.20.0@sha256:383968cd5e8873f7976fa76aa6196045643558f4cc9
 quay.io/cilium/operator-generic:v1.20.0@sha256:80744a8cc7c91c2f9e6347629406844eb35d79b30a732c6d41c15b17232a74f3
 quay.io/cilium/cilium-envoy:v1.37.5-1782911245-7cffc778c923f68a77954a53b1a98d6b5353f004@sha256:583057dd4f7d54cd41efff3c413aa0b148ac201f522e2c3336851fa89c78b039
 
-# --- Gitea (chart 12.6.0, rootless single-pod)
-docker.gitea.com/gitea:1.26.1-rootless
+# --- Gitea (chart 12.7.0, rootless single-pod)
+docker.gitea.com/gitea:1.27.0-rootless
 
-# --- ArgoCD v3.4.5 (images from the vendored install.yaml)
-quay.io/argoproj/argocd:v3.4.5
+# --- ArgoCD v3.5.0 (images from the vendored install.yaml)
+quay.io/argoproj/argocd:v3.5.0
 ghcr.io/dexidp/dex:v2.45.0
 public.ecr.aws/docker/library/redis:8.2.3-alpine
 
 # --- Wave 0: storage
-docker.io/rancher/local-path-provisioner:v0.0.36
+docker.io/rancher/local-path-provisioner:v0.0.37
 docker.io/library/busybox:1.37.0
 
 # --- Wave 1: data services

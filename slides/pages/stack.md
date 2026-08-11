@@ -50,8 +50,8 @@ Cilium tradeoff to name honestly: eBPF wants a modern kernel — Docker Desktop 
 <table>
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
-<tr><td>Git server</td><td><span class="we"><Logo name="gitea" size="1.3rem"/> <b>Gitea 1.26.1</b></span></td><td>external GitHub</td><td>One more pod, but the write-path is offline and <em>yours</em></td></tr>
-<tr><td>GitOps engine</td><td><span class="we"><Logo name="argocd" size="1.3rem"/> <b>Argo CD v3.4.5</b></span></td><td>Flux · manual kubectl</td><td>Drift detection + self-heal; app-of-apps is one-cluster, not fleet</td></tr>
+<tr><td>Git server</td><td><span class="we"><Logo name="gitea" size="1.3rem"/> <b>Gitea 1.27.0</b></span></td><td>external GitHub</td><td>One more pod, but the write-path is offline and <em>yours</em></td></tr>
+<tr><td>GitOps engine</td><td><span class="we"><Logo name="argocd" size="1.3rem"/> <b>Argo CD v3.5.0</b></span></td><td>Flux · manual kubectl</td><td>Drift detection + self-heal; app-of-apps is one-cluster, not fleet</td></tr>
 </tbody>
 </table>
 
@@ -82,7 +82,7 @@ ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; 
 <tr><td>Managed Postgres</td><td><span class="we"><Logo name="cloudnativepg" size="1.3rem"/> <b>CloudNativePG 1.28.4</b></span></td><td>bitnami/stock PG · RDS</td><td>A real control loop (failover, backup) vs. a bare pod — costs CRDs</td></tr>
 <tr><td>Object storage (S3)</td><td><span class="we"><Logo name="rustfs" text="RustFS" size="1.3rem"/> <b>1.0.0-beta.8</b></span></td><td>MinIO</td><td>Apache-2.0, ~90 MB — but young; SeaweedFS is the rehearsed Plan B</td></tr>
 <tr><td>OCI registry</td><td><span class="we"><Logo name="zot" text="Zot" size="1.3rem"/> <b>v2.1.18</b></span></td><td>Harbor · registry:2</td><td>One CNCF binary + UI vs. a Postgres/Redis/Trivy fleet — fewer features</td></tr>
-<tr><td>Storage class</td><td><span class="we"><Logo name="localpath" text="local-path" size="1.3rem"/> <b>v0.0.36</b></span></td><td>Longhorn · Ceph CSI</td><td>Node-local, no snapshots/replication — right for one node</td></tr>
+<tr><td>Storage class</td><td><span class="we"><Logo name="localpath" text="local-path" size="1.3rem"/> <b>v0.0.37</b></span></td><td>Longhorn · Ceph CSI</td><td>Node-local, no snapshots/replication — right for one node</td></tr>
 </tbody>
 </table>
 

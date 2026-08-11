@@ -32,7 +32,7 @@ one `git clean` from oblivion.
 |---|---|
 | Talos-in-Docker + Cilium | **GO** — pin Talos v1.13.8 (never 1.12.x), raise node memory limits, scripted kind+Cilium fallback |
 | RustFS | **Conditional GO** — pin ≥1.0.0-beta.8, standalone mode; SeaweedFS is the rehearsed Plan B with explicit switch triggers (mid-Aug) |
-| GitOps write path | **In-cluster Gitea** (single-pod SQLite, push-create, seeded by Job); ArgoCD v3.4.x pinned, app-of-apps + sync waves; never point at GitHub |
+| GitOps write path | **In-cluster Gitea** (single-pod SQLite, push-create, seeded by Job); ArgoCD v3.5.x pinned, app-of-apps + sync waves; never point at GitHub |
 | In-cluster builds | Kaniko is dead → **rootless BuildKit** + Zot registry; needs PSA-privileged build namespace on Talos; unrehearsed combo — spike early |
 | Crossplane | **v2** (claims gone; compositions emit CNPG `Cluster` directly) — simpler to teach than v1 ever was |
 | Backstage | Hands-on **is** feasible via CNOE prebuilt image — but heaviest item (~2 GB); last module + presenter fallback |
@@ -71,7 +71,7 @@ attendee laptop
     └── Talos v1.13.8 docker cluster (1 CP + 1 worker, raised memory)
         ├── Cilium 1.18/1.19 (CNI)
         ├── Gitea (single-pod SQLite, seeded from this repo)   ← the "cloud's" git
-        ├── ArgoCD v3.4.x  ── app-of-apps w/ sync waves ──┐
+        ├── ArgoCD v3.5.x  ── app-of-apps w/ sync waves ──┐
         ├── CloudNativePG + demo Postgres                 │ everything below
         ├── RustFS (standalone)                           │ delivered as
         ├── Crossplane v2 + XRD/composition               │ ArgoCD apps from

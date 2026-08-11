@@ -29,7 +29,7 @@ your laptop
     └── Talos v1.13.8 cluster (1 control plane + 1 worker)
         ├── Cilium 1.19 (eBPF CNI)
         ├── Gitea (in-cluster git — this is your cloud's git server)
-        ├── ArgoCD v3.4 ── app-of-apps w/ sync waves ──────┐
+        ├── ArgoCD v3.5 ── app-of-apps w/ sync waves ──────┐
         ├── CloudNativePG + demo Postgres                  │ everything below
         ├── RustFS (S3-compatible object storage)          │ is delivered as
         ├── Crossplane v2 (self-service compositions)      │ ArgoCD apps from
