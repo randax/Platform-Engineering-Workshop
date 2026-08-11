@@ -155,9 +155,15 @@ done
 # installs only what mise.toml lists, so a mismatched `mise x crane@…` would try
 # to download a second crane — at the venue, offline, mid-lab.
 crane_mise="$(mise_pin 'crane')"
-bad_crane="$(git grep -hoE 'crane@[0-9][0-9.]*' -- . 2>/dev/null \
-  | sort -u | grep -v "^crane@${crane_mise}$" || true)"
-if [[ -z "${bad_crane}" ]]; then
+crane_refs="$(grep -rhoE 'crane@[0-9][0-9.]*' \
+  --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' \
+  scripts lab solutions gitops docs .github 2>/dev/null | sort -u || true)"
+bad_crane="$(grep -v "^crane@${crane_mise}$" <<<"${crane_refs}" || true)"
+if [[ -z "${crane_refs}" ]]; then
+  # The refs are what this check exists to police; finding none means the grep
+  # broke, not that the tree is clean.
+  bad "no 'crane@<ver>' reference found anywhere — the crane pin check could not run"
+elif [[ -z "${bad_crane}" ]]; then
   ok "every 'mise x crane@…' matches the mise.toml crane pin (${crane_mise})"
 else
   bad "crane pin drift: mise.toml has ${crane_mise} but the tree also references $(echo "${bad_crane}" | tr '\n' ' ')— dev-setup only installs the mise.toml version, so the others need a download"
