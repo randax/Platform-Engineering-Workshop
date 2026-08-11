@@ -1,4 +1,4 @@
-# Crossplane v2.3.3 + workshop config (module 4: self-service compositions).
+# Crossplane v2.3.4 + workshop config (module 4: self-service compositions).
 # config/ adds the aggregated ClusterRole (CNPG/batch/core) and the pinned
 # patch-and-transform function. The XRD/Composition live in lab 04, not here.
 # ServerSideApply: Crossplane CRDs blow the annotation limit.

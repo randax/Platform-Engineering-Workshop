@@ -92,7 +92,7 @@ in late August before the final pin.
 
 ## 4. CI/CD: Argo Workflows + BuildKit + Zot (if kept in scope)
 
-- Argo Workflows **v4.0.7**; `namespace-install.yaml`; server-side apply required; emissary
+- Argo Workflows **v4.0.8**; `namespace-install.yaml`; server-side apply required; emissary
   executor (unprivileged).
 - **Kaniko was archived June 2025.** The 2026 in-cluster build answer is **rootless BuildKit**
   (v0.31.x): `buildctl-daemonless.sh`, `--oci-worker-no-process-sandbox`, seccomp/AppArmor
@@ -101,13 +101,13 @@ in late August before the final pin.
 - **Talos gotcha:** PSA `baseline` is enforced cluster-wide by default and forbids Unconfined —
   label the build namespace `pod-security.kubernetes.io/enforce=privileged`.
   **No published BuildKit-on-Talos report exists — rehearse early.**
-- Registry: **Zot v2.1.18** (CNCF, single binary, Helm chart). BuildKit pushes with
+- Registry: **Zot v2.1.20** (CNCF, single binary, Helm chart). BuildKit pushes with
   `registry.insecure=true` to the in-cluster service; add `machine.registries` mirror /
   insecureSkipVerify in Talos machine config so nodes can pull back.
 
 ## 5. Platform components
 
-- **Crossplane v2.3.3** (v2 GA Aug 2025; CNCF **graduated** Nov 2025). Teaching deltas:
+- **Crossplane v2.3.4** (v2 GA Aug 2025; CNCF **graduated** Nov 2025). Teaching deltas:
   Claims are gone (namespaced XRs created directly); pipeline-mode compositions only
   (native P&T removed); **compositions emit arbitrary k8s resources directly — official docs
   compose a CloudNativePG `Cluster` as their example**. No provider-kubernetes wrapping.

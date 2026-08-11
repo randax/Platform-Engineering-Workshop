@@ -11,7 +11,6 @@ metadata:
     app.kubernetes.io/instance: kagent
     app.kubernetes.io/version: "0.2.1"
     app.kubernetes.io/managed-by: Helm
-
 ---
 # Source: kagent/templates/controller-serviceaccount.yaml
 apiVersion: v1
@@ -20,13 +19,12 @@ metadata:
   name: kagent-controller
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
-
 ---
 # Source: kagent/templates/postgresql.yaml
 apiVersion: v1
@@ -35,10 +33,10 @@ metadata:
   name: kagent-postgresql
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: database
@@ -50,13 +48,12 @@ metadata:
   name: kagent-ui
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
-
 ---
 # Source: kagent/templates/postgresql-secret.yaml
 apiVersion: v1
@@ -65,17 +62,16 @@ metadata:
   name: kagent-postgresql
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: database
 type: Opaque
 data:
   POSTGRES_PASSWORD: "a2FnZW50"
-
 ---
 # Source: kagent/templates/builtin-prompts-configmap.yaml
 apiVersion: v1
@@ -84,10 +80,10 @@ metadata:
   name: kagent-builtin-prompts
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     kagent.dev/prompt-library: "true"
@@ -197,7 +193,6 @@ data:
        alternative approach, or informing the user.
     4. **Avoid circular delegation**: Do not create circular delegation chains where
        agents repeatedly delegate tasks back to each other without making progress.
-
 ---
 # Source: kagent/templates/controller-configmap.yaml
 apiVersion: v1
@@ -206,10 +201,10 @@ metadata:
   name: kagent-controller
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: controller
@@ -220,11 +215,11 @@ data:
   IMAGE_PULL_POLICY: "IfNotPresent"
   IMAGE_REGISTRY: "ghcr.io"
   IMAGE_REPOSITORY: "kagent-dev/kagent/app"
-  IMAGE_TAG: "0.9.11"
+  IMAGE_TAG: "0.9.12"
   SKILLS_INIT_IMAGE_PULL_POLICY: "IfNotPresent"
   SKILLS_INIT_IMAGE_REGISTRY: "ghcr.io"
   SKILLS_INIT_IMAGE_REPOSITORY: "kagent-dev/kagent/skills-init"
-  SKILLS_INIT_IMAGE_TAG: "0.9.11"
+  SKILLS_INIT_IMAGE_TAG: "0.9.12"
   LEADER_ELECT: "false"
   # OpenTelemetry Configuration
   OTEL_TRACING_ENABLED: "false"
@@ -234,7 +229,6 @@ data:
   WATCH_NAMESPACES: ""
   MCP_EGRESS_PLAINTEXT: "false"
   ZAP_LOG_LEVEL: "info"
-
 ---
 # Source: kagent/templates/ui-nginx-configmap.yaml
 apiVersion: v1
@@ -243,10 +237,10 @@ metadata:
   name: kagent-ui-config
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 data:
@@ -379,8 +373,6 @@ data:
     stderr_logfile_maxbytes=0
     stdout_events_enabled=true
     stderr_events_enabled=true
-    
-
 ---
 # Source: kagent/templates/postgresql.yaml
 apiVersion: v1
@@ -389,10 +381,10 @@ metadata:
   name: kagent-postgresql
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: database
@@ -473,7 +465,6 @@ rules:
     resources:
       - horizontalpodautoscalers
     verbs: ["get", "list", "watch"]
-
 ---
 # Source: kagent/templates/rbac/getter-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -481,10 +472,10 @@ kind: ClusterRole
 metadata:
   name: kagent-getter-role
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 rules:
@@ -597,7 +588,6 @@ rules:
     - get
     - list
     - watch
-
 ---
 # Source: kagent/templates/rbac/writer-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -605,10 +595,10 @@ kind: ClusterRole
 metadata:
   name: kagent-writer-role
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 rules:
@@ -697,7 +687,6 @@ rules:
     - update
     - patch
     - delete
-
 ---
 # Source: kagent/charts/kagent-tools/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -718,7 +707,6 @@ subjects:
 - kind: ServiceAccount
   name: kagent-tools
   namespace: kagent
-
 ---
 # Source: kagent/templates/rbac/getter-rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -726,10 +714,10 @@ kind: ClusterRoleBinding
 metadata:
   name: kagent-getter-rolebinding
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 roleRef:
@@ -740,7 +728,6 @@ subjects:
 - kind: ServiceAccount
   name: kagent-controller
   namespace: kagent
-
 ---
 # Source: kagent/templates/rbac/writer-rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -748,10 +735,10 @@ kind: ClusterRoleBinding
 metadata:
   name: kagent-writer-rolebinding
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 roleRef:
@@ -762,7 +749,6 @@ subjects:
 - kind: ServiceAccount
   name: kagent-controller
   namespace: kagent
-
 ---
 # Source: kagent/charts/kagent-tools/templates/service.yaml
 apiVersion: v1
@@ -809,7 +795,6 @@ spec:
       protocol: TCP
       port: 8085
       targetPort: 8085
- 
 ---
 # Source: kagent/templates/controller-service.yaml
 apiVersion: v1
@@ -818,10 +803,10 @@ metadata:
   name: kagent-controller
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: controller
@@ -836,7 +821,6 @@ spec:
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
     app.kubernetes.io/component: controller
-
 ---
 # Source: kagent/templates/postgresql.yaml
 apiVersion: v1
@@ -845,10 +829,10 @@ metadata:
   name: kagent-postgresql
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: database
@@ -863,7 +847,6 @@ spec:
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
     app.kubernetes.io/component: database
-
 ---
 # Source: kagent/templates/ui-service.yaml
 apiVersion: v1
@@ -872,10 +855,10 @@ metadata:
   name: kagent-ui
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: ui
@@ -890,7 +873,6 @@ spec:
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
     app.kubernetes.io/component: ui
-
 ---
 # Source: kagent/charts/kagent-tools/templates/deployment.yaml
 apiVersion: apps/v1
@@ -990,7 +972,6 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
-
 ---
 # Source: kagent/templates/controller-deployment.yaml
 apiVersion: apps/v1
@@ -999,10 +980,10 @@ metadata:
   name: kagent-controller
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: controller
@@ -1016,8 +997,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/configmap: 3e49a19aa2c8a101503aae39b4ae10cf6a45ed005ccbca5ad020352d3130bbcd
-        checksum/secret: 16da8ae69edc004716b8ebe960ab1d71cc0f444098fdedbecb16a992e9a8029b
+        checksum/configmap: 232032c383adc8de1cbb0cacfa2d099b1d0d7dac0ffeb89d021af6a228fd48b6
+        checksum/secret: 78ff8495bb80971e9637b71d9311217196a435934dc602d985ecac0325fd80ad
       labels:
         app.kubernetes.io/name: kagent
         app.kubernetes.io/instance: kagent
@@ -1030,7 +1011,7 @@ spec:
       serviceAccountName: kagent-controller
       containers:
         - name: controller
-          image: "ghcr.io/kagent-dev/kagent/controller:0.9.11"
+          image: "ghcr.io/kagent-dev/kagent/controller:0.9.12"
           imagePullPolicy: IfNotPresent
           env:
             - name: KAGENT_NAMESPACE
@@ -1085,7 +1066,6 @@ spec:
               path: /health
               port: http
             periodSeconds: 30
-
 ---
 # Source: kagent/templates/postgresql.yaml
 apiVersion: apps/v1
@@ -1094,10 +1074,10 @@ metadata:
   name: kagent-postgresql
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
     app.kubernetes.io/component: database
@@ -1199,10 +1179,10 @@ metadata:
   name: kagent-ui
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 spec:
@@ -1215,7 +1195,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/ui-config: fb31cf50019048c932161e350c62dada417c2e73bd2bfc1bb0ae7b54ad81d0da
+        checksum/ui-config: 9d4915edc54dbe093b919ccc7f9163b6ef0fe93110864732409e73c68a2df68c
       labels:
         app.kubernetes.io/name: kagent
         app.kubernetes.io/instance: kagent
@@ -1244,7 +1224,7 @@ spec:
               drop:
               - ALL
             readOnlyRootFilesystem: true
-          image: "ghcr.io/kagent-dev/kagent/ui:0.9.11"
+          image: "ghcr.io/kagent-dev/kagent/ui:0.9.12"
           imagePullPolicy: IfNotPresent
           env:
             - name: NEXT_PUBLIC_BACKEND_URL
@@ -1301,10 +1281,10 @@ metadata:
   name: k8s-agent
   namespace: kagent
   labels:
-    helm.sh/chart: k8s-agent-0.9.11
+    helm.sh/chart: k8s-agent-0.9.12
     app.kubernetes.io/name: k8s-agent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 spec:
@@ -1456,7 +1436,6 @@ spec:
         requests:
           cpu: 50m
           memory: 128Mi
-
 ---
 # Source: kagent/templates/modelconfig.yaml
 apiVersion: kagent.dev/v1alpha2
@@ -1465,10 +1444,10 @@ metadata:
   name: "default-model-config"
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 spec:
@@ -1478,7 +1457,6 @@ spec:
     host: host.docker.internal:11434
     options:
       num_ctx: "64000"
-
 ---
 # Source: kagent/templates/toolserver-kagent.yaml
 apiVersion: kagent.dev/v1alpha2
@@ -1487,10 +1465,10 @@ metadata:
   name: kagent-tool-server
   namespace: kagent
   labels:
-    helm.sh/chart: kagent-0.9.11
+    helm.sh/chart: kagent-0.9.12
     app.kubernetes.io/name: kagent
     app.kubernetes.io/instance: kagent
-    app.kubernetes.io/version: "0.9.11"
+    app.kubernetes.io/version: "0.9.12"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: kagent
 spec:

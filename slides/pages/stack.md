@@ -81,7 +81,7 @@ ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; 
 <tbody>
 <tr><td>Managed Postgres</td><td><span class="we"><Logo name="cloudnativepg" size="1.3rem"/> <b>CloudNativePG 1.28.4</b></span></td><td>bitnami/stock PG · RDS</td><td>A real control loop (failover, backup) vs. a bare pod — costs CRDs</td></tr>
 <tr><td>Object storage (S3)</td><td><span class="we"><Logo name="rustfs" text="RustFS" size="1.3rem"/> <b>1.0.0-rc.1</b></span></td><td>MinIO</td><td>Apache-2.0, ~90 MB — but young; SeaweedFS is the rehearsed Plan B</td></tr>
-<tr><td>OCI registry</td><td><span class="we"><Logo name="zot" text="Zot" size="1.3rem"/> <b>v2.1.18</b></span></td><td>Harbor · registry:2</td><td>One CNCF binary + UI vs. a Postgres/Redis/Trivy fleet — fewer features</td></tr>
+<tr><td>OCI registry</td><td><span class="we"><Logo name="zot" text="Zot" size="1.3rem"/> <b>v2.1.20</b></span></td><td>Harbor · registry:2</td><td>One CNCF binary + UI vs. a Postgres/Redis/Trivy fleet — fewer features</td></tr>
 <tr><td>Storage class</td><td><span class="we"><Logo name="localpath" text="local-path" size="1.3rem"/> <b>v0.0.37</b></span></td><td>Longhorn · Ceph CSI</td><td>Node-local, no snapshots/replication — right for one node</td></tr>
 </tbody>
 </table>
@@ -109,9 +109,9 @@ RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed clust
 <table>
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
-<tr><td>Self-service API</td><td><span class="we"><Logo name="crossplane" size="1.3rem"/> <b>Crossplane v2.3.3</b></span></td><td>Helm/operators · Crossplane v1</td><td>Namespaced XRs compose real K8s resources — needs per-group RBAC</td></tr>
+<tr><td>Self-service API</td><td><span class="we"><Logo name="crossplane" size="1.3rem"/> <b>Crossplane v2.3.4</b></span></td><td>Helm/operators · Crossplane v1</td><td>Namespaced XRs compose real K8s resources — needs per-group RBAC</td></tr>
 <tr><td>Serverless</td><td><span class="we"><Logo name="knative" size="1.3rem"/> <b>Knative v1.23</b></span></td><td>plain Deployments · KEDA</td><td>Scale-to-zero + request buffering — an activator in the path</td></tr>
-<tr><td>In-cluster CI</td><td><span class="we"><Logo name="argo-workflows" size="1.3rem"/> <b>Argo Workflows v4.0.7 + BuildKit</b></span></td><td>Tekton · external CI</td><td>Rootless image builds, no cloud — needs a PSA-privileged namespace</td></tr>
+<tr><td>In-cluster CI</td><td><span class="we"><Logo name="argo-workflows" size="1.3rem"/> <b>Argo Workflows v4.0.8 + BuildKit</b></span></td><td>Tekton · external CI</td><td>Rootless image builds, no cloud — needs a PSA-privileged namespace</td></tr>
 </tbody>
 </table>
 

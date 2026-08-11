@@ -695,7 +695,6 @@ spec:
     storage: true
     subresources:
       status: {}
-
 ---
 # Source: kagent-crds/templates/kagent.dev_agents.yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -14414,7 +14413,6 @@ spec:
     storage: true
     subresources:
       status: {}
-
 ---
 # Source: kagent-crds/templates/kagent.dev_memories.yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -14573,7 +14571,6 @@ spec:
     storage: true
     subresources:
       status: {}
-
 ---
 # Source: kagent-crds/templates/kagent.dev_modelconfigs.yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -15434,7 +15431,6 @@ spec:
     storage: true
     subresources:
       status: {}
-
 ---
 # Source: kagent-crds/templates/kagent.dev_modelproviderconfigs.yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -15635,7 +15631,6 @@ spec:
     storage: true
     subresources:
       status: {}
-
 ---
 # Source: kagent-crds/templates/kagent.dev_remotemcpservers.yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -15999,7 +15994,6 @@ spec:
     storage: true
     subresources:
       status: {}
-
 ---
 # Source: kagent-crds/templates/kagent.dev_sandboxagents.yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -27420,7 +27414,6 @@ spec:
     storage: true
     subresources:
       status: {}
-
 ---
 # Source: kagent-crds/templates/kagent.dev_toolservers.yaml
 apiVersion: apiextensions.k8s.io/v1

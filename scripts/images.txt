@@ -61,10 +61,10 @@ ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
 # RESEARCH.md §2. 1.0.0-rc.1 needs the log-flood workaround documented in
 # gitops/components/rustfs/VENDOR.md (upstream rustfs/rustfs#5927).
 docker.io/rustfs/rustfs:1.0.0-rc.1
-ghcr.io/project-zot/zot:v2.1.18
+ghcr.io/project-zot/zot:v2.1.20
 
 # --- Wave 2: self-service, serverless, builds
-xpkg.crossplane.io/crossplane/crossplane:v2.3.3
+xpkg.crossplane.io/crossplane/crossplane:v2.3.4
 # Knative Serving v1.23.0 (digest-pinned in the upstream release YAMLs)
 gcr.io/knative-releases/knative.dev/serving/cmd/activator@sha256:e5ab46f3b73fa2e3898fe47f6a3a0c2bd765596f4fb36ceb4c28c35d0a74b2e5
 gcr.io/knative-releases/knative.dev/serving/cmd/autoscaler@sha256:879da127b23db65d862cafa6b23fb987381d0e44150f0027d44e1f5aee83bde2
@@ -86,10 +86,11 @@ gcr.io/knative-releases/knative.dev/eventing/cmd/in_memory/channel_dispatcher@sh
 gcr.io/knative-releases/knative.dev/eventing/cmd/broker/filter@sha256:d7bb470ad790a9460c9a6b526d73a9b87a16ab9b94094745bc59a97507f0f466
 gcr.io/knative-releases/knative.dev/eventing/cmd/broker/ingress@sha256:d5bfc081eb9dccb47eb15f9971f0b3d8a24d0224573315a46d4afd87074b84ab
 gcr.io/knative-releases/knative.dev/eventing/cmd/mtchannel_broker@sha256:e600b78ee63225b3ab905fc3daf1f73772e8756b26ca5ace26fbaf4d81d3f8e5
-# Argo Workflows v4.0.7
-quay.io/argoproj/workflow-controller:v4.0.7
-quay.io/argoproj/argoexec:v4.0.7
-quay.io/argoproj/argocli:v4.0.7
+# Argo Workflows v4.0.8 (argoexec is injected by the controller at pod
+# creation, not an image: field anywhere — offline needs it listed here)
+quay.io/argoproj/workflow-controller:v4.0.8
+quay.io/argoproj/argoexec:v4.0.8
+quay.io/argoproj/argocli:v4.0.8
 # Rootless BuildKit (in-cluster image builds)
 docker.io/moby/buildkit:v0.31.1-rootless
 # NATS 2.12.12 + JetStream — durable messaging (PRD-0001)
@@ -99,17 +100,17 @@ docker.io/library/nats:2.12.12-alpine@sha256:2ca98656a279b2d88cfdf2b8c3f0d5d7f39
 docker.io/natsio/prometheus-nats-exporter:0.17.3@sha256:26c826662ac8424597cc9bdf89ea5b606eb66e3c11db9b1215c27d2076bbb01b
 
 # --- Kagent (day-2 ops agent, module 10)
-ghcr.io/kagent-dev/kagent/controller:0.9.11
+ghcr.io/kagent-dev/kagent/controller:0.9.12
 ghcr.io/kagent-dev/kagent/tools:0.2.1
-ghcr.io/kagent-dev/kagent/ui:0.9.11
+ghcr.io/kagent-dev/kagent/ui:0.9.12
 docker.io/library/postgres:18.3-alpine
 # app + skills-init are controller-created at Agent reconcile; the static scan
 # misses them, but offline needs them. Comments in this file must be FULL-LINE:
 # both checkers read image entries verbatim and only strip full-line comments —
 # the crane-check job (.github/workflows/images-gate.yaml) and
 # scripts/check-consistency.sh.
-ghcr.io/kagent-dev/kagent/app:0.9.11
-ghcr.io/kagent-dev/kagent/skills-init:0.9.11
+ghcr.io/kagent-dev/kagent/app:0.9.12
+ghcr.io/kagent-dev/kagent/skills-init:0.9.12
 
 # --- Observability v2 (Victoria stack, issue #57) — the on-demand observability
 # capability that REPLACED otel-lgtm: metrics + logs + traces + Grafana, fed by

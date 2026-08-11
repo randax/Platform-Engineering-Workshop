@@ -1,4 +1,4 @@
-# Kagent v0.9.11 — day-2 Kubernetes AI agent (module 10).
+# Kagent v0.9.12 — day-2 Kubernetes AI agent (module 10).
 # Minimal profile: k8s-agent only, UI scaled to zero and tool RBAC read-only;
 # the default ModelConfig uses host-side Ollama qwen3:4b.
 # ServerSideApply covers large CRDs; SkipDryRun covers CRs installed with them.

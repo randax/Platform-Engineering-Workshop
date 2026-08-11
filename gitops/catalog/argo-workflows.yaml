@@ -1,4 +1,4 @@
-# Argo Workflows v4.0.7, namespace-install (module S2: in-cluster CI).
+# Argo Workflows v4.0.8, namespace-install (module S2: in-cluster CI).
 # Server/controller in `argo`, workflow pods in the PSA-privileged `builds`
 # namespace (--managed-namespace), incl. the rootless-BuildKit
 # build-and-push WorkflowTemplate. UI: kubectl -n argo port-forward

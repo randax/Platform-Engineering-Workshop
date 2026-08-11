@@ -1,4 +1,4 @@
-# Zot v2.1.18 OCI registry (module S2: in-cluster builds push here).
+# Zot v2.1.20 OCI registry (module S2: in-cluster builds push here).
 # Anonymous read/write (workshop-grade). UI + API on NodePort
 # http://localhost:30500, in-cluster zot.zot.svc.cluster.local:5000.
 #

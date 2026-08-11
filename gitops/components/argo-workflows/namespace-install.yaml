@@ -17381,7 +17381,7 @@ spec:
                           description: |-
                             Image pull policy.
                             One of Always, Never, IfNotPresent.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                             Cannot be updated.
                             More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                           type: string
@@ -18826,7 +18826,7 @@ spec:
                                 description: |-
                                   Image pull policy.
                                   One of Always, Never, IfNotPresent.
-                                  Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                  Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                   Cannot be updated.
                                   More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                                 type: string
@@ -24455,7 +24455,7 @@ spec:
                             description: |-
                               Image pull policy.
                               One of Always, Never, IfNotPresent.
-                              Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                              Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                               Cannot be updated.
                               More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                             type: string
@@ -29762,7 +29762,7 @@ spec:
                           description: |-
                             Image pull policy.
                             One of Always, Never, IfNotPresent.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                             Cannot be updated.
                             More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                           type: string
@@ -31440,7 +31440,7 @@ spec:
                             description: |-
                               Image pull policy.
                               One of Always, Never, IfNotPresent.
-                              Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                              Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                               Cannot be updated.
                               More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                             type: string
@@ -36525,7 +36525,7 @@ spec:
                                   Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
                                   Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
                                   IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
-                                  Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                  Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                 type: string
                               reference:
                                 description: |-
@@ -38858,7 +38858,7 @@ spec:
                             Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
                             Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
                             IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                           type: string
                         reference:
                           description: |-
@@ -57318,7 +57318,7 @@ spec:
                               description: |-
                                 Image pull policy.
                                 One of Always, Never, IfNotPresent.
-                                Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                 Cannot be updated.
                                 More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                               type: string
@@ -58768,7 +58768,7 @@ spec:
                                     description: |-
                                       Image pull policy.
                                       One of Always, Never, IfNotPresent.
-                                      Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                      Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                       Cannot be updated.
                                       More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                                     type: string
@@ -64593,7 +64593,7 @@ spec:
                                 description: |-
                                   Image pull policy.
                                   One of Always, Never, IfNotPresent.
-                                  Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                  Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                   Cannot be updated.
                                   More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                                 type: string
@@ -70036,7 +70036,7 @@ spec:
                               description: |-
                                 Image pull policy.
                                 One of Always, Never, IfNotPresent.
-                                Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                 Cannot be updated.
                                 More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                               type: string
@@ -71723,7 +71723,7 @@ spec:
                                 description: |-
                                   Image pull policy.
                                   One of Always, Never, IfNotPresent.
-                                  Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                  Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                   Cannot be updated.
                                   More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                                 type: string
@@ -76902,7 +76902,7 @@ spec:
                                       Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
                                       Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
                                       IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
-                                      Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                      Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                     type: string
                                   reference:
                                     description: |-
@@ -79257,7 +79257,7 @@ spec:
                                 Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
                                 Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
                                 IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
-                                Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                               type: string
                             reference:
                               description: |-
@@ -100102,7 +100102,7 @@ spec:
                           description: |-
                             Image pull policy.
                             One of Always, Never, IfNotPresent.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                             Cannot be updated.
                             More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                           type: string
@@ -101547,7 +101547,7 @@ spec:
                                 description: |-
                                   Image pull policy.
                                   One of Always, Never, IfNotPresent.
-                                  Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                  Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                   Cannot be updated.
                                   More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                                 type: string
@@ -107176,7 +107176,7 @@ spec:
                             description: |-
                               Image pull policy.
                               One of Always, Never, IfNotPresent.
-                              Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                              Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                               Cannot be updated.
                               More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                             type: string
@@ -112483,7 +112483,7 @@ spec:
                           description: |-
                             Image pull policy.
                             One of Always, Never, IfNotPresent.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                             Cannot be updated.
                             More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                           type: string
@@ -114161,7 +114161,7 @@ spec:
                             description: |-
                               Image pull policy.
                               One of Always, Never, IfNotPresent.
-                              Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                              Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                               Cannot be updated.
                               More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                             type: string
@@ -119246,7 +119246,7 @@ spec:
                                   Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
                                   Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
                                   IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
-                                  Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                  Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                 type: string
                               reference:
                                 description: |-
@@ -121579,7 +121579,7 @@ spec:
                             Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
                             Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
                             IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                           type: string
                         reference:
                           description: |-
@@ -156514,7 +156514,7 @@ spec:
                           description: |-
                             Image pull policy.
                             One of Always, Never, IfNotPresent.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                             Cannot be updated.
                             More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                           type: string
@@ -157959,7 +157959,7 @@ spec:
                                 description: |-
                                   Image pull policy.
                                   One of Always, Never, IfNotPresent.
-                                  Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                  Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                   Cannot be updated.
                                   More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                                 type: string
@@ -163588,7 +163588,7 @@ spec:
                             description: |-
                               Image pull policy.
                               One of Always, Never, IfNotPresent.
-                              Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                              Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                               Cannot be updated.
                               More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                             type: string
@@ -168895,7 +168895,7 @@ spec:
                           description: |-
                             Image pull policy.
                             One of Always, Never, IfNotPresent.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                             Cannot be updated.
                             More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                           type: string
@@ -170573,7 +170573,7 @@ spec:
                             description: |-
                               Image pull policy.
                               One of Always, Never, IfNotPresent.
-                              Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                              Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                               Cannot be updated.
                               More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
                             type: string
@@ -175658,7 +175658,7 @@ spec:
                                   Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
                                   Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
                                   IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
-                                  Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                                  Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                                 type: string
                               reference:
                                 description: |-
@@ -177991,7 +177991,7 @@ spec:
                             Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
                             Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
                             IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
-                            Defaults to Always if :v4.0.7 tag is specified, or IfNotPresent otherwise.
+                            Defaults to Always if :v4.0.8 tag is specified, or IfNotPresent otherwise.
                           type: string
                         reference:
                           description: |-
@@ -179165,7 +179165,7 @@ spec:
         - --auth-mode
         - server
         env: []
-        image: quay.io/argoproj/argocli:v4.0.7
+        image: quay.io/argoproj/argocli:v4.0.8
         name: argo-server
         ports:
         - containerPort: 2746
@@ -179230,7 +179230,7 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.name
-        image: quay.io/argoproj/workflow-controller:v4.0.7
+        image: quay.io/argoproj/workflow-controller:v4.0.8
         livenessProbe:
           failureThreshold: 3
           httpGet:

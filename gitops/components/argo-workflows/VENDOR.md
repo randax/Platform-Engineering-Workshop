@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | Source | https://github.com/argoproj/argo-workflows |
-| Version | **v4.0.7** (latest, 2026-07-07; verified 2026-07-13) |
+| Version | **v4.0.8** (latest, 2026-07-22; verified 2026-08-11) |
 | Files | `namespace-install.yaml` (patched), `builds.yaml`, `workflowtemplate-build-and-push.yaml` (workshop additions) |
 
 ## Re-vendor
 
 ```sh
 curl -sL -o namespace-install.yaml \
-  https://github.com/argoproj/argo-workflows/releases/download/v4.0.7/namespace-install.yaml
+  https://github.com/argoproj/argo-workflows/releases/download/v4.0.8/namespace-install.yaml
 ```
 
 ## Workshop curation applied (re-apply after re-vendoring)
@@ -52,7 +52,14 @@ apply), so with Dockerfiles whose FROM points at Zot the whole build is
 in-cluster and offline-safe.
 
 Images used:
-- `quay.io/argoproj/workflow-controller:v4.0.7`
-- `quay.io/argoproj/argocli:v4.0.7`
-- `quay.io/argoproj/argoexec:v4.0.7` (executor — referenced by the controller at runtime, MUST be pre-pulled)
+- `quay.io/argoproj/workflow-controller:v4.0.8`
+  (`sha256:7a156419f80285859fc8f859927b6cc249f0d128e161e080dc17fca8fcbbceb6`)
+- `quay.io/argoproj/argocli:v4.0.8`
+  (`sha256:83e93aa9149a51da998c1df4abea7ae2c504e0b0a5892052dc092740f68323e8`)
+- `quay.io/argoproj/argoexec:v4.0.8`
+  (`sha256:86a965d7eea176959351156e24f3a2fa8d8e342e477ef425009af95a12e3fe87`) —
+  executor, referenced by the controller at runtime, MUST be pre-pulled
+
+All three are linux/amd64 + linux/arm64 (digests and platforms verified with
+crane 2026-08-11; `argoexec` additionally ships windows/amd64, unused here).
 - `docker.io/moby/buildkit:v0.31.1-rootless`

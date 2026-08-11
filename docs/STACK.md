@@ -22,11 +22,11 @@ these picks flip — reading the tradeoff is the transferable skill, not memoris
 | GitOps engine | **ArgoCD** v3.5.0, app-of-apps | Flux · manual kubectl | Drift detection + self-heal; app-of-apps is the one-cluster shape; plain `install.yaml` teaches better than Helm. |
 | Managed Postgres | **CloudNativePG** 1.28.4 (PG 18.4) | bitnami/stock Postgres · cloud RDS | A real control loop (primary+replica, failover, backup) — the operator *is* the "managed" service. |
 | Object storage (S3) | **RustFS** 1.0.0-rc.1 | MinIO | Apache-2.0, single ~90 MB Rust binary; MinIO's community edition was discontinued for proprietary AIStor. SeaweedFS is Plan B. |
-| OCI registry | **Zot** v2.1.18 | Harbor · Docker registry:2 | One CNCF-native binary with search + UI; Harbor is a Postgres/Redis/Trivy/ChartMuseum fleet. |
+| OCI registry | **Zot** v2.1.20 | Harbor · Docker registry:2 | One CNCF-native binary with search + UI; Harbor is a Postgres/Redis/Trivy/ChartMuseum fleet. |
 | Storage class | **local-path-provisioner** v0.0.37 | Longhorn · Ceph/Rook CSI | Node-local hostPath, one Deployment — no replication/snapshots needed for one node. |
-| Self-service API | **Crossplane** v2.3.3 | Helm/operators · Crossplane v1 | Namespaced XRs (no Claims) compose arbitrary K8s resources directly — one YAML → whole stack. |
+| Self-service API | **Crossplane** v2.3.4 | Helm/operators · Crossplane v1 | Namespaced XRs (no Claims) compose arbitrary K8s resources directly — one YAML → whole stack. |
 | Serverless | **Knative** Serving v1.23.0 + Eventing v1.23.0 (Kourier) | plain Deployments · KEDA | Scale-to-zero with request buffering + CloudEvents broker/trigger; it's what Cloud Run is built on. |
-| In-cluster CI | **Argo Workflows** v4.0.7 + **BuildKit** v0.31.1 | Tekton · external/cloud CI | Rootless in-cluster image builds → your own Zot, no cloud minutes; Kaniko was archived June 2025. |
+| In-cluster CI | **Argo Workflows** v4.0.8 + **BuildKit** v0.31.1 | Tekton · external/cloud CI | Rootless in-cluster image builds → your own Zot, no cloud minutes; Kaniko was archived June 2025. |
 | Durable messaging | **NATS** 2.12.12 + JetStream | Kafka · RabbitMQ | The durable streaming primitive in ~15 MB of Go vs. GBs of JVM/Erlang + coordination. |
 | Metrics store | **VictoriaMetrics** 1.147.0 | Prometheus | PromQL-compatible, columnar TSDB + `vmrange` histograms — far less RAM for the same series. |
 | Log store | **VictoriaLogs** 1.52.0 | Loki | LogsQL via its own native Grafana plugin, single node, minimal RAM. |

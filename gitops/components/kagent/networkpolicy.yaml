@@ -1,5 +1,5 @@
 ---
-# The kagent controller ships with AUTH_MODE=unsecure (upstream 0.9.11 default:
+# The kagent controller ships with AUTH_MODE=unsecure (upstream 0.9.12 default:
 # identity is a bare X-User-ID header, no authentication). The workshop posture
 # is documented in VENDOR.md: the Cloudbox Console is the ONLY intended caller.
 # This policy makes that intent enforceable — controller ingress is allowed

@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Source chart | `crossplane` **2.3.3** from https://charts.crossplane.io/stable |
-| Core image | `xpkg.crossplane.io/crossplane/crossplane:v2.3.3` (chart default; xpkg.crossplane.io fronts GHCR — both `xpkg.crossplane.io/crossplane/crossplane:v2.3.3` and `ghcr.io/crossplane/crossplane:v2.3.3` verified 2026-07-13) |
+| Source chart | `crossplane` **2.3.4** from https://charts.crossplane.io/stable |
+| Core image | `xpkg.crossplane.io/crossplane/crossplane:v2.3.4` — `sha256:cea30c75198e8cee8e9a4fcb003b158750d345ca91831876de38989c11cbf94c`, linux/amd64 + linux/arm64 verified 2026-08-11 (chart default; xpkg.crossplane.io fronts GHCR — `ghcr.io/crossplane/crossplane:v2.3.4` resolves to the same digest, verified 2026-08-11) |
 | Files | `crossplane.yaml` (rendered) + `config/rbac.yaml`, `config/functions.yaml` (workshop additions) |
 
 ## Re-vendor
@@ -24,7 +24,7 @@ resourcesRBACManager:
   limits:
     memory: 256Mi
 VALUES
-helm template crossplane crossplane-stable/crossplane --version 2.3.3 \
+helm template crossplane crossplane-stable/crossplane --version 2.3.4 \
   --namespace crossplane-system --no-hooks -f /tmp/crossplane-values.yaml > crossplane.yaml
 ```
 
