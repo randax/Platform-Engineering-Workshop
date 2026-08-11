@@ -1,7 +1,7 @@
 # Workshop addition: in-cluster image build with rootless BuildKit, pushed to
 # the in-cluster Zot registry. This modernizes the official Argo Workflows
 # buildkit-template example (which predates Kaniko's death and PSA):
-#   - moby/buildkit v0.31.1-rootless instead of v0.9.x
+#   - moby/buildkit v0.32.2-rootless instead of v0.9.x
 #   - explicit seccomp/AppArmor Unconfined securityContext (required because
 #     rootless BuildKit needs to create user+mount namespaces; that is also
 #     why the `builds` namespace is PSA-privileged — see builds.yaml)
@@ -88,7 +88,7 @@ spec:
               revision: "{{inputs.parameters.branch}}"
               depth: 1
       container:
-        image: docker.io/moby/buildkit:v0.31.1-rootless
+        image: docker.io/moby/buildkit:v0.32.2-rootless
         workingDir: /src/{{inputs.parameters.path}}
         command:
           - buildctl-daemonless.sh

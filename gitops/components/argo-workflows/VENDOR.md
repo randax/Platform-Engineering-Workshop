@@ -40,7 +40,7 @@ executor Role (`workflowtaskresults` create/patch) for the `default` SA.
 
 `workflowtemplate-build-and-push.yaml` modernizes the official
 buildkit-template example: git input artifact from the in-cluster Gitea →
-`moby/buildkit:v0.31.1-rootless` (tag verified on Docker Hub 2026-07-13,
+`moby/buildkit:v0.32.2-rootless` (tag verified on Docker Hub 2026-08-11,
 multi-arch) → anonymous push to Zot with `registry.insecure=true`. It also
 ships a `buildkitd-config` ConfigMap (`builds` namespace) marking
 `zot.zot.svc.cluster.local:5000` as plain-HTTP, mounted at
@@ -60,6 +60,9 @@ Images used:
   (`sha256:86a965d7eea176959351156e24f3a2fa8d8e342e477ef425009af95a12e3fe87`) —
   executor, referenced by the controller at runtime, MUST be pre-pulled
 
-All three are linux/amd64 + linux/arm64 (digests and platforms verified with
-crane 2026-08-11; `argoexec` additionally ships windows/amd64, unused here).
-- `docker.io/moby/buildkit:v0.31.1-rootless`
+The three Argo images above are linux/amd64 + linux/arm64 (digests and
+platforms verified with crane 2026-08-11; `argoexec` additionally ships
+windows/amd64, unused here).
+- `docker.io/moby/buildkit:v0.32.2-rootless` — pinned by tag, not digest: it is
+  an OCI image index carrying linux/amd64 + arm64 (+ arm/v7, ppc64le, riscv64,
+  s390x), verified with crane 2026-08-11

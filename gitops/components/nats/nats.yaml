@@ -1,5 +1,5 @@
 ---
-# NATS 2.12.12 + JetStream — single-node durable messaging (PRD-0001).
+# NATS 2.14.4 + JetStream — single-node durable messaging (PRD-0001).
 # Client :4222 (NodePort 30422), monitoring :8222. JetStream persists to a PVC
 # so the "kill the pod, watch the stream replay" demo actually survives a restart.
 apiVersion: v1
@@ -72,7 +72,7 @@ metadata:
   labels:
     app.kubernetes.io/name: nats
     app.kubernetes.io/instance: nats
-    app.kubernetes.io/version: "2.12.12"
+    app.kubernetes.io/version: "2.14.4"
 spec:
   replicas: 1
   # Recreate (not RollingUpdate): the JetStream PVC is RWO, so a second pod
@@ -108,7 +108,7 @@ spec:
       # gid on mount, so JetStream can create its store under /data directly.
       containers:
         - name: nats
-          image: "nats:2.12.12-alpine@sha256:2ca98656a279b2d88cfdf2b8c3f0d5d7f3941ae9dc2ab12ebaa92d83e0f4ccdb"
+          image: "nats:2.14.4-alpine@sha256:f2123f533c2b0cada0a5c5ec434fb2b8cfe1cf220215ef9d7517e1372917ad66"
           imagePullPolicy: IfNotPresent
           args: ["--config", "/etc/nats/nats.conf"]
           securityContext:
@@ -160,7 +160,7 @@ spec:
         # connection gauges (gnatsd_varz_*). Digest-pinned (see scripts/images.txt);
         # the rehearsal verifies the exact metric names land in VM.
         - name: metrics
-          image: "docker.io/natsio/prometheus-nats-exporter:0.17.3@sha256:26c826662ac8424597cc9bdf89ea5b606eb66e3c11db9b1215c27d2076bbb01b"
+          image: "docker.io/natsio/prometheus-nats-exporter:0.20.1@sha256:4fbf6dacb84780a45a1c3af9b1080c69451a288d20902deae671b80717bb8f61"
           imagePullPolicy: IfNotPresent
           args: [ "-varz", "-connz", "-jsz=all", "-port", "7777", "http://localhost:8222" ]
           securityContext:

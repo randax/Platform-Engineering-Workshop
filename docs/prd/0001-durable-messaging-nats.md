@@ -32,7 +32,8 @@ durable stream and its state visible — messaging you can *inspect*.
 
 ## Design
 
-**Component:** single-node **NATS 2.11/2.12 + JetStream**, official Helm chart,
+**Component:** single-node **NATS 2.14 + JetStream**, hand-written manifests (the official
+Helm chart was rejected — see `gitops/components/nats/VENDOR.md`),
 one Deployment, no external deps. Vendor the rendered manifests into
 `gitops/components/nats/` and add a `gitops/catalog/nats.yaml` Application
 (same pattern as every other capability). Cap it at ~256 MiB.

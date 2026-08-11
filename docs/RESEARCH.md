@@ -95,7 +95,7 @@ in late August before the final pin.
 - Argo Workflows **v4.0.8**; `namespace-install.yaml`; server-side apply required; emissary
   executor (unprivileged).
 - **Kaniko was archived June 2025.** The 2026 in-cluster build answer is **rootless BuildKit**
-  (v0.31.x): `buildctl-daemonless.sh`, `--oci-worker-no-process-sandbox`, seccomp/AppArmor
+  (v0.32.x): `buildctl-daemonless.sh`, `--oci-worker-no-process-sandbox`, seccomp/AppArmor
   Unconfined, runAsUser 1000. Modernize the official
   [buildkit-template example](https://github.com/argoproj/argo-workflows/blob/main/examples/buildkit-template.yaml).
 - **Talos gotcha:** PSA `baseline` is enforced cluster-wide by default and forbids Unconfined —
