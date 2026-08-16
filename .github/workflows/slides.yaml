@@ -1,5 +1,12 @@
 # =============================================================================
-# Deploy the Slidev deck to GitHub Pages on every slides/ change on main.
+# Slidev deck: build on every slides/ PR, deploy to Pages on main.
+#
+# The PR build is not decoration. ci.yaml deliberately prunes ./slides (it
+# lints shell and validates k8s YAML), and this workflow used to run on pushes
+# to main only — so a slides dependency bump could go green on all checks
+# without the deck ever being compiled, and only break after merging. A major
+# @hono/node-server bump (#185) is what exposed that.
+#
 # Base path is derived from the repo name, so repo renames are a non-event.
 # Pages source must be set to "GitHub Actions" (Settings -> Pages) once.
 # =============================================================================
@@ -9,20 +16,27 @@ on:
   push:
     branches: [main]
     paths: ['slides/**', '.github/workflows/slides.yaml']
+  pull_request:
+    paths: ['slides/**', '.github/workflows/slides.yaml']
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: slides-pages
-  cancel-in-progress: true
+  # PRs cancel their own superseded runs; the Pages deploy must not be cancelled
+  # mid-flight, so main gets its own stable group.
+  group: slides-${{ github.event.pull_request.number || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pages artifact upload needs id-token; harmless on PR runs, which skip it.
+      pages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -35,14 +49,22 @@ jobs:
         run: |
           npm ci
           npx slidev build --base "/${{ github.event.repository.name }}/"
+
+      # Publishing steps are skipped on PRs — the build above IS the PR gate.
       - uses: actions/configure-pages@v6
+        if: github.event_name != 'pull_request'
       - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
         with:
           path: slides/dist
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
