@@ -18,16 +18,29 @@ extra-file — its version is prose, kept honest by review.
 
 ## Design decisions recorded here
 
+- **This component ships its own `Namespace portal`** plus the ServiceAccount,
+  ClusterRole, ClusterRoleBinding, Deployment and Service — everything the
+  console needs except the `demo` Role below. (The catalog Application also
+  sets `CreateNamespace=true`, a harmless overlap.)
 - **RBAC is least-privilege by design** (teaching contrast with the
-  Backstage demo's read-all ClusterRole): a ClusterRole reading only
+  Backstage demo's read-all ClusterRole): one ClusterRole `portal-read`,
+  `get/list/watch` only, over exactly the surfaces the console renders —
   `applications.argoproj.io`, `clusters.postgresql.cnpg.io`,
-  `services.serving.knative.dev`, `pods`, `namespaces`.
+  `services.serving.knative.dev`, core `pods`/`namespaces`/`nodes`/`events`,
+  and `apps` `deployments`/`statefulsets`/`daemonsets`. The last three groups
+  are easy to miss and each one is a page: `nodes` + `events` back the cluster
+  inventory and the event feed, `apps/*` backs the `/components` status page
+  and the `/workshop` checklist — drop them and those pages render "forbidden"
+  instead of state.
 - **This component ships NO resources in the `demo` namespace.** XR
   self-service (the Databases page: create/get/list/delete on
   `workshopdatabases.platform.cloudbox.io`, the Crossplane v2 namespaced XR
-  from `lab/04-self-service/platform/xrd.yaml`) requires the module-08 Role
-  in `gitops/components/demo/`, which ships alongside the `demo` namespace
-  itself. Shipping that Role from here would deadlock a mass sync: portal
+  from `lab/04-self-service/platform/xrd.yaml`) requires the module-08 Role —
+  `lab/08-portal/portal-access.yaml`, which the attendee copies into
+  `gitops/components/demo/` **in their own platform repo** (canonical copy:
+  `solutions/module-08/components/demo/portal-access.yaml`). It ships
+  alongside the `demo` namespace itself. Shipping that Role from here would
+  deadlock a mass sync: portal
   syncs at wave 3, the namespace arrives later, the dry-run fails on the
   missing namespace and the health gate blocks every later wave. Module 08
   teaches pushing the Role as a one-file change; until it lands, the
@@ -40,7 +53,27 @@ extra-file — its version is prose, kept honest by review.
 - **Service NodePort 30600** (`http://localhost:30600`), container port
   8080, `/healthz` readiness+liveness — port and health path are the
   contract with `apps/portal` (Knative-style `$PORT=8080` default).
+- **Two S3 endpoints, and they are not interchangeable.**
+  `S3_ENDPOINT=http://rustfs-svc.rustfs.svc.cluster.local:9000` is what the
+  *pod* talks to; `S3_PUBLIC_ENDPOINT=localhost:30900` is the host the
+  *browser* must see, because gallery images are served through presigned URLs
+  that the browser fetches directly. It must track `NODEPORT_RUSTFS_S3` in
+  `scripts/versions.env` — set it to the in-cluster Service and every gallery
+  thumbnail 404s in the attendee's browser while working fine from inside the
+  cluster.
+- **`GRAFANA_URL=http://localhost:30030`** — browser-facing, matches
+  `NODEPORT_GRAFANA` and the `grafana` component's NodePort. Source of the
+  console's Explore deep-links (which also depend on the datasource uids —
+  see `../grafana/VENDOR.md`).
+- **`GITEA_USER=gitea_admin` / `GITEA_PASSWORD=cloudbox123`** — the scaffold
+  bridge (PRD-0012): the console calls Gitea's *generate* API to create a
+  tenant repo from a template. Workshop-grade and committed like the S3 creds;
+  must match the `gitea_admin` credentials in `scripts/versions.env` /
+  `bootstrap-gitops.sh`. Degrades gracefully: with `GITEA_USER` unset the
+  "start from a template" option is simply not offered.
 - S3 credentials `cloudbox`/`cloudbox123` are workshop-grade on purpose
   (ephemeral lab sandbox) and must match the rustfs component. The
-  `images` bucket is created by picture-pipeline's setup Job.
+  `images` bucket (`S3_BUCKET=images`) is created by picture-pipeline's setup
+  Job — until that component is enabled the gallery is empty but the page
+  still loads.
 - Requests 50m/64Mi, limit 128Mi — small Go binary, small cluster.
