@@ -57,7 +57,9 @@ Two collectors, split by what each signal needs:
     exist, so they are load-bearing for CI as well as for the capstone.
   - Exports: traces → VTraces, metrics → VM, logs → VLogs.
 
-Both export over plain HTTP (`otlphttp`, explicit full `*_endpoint` paths) to
+Both export over plain HTTP through three separately-named exporters —
+`otlphttp/traces`, `otlphttp/metrics` and `otlphttp/logs`, one per Victoria
+backend, because each needs its own explicit full `*_endpoint` path — to
 `victoria-metrics:8428/opentelemetry/v1/metrics` and
 `victoria-logs:9428/insert/opentelemetry/v1/logs`. `VL-Stream-Fields` tells
 VictoriaLogs which resource attributes partition the streams (its Loki-label
@@ -119,7 +121,18 @@ equivalent).
   first-party apps are configured against.
 - **RBAC is read-only** — one ServiceAccount shared by both collectors; the
   ClusterRole is the union of what k8s_cluster / kubeletstats / prometheus-SD
-  need, all `get/list/watch`. The collector observes; it never mutates.
+  need, all `get/list/watch`. The collector observes; it never mutates. The
+  grant, written out because widening it is a privilege decision — core:
+  `events`, `namespaces`, `namespaces/status`, `nodes`, `nodes/spec`,
+  `nodes/stats`, `nodes/proxy`, `pods`, `pods/status`,
+  `replicationcontrollers`, `replicationcontrollers/status`, `resourcequotas`,
+  `services`, `endpoints`; apps: `daemonsets`, `deployments`, `replicasets`,
+  `statefulsets`; batch: `jobs`, `cronjobs`; autoscaling:
+  `horizontalpodautoscalers`.
+- **`checksum/config` pod annotations** (`stage2-v1` on the agent,
+  `stage2-v3` on the gateway) — bumped by hand whenever the collector config
+  changes, so ArgoCD's sync actually restarts the pods instead of leaving them
+  on the old config (a plain ConfigMap edit does not roll a Deployment).
 - **`memory_limiter` on both** — sheds load before the container hits its memory
   limit (the module-09 RAM ceiling), rather than getting OOM-killed.
 - **`start_at: end` on filelog** — only new lines from boot, so no history replay
@@ -130,10 +143,14 @@ equivalent).
   caps dropped, seccomp).
 - **PodSecurity**: the agent's hostPath log mount is forbidden under PSA
   `baseline` (Talos's default for non-system namespaces), so `namespace.yaml`
-  labels the observability namespace `privileged` — the standard treatment for
-  a log-collector DaemonSet (fluent-bit/vector/promtail need the same). The
-  Namespace carries `Prune=false` since observability is shared with the
-  Victoria backends.
+  labels the observability namespace `privileged` on all three PSA modes —
+  `pod-security.kubernetes.io/enforce`, `pod-security.kubernetes.io/audit` and
+  `pod-security.kubernetes.io/warn` — the standard treatment for a
+  log-collector DaemonSet (fluent-bit/vector/promtail need the same); labelling
+  only `enforce` would leave the audit log and `kubectl` full of warnings about
+  a pod we deliberately allow. The Namespace carries
+  `argocd.argoproj.io/sync-options: Prune=false` since observability is shared
+  with the Victoria backends.
 - **Replaced otel-lgtm**: the apps + the Victoria stack now route all telemetry
   through this collector; the single otel-lgtm pod is gone (#57).
 - **We keep the legacy component IDs on purpose.** Upstream is renaming component

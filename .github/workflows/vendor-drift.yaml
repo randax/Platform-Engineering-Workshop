@@ -1,0 +1,54 @@
+# =============================================================================
+# VENDOR.md re-render gate — guard 1 of scripts/check-vendor-drift.sh.
+#
+# Re-renders every vendored manifest from the recipe its VENDOR.md documents
+# and fails on any diff hunk that is not in that file's curation allowlist.
+# Needs the network and the pinned helm, so it cannot live in ci.yaml's offline
+# `consistency` job — guard 2 (the offline token lint) runs there instead.
+#
+# Same cadence as images-gate.yaml, for the same reason: the answer changes
+# when UPSTREAM moves, not only when we push. A chart that is re-tagged, or a
+# release asset that is rewritten in place, turns this red on the Monday after
+# it happens rather than during a bump three weeks later.
+# =============================================================================
+name: VENDOR.md drift
+
+on:
+  pull_request:
+    paths:
+      - 'gitops/components/**'
+      - 'scripts/check-vendor-drift.sh'
+      - '.github/workflows/vendor-drift.yaml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'gitops/components/**'
+      - 'scripts/check-vendor-drift.sh'
+  schedule:
+    - cron: "17 5 * * 1"   # weekly, Monday 05:17 UTC (after the image gate)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  re-render:
+    name: Vendored manifests still reproduce upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install helm (pinned via mise)
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" sh
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          echo "${HOME}/.local/share/mise/shims" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/mise" trust && "${HOME}/.local/bin/mise" install helm
+
+      - name: Re-render + curation allowlist
+        # Guard 1 only: guard 2 already ran offline in ci.yaml on this commit,
+        # and running it twice would just double the failure noise.
+        run: ./scripts/check-vendor-drift.sh --render-only

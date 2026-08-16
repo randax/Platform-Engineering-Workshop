@@ -8,33 +8,56 @@
 
 ## Re-vendor
 
-```sh
-helm repo add crossplane-stable https://charts.crossplane.io/stable && helm repo update
-cat > /tmp/crossplane-values.yaml <<'VALUES'
-resourcesCrossplane:
-  requests:
-    cpu: 100m
-    memory: 256Mi
-  limits:
-    memory: 1Gi
-resourcesRBACManager:
-  requests:
-    cpu: 50m
-    memory: 128Mi
-  limits:
-    memory: 256Mi
-VALUES
-helm template crossplane crossplane-stable/crossplane --version 2.3.4 \
-  --namespace crossplane-system --no-hooks -f /tmp/crossplane-values.yaml > crossplane.yaml
+The recipe lives **once**, in the `curation` block further down this file —
+`scripts/check-vendor-drift.sh` runs it, so it cannot rot into a stale copy of
+itself. Re-vendoring is: reproduce the file with that recipe, re-apply the
+curation below, then `./scripts/check-vendor-drift.sh --only crossplane`.
+
+### The re-render gate
+
+`scripts/check-vendor-drift.sh` re-runs the `helm template` below — values and
+all — and diffs the result against `crossplane.yaml`. All of this component's
+curation is *in the values*, so the render has no post-hoc edits; the single
+`allow` line is inert helm-4 whitespace (the file was rendered with helm 3, and
+helm 4 lays out blank lines differently). Any other hunk means the chart changed
+under a value we set, or someone hand-edited the rendered file.
+
+```curation
+render crossplane.yaml
+chart     crossplane
+repo      https://charts.crossplane.io/stable
+version   2.3.4
+release   crossplane
+namespace crossplane-system
+flags     --no-hooks
+values
+  resourcesCrossplane:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  resourcesRBACManager:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# --- accepted curation: one line per diff hunk (id, then why) ---
+allow  crossplane.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm 4.2.3
 ```
 
 ## Workshop additions (`config/`, picked up via `directory.recurse: true`)
 
 - `rbac.yaml` — aggregated ClusterRole (label
   `rbac.crossplane.io/aggregate-to-crossplane: "true"`) granting Crossplane
-  rights over `postgresql.cnpg.io`, `batch` and the core resources lab 04's
-  composition emits. Crossplane v2 composes arbitrary k8s resources directly
-  and needs explicit RBAC per third-party API group.
+  rights over `postgresql.cnpg.io` (`*`), `batch` (`jobs`, `cronjobs`) and the
+  core resources lab 04's composition emits — `configmaps`, `secrets`,
+  `services`, `serviceaccounts`, `persistentvolumeclaims`. Crossplane v2
+  composes arbitrary k8s resources directly and needs explicit RBAC per
+  third-party API group; widening this list is a privilege decision, so it is
+  written out here rather than left to the YAML.
 - `functions.yaml` — pinned Function package
   `ghcr.io/crossplane-contrib/function-patch-and-transform:v0.10.7`
   (latest, 2026-06-05; manifest verified on GHCR 2026-07-13).

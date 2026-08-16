@@ -7,6 +7,17 @@
 | Source | Official image, https://hub.docker.com/r/grafana/grafana · docs https://grafana.com/docs/grafana/latest/ |
 | Files | `grafana.yaml` (ConfigMap + Service + Deployment), `service-nodeport.yaml` (workshop addition) |
 
+Deployed image (first-party, built from `apps/grafana`):
+
+<!-- x-release-please-start-version -->
+```
+ghcr.io/randax/cloudbox-grafana:v0.2.0
+```
+<!-- x-release-please-end-version -->
+
+release-please rewrites that block (an `extra-files` entry in
+`release-please-config.json`), so it cannot fall behind `grafana.yaml`.
+
 ## Why not the Helm chart
 
 The `grafana/grafana` chart brings a StatefulSet-or-Deployment toggle, a
@@ -57,11 +68,14 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
 - **`jsonData.httpMethod: POST` on VictoriaMetrics** — long MetricsQL queries
   (the Console's deep-links carry the full query in the URL) exceed what a GET
   querystring handles comfortably.
-- **Anonymous read access** (`GF_AUTH_ANONYMOUS_ENABLED=true`, org role
-  `Viewer`) — the workshop Grafana is open, workshop-grade on purpose. The
-  login form is left available so an admin (default `admin`/`admin`, ephemeral
-  lab) can still edit. Sign-up disabled; analytics/update checks disabled so
-  nothing phones home at boot (offline rule); `GF_INSTALL_PLUGINS=""` **and**
+- **Anonymous read access** (`GF_AUTH_ANONYMOUS_ENABLED=true`,
+  `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`) — the workshop Grafana is open,
+  workshop-grade on purpose. The login form is left available so an admin
+  (default `admin`/`admin`, ephemeral lab) can still edit. Sign-up disabled
+  (`GF_USERS_ALLOW_SIGN_UP=false`); analytics and update checks disabled
+  (`GF_ANALYTICS_REPORTING_ENABLED=false`,
+  `GF_ANALYTICS_CHECK_FOR_UPDATES=false`) so nothing phones home at boot
+  (offline rule); `GF_INSTALL_PLUGINS=""` **and**
   `GF_PLUGINS_PREINSTALL_DISABLED=true`.
 - **`GF_PLUGINS_PREINSTALL_DISABLED=true` — the second half of the offline rule.**
   `GF_INSTALL_PLUGINS=""` only empties the *user* install list. Grafana separately
@@ -140,3 +154,13 @@ The deployed image is `ghcr.io/randax/cloudbox-grafana`, whose tag in
 `x-release-please` block comments — never hand-edit those refs. Stock
 `docker.io/grafana/grafana` is deliberately **absent** from `scripts/images.txt`:
 it is a CI build input, never pulled by a node.
+
+## Guard-2 ignores
+
+`scripts/check-vendor-drift.sh` requires every load-bearing knob in
+`grafana.yaml` / `service-nodeport.yaml` to be mentioned somewhere above. One
+extracted token is not a knob:
+
+```curation
+ignore apiVersion  the datasource-provisioning file's own schema version (`apiVersion: 1`, fixed by Grafana), not a workshop choice — it reads as a k8s apiVersion to the extractor
+```

@@ -19,7 +19,8 @@ Crossplane v2 pipeline + `function-patch-and-transform` — no new components.
 1. **workload** — a Knative `Service` named after the XR. Free scale-to-zero and
    a `http://<name>.<namespace>.127.0.0.1.sslip.io:31080` URL via Kourier — no
    separate ingress component. `spec.image` → the container; `spec.replicas`
-   `{min,max}` → `autoscaling.knative.dev/{minScale,maxScale}`. **`spec.env` is
+   `{min,max}` → the `autoscaling.knative.dev/minScale` and
+   `autoscaling.knative.dev/maxScale` annotations. **`spec.env` is
    accepted by the XRD but NOT wired in v1** — see the limitations below.
 2. **database** — a `WorkshopDatabase` XR (module 04, verbatim), which in turn
    composes a CNPG `Cluster` + a bucket Job. This is the make-or-break
@@ -66,8 +67,8 @@ shared with module 04), three resources:
   `maxScale: "3"`. If the two ever disagree, an XR that omits `spec.replicas`
   gets whichever the base carries.
 - **The base image is a real, pre-pulled ref**
-  (`ghcr.io/randax/cloudbox-uploader`) inside `x-release-please-start/end-version`
-  block comments, not a placeholder. It exists so the manifest is valid
+  (`ghcr.io/randax/cloudbox-uploader`, tag below) inside
+  `x-release-please-start/end-version` block comments, not a placeholder. It exists so the manifest is valid
   standalone and so `check-consistency.sh`'s "every image is pre-pulled" check
   passes; release-please rewrites the tag. Never replace it with something like
   `example/app:latest`.
@@ -92,9 +93,13 @@ shared with module 04), three resources:
   These are what make the Application's own readiness mean something — without
   them the XR reports Ready while its database is still provisioning.
 - **The bucket Job** is `backoffLimit: 6`, `restartPolicy: OnFailure`, the
-  pinned `public.ecr.aws/aws-cli/aws-cli` image, `head-bucket || s3 mb` for
-  idempotency, and `AWS_REGION=us-east-1` (the CLI refuses to sign without a
-  region). Job name `<name>-storage`, bucket `<name>-data` — deliberately
+  pinned `public.ecr.aws/aws-cli/aws-cli:2.36.20` image, `head-bucket || s3 mb`
+  for idempotency, and `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
+  `AWS_REGION=us-east-1` (the CLI refuses to sign without a region) — the same
+  workshop-grade `cloudbox`/`cloudbox123` credentials the workload gets as
+  `S3_ACCESS_KEY` / `S3_SECRET_KEY`.
+- **Every composed container asks for 50m/64Mi** and limits memory at 256Mi —
+  the small-cluster convention used by every other component here. Job name `<name>-storage`, bucket `<name>-data` — deliberately
   distinct from the WorkshopDatabase's own `<name>-bucket`/`<name>-assets` so
   the two Jobs can coexist in one namespace.
 
@@ -158,3 +163,15 @@ to compose. Rehearse before calling it done:
 - `platform-api` (wave 5, module 04) — installs the `WorkshopDatabase` XRD this
   composition composes. **Without it, the `database` resource cannot be created.**
 - `cnpg-operator`, `rustfs`, `knative-serving` (Kourier).
+
+## Deployed image tags
+
+The composition's workload base and the bucket Job pin these refs; the block is
+an `extra-files` entry in `release-please-config.json`, so release-please keeps
+it in step with `composition.yaml` instead of letting this file rot behind it.
+
+<!-- x-release-please-start-version -->
+```
+ghcr.io/randax/cloudbox-uploader:v0.2.0
+```
+<!-- x-release-please-end-version -->

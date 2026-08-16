@@ -40,6 +40,22 @@
         {
           "type": "generic",
           "path": "/apps/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "/gitops/components/portal/VENDOR.md"
+        },
+        {
+          "type": "generic",
+          "path": "/gitops/components/picture-pipeline/VENDOR.md"
+        },
+        {
+          "type": "generic",
+          "path": "/gitops/components/grafana/VENDOR.md"
+        },
+        {
+          "type": "generic",
+          "path": "/gitops/components/application-xr/VENDOR.md"
         }
       ]
     }

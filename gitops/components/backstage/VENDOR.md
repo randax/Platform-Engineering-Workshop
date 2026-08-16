@@ -49,17 +49,27 @@ diff against:
   — the image runs `NODE_ENV=production`, so guest auth must opt in explicitly
   or sign-in is impossible. `auth.session.secret` is a static workshop-grade
   string (a lab sandbox; rotating it only logs everyone out).
-- `techdocs` is all-`local` (builder/generator/publisher) — no S3, no Docker
-  generator: the offline rule.
+- `techdocs` is all-`local` (builder, `generator.runIn: local`, publisher) —
+  no S3, no Docker generator: the offline rule.
+- `scaffolder.defaultAuthor` (`backstage-scaffolder`
+  <scaffolder@cloudbox.local>) and `scaffolder.defaultCommitMessage` — Gitea
+  rejects a commit with no author, and the lab has no per-attendee identity.
+- `catalog.import.entityFilename: catalog-info.yaml` and
+  `catalog.import.pullRequestBranchName: backstage-integration` — the file and
+  branch the "register existing component" flow writes in Gitea.
 - `catalog.rules.allow` lists the entity kinds the workshop uses and
   `catalog.locations: []` is **deliberately empty**, with a commented example
   showing the Gitea `raw/branch/main/catalog-info.yaml` URL — module S3 is the
   attendee editing this key and pushing. Keep the comment when re-vendoring.
 - `kubernetes.serviceLocatorMethod: multiTenant` +
   `clusterLocatorMethods: [$include: k8s-config.yaml]` — the `$include` only
-  resolves because of the projected volume below.
-- `argocd.*` and `integrations.gitea.*` carry the in-cluster URLs and
-  `${…}` refs to the two credential Secrets.
+  resolves because of the projected volume below. Inside `k8s-config.yaml` the
+  cluster entry authenticates with `authProvider: serviceAccount`, reading
+  `serviceAccountToken` and `caData` via `$file:` from the pod's own projected
+  ServiceAccount token — no credential is committed.
+- `argocd.appLocatorMethods` (one `type: config` instance, `in-cluster`, plain
+  HTTP) and `integrations.gitea.*` carry the in-cluster URLs and `${…}` refs to
+  the two credential Secrets.
 
 ### Deployment details that are easy to lose
 

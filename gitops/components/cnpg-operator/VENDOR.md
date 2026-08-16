@@ -20,18 +20,26 @@ So re-vendoring is a plain overwrite, and *any* diff against the upstream asset
 is a defect, not a curation. Keep it that way: if a change ever seems necessary
 here, put it in an ArgoCD sync option or a kustomize-free sibling file instead.
 
+### The re-render gate
+
+`scripts/check-vendor-drift.sh` re-downloads the release asset and diffs it, so
+that "byte-for-byte" claim is checked rather than asserted. The block below has
+no `allow` lines and never should have: **any** hunk here is a defect, exactly
+as the paragraph above says.
+
 ## Re-vendor
 
-```sh
-curl -sL -o cnpg-1.28.4.yaml \
-  https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.28.4/cnpg-1.28.4.yaml
-```
+The recipe lives **once**, in the `curation` block below —
+`scripts/check-vendor-drift.sh` runs it, so it cannot rot into a stale copy of
+itself. Re-vendoring is a plain overwrite with that `fetch` URL, then
+`./scripts/check-vendor-drift.sh --only cnpg-operator` (which is also the
+"verify it stayed verbatim" check — it must print no hunks).
 
-Verify it stayed verbatim (must print nothing):
+```curation
+render cnpg-1.28.4.yaml
+fetch  https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.28.4/cnpg-1.28.4.yaml
 
-```sh
-curl -sL https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.28.4/cnpg-1.28.4.yaml \
-  | diff - cnpg-1.28.4.yaml
+# --- accepted curation: one line per diff hunk (id, then why) ---
 ```
 
 The filename carries the version, so a bump renames the file. The ArgoCD

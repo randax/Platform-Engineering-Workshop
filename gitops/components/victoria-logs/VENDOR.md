@@ -17,9 +17,13 @@ doesn't need. Hand-written minimal (one Deployment, one PVC, one Service).
 
 - **Listens on :9428** — OTLP logs ingest (`POST /insert/opentelemetry/v1/logs`)
   and LogsQL query (`GET /select/logsql/query`) on one port.
-- **Data on a PVC** (`local-path`, 2 Gi) at `/victoria-logs-data`
-  (`-storageDataPath`), `Prune=false` (same protection as the other stateful
-  components).
+- **Data on a PVC** (`local-path`, `2Gi`) at `/victoria-logs-data`
+  (`-storageDataPath`), annotated
+  `argocd.argoproj.io/sync-options: Prune=false` (same protection as the other
+  stateful components).
+- **Probes**: liveness and readiness are both `GET /health` on :9428 —
+  VictoriaLogs answers it as soon as the storage directory is open, which is
+  what "Ready" should mean for a log sink.
 - **`-retentionPeriod=7d`** — VictoriaLogs default made explicit; plenty for a
   4-hour lab.
 - **Deployment strategy `Recreate`** (RWO PVC), same as VictoriaMetrics.

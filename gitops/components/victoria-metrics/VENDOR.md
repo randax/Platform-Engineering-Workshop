@@ -29,8 +29,9 @@ the whole thing, matching the rustfs / nats treatment.
   hard-code. 1.149.0 carries a bugfix to OTLP `Unit`-suffix handling, so the
   re-pin was checked by pushing the exact names+units we emit into 1.147.0 and
   1.149.0 side by side: the resulting `__name__` sets are identical.
-- **Data on a PVC** (`local-path`, 2 Gi) at `/victoria-metrics-data`
-  (`-storageDataPath`). `Prune=false` so disabling the app doesn't wipe the TSDB
+- **Data on a PVC** (`local-path`, `2Gi`) at `/victoria-metrics-data`
+  (`-storageDataPath`). `argocd.argoproj.io/sync-options: Prune=false` so
+  disabling the app doesn't wipe the TSDB
   mid-workshop — same protection as `rustfs-data` / `nats-jetstream`.
 - **`-retentionPeriod=1`** (1 month, the default made explicit) — a sandbox,
   not prod.
@@ -40,6 +41,8 @@ the whole thing, matching the rustfs / nats treatment.
   `readOnlyRootFilesystem` (VM only writes the mounted data path),
   `seccompProfile: RuntimeDefault` — passes PodSecurity `restricted`. `fsGroup`
   makes kubelet chown the volume, so no initContainer is needed (same as nats).
+- **Probes**: liveness and readiness are both `GET /health` on :8428 — it
+  answers once the TSDB is open, which is what "Ready" should mean here.
 - **Resources**: requests 50m / 256Mi, limit 512Mi (single-tenant lab).
 
 ## Re-vendor

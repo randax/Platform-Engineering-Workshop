@@ -8,10 +8,10 @@
 
 ## Re-vendor
 
-```sh
-curl -sL -o namespace-install.yaml \
-  https://github.com/argoproj/argo-workflows/releases/download/v4.0.8/namespace-install.yaml
-```
+The recipe lives **once**, in the `curation` block further down this file —
+`scripts/check-vendor-drift.sh` runs it, so it cannot rot into a stale copy of
+itself. Re-vendoring is: reproduce the file with that recipe, re-apply the
+curation below, then `./scripts/check-vendor-drift.sh --only argo-workflows`.
 
 ## Workshop curation applied (re-apply after re-vendoring)
 
@@ -31,12 +31,25 @@ In `namespace-install.yaml` (both Deployments):
 
 Why managed-namespace: workflow pods run rootless BuildKit, which needs
 seccomp/AppArmor `Unconfined`. Talos enforces PSA `baseline` cluster-wide, so
-builds get their own `pod-security.kubernetes.io/enforce=privileged`
-namespace (`builds.yaml`) while the control plane stays in `argo`.
+builds get their own privileged namespace (`builds.yaml`) while the control
+plane stays in `argo`. All three PSA modes carry it —
+`pod-security.kubernetes.io/enforce`, `pod-security.kubernetes.io/audit` and
+`pod-security.kubernetes.io/warn` — so the audit log and `kubectl` are not
+full of warnings about pods we deliberately allow.
 
 `builds.yaml` also mirrors `argo-role`/`argo-server-role` into `builds`
 (namespace-install RBAC only covers the install namespace) and adds the
-executor Role (`workflowtaskresults` create/patch) for the `default` SA.
+executor Role (`workflowtaskresults` create/patch) for the `default` SA. The
+mirrored rules are copied verbatim from namespace-install v4.0.8 and grant, in
+`builds` only: `leases`; `pods`, `pods/exec`, `pods/log`; `configmaps`;
+`secrets`; `serviceaccounts`; `events`; `persistentvolumeclaims` and
+`persistentvolumeclaims/finalizers`; `poddisruptionbudgets`; and the Argo kinds
+`workflows`, `workflows/finalizers`, `workflowtemplates`,
+`workflowtemplates/finalizers`, `workflowtasksets`,
+`workflowtasksets/finalizers`, `workflowtaskresults`, `workflowartifactgctasks`,
+`workfloweventbindings`, `cronworkflows`, `cronworkflows/finalizers`,
+`eventsources` and `sensors`. They are listed rather than summarised so a
+re-vendor that widens the mirror shows up as a doc change too.
 
 `workflowtemplate-build-and-push.yaml` modernizes the official
 buildkit-template example: git input artifact from the in-cluster Gitea →
@@ -49,7 +62,35 @@ config path (`~/.config/buildkit/buildkitd.toml`, uid 1000, home
 `/home/user`; per moby/buildkit docs/buildkitd.toml.md). BuildKit does its
 own FROM pulls and pushes inside the pod (the node registry mirror does not
 apply), so with Dockerfiles whose FROM points at Zot the whole build is
-in-cluster and offline-safe.
+in-cluster and offline-safe. The build step clones into `/src` (the git input
+artifact's path, and the step's `workingDir`), sets
+`BUILDKITD_FLAGS=--oci-worker-no-process-sandbox` — rootless buildkitd cannot
+create its own process sandbox inside an unprivileged pod — and asks for
+250m/512Mi with a 2Gi memory limit, the one step in the workshop that really
+does need room.
+
+### The same list, machine-readable
+
+`scripts/check-vendor-drift.sh` reproduces the pristine upstream artifact from
+the `render` recipe below and diffs it against the vendored file. Every hunk
+needs an `allow` line here: an unlisted hunk fails (undocumented curation, or
+upstream moved under us) and an `allow` line whose hunk has **disappeared**
+fails too — that is a curation lost in a re-vendor, which is exactly how these
+docs went wrong before. The prose above is the *why*; these lines are only the
+bookkeeping that keeps the prose honest. `--update` rewrites the ids; you still
+write the label.
+
+```curation
+render namespace-install.yaml
+fetch  https://github.com/argoproj/argo-workflows/releases/download/v4.0.8/namespace-install.yaml
+
+# --- accepted curation: one line per diff hunk (id, then why) ---
+allow  namespace-install.yaml  cb5c13bb  sync-wave "-1" on the workflow-controller PriorityClass, so ArgoCD applies it before the Deployment that names it
+allow  namespace-install.yaml  fec1f330  argo-server args: --managed-namespace builds and --auth-mode server
+allow  namespace-install.yaml  0f18d239  50m/64Mi requests on argo-server (upstream ships none)
+allow  namespace-install.yaml  10015baf  workflow-controller arg: --managed-namespace builds
+allow  namespace-install.yaml  2b00dc13  50m/64Mi requests on workflow-controller (upstream ships none)
+```
 
 Images used:
 - `quay.io/argoproj/workflow-controller:v4.0.8`

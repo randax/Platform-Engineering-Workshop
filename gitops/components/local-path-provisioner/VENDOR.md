@@ -8,10 +8,10 @@
 
 ## Re-vendor
 
-```sh
-curl -sL -o local-path-storage.yaml \
-  https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.37/deploy/local-path-storage.yaml
-```
+The recipe lives **once**, in the `curation` block at the bottom of this file —
+`scripts/check-vendor-drift.sh` runs it, so it cannot rot into a stale copy.
+Re-vendoring is: run that `fetch` URL into the file, re-apply the curation
+below, then `./scripts/check-vendor-drift.sh --only local-path-provisioner`.
 
 ## Upstream change in v0.0.37 — the Deployment now has probes
 
@@ -42,6 +42,29 @@ worth watching in rehearsal.
 4. **Added container resource requests 25m/32Mi** to the provisioner
    Deployment (upstream ships none) — same small-cluster requests
    convention as the other components, no limits.
+
+### The same list, machine-readable
+
+`scripts/check-vendor-drift.sh` re-fetches the upstream file and diffs it
+against ours. Every hunk must have an `allow` line here; an unlisted hunk fails
+(undocumented curation, or upstream moved under us), and an `allow` line whose
+hunk has *disappeared* fails too — that is a curation lost in a re-vendor,
+which is how the PSA label went missing once already. The prose above is the
+why; these lines are only the bookkeeping that keeps the prose honest.
+`--update` rewrites the ids for you; you still write the label.
+
+```curation
+render local-path-storage.yaml
+fetch  https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.37/deploy/local-path-storage.yaml
+
+# --- accepted curation: one line per diff hunk (id, then why) ---
+allow  local-path-storage.yaml  655d7dcf  curation 0 — `pod-security.kubernetes.io/enforce: privileged` on the namespace (helper pods mount hostPath; without it every PVC hangs Pending)
+allow  local-path-storage.yaml  c098d56d  curation 4 — 25m/32Mi requests on the provisioner container (upstream ships none)
+allow  local-path-storage.yaml  0041183a  curation 1 — `storageclass.kubernetes.io/is-default-class` on the local-path StorageClass
+allow  local-path-storage.yaml  5e387756  curation 2 — the comment explaining why nodePathMap moved to /var (Talos root FS is immutable)
+allow  local-path-storage.yaml  be0e5885  curation 2 — nodePathMap /opt/local-path-provisioner → /var/local-path-provisioner
+allow  local-path-storage.yaml  2d6953aa  curation 3 — helper pod image pinned to busybox:1.37.0 (upstream ships it unpinned)
+```
 
 Images used (all pinned, verified pullable 2026-08-11):
 - `docker.io/rancher/local-path-provisioner:v0.0.37`

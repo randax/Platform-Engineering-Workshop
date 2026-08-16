@@ -17,12 +17,15 @@ config) so attendees can read the whole thing, matching the rustfs treatment.
 
 ## Config & curation
 
-- **JetStream on a PVC** (`local-path`, 1 Gi): the store must survive a pod restart or
+- **Ports**: client `:4222` (also on NodePort 30422, see
+  `service-nodeport.yaml`) and monitoring `:8222`; the exporter sidecar serves
+  Prometheus on `:7777`.
+- **JetStream on a PVC** (`local-path`, `1Gi`): the store must survive a pod restart or
   the headline demo — kill the pod, watch the durable stream replay — wouldn't work.
   Store caps are deliberately small (64 MiB memory / 512 MiB file): a sandbox, not prod.
 - **Deployment strategy `Recreate`**: the JetStream PVC is ReadWriteOnce, so a rolling
   update (two pods briefly) would deadlock on the volume.
-- **PVC `Prune=false`**: disabling the app (git rm + push) must not wipe streams
+- **PVC `argocd.argoproj.io/sync-options: Prune=false`**: disabling the app (git rm + push) must not wipe streams
   mid-workshop — same protection as `rustfs-data`.
 - **Security**: runs non-root (uid 1000), all caps dropped, `readOnlyRootFilesystem`
   (JetStream only writes the mounted `/data`), `seccompProfile: RuntimeDefault` — passes

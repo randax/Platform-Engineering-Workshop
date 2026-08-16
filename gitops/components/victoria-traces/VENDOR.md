@@ -35,8 +35,9 @@ It's new (v0.10.x), so the two workshop-critical risks are managed explicitly:
     Collector's `otlphttp/traces` exporter targets this).
   - Jaeger Query API → `GET /select/jaeger/api/*` — Grafana's Jaeger datasource
     URL is `http://victoria-traces.observability.svc.cluster.local:10428/select/jaeger`.
-- **Data on a PVC** (`local-path`, 2 Gi) at `/victoria-traces-data`
-  (`-storageDataPath`). `Prune=false` so disabling the app doesn't wipe traces
+- **Data on a PVC** (`local-path`, `2Gi`) at `/victoria-traces-data`
+  (`-storageDataPath`). `argocd.argoproj.io/sync-options: Prune=false` so
+  disabling the app doesn't wipe traces
   mid-workshop — same protection as `victoria-logs` / `nats-jetstream`.
 - **`-retentionPeriod=7d`** — a sandbox, not prod.
 - **Deployment strategy `Recreate`**: the data PVC is ReadWriteOnce, so a rolling
@@ -45,6 +46,7 @@ It's new (v0.10.x), so the two workshop-critical risks are managed explicitly:
   (VT only writes the mounted data path + `/tmp` emptyDir), `seccompProfile:
   RuntimeDefault`. `fsGroup` chowns the volume so no initContainer is needed
   (same as victoria-logs).
+- **Probes**: liveness and readiness are both `GET /health` on :10428.
 - **Resources**: requests 50m / 256Mi, limit 512Mi (single-tenant lab).
 - **No shell in the image from 0.10.0 on** — upstream moved the base from Alpine
   to distroless (which is also why the image shrank 47.6 MB → 40.2 MB). Nothing

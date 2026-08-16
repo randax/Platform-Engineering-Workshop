@@ -8,12 +8,10 @@
 
 ## Re-vendor
 
-```sh
-BASE=https://github.com/knative/eventing/releases/download/knative-v1.23.0
-for f in eventing-crds.yaml eventing-core.yaml in-memory-channel.yaml mt-channel-broker.yaml; do
-  curl -sL -o $f $BASE/$f
-done
-```
+The recipe lives **once**, in the `curation` block further down this file —
+`scripts/check-vendor-drift.sh` runs it, so it cannot rot into a stale copy of
+itself. Re-vendoring is: reproduce the file with that recipe, re-apply the
+curation below, then `./scripts/check-vendor-drift.sh --only knative-eventing`.
 
 ## Workshop curation applied (re-apply after re-vendoring)
 
@@ -55,6 +53,39 @@ way after every re-vendor.
 Those are the only curations: no images repointed, no services exposed —
 eventing is control-plane + in-cluster data-plane only (the Broker ingress
 is `broker-ingress.knative-eventing.svc.cluster.local`, ClusterIP).
+
+### The same list, machine-readable
+
+`scripts/check-vendor-drift.sh` reproduces the pristine upstream artifact from
+the `render` recipe below and diffs it against the vendored file. Every hunk
+needs an `allow` line here: an unlisted hunk fails (undocumented curation, or
+upstream moved under us) and an `allow` line whose hunk has **disappeared**
+fails too — that is a curation lost in a re-vendor, which is exactly how these
+docs went wrong before. The prose above is the *why*; these lines are only the
+bookkeeping that keeps the prose honest. `--update` rewrites the ids; you still
+write the label.
+
+```curation
+render eventing-crds.yaml
+fetch  https://github.com/knative/eventing/releases/download/knative-v1.23.0/eventing-crds.yaml
+
+render eventing-core.yaml
+fetch  https://github.com/knative/eventing/releases/download/knative-v1.23.0/eventing-core.yaml
+
+render in-memory-channel.yaml
+fetch  https://github.com/knative/eventing/releases/download/knative-v1.23.0/in-memory-channel.yaml
+
+render mt-channel-broker.yaml
+fetch  https://github.com/knative/eventing/releases/download/knative-v1.23.0/mt-channel-broker.yaml
+
+# --- accepted curation: one line per diff hunk (id, then why) ---
+allow  eventing-core.yaml  eedd7191  curation 2 — the six real config-observability keys pointing eventing telemetry at the OTel Collector (a literal re-vendor silently drops all six)
+allow  eventing-core.yaml  02de06f1  curation 1 — halved requests 100m/100Mi → 50m/50Mi (eventing-controller, mt-broker-*)
+allow  eventing-core.yaml  3dd1e004  curation 1 — halved requests 125m/64Mi → 62m/32Mi (job-sink, pingsource-mt-adapter)
+allow  eventing-core.yaml  bbd482a6  curation 1 — halved requests 100m/50Mi → 50m/25Mi (eventing-webhook)
+allow  in-memory-channel.yaml  1ae27e05  curation 1 — added 25m/32Mi requests to imc-controller and imc-dispatcher (upstream ships none)
+allow  mt-channel-broker.yaml  02de06f1  curation 1 — halved requests 100m/100Mi → 50m/50Mi (mt-broker-filter/-ingress/-controller)
+```
 
 ## Images (all upstream digest-pinned; verified pullable via crane 2026-07-14)
 

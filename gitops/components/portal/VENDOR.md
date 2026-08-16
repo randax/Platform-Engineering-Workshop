@@ -3,7 +3,16 @@
 | | |
 |---|---|
 | Source | `apps/portal` **in this repo** — nothing vendored from upstream; the manifest is ours |
-| Image | `ghcr.io/randax/cloudbox-portal:v0.1.0` (multi-arch) — built and pushed by this repo's CI from `apps/portal`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. |
+| Image | `ghcr.io/randax/cloudbox-portal` (multi-arch) — built and pushed by this repo's CI from `apps/portal`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. The deployed tag is below. |
+
+<!-- x-release-please-start-version -->
+```
+ghcr.io/randax/cloudbox-portal:v0.2.0
+```
+<!-- x-release-please-end-version -->
+
+release-please rewrites that block (it is an `extra-files` entry in
+`release-please-config.json`), so it cannot fall behind `portal.yaml`.
 | File | `portal.yaml` |
 
 ## Re-vendor
@@ -71,7 +80,8 @@ extra-file — its version is prose, kept honest by review.
   must match the `gitea_admin` credentials in `scripts/versions.env` /
   `bootstrap-gitops.sh`. Degrades gracefully: with `GITEA_USER` unset the
   "start from a template" option is simply not offered.
-- S3 credentials `cloudbox`/`cloudbox123` are workshop-grade on purpose
+- S3 credentials `cloudbox`/`cloudbox123` (`S3_ACCESS_KEY` / `S3_SECRET_KEY`)
+  are workshop-grade on purpose
   (ephemeral lab sandbox) and must match the rustfs component. The
   `images` bucket (`S3_BUCKET=images`) is created by picture-pipeline's setup
   Job — until that component is enabled the gallery is empty but the page

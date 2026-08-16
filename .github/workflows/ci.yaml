@@ -85,6 +85,12 @@ jobs:
         # pinned artifacts present. See the script header for the full list.
         run: ./scripts/check-consistency.sh
 
+      - name: VENDOR.md mentions every knob it documents
+        # Guard 2 of check-vendor-drift.sh: offline, sub-second, so it belongs
+        # on every push next to the other cross-file checks. Guard 1 (the
+        # re-render gate) needs network + helm and runs in vendor-drift.yaml.
+        run: ./scripts/check-vendor-drift.sh --offline
+
   kubeconform:
     name: Kubernetes schema validation (gitops/)
     runs-on: ubuntu-latest

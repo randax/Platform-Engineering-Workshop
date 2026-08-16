@@ -8,13 +8,10 @@
 
 ## Re-vendor
 
-```sh
-BASE=https://github.com/knative/serving/releases/download/knative-v1.23.0
-curl -sL -o serving-crds.yaml $BASE/serving-crds.yaml
-curl -sL -o serving-core.yaml $BASE/serving-core.yaml
-curl -sL -o kourier.yaml \
-  https://github.com/knative-extensions/net-kourier/releases/download/knative-v1.23.0/kourier.yaml
-```
+The recipe lives **once**, in the `curation` block further down this file —
+`scripts/check-vendor-drift.sh` runs it, so it cannot rot into a stale copy of
+itself. Re-vendoring is: reproduce the file with that recipe, re-apply the
+curation below, then `./scripts/check-vendor-drift.sh --only knative-serving`.
 
 ## Workshop curation applied (re-apply after re-vendoring)
 
@@ -111,6 +108,44 @@ either a new upstream change or a curation someone forgot to write down.
    **Drop this curation** once the cluster is dual-stack, or once a rehearsal
    proves `"::"` binds in our pod netns.
    ⚠️ **Top rehearsal watch item for module 06** — see the note below.
+
+### The same list, machine-readable
+
+`scripts/check-vendor-drift.sh` reproduces the pristine upstream artifact from
+the `render` recipe below and diffs it against the vendored file. Every hunk
+needs an `allow` line here: an unlisted hunk fails (undocumented curation, or
+upstream moved under us) and an `allow` line whose hunk has **disappeared**
+fails too — that is a curation lost in a re-vendor, which is exactly how these
+docs went wrong before. The prose above is the *why*; these lines are only the
+bookkeeping that keeps the prose honest. `--update` rewrites the ids; you still
+write the label.
+
+```curation
+render serving-crds.yaml
+fetch  https://github.com/knative/serving/releases/download/knative-v1.23.0/serving-crds.yaml
+
+render serving-core.yaml
+fetch  https://github.com/knative/serving/releases/download/knative-v1.23.0/serving-core.yaml
+
+render kourier.yaml
+fetch  https://github.com/knative-extensions/net-kourier/releases/download/knative-v1.23.0/kourier.yaml
+
+# --- accepted curation: one line per diff hunk (id, then why) ---
+allow  serving-core.yaml  fa38a31c  curation 2 — config-deployment registries-skipping-tag-resolving (Zot + its aliases + ghcr.io)
+allow  serving-core.yaml  797bdd28  curation 3 — config-domain's knative.dev/example-checksum annotation deleted (inert; kept as-is rather than re-litigated at each bump)
+allow  serving-core.yaml  3cb2e735  curation 3 — config-domain gains 127.0.0.1.sslip.io; without it every ksvc URL 404s
+allow  serving-core.yaml  62912f67  curation 4 — config-network ingress-class kourier.ingress.networking.knative.dev
+allow  serving-core.yaml  09d0bf54  curation 5 — the nine real config-observability keys (tracing + metrics + request-metrics) to the OTel Collector
+allow  serving-core.yaml  32736b89  curation 1 — halved activator requests 300m/60Mi → 150m/30Mi
+allow  serving-core.yaml  02de06f1  curation 1 — halved requests 100m/100Mi → 50m/50Mi (autoscaler, controller, webhook)
+allow  kourier.yaml  434d5b5e  curation 9 — Envoy stats_listener bound back to 0.0.0.0 (a static listener that cannot bind is fatal; this cluster is IPv4-only)
+allow  kourier.yaml  2b705ea2  curation 9 — the matching ipv4_compat: true removed
+allow  kourier.yaml  3d26dade  curation 6 — halved requests 200m/200Mi → 100m/100Mi (net-kourier-controller, 3scale-kourier-gateway)
+allow  kourier.yaml  aff418f9  curation 7 — Envoy pinned: v1.37-latest (floating!) → v1.37.5
+allow  kourier.yaml  165f359a  curation 8 — the comment showing the curl -H 'Host: …' :31080 form
+allow  kourier.yaml  ea492933  curation 8 — nodePort 31080 on the http2 port
+allow  kourier.yaml  4cb63f9a  curation 8 — Service kourier type LoadBalancer → NodePort (no LB in Talos-in-Docker)
+```
 
 Notes:
 - **Rehearsal watch item (module 06):** bring up `knative-serving` +

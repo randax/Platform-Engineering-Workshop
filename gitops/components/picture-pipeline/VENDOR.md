@@ -3,8 +3,18 @@
 | | |
 |---|---|
 | Source | `apps/uploader` + `apps/resizer` **in this repo** — nothing vendored from upstream; the manifest is ours |
-| Images | `ghcr.io/randax/cloudbox-uploader:v0.1.0`, `ghcr.io/randax/cloudbox-resizer:v0.1.0` (multi-arch) — built and pushed by this repo's CI from `apps/`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. `public.ecr.aws/aws-cli/aws-cli:2.36.20` (bucket Job) is pinned and verified pullable, amd64+arm64 (crane, 2026-08-11) — already in the pre-pull list for module 03. |
+| Images | `ghcr.io/randax/cloudbox-uploader`, `ghcr.io/randax/cloudbox-resizer` (multi-arch; deployed tags below) — built and pushed by this repo's CI from `apps/`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. `public.ecr.aws/aws-cli/aws-cli:2.36.20` (bucket Job) is pinned and verified pullable, amd64+arm64 (crane, 2026-08-11) — already in the pre-pull list for module 03. |
 | File | `picture-pipeline.yaml` |
+
+<!-- x-release-please-start-version -->
+```
+ghcr.io/randax/cloudbox-uploader:v0.2.0
+ghcr.io/randax/cloudbox-resizer:v0.2.0
+```
+<!-- x-release-please-end-version -->
+
+release-please rewrites that block (an `extra-files` entry in
+`release-please-config.json`), so it cannot fall behind the manifest.
 
 ## Re-vendor
 
@@ -23,7 +33,7 @@ honest by review.
   adds `CreateNamespace=true` and — because Broker/Trigger/ksvc CRDs may still
   be landing — `SkipDryRunOnMissingResource=true`.
 - **Broker `default` is in-memory** (`MTChannelBasedBroker` over the
-  InMemoryChannel that knative-eventing defaults to). The broker.class
+  InMemoryChannel that knative-eventing defaults to). The `eventing.knative.dev/broker.class`
   annotation is redundant with `config-br-defaults` but kept explicit for
   teachability. In-memory means **no durability** — an imc-dispatcher
   restart drops in-flight events. Deliberate: this is a 4-hour lab, not

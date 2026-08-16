@@ -7,11 +7,12 @@ re-researching the stack.
 Read this before doing a "re-verify the versions" pass — it exists precisely so
 that pass costs an hour, not an afternoon.
 
-## The four mechanized checks
+## The five mechanized checks
 
 | Question | Answered by | When |
 |---|---|---|
 | Do our files agree with **each other**? | `scripts/check-consistency.sh` | every push/PR (`ci.yaml`) |
+| Are the **VENDOR.md files still true**? | `scripts/check-vendor-drift.sh` | guard 2 every push/PR (`ci.yaml`); guard 1 weekly + on `gitops/components/**` PRs (`vendor-drift.yaml`) |
 | Does every pinned image still **exist** upstream? | `.github/workflows/images-gate.yaml` | weekly + on `images.txt` PRs |
 | Has any pin fallen **behind** upstream? | `scripts/check-upstream.sh` | weekly (`upstream-check.yaml`) |
 | Does the whole attendee flow still **work**? | `.github/workflows/bootstrap-test.yaml` | weekly |
@@ -19,8 +20,9 @@ that pass costs an hour, not an afternoon.
 Dependencies inside our own code (Go modules, the Slidev deck, GitHub Actions)
 are Dependabot's job — see `.github/dependabot.yml`.
 
-Nothing in this list is part of the attendee flow. `check-upstream.sh` needs
-internet by design; everything attendees run must work offline.
+Nothing in this list is part of the attendee flow. `check-upstream.sh` and
+`check-vendor-drift.sh`'s guard 1 need internet by design; everything attendees
+run must work offline.
 
 ## The weekly signal
 
@@ -69,6 +71,46 @@ Two things to get right:
 `check-consistency.sh` fails if a row stops resolving to a real pin, so a moved
 file cannot silently retire a check.
 
+## Keeping the VENDOR.md files honest
+
+`gitops/components/*/VENDOR.md` is what step 2 above tells you to trust. It was
+not trustworthy: **11 of 19 were found wrong**, every one by accident while
+doing something else — a missing PSA `privileged` label that hangs every PVC, a
+missing `config-domain` entry that 404s every Knative URL, config keys that a
+literal re-vendor silently drops. They all rotted the same way: accurate when
+written, stale at the next bump, because nothing ever compared them to
+anything. `scripts/check-vendor-drift.sh` is that comparison. Two guards:
+
+**Guard 1 — the re-render gate** (strong; network + helm; `vendor-drift.yaml`).
+For every file whose VENDOR.md carries a ```` ```curation ```` block with a
+`render` recipe, it reproduces the pristine upstream artifact and diffs it. Every
+hunk must have an `allow  <file>  <id>  <why>` line, where `<id>` is a digest of
+the hunk's *changed lines only* — so a curation keeps its id when upstream moves
+it around, and identical curations (the halved requests, repeated per Deployment)
+share one line. Two ways to fail:
+
+- an **unlisted hunk** — undocumented curation, or upstream moved under us;
+- an **`allow` line whose hunk has vanished** — the curation it documents was
+  lost in a re-vendor. That is the failure mode that produced most of the 11.
+
+Components with no reproducible upstream artifact (the hand-written ones) have
+no `render` recipe and are covered by guard 2 instead.
+
+**Guard 2 — the token-coverage lint** (weak but broad; offline; `ci.yaml`).
+Every file *not* covered by guard 1 has its load-bearing knobs extracted —
+nodePorts, container/service ports, env var names, image refs, resource
+requests/limits, `pod-security.kubernetes.io/*` and other slash-keys, probe
+paths and hostPaths, RBAC resources, volume shapes, readiness checks — and each
+token must appear *somewhere* in that component's VENDOR.md. Incidental tokens
+get an `ignore <token>  <why>` line in the same block; use it sparingly, with a
+reason, rather than loosening the extraction.
+
+**Read the honest limits before trusting a green run.** The guard-1 allowlists
+were bootstrapped from the tree as it stood — that day's diff *was* the accepted
+curation — so green means "nothing changed since", not "someone audited it". And
+guard 2 proves a knob is *mentioned*, not that the sentence next to it is
+correct or current. The script prints both caveats on every run.
+
 ## Doing a bump
 
 1. **Change the pin where it actually lives** — `scripts/versions.env`,
@@ -76,11 +118,30 @@ file cannot silently retire a check.
    Never in two places: if `check-consistency.sh` compares them, it will tell
    you which pair drifted.
 2. **Re-vendor if the component ships a chart or a release YAML.** Every
-   `gitops/components/*/VENDOR.md` carries its own re-vendor command *and* the
+   `gitops/components/*/VENDOR.md` carries its own re-vendor recipe *and* the
    workshop curation to re-apply afterwards (halved resource requests, NodePort
    services, repointed images). Re-applying that curation is the part that
    actually takes judgment — the VENDOR.md exists so it is not re-derived from
    scratch each time.
+
+   **Trust the re-render for *what* changed and the VENDOR.md for *why*.**
+   `./scripts/check-vendor-drift.sh --only <component>` re-runs the recipe and
+   diffs it against the vendored file: that diff, not the prose, is the
+   authority on what actually differs from upstream. The prose is the authority
+   on why each difference is there — and it is only as good as the person who
+   last wrote it. If the two disagree, the diff is right and the prose needs
+   fixing. Workflow after a bump:
+
+   ```sh
+   ./scripts/check-vendor-drift.sh --only <component>            # what broke
+   # …re-apply the curation the failures name…
+   ./scripts/check-vendor-drift.sh --update --only <component>   # re-id the hunks
+   git diff gitops/components/<component>/VENDOR.md              # READ THIS
+   ```
+
+   `--update` only does the bookkeeping (hunk ids); every new hunk arrives
+   labelled `TODO describe:` and you write the label. A `TODO` left in the tree
+   is a curation nobody has explained yet.
 3. **Re-pin the images the new version ships.** For a chart:
    `helm template … | grep image:`. For a release YAML: read the digests out of
    it. Everything deployed must appear in `scripts/images.txt` or
@@ -114,6 +175,8 @@ The pre-event re-verify pass is the one time the answer to the report is
 - [ ] Read the `upstream-drift` issue; decide per row, not in bulk
 - [ ] Bump + re-vendor, one component per commit
 - [ ] `./scripts/check-consistency.sh` green
+- [ ] `./scripts/check-vendor-drift.sh` green, and every VENDOR.md diff it
+      produced actually read (that diff is the re-vendor's real changelog)
 - [ ] `bootstrap-test.yaml` green on the full module range
 - [ ] One real prework run on a clean machine: `dev-setup.sh` →
       `cloudbox-init.sh` → `install.sh --check`
