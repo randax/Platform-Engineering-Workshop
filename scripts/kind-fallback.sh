@@ -59,6 +59,8 @@ nodes:
         hostPort: ${NODEPORT_RUSTFS_S3}
       - containerPort: ${NODEPORT_GRAFANA}
         hostPort: ${NODEPORT_GRAFANA}
+      - containerPort: ${NODEPORT_NATS}
+        hostPort: ${NODEPORT_NATS}
       - containerPort: ${NODEPORT_KOURIER}
         hostPort: ${NODEPORT_KOURIER}
 EOF

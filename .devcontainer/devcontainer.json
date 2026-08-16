@@ -30,7 +30,7 @@
   "postCreateCommand": "curl -fsSL https://mise.run | MISE_VERSION=v2026.8.4 sh && export PATH=\"$HOME/.local/bin:$PATH\" && ./scripts/dev-setup.sh",
 
   // NodePorts exposed by the in-cluster platform.
-  "forwardPorts": [30300, 30080, 30500, 30600, 30700, 30900, 31080],
+  "forwardPorts": [30300, 30080, 30500, 30600, 30700, 30900, 30030, 31080, 30422],
   "portsAttributes": {
     "30030": { "label": "Grafana" },
     "30300": { "label": "Gitea (in-cluster git)" },
@@ -39,7 +39,8 @@
     "30600": { "label": "Cloudbox Console" },
     "30700": { "label": "Backstage portal" },
     "30900": { "label": "RustFS S3" },
-    "31080": { "label": "App ingress (Kourier)" }
+    "31080": { "label": "App ingress (Kourier)" },
+    "30422": { "label": "NATS (JetStream)" }
   },
 
   "customizations": {

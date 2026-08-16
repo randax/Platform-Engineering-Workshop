@@ -106,9 +106,11 @@ step "Workshop NodePorts free on the host"
 if have docker && [[ -n "$(docker ps -q --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
   ok "Cluster '${CLUSTER_NAME}' is already running — its ports are expected to be bound"
 else
+  # Every NODEPORT_* in versions.env, or preflight passes and the module that
+  # needs the missed port fails at the venue instead.
   for port in "${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
               "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
-              "${NODEPORT_KOURIER}"; do
+              "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}"; do
     if (echo > "/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
       check_fail "Port ${port} is already in use — the cluster needs it; free it first (lsof -i :${port})"
     else

@@ -23,18 +23,18 @@ fi
 # --- Docker memory ---------------------------------------------------------
 MEM_BYTES="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
 MEM_GB=$((MEM_BYTES / 1024 / 1024 / 1024))
-if [ "$MEM_GB" -ge 10 ]; then
-  ok "Docker can use ${MEM_GB} GB memory (need >= 10)"
+if [ "$MEM_GB" -ge "$MIN_DOCKER_MEMORY_GB" ]; then
+  ok "Docker can use ${MEM_GB} GB memory (need >= ${MIN_DOCKER_MEMORY_GB})"
 else
-  fail "Docker only has ${MEM_GB} GB memory — raise it to >= 10 GB (Docker Desktop: Settings > Resources; WSL2: .wslconfig)"
+  fail "Docker only has ${MEM_GB} GB memory — raise it to >= ${MIN_DOCKER_MEMORY_GB} GB (Docker Desktop: Settings > Resources; WSL2: .wslconfig)"
 fi
 
 # --- Docker CPUs -----------------------------------------------------------
 CPUS="$(docker info --format '{{.NCPU}}' 2>/dev/null || echo 0)"
-if [ "$CPUS" -ge 4 ]; then
-  ok "Docker can use ${CPUS} CPUs (need >= 4)"
+if [ "$CPUS" -ge "$MIN_CPUS" ]; then
+  ok "Docker can use ${CPUS} CPUs (need >= ${MIN_CPUS})"
 else
-  fail "Docker only has ${CPUS} CPUs — give it at least 4"
+  fail "Docker only has ${CPUS} CPUs — give it at least ${MIN_CPUS}"
 fi
 
 # --- Free disk -------------------------------------------------------------
