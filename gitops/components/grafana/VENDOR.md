@@ -41,6 +41,22 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
     VTraces exposes a Jaeger-compatible query API, so we use the **built-in
     Jaeger type** (again no plugin, offline rule) — Jaeger-style trace search,
     not Tempo/TraceQL. See `../victoria-traces/VENDOR.md`.
+- **The datasource `uid`s are a contract, not cosmetics** — `victoriametrics`,
+  `victorialogs`, `victoriatraces`. The Console builds Grafana Explore deep-links
+  by uid (`apps/portal/internal/web/grafana.go`; the trace link also hardcodes
+  `"type": "jaeger"` for the VictoriaTraces pane, and `grafana_test.go` asserts
+  it). Rename a uid or change the VictoriaTraces datasource type and every
+  "View metrics"/"View traces" button in module 08/09 opens an empty Explore
+  pane. Keep them stable across any Grafana or plugin bump.
+- **`nodeGraph.enabled: true` on the VictoriaTraces (Jaeger) datasource** —
+  turns on Grafana's built-in Node Graph tab, which renders a trace as a
+  topology graph. For the module 09 capstone *this is the service map*
+  (portal → uploader → broker → resizer) — without it the trace view is a
+  waterfall only, and the capstone's "see the whole chain" beat is weaker. No
+  plugin involved, so it works offline.
+- **`jsonData.httpMethod: POST` on VictoriaMetrics** — long MetricsQL queries
+  (the Console's deep-links carry the full query in the URL) exceed what a GET
+  querystring handles comfortably.
 - **Anonymous read access** (`GF_AUTH_ANONYMOUS_ENABLED=true`, org role
   `Viewer`) — the workshop Grafana is open, workshop-grade on purpose. The
   login form is left available so an admin (default `admin`/`admin`, ephemeral
@@ -70,6 +86,26 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
   `readOnlyRootFilesystem` (only the two emptyDirs are writable),
   `seccompProfile: RuntimeDefault` — passes PodSecurity `restricted`.
 - **Resources**: requests 100m / 128Mi, limit 512Mi.
+- **Two Services on purpose.** `grafana` (ClusterIP, 3000→3000) is what anything
+  in-cluster would talk to; `grafana-nodeport` (the workshop addition) carries
+  nodePort 30030. Both select `app.kubernetes.io/{name,instance}: grafana` —
+  those two labels are the selector contract, so keep them on the Deployment's
+  pod template.
+- **`strategy: type: Recreate`** — the default RollingUpdate would briefly run
+  two Grafanas, and `grafana.db` lives on a per-pod emptyDir; Recreate keeps the
+  single-writable-state story honest on a one-node cluster.
+- **`fsGroup: 472`** alongside `runAsUser`/`runAsGroup` — the emptyDirs are
+  group-owned by 472 so Grafana can write `/var/lib/grafana` under
+  `readOnlyRootFilesystem`.
+- **Liveness + readiness on `/api/health`** (:3000, 20s/10s and 10s/5s initial
+  delay + period, 3s timeout). Grafana boots slowly on first start; shorter
+  windows produce restart loops on a loaded laptop.
+- **`imagePullPolicy: IfNotPresent`** — offline rule: never re-pull an image that
+  `cloudbox-init.sh` already put on the node.
+- **`app.kubernetes.io/version: "13.1.3"` on the Deployment** — a *hand-kept*
+  label. Bump it with the base image (it is not release-please-managed; the
+  `image:` ref inside the `x-release-please` block is, and it tracks our
+  `cloudbox-grafana` release, not the Grafana version).
 
 ## Re-vendor
 
