@@ -9,6 +9,9 @@
 # the same way module 07 seeds busybox:
 #   crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine \
 #     localhost:30500/library/golang:1.25-alpine
+# That seed step needs internet: this base is deliberately NOT on the pre-pull
+# list (scripts/images.txt) — it serves an optional going-deeper path, and the
+# download would be charged to every attendee. See docs/HAZARDS.md.
 FROM zot.zot.svc.cluster.local:5000/library/golang:1.25-alpine AS build
 WORKDIR /src
 COPY . .

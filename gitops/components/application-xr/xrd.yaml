@@ -52,7 +52,11 @@ spec:
                       default: 3
                 env:
                   type: array
-                  description: Extra plain environment variables, appended to the platform-injected ones.
+                  description: >-
+                    RESERVED — not yet implemented. The Composition emits no patch for
+                    this field, so values set here are silently ignored. Kept in the
+                    schema so the v2 append lands without an API break; see
+                    gitops/components/application-xr/VENDOR.md.
                   items:
                     type: object
                     required:
