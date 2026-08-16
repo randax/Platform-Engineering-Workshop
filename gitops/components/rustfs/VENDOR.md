@@ -8,42 +8,10 @@
 
 ## Re-vendor
 
-```sh
-helm repo add rustfs https://charts.rustfs.com && helm repo update
-cat > /tmp/rustfs-values.yaml <<'VALUES'
-replicaCount: 1
-image:
-  initImage:
-    repository: busybox
-    tag: "1.37.0"
-mode:
-  standalone:
-    enabled: true
-  distributed:
-    enabled: false
-ingress:
-  enabled: false
-secret:
-  rustfs:
-    access_key: cloudbox
-    secret_key: cloudbox123
-config:
-  rustfs:
-    obs_log_directory: ""
-    log_level: "info"
-resources:
-  requests:
-    cpu: 50m
-    memory: 128Mi
-  limits:
-    memory: 512Mi
-storageclass:
-  name: local-path
-  dataStorageSize: 2Gi
-VALUES
-helm template rustfs rustfs/rustfs --version 1.0.0-rc.2 --namespace rustfs \
-  --no-hooks -f /tmp/rustfs-values.yaml > rustfs.yaml
-```
+The recipe lives **once**, in the `curation` block further down this file —
+`scripts/check-vendor-drift.sh` runs it, so it cannot rot into a stale copy of
+itself. Re-vendoring is: reproduce the file with that recipe, re-apply the five
+curations below, then `./scripts/check-vendor-drift.sh --only rustfs`.
 
 Values rationale:
 - **standalone mode** (the chart defaults to a 4-pod *distributed* StatefulSet!).
@@ -63,6 +31,26 @@ Values rationale:
 - init image pinned (`busybox:stable` upstream → `busybox:1.37.0`).
 - Credentials `cloudbox`/`cloudbox123` are **workshop-grade and committed on
   purpose** (ephemeral lab sandbox); a comment in `rustfs.yaml` says the same.
+
+What the render exposes, since the labs address it directly:
+
+- **`9000` — the S3 endpoint.** In-cluster that is
+  `http://rustfs-svc.rustfs.svc.cluster.local:9000`, which is what
+  `S3_ENDPOINT` points at in portal, picture-pipeline and the module 03/04
+  bucket Jobs. `service-nodeport.yaml` (a workshop addition, not in the chart)
+  re-exposes the same port on **NodePort `30900`** = `NODEPORT_RUSTFS_S3` in
+  `scripts/versions.env`, so presigned URLs and `aws --endpoint-url` work from
+  the laptop with no port-forward. Those two numbers must move together with
+  that variable.
+- **`9001` — the built-in console**, ClusterIP only. Deliberately not on a
+  NodePort: the workshop's browser story is the Console (module 08) reading the
+  bucket over S3, not RustFS's own UI. Reach it with a port-forward if you want
+  to look.
+- **Probes, both on :9000**: liveness `GET /health` (30 s delay, 5 s period),
+  readiness `GET /health/ready` (10 s delay, 5 s period). `/health/ready` is the
+  one that matters for the labs — it is what makes "rustfs is Ready" mean the
+  object store will actually answer a `PutObject`, so the module 03 bucket Job
+  and the picture pipeline do not race a half-started server.
 
 Chart 1.0.0-rc.2 notes (vs the 1.0.0-rc.1 we vendored before):
 - **No values key we set was renamed, removed, or moved**, and none is
@@ -89,8 +77,9 @@ Chart 1.0.0-rc.2 notes (vs the 1.0.0-rc.1 we vendored before):
 
 ## Workshop curation applied (re-apply after re-vendoring)
 
-This list is **complete and mechanically verified**: `diff <the helm template
-output above> rustfs.yaml` produces nothing outside the five items below.
+This list is **complete and mechanically verified**, and stays that way:
+`./scripts/check-vendor-drift.sh --only rustfs` re-runs the recipe below and
+fails on any hunk that is not one of the five items here.
 
 1. **Credentials comment** above the `rustfs-secret` Secret.
 2. **`argocd.argoproj.io/sync-options: Prune=false`** on the `rustfs-data`
@@ -108,6 +97,69 @@ output above> rustfs.yaml` produces nothing outside the five items below.
    is a renderer artifact, not a chart change: helm 3 did not emit it and the
    file was first vendored under helm 3. Purely cosmetic — strip it to keep
    re-vendor diffs readable.
+
+### The same list, machine-readable
+
+`scripts/check-vendor-drift.sh` re-runs the `helm template` below — chart,
+version, flags and the whole values document — and diffs the result against
+`rustfs.yaml`. Every hunk needs an `allow` line, and each one names the numbered
+curation above rather than re-explaining it; an unlisted hunk fails (the chart
+moved under a value we set, or someone hand-edited the render) and an `allow`
+line whose hunk has **disappeared** fails too, because that is one of the five
+curations lost in a re-vendor.
+
+Curation 5 is why there are whitespace hunks here at all. This file was rendered
+with the pinned helm 4.2.3, so it carries none of the helm-3-era layout drift
+the other rendered components allow — the blank lines below are stripped on
+purpose, by us, and hunk `39cdd0de` is that strip and nothing else.
+
+```curation
+render rustfs.yaml
+chart     rustfs
+repo      https://charts.rustfs.com
+version   1.0.0-rc.2
+release   rustfs
+namespace rustfs
+flags     --no-hooks
+values
+  replicaCount: 1
+  image:
+    initImage:
+      repository: busybox
+      tag: "1.37.0"
+  mode:
+    standalone:
+      enabled: true
+    distributed:
+      enabled: false
+  ingress:
+    enabled: false
+  secret:
+    rustfs:
+      access_key: cloudbox
+      secret_key: cloudbox123
+  config:
+    rustfs:
+      obs_log_directory: ""
+      log_level: "info"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  storageclass:
+    name: local-path
+    dataStorageSize: 2Gi
+
+# --- accepted curation: one line per diff hunk (id, then why) ---
+allow  rustfs.yaml  39cdd0de  curation 5 — the blank line helm 4 emits before each `---`, stripped on purpose (4 hunks share this id: identical content). Not the same thing crossplane/zot/kagent allow — those are helm-3-era files nobody has re-rendered; this one WAS rendered with the pinned helm 4.2.3 and then stripped
+allow  rustfs.yaml  641f354b  curation 1 — the WORKSHOP-GRADE CREDENTIALS comment above the `rustfs-secret` Secret
+allow  rustfs.yaml  27322aea  curation 3 — the `RUSTFS_OBS_LOGGER_LEVEL` comment recording that the rc.1 log-flood workaround was removed in rc.2 (so nobody re-adds the EnvFilter suffix)
+allow  rustfs.yaml  a81b83fa  curation 2 — the comment explaining why the PVC carries two keep-annotations (ArgoCD ignores helm.sh/resource-policy)
+allow  rustfs.yaml  a3b94d12  curation 2 — `argocd.argoproj.io/sync-options: Prune=false` on the `rustfs-data` PVC; without it, disabling the app deletes the volume and every uploaded image
+allow  rustfs.yaml  12664c73  curation 4 — the empty trailing YAML document the disabled KMS `secret.yaml` template emits, plus its preceding blank line (curation 5)
+```
 
 ## History: the rc.1 log-flood workaround (upstream rustfs/rustfs#5927) — RESOLVED
 

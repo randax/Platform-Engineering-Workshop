@@ -79,7 +79,6 @@ info() { printf 'ℹ️  %s\n' "$1"; }
 #
 # A deferred component with no `render` recipe is covered by NEITHER guard.
 DEFERRED=(
-  "rustfs:its VENDOR.md was rewritten in a parallel change (chart 1.0.0-rc.2) that this one must not collide with, so nothing here is guarded yet. Two things to do, then delete this line: (1) document the five knobs it is missing — S3 port 9000, console port 9001, NodePort 30900, and the two probe paths /health and /health/ready; (2) give it a curation block with a \`render rustfs.yaml\` recipe (it is a plain \`helm template\`, so guard 1 can cover it properly)"
 )
 
 usage() {
