@@ -65,6 +65,58 @@ equivalent).
 
 ## Curation
 
+- **`filelog.exclude` skips the agent's own pod logs**
+  (`/var/log/pods/observability_otel-collector-agent*/*/*.log`). Without it the
+  agent tails its own stdout, every log line produces at least one more, and a
+  single warning turns into a self-feeding loop that fills VictoriaLogs on a
+  laptop-sized cluster. Non-obvious and easy to drop on a re-vendor.
+- **`batch` (timeout 10s) after `memory_limiter` in every pipeline** — one
+  export per 10s instead of per record; the ordering matters (limit first, then
+  batch).
+- **The `memory_limiter` numbers are tied to the container limits**: agent
+  `limit_mib: 200` / `spike_limit_mib: 50` under a 256Mi limit, gateway
+  `limit_mib: 400` / `spike_limit_mib: 100` under 512Mi (~80% each). Explicit
+  MiB, not a percentage, so behaviour is the same across attendee cgroup
+  setups. **Change one and change the other** — a limiter above the container
+  limit is worse than none, because the pod OOMKills before it ever sheds.
+- **Resources** (module-09 RAM ceiling): agent requests 50m/128Mi, limit 256Mi;
+  gateway requests 100m/128Mi, limit 512Mi.
+- **`health_check` extension on :13133 + probes.** Both collectors expose it and
+  both use `httpGet /` on 13133 for liveness (15s/10s) and readiness (5s/5s).
+  The port is deliberately **not** on the Service — it is a probe surface, not
+  an API.
+- **The agent tolerates everything** (`tolerations: [{operator: Exists}]`) so
+  the DaemonSet also runs on the control-plane node. Drop it and the CP node's
+  pod logs and node metrics silently vanish — half the cluster on a 1 CP + 1
+  worker `talosctl cluster create`.
+- **`K8S_NODE_IP` via the downward API** (`fieldRef: status.hostIP`) — the
+  agent's `kubeletstats` endpoint is `https://${env:K8S_NODE_IP}:10250`, so the
+  env var is load-bearing config, not decoration.
+- **`checksum/config` pod annotation** (`"stage2-v1"` agent, `"stage2-v3"`
+  gateway) is **hand-maintained**: editing a ConfigMap does not restart a
+  DaemonSet or Deployment. Bump the string whenever you touch that collector's
+  `config.yaml`, or the change only lands on the next unrelated pod restart —
+  the classic "I fixed the config and nothing changed" hour.
+- **Gateway `strategy: Recreate`, `replicas: 1`** — `k8s_cluster` and the
+  prometheus scrape jobs must run exactly once, and a rolling update would
+  briefly double-count.
+- **`app.kubernetes.io/version: "0.158.0"`** on both workloads is hand-kept —
+  bump it with the image tag/digest.
+- **The two `VL-Stream-Fields` headers differ on purpose**: the agent partitions
+  by `k8s.namespace.name,k8s.pod.name,k8s.container.name` (pod logs), the
+  gateway by `service.name,k8s.namespace.name` (app OTLP logs). Copying one
+  over the other gives VictoriaLogs a stream key that doesn't exist on that
+  signal.
+- **Connector shapes are load-bearing for module 09**: `spanmetrics` uses
+  `namespace: span` (hence `span_calls_total` / `span_duration_*`, never
+  colliding with app metric names) with explicit 5ms…5s buckets;
+  `servicegraph` uses 10ms…5s buckets and `store.ttl: 30s` / `max_items: 2000`.
+  **The 30s TTL is the curation**: the broker → resizer edge crosses a Knative
+  scale-from-zero cold start, so a shorter store drops the client/server pair
+  and that hop disappears from the service map.
+- **The gateway Service publishes only OTLP** — `otel-collector` (ClusterIP)
+  with 4317 (grpc) + 4318 (http). That name/port pair is the endpoint the
+  first-party apps are configured against.
 - **RBAC is read-only** — one ServiceAccount shared by both collectors; the
   ClusterRole is the union of what k8s_cluster / kubeletstats / prometheus-SD
   need, all `get/list/watch`. The collector observes; it never mutates.
