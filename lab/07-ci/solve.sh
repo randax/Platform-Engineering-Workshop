@@ -25,8 +25,18 @@ wait_exists builds workflowtemplate/build-and-push 180
 # 2. Seed YOUR registry with the (pre-pulled) base image — the app's Dockerfile
 #    builds FROM zot.zot.svc.cluster.local:5000, so the platform never touches
 #    an external registry. Host-side crane against Zot's NodePort (plain HTTP).
+#    SOURCE is the local cloudbox-mirror, not Docker Hub: busybox:1.37.0 is on
+#    the pre-pull list, so it is already there, and Docker Hub is rate-limited
+#    at the venue. Falls back to Docker Hub only if the mirror is absent.
+MIRROR="localhost:5001"     # cloudbox-mirror; MIRROR_PORT in scripts/versions.env
+if curl -fsS "http://${MIRROR}/v2/" >/dev/null 2>&1; then
+  BUSYBOX_SRC="${MIRROR}/library/busybox:1.37.0"
+else
+  echo "⚠️  cloudbox-mirror not reachable — falling back to Docker Hub (needs internet)"
+  BUSYBOX_SRC="docker.io/library/busybox:1.37.0"
+fi
 mise x crane@0.21.9 -- crane copy --insecure \
-  docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
+  "${BUSYBOX_SRC}" localhost:30500/library/busybox:1.37.0
 
 # 3. Build inside the cluster.
 WF_NAME="$(kubectl create -f "$LAB_DIR/workflow-run.yaml" -o jsonpath='{.metadata.name}')"

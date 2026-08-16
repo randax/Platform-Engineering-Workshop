@@ -78,7 +78,9 @@ zot                      | github-release | project-zot/zot                     
 zot-chart                | helm-index     | https://zotregistry.dev/helm-charts#zot         | chart:gitops/components/zot/zot.yaml#zot     |
 
 # --- Platform: self-service, serverless, builds, messaging -------------------
-crossplane-chart         | helm-index     | https://charts.crossplane.io/stable#crossplane  | chart:gitops/components/crossplane/crossplane.yaml#crossplane |
+# The "stable" channel index still carries -rc entries, so track stable only —
+# without this the weekly report recommended 2.4.0-rc.1 over 2.3.4.
+crossplane-chart         | helm-index     | https://charts.crossplane.io/stable#crossplane  | chart:gitops/components/crossplane/crossplane.yaml#crossplane | ^[0-9]+\.[0-9]+\.[0-9]+$
 knative-serving          | github-release | knative/serving                                 | file:gitops/components/knative-serving/serving-core.yaml#app.kubernetes.io/version: "([0-9][^"]*)" |
 knative-eventing         | github-release | knative/eventing                                | env:KNATIVE_EVENTING_VERSION                 |
 # Envoy backports patches to old minors, so /releases/latest can point BACKWARDS;

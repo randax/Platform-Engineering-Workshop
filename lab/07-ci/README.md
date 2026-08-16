@@ -29,14 +29,19 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    contains it (it was seeded with the whole workshop repo). Notice the `FROM` line:
    it pulls the base image from *your* Zot, not from Docker Hub — your platform builds
    FROM your own registry, fully offline.
-3. **Seed the base image**: pull busybox into YOUR registry (host-side, against Zot's
+3. **Seed the base image**: copy busybox into YOUR registry (host-side, against Zot's
    NodePort). `crane copy` doesn't read your local docker — it's a registry-to-registry
-   copy that pulls busybox from Docker Hub and pushes it straight into Zot:
+   copy. Source it from your own `cloudbox-mirror`, which already has it from the
+   pre-pull, so this step needs no internet either (Docker Hub is rate-limited at the
+   venue — that is the whole reason the mirror exists):
 
    ```bash
    mise x crane@0.21.9 -- crane copy --insecure \
-     docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
+     localhost:5001/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
    ```
+
+   If the mirror isn't running, `docker.io/library/busybox:1.37.0` works as a source
+   too — but then you're online.
 
    That's the platform-team move: you decide what base images exist in your cloud.
 4. Submit a build with [`workflow-run.yaml`](workflow-run.yaml) and follow it to
