@@ -109,23 +109,40 @@ curation upstream does not have — a maintenance cost, taken knowingly.
 /proc/net/if_inet6` inside the pod shows usable IPv6. Then drop it at the next
 re-vendor.
 
-## LIVE — VENDOR.md curation lists have been wrong three times
+## LIVE — VENDOR.md curation lists were wrong 11 times out of 19
 
 A `VENDOR.md` that under-documents its curation is a landmine for the *next*
 person to re-vendor: they follow the recipe, lose an undocumented edit, and
 break a module silently.
 
-Found and fixed this pass:
+All 19 components have now been audited. **11 were wrong**, and every one of the
+first four was found by accident, while bumping that component for an unrelated
+reason:
+
+- `local-path-provisioner` — missing the PSA `privileged` namespace label, whose
+  loss makes **every PVC hang Pending**
 - `knative-serving` — missing the `config-domain` `sslip.io` entry and nine
   `config-observability` keys (module 06 and the module 09 trace waterfall)
 - `knative-eventing` — missing six `config-observability` keys
-- `local-path-provisioner` — missing the PSA `privileged` namespace label, whose
-  loss makes **every PVC hang Pending**
+- `nats` — documented about half the component: the whole metrics sidecar, its
+  port and annotations, the probe split, the resource blocks
+- `grafana`, `otel-collector`, `portal`, `picture-pipeline`, `backstage`,
+  `application-xr` — gaps found in the full audit; `portal`'s RBAC list was
+  actively stale
+- only `cnpg-operator` was complete (it has no curation at all — byte-identical
+  to upstream, now stated explicitly)
 
-**Not yet audited:** every other `gitops/components/*/VENDOR.md`. The check is
-mechanical — diff the vendored file against pristine upstream at the pinned
-version and confirm every difference is a documented curation. Worth doing
-before the event.
+Two of those were worse than gaps: `backstage`'s VENDOR.md named the **wrong
+Gitea admin** (`cloudbox` instead of `gitea_admin`), so a maintainer "fixing"
+the manifest to match the doc would have broken the integration; and
+`application-xr` documented a curation **that does not exist** (see the
+`spec.env` TRAP below).
+
+**The shape is always the same:** the doc was accurate the day it was written
+and rotted at the next bump, because nothing ever compared it to anything.
+Prose cannot stay honest about a file that changes for other reasons — which is
+why the re-render gate and token-coverage lint exist. Do not rely on this
+audit staying true; rely on the guards.
 
 ## LIVE — a wrong-architecture mirror serves happily
 
@@ -165,6 +182,7 @@ in an index regardless of platform. Passing at home, failing at the venue.
 | CNPG is stuck on 1.28.x | Deliberate hold — the mature minor. 1.29/1.30 exist and are ignored by a `track` regex. |
 | envoy is behind at v1.37.x | net-kourier ships `v1.37-latest`; we pin the exact patch it resolves to. A `track ^1\.37\.` regex stops the weekly report recommending 1.39. |
 | Backstage is amd64-only | Upstream ships it that way; Apple Silicon runs it emulated. Listed in `MIRROR_ARCH_EXEMPT`. Under Colima it may need `--vm-type vz --vz-rosetta`. |
+| `application-xr`'s `spec.env` does nothing | Correct — it is **RESERVED, not implemented**. The Composition emits no patch for it; the field stays in the XRD so the v2 append lands without an API break. The VENDOR.md claimed for months that it was "appended"; git history shows the patch never existed. The XRD description now says so. |
 | `docker.io/grafana/grafana` vanished from `images.txt` | It was only the `FROM` line in `apps/grafana/Dockerfile`, consumed by CI. No pod ever pulled it. The deployed image is `ghcr.io/randax/cloudbox-grafana`. |
 
 ## WATCH — helm 4 on the apply path
@@ -224,15 +242,22 @@ Separately: "GitHub Actions is not permitted to create or approve pull requests"
 is a **repo setting**, not a code problem. It silently failed every release-please
 run from 2026-07-19 until it was ticked on 2026-08-11.
 
-## LIVE — the release/pin publish window
+## TRAP — the release/pin publish window (recurs every release)
 
-Release PR #184 rewrites all 15 first-party pins from `:v0.1.0` to `:v0.2.0`,
-but those images only exist **after** the PR merges. Between the two,
-`images.txt` points at images that do not exist and `cloudbox-init.sh`'s 67-ref
-preflight fails, downloading nothing.
+A release PR rewrites all 15 first-party pins to the next version, but those
+images only exist **after** the PR merges and `build-images` finishes. In
+between, `images.txt` points at images that do not exist and
+`cloudbox-init.sh`'s preflight fails, downloading nothing.
 
-Never start a fresh-laptop pre-pull inside that window. Merge the release, let
-`build-images` finish, verify all refs resolve, then pre-pull.
+Hit once for real on 2026-08-11 (`cloudbox-grafana:v0.1.0` did not exist) and
+navigated deliberately for v0.2.0 on 2026-08-16. **This is not a bug to fix —
+it is inherent to pinning your own images.** The rule is procedural: merge the
+release, wait for the build, verify every ref resolves, *then* pre-pull.
+
+    while IFS= read -r ref; do crane manifest "$ref" >/dev/null 2>&1 \
+      || echo "MISSING: $ref"; done < <(grep -vE '^\s*(#|\[|$)' scripts/images.txt)
+
+Never hand a fresh laptop a pre-pull inside that window.
 
 ## Open question — why the AWS CLI?
 
