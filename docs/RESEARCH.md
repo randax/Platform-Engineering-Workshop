@@ -34,10 +34,11 @@ deliberate hold: `helm` stays at 3.21.3.
 
 ## 2. Object storage: RustFS — **conditional GO**, SeaweedFS is Plan B
 
-- RustFS is at **1.0.0-rc.1**; no GA yet (roadmap said ~July 2026). Apache 2.0.
-  Official Helm chart `rustfs/rustfs` 1.0.0-rc.1 via https://charts.rustfs.com.
-  rc.1 carries an open log-flood regression (rustfs/rustfs#5927) that the
-  component works around at source — see `gitops/components/rustfs/VENDOR.md`.
+- RustFS is at **1.0.0-rc.2**; no GA yet (roadmap said ~July 2026). Apache 2.0.
+  Official Helm chart `rustfs/rustfs` 1.0.0-rc.2 via https://charts.rustfs.com.
+  rc.1's log-flood regression (rustfs/rustfs#5927) is **fixed** in rc.2, and the
+  workaround we shipped for it is gone — re-measured, see
+  `gitops/components/rustfs/VENDOR.md`.
 - Config for the workshop: `mode.standalone.enabled=true`, `mode.distributed.enabled=false`
   (distributed 4-pod is the default!), `ingress.enabled=false` (port-forward), creds via
   `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` env. ~90 MB idle, arm64 OK, runs as UID 10001.

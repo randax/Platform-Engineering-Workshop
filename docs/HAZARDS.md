@@ -12,52 +12,64 @@ rehearsal to settle · **TRAP** = looks like a bug, is deliberate, do not "fix"
 
 ---
 
-## LIVE — RustFS 1.0.0-rc.1 floods logs at ~29 GiB/h
+## WATCH — the RustFS scanner log flood is fixed; confirm it on a cluster
 
 Upstream [rustfs/rustfs#5927](https://github.com/rustfs/rustfs/issues/5927).
-`nsscanner_disk` omits `set_disks` from its `#[tracing::instrument]` skip list,
-so a `Vec<Arc<Disk>>` is Debug-rendered into every span line — **332,800 bytes
-per line**, several times a second.
+`nsscanner_disk` omitted `set_disks` from its `#[tracing::instrument]` skip
+list, so a `Vec<Arc<Disk>>` was Debug-rendered into every span line — **332,800
+bytes per line**, several times a second. From 1.0.0-rc.1 we shipped
+`log_level: "info,rustfs_scanner::scanner_io=warn"` to demote just that module.
 
-Measured here, idle, our exact config:
+**Fixed in 1.0.0-rc.2** (released 2026-08-14) by PR
+[#5933](https://github.com/rustfs/rustfs/pull/5933) ("skip disk inventory in
+scan spans", merged 2026-08-11, commit `727a10e1`, one of the 215 commits in
+the `rc.1...rc.2` comparison; issue closed). **Pinned rc.2 and removed the
+workaround on 2026-08-16, after re-measuring** — a release note is not
+evidence. Idle stdout, our exact config and pod hardening, 300 s windows:
 
-| store state | 1.0.0-beta.8 | 1.0.0-rc.1 |
-|---|---|---|
-| empty | 3.57 MiB/h | 2.27 MiB/h |
-| ~240 objects | 3.26 MiB/h | **30,030 MiB/h** |
+| image | `log_level` | store | idle stdout | longest line |
+|---|---|---|---|---|
+| `1.0.0-beta.8` | `info` | ~240 objects | 3.26 MiB/h | ~9 KB |
+| `1.0.0-rc.1` | `info` | ~240 objects | **30,030 MiB/h** *(orig. pass)* | 332,800 B |
+| `1.0.0-rc.1` | `info` | 240 objects | **7,668 MiB/h** *(re-measure)* | 326,600 B |
+| `1.0.0-rc.1` | `info,…scanner_io=warn` | 240 objects | 7.35 MiB/h | 3,921 B |
+| **`1.0.0-rc.2`** | **`info`** ← shipped | **240 objects** | **5.45 MiB/h** | **4,157 B** |
+| `1.0.0-rc.2` | `info,…scanner_io=warn` | 240 objects | 6.37 MiB/h | 4,086 B |
+| `1.0.0-rc.2` | `info` | **empty** | 1.21 MiB/h | 4,068 B |
 
-**It only floods once the scanner has objects to scan.** An empty-cluster smoke
-test cannot see this; an attendee at minute 150 can.
+On rc.2 the workaround measures *worse* than no workaround (6.37 vs 5.45 —
+noise): it has nothing left to suppress, which is why it went rather than
+being kept "just in case".
 
-**Mitigation (shipped):** `gitops/components/rustfs/rustfs.yaml` sets
-`log_level: "info,rustfs_scanner::scanner_io=warn"`. `RUSTFS_OBS_LOGGER_LEVEL`
-accepts a full tracing EnvFilter directive, not just a bare level — that cuts it
-to **5.72 MiB/h** while keeping ~15,700 INFO lines. A `filelog` exclusion in the
-OTel Collector was rejected: it keeps the flood out of VictoriaLogs but the
-runtime still writes 29 GiB/h to the attendee's disk and `kubectl logs` stays
-unusable. A real `obs_log_directory` would fill the 2Gi PVC in seconds.
-
-**Fixed upstream but not released.** PR
-[#5933](https://github.com/rustfs/rustfs/pull/5933) merged to `main`
-2026-08-11 01:01 UTC; the newest release is `1.0.0-rc.1` (2026-08-08), which
-predates it. Release cadence has been roughly weekly (beta.10 → beta.11 →
-beta.12 → rc.1 over four weeks), so a fixed build will *probably* exist before
-the workshop — do not depend on it.
-
-**Retire when:** a release containing #5933 is pinned. Then drop the filter
-suffix back to plain `"info"` — the comment at the change site says so.
+**The lesson that outlives the bug: it only floods once the scanner has
+objects to scan.** An empty store reads 1.21 MiB/h on fixed rc.2 and read
+2.27 MiB/h on flooding rc.1 — indistinguishable. An empty-cluster smoke test
+cannot see this class of bug; an attendee at minute 150 can. Seed the store
+first, always.
 
 **Watch in rehearsal:** modules 03/04/09. Upload objects, then check log growth
-stays in single MiB/hour. Not at boot — *after* objects exist.
+stays in single MiB/hour. Not at boot — *after* objects exist. If it is back,
+the mitigation history (EnvFilter directive, and the OTel `filelog` exclusion
+and `obs_log_directory` options that were rejected and why) is in
+`gitops/components/rustfs/VENDOR.md`.
+
+**Do not mistake this for it:** rc.2 still Debug-renders a whole `ECStore`
+(disk map and all) into `rustfs_ecstore::bucket::replication::replication_pool`
+spans — a **1.5 MB single log line**, same shape of bug as #5927. It is
+harmless because it is a *fixed boot cost, not a rate*: measured at exactly
+**7 lines / ~6.2 MB within 9 ms of startup**, and the count stayed at 7
+through 240 uploads and 120 s of idle. Worth re-checking only if it ever
+starts scaling with operations.
 
 ## LIVE — RustFS is a prerelease, by choice
 
-`1.0.0-rc.1` is an rc, on a component modules 03, 04 and 09 depend on. Chosen
+`1.0.0-rc.2` is an rc, on a component modules 03, 04 and 09 depend on. Chosen
 deliberately by the maintainer with the above evidence in hand. RustFS is beta
 by design in this workshop (`docs/RESEARCH.md` §2); SeaweedFS is Plan B.
 
-If #5927 turns out to have siblings in other scanner modules, the EnvFilter
-directive needs widening — it targets one module path, not a class of bug.
+#5927 is fixed, but it was a whole-class reminder: if a sibling lands in
+another scanner module, the EnvFilter directive that fixed it targets one
+module path, not a class of bug, and would need widening.
 
 ## WATCH — Cilium 1.20.0 datapath is unproven
 
