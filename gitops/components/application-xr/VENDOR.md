@@ -19,8 +19,8 @@ Crossplane v2 pipeline + `function-patch-and-transform` — no new components.
 1. **workload** — a Knative `Service` named after the XR. Free scale-to-zero and
    a `http://<name>.<namespace>.127.0.0.1.sslip.io:31080` URL via Kourier — no
    separate ingress component. `spec.image` → the container; `spec.replicas`
-   `{min,max}` → `autoscaling.knative.dev/{minScale,maxScale}`; `spec.env` is
-   **appended** (patch `mergeOptions.appendSlice`) to the platform-injected env.
+   `{min,max}` → `autoscaling.knative.dev/{minScale,maxScale}`. **`spec.env` is
+   accepted by the XRD but NOT wired in v1** — see the limitations below.
 2. **database** — a `WorkshopDatabase` XR (module 04, verbatim), which in turn
    composes a CNPG `Cluster` + a bucket Job. This is the make-or-break
    **composition-of-compositions**.
@@ -44,8 +44,77 @@ key: "uri" }` with a `Format` patch. Because a Knative revision with a
 `secretKeyRef` to a not-yet-existent secret won't become Ready, the workload is
 **naturally ordered after the database** — no explicit readiness gate needed.
 
+## The details a rewrite must reproduce
+
+These files are ours, so there is no upstream render to diff against — this is
+the list that keeps them rebuildable.
+
+**`xrd.yaml`** — `apiextensions.crossplane.io/v2`, `scope: Namespaced`, no
+claims. Group `platform.cloudbox.io`, kind `Application`, plural
+`applications`, **shortName `app`** (`kubectl get app` is what the lab types).
+Version `v1alpha1`, `served` + `referenceable`. `spec.image` is the only
+required field; `spec.replicas` defaults to `{}` with `min: 0` / `max: 3` so the
+object validates when omitted; `spec.database` / `spec.bucket` default `true`
+(and are inert — see limitations); `spec.env` is a `[{name,value}]` array (also
+inert).
+
+**`composition.yaml`** — `mode: Pipeline`, one step against
+`function-patch-and-transform` (the name must match the installed Function,
+shared with module 04), three resources:
+
+- **workload base defaults mirror the XRD defaults** — `minScale: "0"`,
+  `maxScale: "3"`. If the two ever disagree, an XR that omits `spec.replicas`
+  gets whichever the base carries.
+- **The base image is a real, pre-pulled ref**
+  (`ghcr.io/randax/cloudbox-uploader`) inside `x-release-please-start/end-version`
+  block comments, not a placeholder. It exists so the manifest is valid
+  standalone and so `check-consistency.sh`'s "every image is pre-pulled" check
+  passes; release-please rewrites the tag. Never replace it with something like
+  `example/app:latest`.
+- **The workload's S3 env is platform-injected**: `S3_ENDPOINT` →
+  `http://rustfs-svc.rustfs.svc.cluster.local:9000`, workshop creds
+  `cloudbox`/`cloudbox123` (must match the rustfs component), and `S3_BUCKET`
+  patched to `<name>-data`.
+- **Patches address env by index** — `env[0]` is `DATABASE_URL` (its
+  `secretKeyRef.name` patched to `<name>-pg-app`) and `env[4]` is `S3_BUCKET`.
+  Reorder the base env array and the patches silently write to the wrong
+  variable; the same applies to the bucket Job's `env[3]` (`BUCKET`).
+- **Numeric → annotation needs `convert: int64` before `Format: "%d"`.** The
+  replicas arrive as JSON numbers (float64); formatting them directly yields
+  `"0.000000"` in an annotation Knative then rejects. Module 04 hit the same
+  gotcha with `storageGB`.
+- **The `database` resource sets `spec.size: small`** (the WorkshopDatabase
+  T-shirt knob, PRD-0006) and patches **both `metadata.name` and
+  `metadata.namespace`** — the namespace patch is what keeps a namespaced XR
+  from landing in the wrong place.
+- **Every resource carries a `readinessCheck`**: `MatchCondition Ready=True` on
+  the workload and the database, `MatchCondition Complete=True` on the Job.
+  These are what make the Application's own readiness mean something — without
+  them the XR reports Ready while its database is still provisioning.
+- **The bucket Job** is `backoffLimit: 6`, `restartPolicy: OnFailure`, the
+  pinned `public.ecr.aws/aws-cli/aws-cli` image, `head-bucket || s3 mb` for
+  idempotency, and `AWS_REGION=us-east-1` (the CLI refuses to sign without a
+  region). Job name `<name>-storage`, bucket `<name>-data` — deliberately
+  distinct from the WorkshopDatabase's own `<name>-bucket`/`<name>-assets` so
+  the two Jobs can coexist in one namespace.
+
+**`rbac.yaml`** — a ClusterRole labelled
+`rbac.crossplane.io/aggregate-to-crossplane: "true"` (that label is the entire
+mechanism; without it the rules are inert) granting full lifecycle over
+`serving.knative.dev/services` and `platform.cloudbox.io/*`. Crossplane only
+gets RBAC over its own types, so a composition that emits a third-party kind
+fails with a plain "forbidden" until its group is aggregated in.
+
 ## v1 limitations (deferred to follow-ups — call these out in review)
 
+- **`spec.env` is inert.** The XRD accepts it (and its description says
+  "appended to the platform-injected ones"), but the composition emits **no
+  patch for it** — `function-patch-and-transform`'s `PatchPolicy` has no
+  `mergeOptions.appendSlice` (that was classic-Composition syntax), and the
+  modern array-append form needs a cluster to verify. So a developer can set
+  `spec.env` and nothing happens, silently. v1 ships the platform-injected
+  DB/S3 env only. Fix the XRD description or land the patch — do not "fix" this
+  by trusting the description.
 - **`database` / `bucket` are NOT gated.** `function-patch-and-transform` has no
   per-resource conditional, so both resources are **always** emitted regardless
   of the boolean. The flags are kept in the API for forward-compat; honoring
