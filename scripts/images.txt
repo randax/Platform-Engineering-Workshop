@@ -60,9 +60,9 @@ ghcr.io/cloudnative-pg/cloudnative-pg:1.28.4
 # also pinned explicitly by the Backstage database in gitops/
 ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
 # RustFS — Docker Hub only (no GHCR mirror upstream); prerelease by design, see
-# RESEARCH.md §2. 1.0.0-rc.1 needs the log-flood workaround documented in
-# gitops/components/rustfs/VENDOR.md (upstream rustfs/rustfs#5927).
-docker.io/rustfs/rustfs:1.0.0-rc.1
+# RESEARCH.md §2. rc.2 carries the fix for the rc.1 scanner log flood
+# (rustfs/rustfs#5927), re-measured in gitops/components/rustfs/VENDOR.md.
+docker.io/rustfs/rustfs:1.0.0-rc.2
 ghcr.io/project-zot/zot:v2.1.20
 
 # --- Wave 2: self-service, serverless, builds
