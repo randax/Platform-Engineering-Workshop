@@ -2,7 +2,9 @@
 # CloudBox — JavaZone 2026: Cloud on Your Terms
 #
 # Tool pins for the workshop. Everything is pinned (principle 14) — versions
-# verified 2026-08-11 (the pre-event pass; `helm` is held at 3.21.3 on purpose).
+# verified 2026-08-11 (the pre-event pass) and re-verified 2026-08-16, when
+# `helm` went to 4.2.3 and the three `helm upgrade --install` call sites gained
+# an explicit `--server-side=false` (docs/HAZARDS.md).
 # Keep in sync with scripts/versions.env when bumping.
 #
 #   mise install        # install all tools below
