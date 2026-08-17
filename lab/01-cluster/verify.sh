@@ -20,7 +20,12 @@ fi
 if kubectl version >/dev/null 2>&1; then
   ok "kubectl reaches the API server"
 else
-  fail "kubectl cannot reach the cluster — did create-cluster.sh finish? Try: talosctl kubeconfig -n 10.5.0.2"
+  # Do NOT suggest `talosctl kubeconfig` here. It writes the server address from
+  # the machine config's cluster.controlPlane.endpoint (https://10.5.0.2:6443),
+  # which only routes on native Linux — on macOS/Windows it replaces a working
+  # kubeconfig with one that hangs on TCP connect. create-cluster.sh repoints the
+  # context at the controlplane container's published port; re-running it is the fix.
+  fail "kubectl cannot reach the cluster — did create-cluster.sh finish? Re-run ./scripts/create-cluster.sh (it repoints kubeconfig at https://127.0.0.1:\$(docker port cloudbox-controlplane-1 6443/tcp))"
   echo; echo "❌ Cannot check further without API access."; exit 1
 fi
 
