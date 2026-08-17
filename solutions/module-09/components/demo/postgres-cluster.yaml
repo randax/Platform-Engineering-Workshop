@@ -20,13 +20,19 @@ spec:
     size: 1Gi
     storageClass: local-path   # must exist — wave 0 installed this provisioner
 
+  # Requests only for CPU — deliberately no cpu limit. A request is what the
+  # scheduler packs against; a CPU *limit* is a CFS quota that throttles the
+  # container even when the node has idle cores, and a throttled Postgres pays
+  # in latency for capacity nobody else is using. (Ask us about the rehearsal
+  # where 98% CPU pressure sat on top of 23% actual utilisation.)
+  # Memory limits stay: memory can't be throttled, so the limit is the only
+  # backstop against a runaway — the failure mode is an OOM kill, not a queue.
   resources:
     requests:
       memory: 256Mi
       cpu: 100m
     limits:
       memory: 512Mi
-      cpu: 500m
 
   postgresql:
     parameters:

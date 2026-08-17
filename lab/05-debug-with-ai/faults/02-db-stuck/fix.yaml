@@ -20,10 +20,12 @@ spec:
     size: 1Gi
     # was: localpath (a storage class that does not exist)
     storageClass: local-path
+  # No cpu limit anywhere in this workshop: a request is what the scheduler
+  # needs, a cpu limit is a CFS quota that throttles on an idle node. Memory
+  # keeps its limit — that failure mode is an OOM kill, not a queue.
   resources:
     requests:
       memory: 256Mi
       cpu: 100m
     limits:
       memory: 512Mi
-      cpu: 500m

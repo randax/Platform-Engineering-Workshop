@@ -40,13 +40,18 @@ spec:
                 storage:
                   size: 1Gi # patched from spec.size
                   storageClass: local-path
+                # CPU is requests-only on everything the platform composes. The
+                # request is what the scheduler packs against; a CPU limit is a
+                # CFS quota that throttles the pod even when the node is idle.
+                # Memory keeps its limit (the failure mode there is an OOM kill,
+                # not a queue) and both memory values are patched from the
+                # T-shirt size below.
                 resources:
                   requests:
                     memory: 256Mi # patched from spec.size
                     cpu: 100m
                   limits:
                     memory: 512Mi # patched from spec.size
-                    cpu: 500m
                 postgresql:
                   parameters:
                     max_connections: "100"
