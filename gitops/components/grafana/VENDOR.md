@@ -72,7 +72,13 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
   `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`) — the workshop Grafana is open,
   workshop-grade on purpose. The login form is left available so an admin
   (default `admin`/`admin`, ephemeral lab) can still edit. Sign-up disabled
-  (`GF_USERS_ALLOW_SIGN_UP=false`); analytics and update checks disabled
+  (`GF_USERS_ALLOW_SIGN_UP=false`). **`GF_USERS_VIEWERS_CAN_EDIT=true` belongs
+  to this group and is load-bearing:** the Viewer role does not carry the
+  `datasources:explore` RBAC action, so without it Grafana 302s an anonymous
+  `/explore?…panes=…` request to `/?redirectTo=/explore…` — the home page, with
+  the Console's prefilled pane discarded. That breaks module 09 step 5 and every
+  "open in Grafana" link the Console emits. Do not drop it; analytics and update
+  checks disabled
   (`GF_ANALYTICS_REPORTING_ENABLED=false`,
   `GF_ANALYTICS_CHECK_FOR_UPDATES=false`) so nothing phones home at boot
   (offline rule); `GF_INSTALL_PLUGINS=""` **and**

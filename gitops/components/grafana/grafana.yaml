@@ -134,6 +134,21 @@ spec:
               value: Viewer
             - name: GF_USERS_ALLOW_SIGN_UP
               value: "false"
+            # Load-bearing for module 09 step 5 AND every "open in Grafana"
+            # deep-link the Console emits. The Viewer role does NOT carry the
+            # `datasources:explore` RBAC action, so an anonymous visitor asking
+            # for /explore is 302'd to `/?redirectTo=/explore…` — the Grafana
+            # HOME page, with the carefully-built ?panes= payload thrown away.
+            # Verified on 13.1.3: anonymous
+            # GET /api/access-control/user/actions returned
+            #   datasources.id:read, datasources:query, datasources:read
+            # and no datasources:explore. `viewers_can_edit` adds exactly that
+            # action; it does not add dashboards:write, so an anonymous visitor
+            # still cannot save anything. (The heavier alternative is
+            # GF_AUTH_ANONYMOUS_ORG_ROLE=Editor — more rights than the workshop
+            # needs.)
+            - name: GF_USERS_VIEWERS_CAN_EDIT
+              value: "true"
             # Offline rule: never phone home at boot.
             - name: GF_ANALYTICS_REPORTING_ENABLED
               value: "false"
