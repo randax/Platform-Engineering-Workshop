@@ -19,8 +19,20 @@ fi
 
 # 2a. Seed Zot with the base image the Dockerfile builds FROM
 #     (zot.zot.svc.cluster.local:5000/library/busybox). Idempotent.
+#     Source it from the local cloudbox-mirror, which the pre-pull already
+#     filled with busybox:1.37.0 — catch-up.sh is the recovery path AT THE
+#     VENUE, so it must not reach for Docker Hub (rate-limited there, and
+#     unreachable if the WiFi has given up). Same logic as lab/07-ci/solve.sh
+#     and the module README; only fall back to Docker Hub if the mirror is gone.
+MIRROR="localhost:5001"     # MIRROR_PORT in scripts/versions.env
+if curl -fsS --max-time 5 "http://${MIRROR}/v2/" >/dev/null 2>&1; then
+  BUSYBOX_SRC="${MIRROR}/library/busybox:1.37.0"
+else
+  echo "⚠️  cloudbox-mirror not reachable — falling back to Docker Hub (needs internet)" >&2
+  BUSYBOX_SRC="docker.io/library/busybox:1.37.0"
+fi
 mise x crane@0.21.9 -- crane copy --insecure \
-  docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
+  "${BUSYBOX_SRC}" localhost:30500/library/busybox:1.37.0
 
 WF_NAME="$(kubectl create -f "$REPO_ROOT/lab/07-ci/workflow-run.yaml" -o jsonpath='{.metadata.name}')"
 echo "submitted build workflow: $WF_NAME"
