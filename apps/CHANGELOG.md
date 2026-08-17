@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/randax/Platform-Engineering-Workshop/compare/apps-v0.2.0...apps-v0.2.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **console:** read kagent 0.9.12's real A2A frames in the Case file ([7eb4065](https://github.com/randax/Platform-Engineering-Workshop/commit/7eb406523dbe2c38507954cb7d2e3b3ae7200342))
+* **portal:** module 04 could never reach Done on the Workshop page ([c1faf23](https://github.com/randax/Platform-Engineering-Workshop/commit/c1faf237f6487a9db77ebe02f842e5b63f48e98b))
+* stop advertising an inert field, and name the one online-only step ([cc24a27](https://github.com/randax/Platform-Engineering-Workshop/commit/cc24a27f2d4a75fe7788dd25d4fa5e9ec87d4b93))
+
 ## [0.2.0](https://github.com/randax/Platform-Engineering-Workshop/compare/apps-v0.1.0...apps-v0.2.0) (2026-08-16)
 
 
