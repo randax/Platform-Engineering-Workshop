@@ -160,7 +160,7 @@ spec:
       containers:
         - name: create-bucket
           # Same pinned image the platform-api composition and post.sh use.
-          image: public.ecr.aws/aws-cli/aws-cli:2.36.20
+          image: public.ecr.aws/aws-cli/aws-cli:2.36.24
           command:
             - /bin/sh
             - -c

@@ -6,7 +6,7 @@ set -euo pipefail
 
 for attempt in 1 2 3; do
   if kubectl -n demo run "catchup-s3-$$" --rm -i --restart=Never --quiet \
-      --image=public.ecr.aws/aws-cli/aws-cli:2.36.20 \
+      --image=public.ecr.aws/aws-cli/aws-cli:2.36.24 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
       --env AWS_REGION=us-east-1 \
       --command -- /bin/sh -c '

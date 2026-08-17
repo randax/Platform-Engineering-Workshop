@@ -87,7 +87,7 @@ s3() {
       aws --endpoint-url http://localhost:30900 "$@" 2>/dev/null
   else
     kubectl -n pipeline run "verify-s3-$$-${RANDOM}" --rm -i --restart=Never --quiet \
-      --image=public.ecr.aws/aws-cli/aws-cli:2.36.20 \
+      --image=public.ecr.aws/aws-cli/aws-cli:2.36.24 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
       --env AWS_REGION=us-east-1 \
       -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 "$@" 2>/dev/null

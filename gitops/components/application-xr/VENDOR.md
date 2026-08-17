@@ -93,7 +93,7 @@ shared with module 04), three resources:
   These are what make the Application's own readiness mean something — without
   them the XR reports Ready while its database is still provisioning.
 - **The bucket Job** is `backoffLimit: 6`, `restartPolicy: OnFailure`, the
-  pinned `public.ecr.aws/aws-cli/aws-cli:2.36.20` image, `head-bucket || s3 mb`
+  pinned `public.ecr.aws/aws-cli/aws-cli:2.36.24` image, `head-bucket || s3 mb`
   for idempotency, and `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
   `AWS_REGION=us-east-1` (the CLI refuses to sign without a region) — the same
   workshop-grade `cloudbox`/`cloudbox123` credentials the workload gets as
