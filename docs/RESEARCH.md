@@ -94,7 +94,7 @@ deliberate hold: `helm` stays at 3.21.3.
 
 ## 4. CI/CD: Argo Workflows + BuildKit + Zot (if kept in scope)
 
-- Argo Workflows **v4.0.8**; `namespace-install.yaml`; server-side apply required; emissary
+- Argo Workflows **v4.1.1**; `namespace-install.yaml`; server-side apply required; emissary
   executor (unprivileged).
 - **Kaniko was archived June 2025.** The 2026 in-cluster build answer is **rootless BuildKit**
   (v0.32.x): `buildctl-daemonless.sh`, `--oci-worker-no-process-sandbox`, seccomp/AppArmor

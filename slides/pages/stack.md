@@ -133,7 +133,7 @@ RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed clust
 <tbody>
 <tr><td>Self-service API</td><td><span class="we"><Logo name="crossplane" size="1.3rem"/> <b>Crossplane v2.3.4</b></span></td><td>Helm/operators · Crossplane v1</td><td>Namespaced XRs compose real K8s resources — needs per-group RBAC</td></tr>
 <tr><td>Serverless</td><td><span class="we"><Logo name="knative" size="1.3rem"/> <b>Knative v1.23</b></span></td><td>plain Deployments · KEDA</td><td>Scale-to-zero + request buffering — an activator in the path</td></tr>
-<tr><td>In-cluster CI</td><td><span class="we"><Logo name="argo-workflows" size="1.3rem"/> <b>Argo Workflows v4.0.8 + BuildKit</b></span></td><td>Tekton · external CI</td><td>Rootless image builds, no cloud — needs a PSA-privileged namespace</td></tr>
+<tr><td>In-cluster CI</td><td><span class="we"><Logo name="argo-workflows" size="1.3rem"/> <b>Argo Workflows v4.1.1 + BuildKit</b></span></td><td>Tekton · external CI</td><td>Rootless image builds, no cloud — needs a PSA-privileged namespace</td></tr>
 </tbody>
 </table>
 

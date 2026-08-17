@@ -18,7 +18,7 @@ metadata:
 # The namespace-scoped Roles that namespace-install.yaml creates in `argo`
 # only cover `argo`. The controller and server service accounts need the same
 # rights in the managed namespace, so we mirror them here (rules copied from
-# argo-role / argo-server-role in namespace-install.yaml v4.0.8).
+# argo-role / argo-server-role in namespace-install.yaml v4.1.1).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

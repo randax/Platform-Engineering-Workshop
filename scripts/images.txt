@@ -88,11 +88,11 @@ gcr.io/knative-releases/knative.dev/eventing/cmd/in_memory/channel_dispatcher@sh
 gcr.io/knative-releases/knative.dev/eventing/cmd/broker/filter@sha256:d7bb470ad790a9460c9a6b526d73a9b87a16ab9b94094745bc59a97507f0f466
 gcr.io/knative-releases/knative.dev/eventing/cmd/broker/ingress@sha256:d5bfc081eb9dccb47eb15f9971f0b3d8a24d0224573315a46d4afd87074b84ab
 gcr.io/knative-releases/knative.dev/eventing/cmd/mtchannel_broker@sha256:e600b78ee63225b3ab905fc3daf1f73772e8756b26ca5ace26fbaf4d81d3f8e5
-# Argo Workflows v4.0.8 (argoexec is injected by the controller at pod
+# Argo Workflows v4.1.1 (argoexec is injected by the controller at pod
 # creation, not an image: field anywhere — offline needs it listed here)
-quay.io/argoproj/workflow-controller:v4.0.8
-quay.io/argoproj/argoexec:v4.0.8
-quay.io/argoproj/argocli:v4.0.8
+quay.io/argoproj/workflow-controller:v4.1.1
+quay.io/argoproj/argoexec:v4.1.1
+quay.io/argoproj/argocli:v4.1.1
 # Rootless BuildKit (in-cluster image builds)
 docker.io/moby/buildkit:v0.32.2-rootless
 # NATS 2.14.5 + JetStream — durable messaging (PRD-0001). Upstream skipped the

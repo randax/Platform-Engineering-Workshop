@@ -173,7 +173,7 @@ EOF
 
 info "Exposing the ArgoCD UI on NodePort ${NODEPORT_ARGOCD} (plain http for the lab)"
 # server.insecure: plain http for the lab.
-# reposerver.max.combined... : the vendored Argo Workflows install is ~11 MB
+# reposerver.max.combined... : the vendored Argo Workflows install is ~12 MB
 # (huge CEL-validated CRDs) and exceeds the 10M default → the app never syncs
 # ("exceeded max combined manifest file size"). Raise it. Found by rehearsal-in-CI.
 kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge \
