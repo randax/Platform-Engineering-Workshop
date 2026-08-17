@@ -4,15 +4,120 @@ Everything we know is dangerous, deliberately weird, or unproven — with what
 would go wrong, how you would notice, and what retires it.
 
 Written during the pre-event bump pass on **2026-08-11**, three weeks before the
-workshop (JavaZone, Sept 2–3). `docs/MAINTENANCE.md` is how pins get bumped;
-this is what to be afraid of while doing it.
+workshop (JavaZone, Sept 2–3), and rewritten after the first full end-to-end
+rehearsal on **2026-08-17**: modules 00→10 on one Apple Silicon laptop (Colima,
+8 CPU / 15.6 GiB), **11/11 `verify.sh` exit 0**, 21/21 ArgoCD Applications
+Synced+Healthy, Talos v1.13.8 / Kubernetes v1.36.2 / containerd 2.2.6, and
+**~16 minutes of total script time against the 240-minute budget** — the machine
+is not the constraint. It also found three blockers, two of which no CI job we
+have can see. `docs/MAINTENANCE.md` is how pins get bumped; this is what to be
+afraid of while doing it.
 
 Status key: **LIVE** = a real risk today · **WATCH** = unproven, needs a
-rehearsal to settle · **TRAP** = looks like a bug, is deliberate, do not "fix"
+rehearsal to settle · **PROVEN ONCE** = came out green in the 2026-08-17
+rehearsal, on one machine, one architecture — settled, not proven ·
+**TRAP** = looks like a bug, is deliberate, do not "fix"
 
 ---
 
-## WATCH — the RustFS scanner log flood is fixed; confirm it on a cluster
+## LIVE — every node container is capped at 2.0 CPUs, whatever the laptop has
+
+`talosctl cluster create docker` defaults **`--cpus-controlplanes` and
+`--cpus-workers` to `2.0`** (its own `--help` says so), and
+`scripts/create-cluster.sh` passes neither — it raises `--memory-controlplanes` /
+`--memory-workers` deliberately and says nothing about CPU. So the entire
+Kubernetes cluster runs inside a **4-CPU budget** no matter how many cores the
+machine has:
+
+    docker inspect cloudbox-worker-1 --format '{{.HostConfig.NanoCpus}}'
+    2000000000                                     # = 2.0 CPUs
+    grep -n MIN_CPUS scripts/versions.env
+    99:MIN_CPUS="4"                                # the only CPU number in the repo
+
+It is even in `talosctl`'s own creation summary (`CPU 2.00` per node), where
+nobody reads it as a limit.
+
+**What it does.** Everything schedules onto the one untainted worker. Modules
+00–09 each passed on an 8-core machine without a hiccup, but at module 10's
+canonical end state — 18 wave apps plus kagent, NATS and Backstage, 21 apps and
+~125 containers — the worker ran out of CPU and the cluster came apart: kubelet
+`HEALTH Fail` (`/healthz: context deadline exceeded`), `cloudbox-worker-1
+NotReady`, then `kubectl` itself failing with `TLS handshake timeout` for tens of
+minutes. The decisive reading, from inside the Colima VM:
+
+    /proc/pressure/cpu:     some avg10=98.72 avg60=97.89 avg300=96.02
+    /proc/pressure/io:      some avg10=2.56
+    /proc/pressure/memory:  some avg10=0.00        full avg10=0.00
+
+**98.7 % of the time some task is stalled waiting for CPU while the VM is only
+~23 % busy and memory pressure is exactly zero** (worker 4.5/6 GiB, CP 3.2/4 GiB,
+9.4 GB free). High CPU pressure + low absolute utilisation + no memory pressure
+is cgroup throttling, not a machine that is too small.
+
+**You cannot rescue it afterwards.** `docker update --cpus 3` /
+`--cpus 4` on the live containers dropped pressure 98.7 → ~92 but the cluster did
+**not** come back within the next ~10 minutes; once kubelet is behind on ~125
+containers the backlog outlives the fix, and draining it took ~20–30 minutes. The
+caps have to be right *before* the load arrives.
+
+**Unresolved — this is a maintainer decision, not a patch.** Fixing it collides
+with the published spec: `MIN_CPUS="4"` is a promise (principle 12, honest
+specs), and if the worker needs more than 2 CPUs of its own to hold the full
+stack then a 4-core laptop cannot run the stretch modules and the minimum has to
+say so. Nobody has yet measured what the right numbers are. Options, in the order
+worth considering: (1) add `TALOS_CPUS_CONTROLPLANE` / `TALOS_CPUS_WORKER` to
+`versions.env` and pass the flags, sized from the host core count rather than
+fixed; (2) state in modules 06–10's prerequisites that the full stack needs more
+than the core-path minimum, and raise `MIN_CPUS` for the stretch path; (3) give
+the observability stack resource requests so the scheduler refuses instead of
+thrashing. Nothing bounds over-commit today.
+
+**Read the currently-running rehearsal cluster with that in mind:** its 21/21
+healthy state is on **hand-raised caps (3 CP / 4 worker)**, set with `docker
+update` after the wedge. That is not what an attendee's `create-cluster.sh`
+produces. Note also that `install.sh --check` verifies the *host* has ≥4 CPUs and
+never mentions that only 4 reach the cluster regardless.
+
+## TRAP — a green `bootstrap-test.yaml` means "the workshop works on Linux"
+
+`bootstrap-test.yaml` runs on `ubuntu-latest`, where the host routes straight
+into the Talos docker network. **macOS, Windows, and every Docker
+Desktop / OrbStack / Colima host does not** — and macOS is a fully supported
+platform in the published matrix (`docs/PRINCIPLES.md` §12) on which most of a
+JavaZone room will be sitting. Both blockers the 2026-08-17 rehearsal found were
+invisible to CI *by construction*:
+
+- **`create-cluster.sh` could not finish on macOS at all** (fixed `1129983`).
+  `talosctl cluster create` merges a working kubeconfig
+  (`https://127.0.0.1:<published port>`); the script's very next line,
+  `talosctl kubeconfig --force`, overwrites it with the machine config's
+  `cluster.controlPlane.endpoint` = **`https://10.5.0.2:6443`**, an address
+  inside the Talos docker network. Linux routes there, laptops do not, so every
+  `kubectl` call blocks. Cilium never installs; nothing past module 01 happens.
+  Worse, the wait loop had no `--request-timeout`, so `kubectl` blocked on the
+  ~75 s OS TCP connect timeout per attempt: `seq 1 60` × `sleep 2` promised
+  "2 minutes" and was really ~77 minutes of frozen terminal with no error. Fixed
+  by pointing kubeconfig at `docker port <cp> 6443/tcp` (talosctl already puts
+  `127.0.0.1` in the API server certSANs, so it is valid on Linux too) plus
+  `--request-timeout=5s` so the timeout matches its message.
+- **`destroy && create` failed on the second cluster of the day** (fixed
+  `3a7848f`). `talosctl config remove` **refuses to remove the currently-selected
+  context and still exits 0** ("skipping removal of current context …"), and
+  `destroy-cluster.sh` discarded its output — so the context was never removed,
+  the next `talosctl cluster create` found the name taken and renamed **the new**
+  context to `cloudbox-1`, and every `talosctl --context cloudbox` in
+  `create-cluster.sh` then dialled the destroyed cluster (`connection refused`,
+  exit 1, before Cilium). This broke `catch-up.sh --rebuild` — the recovery path,
+  i.e. the one thing reserved for people who are already in trouble. A CI runner
+  creates exactly one cluster and is then discarded, so it can never see this.
+
+**The standing lesson: rehearse on a Mac before the event, and specifically
+rehearse the *second* cluster, not just the first.** A macOS job, or at minimum a
+`destroy && create` cycle appended to `bootstrap-test.yaml`, would close the two
+gaps that hid these. Until then, green CI is evidence about Linux and nothing
+else.
+
+## PROVEN ONCE — the RustFS scanner log flood is fixed, and confirmed on a cluster
 
 Upstream [rustfs/rustfs#5927](https://github.com/rustfs/rustfs/issues/5927).
 `nsscanner_disk` omitted `set_disks` from its `#[tracing::instrument]` skip
@@ -25,7 +130,8 @@ bytes per line**, several times a second. From 1.0.0-rc.1 we shipped
 scan spans", merged 2026-08-11, commit `727a10e1`, one of the 215 commits in
 the `rc.1...rc.2` comparison; issue closed). **Pinned rc.2 and removed the
 workaround on 2026-08-16, after re-measuring** — a release note is not
-evidence. Idle stdout, our exact config and pod hardening, 300 s windows:
+evidence. Idle stdout, our exact config and pod hardening, 300 s windows on the
+bench; the last row is the live cluster over 60 minutes:
 
 | image | `log_level` | store | idle stdout | longest line |
 |---|---|---|---|---|
@@ -36,10 +142,28 @@ evidence. Idle stdout, our exact config and pod hardening, 300 s windows:
 | **`1.0.0-rc.2`** | **`info`** ← shipped | **240 objects** | **5.45 MiB/h** | **4,157 B** |
 | `1.0.0-rc.2` | `info,…scanner_io=warn` | 240 objects | 6.37 MiB/h | 4,086 B |
 | `1.0.0-rc.2` | `info` | **empty** | 1.21 MiB/h | 4,068 B |
+| **`1.0.0-rc.2`** | **`info`** | **on cluster, 247 objects** | **3.44 MiB/h** | **4,158 B** |
 
 On rc.2 the workaround measures *worse* than no workaround (6.37 vs 5.45 —
 noise): it has nothing left to suppress, which is why it went rather than
 being kept "just in case".
+
+The last row is the 2026-08-17 rehearsal — the measurement this entry existed to
+demand, taken on the live cluster after modules 03/04/09 had put 247 objects in
+the store (241 in `app-assets`, 6 in `images` from the capstone), same pod, 0
+restarts, 2h+ old. **3.44 MiB/hour** over 60 minutes against the bench figure of
+5.45, and a longest line of **4,158 B against the recorded 4,157 B** — one byte
+apart. The #5927 shape (332,800-byte lines) is gone: the biggest line in an hour
+is 4 KB. `rustfs_scanner::scanner_io` is still the chattiest target (502
+lines/hour), so the EnvFilter directive would still have something to bite on if
+it regressed. Over a 240-minute workshop this is ~14 MiB of container log.
+
+**One measurement trap the rehearsal exposed: window length matters as much as
+seeding.** With those same 247 objects present, a 300-second window read **0.06
+MiB/hour** — the scanner runs on a cadence, so a short window lands between
+passes and reads clean. 30 min → 2.98 MiB/h, 60 min → 3.44 MiB/h. During the
+240-object upload burst it was 27.8 MiB/h. Measure for half an hour, not five
+minutes.
 
 **The lesson that outlives the bug: it only floods once the scanner has
 objects to scan.** An empty store reads 1.21 MiB/h on fixed rc.2 and read
@@ -47,53 +171,80 @@ objects to scan.** An empty store reads 1.21 MiB/h on fixed rc.2 and read
 cannot see this class of bug; an attendee at minute 150 can. Seed the store
 first, always.
 
-**Watch in rehearsal:** modules 03/04/09. Upload objects, then check log growth
-stays in single MiB/hour. Not at boot — *after* objects exist. If it is back,
-the mitigation history (EnvFilter directive, and the OTel `filelog` exclusion
-and `obs_log_directory` options that were rejected and why) is in
-`gitops/components/rustfs/VENDOR.md`.
+**Re-check at every RustFS bump** the same way: modules 03/04/09, upload objects,
+then watch for half an hour and require single MiB/hour. Not at boot — *after*
+objects exist. If it is back, the mitigation history (EnvFilter directive, and
+the OTel `filelog` exclusion and `obs_log_directory` options that were rejected
+and why) is in `gitops/components/rustfs/VENDOR.md`.
 
 **Do not mistake this for it:** rc.2 still Debug-renders a whole `ECStore`
 (disk map and all) into `rustfs_ecstore::bucket::replication::replication_pool`
 spans — a **1.5 MB single log line**, same shape of bug as #5927. It is
-harmless because it is a *fixed boot cost, not a rate*: measured at exactly
-**7 lines / ~6.2 MB within 9 ms of startup**, and the count stayed at 7
-through 240 uploads and 120 s of idle. Worth re-checking only if it ever
-starts scaling with operations.
+harmless because it is a *fixed boot cost, not a rate*: measured on the bench at
+exactly **7 lines / ~6.2 MB within 9 ms of startup**, and the count stayed at 7
+through 240 uploads and 120 s of idle. The rehearsal reproduced it on-cluster —
+**6 lines over 100 KB, longest 1,556,132 B, ~6.7 MB in the first seconds** — and
+confirmed it does not scale: over the following hour of real traffic no line ever
+exceeded 4,417 B. kubelet rotation then discards the burst, so `kubectl logs`
+reads 556 bytes a minute later. Worth re-checking only if it ever starts scaling
+with operations.
 
 ## LIVE — RustFS is a prerelease, by choice
 
 `1.0.0-rc.2` is an rc, on a component modules 03, 04 and 09 depend on. Chosen
 deliberately by the maintainer with the above evidence in hand. RustFS is beta
-by design in this workshop (`docs/RESEARCH.md` §2); SeaweedFS is Plan B.
+by design in this workshop (`docs/RESEARCH.md` §2); SeaweedFS is Plan B. It held
+up in the 2026-08-17 rehearsal — modules 03, 04 and 09 all green, the same pod
+alive 2h+ with **0 restarts**, presigned URLs and the capstone's thumbnail path
+working — which settles the log flood, not the prerelease.
 
 #5927 is fixed, but it was a whole-class reminder: if a sibling lands in
 another scanner module, the EnvFilter directive that fixed it targets one
 module path, not a class of bug, and would need widening.
 
-## WATCH — Cilium 1.20.0 datapath is unproven
+## PROVEN ONCE — Cilium 1.20.0 datapath comes up on Talos-in-Docker
 
 Everything verified for the 1.19.5 → 1.20.0 bump was static: chart digest
 cross-checked three ways, all eight `--set` values confirmed present in the
 schema *and* landing in the render, KubePrism intact, capability list exactly
-our 11. **Nothing proves the datapath comes up on a real Talos-in-Docker node.**
+our 11. Nothing proved the datapath — until 2026-08-17, on Talos v1.13.8 /
+arm64:
 
-Blast radius is total: nodes never Ready, `wait_rollout kube-system
-daemonset/cilium` times out, and nothing else in the day happens. If there is
-one rehearsal slot, spend it here.
+- `wait_rollout kube-system daemonset/cilium` passed **first try, ~50 s**; both
+  nodes `Ready` at 61 s of age. `cilium status`: agent, operator and
+  `cilium-envoy` DaemonSets all 2/2, 2/2 pods managed, chart 1.20.0.
+- `cilium-dbg status` from inside the agent: **`KubeProxyReplacement: True`**
+  `[eth0 10.5.0.2 (Direct Routing)]`, `routing-mode=tunnel`/vxlan,
+  `ipam=kubernetes`, zero kube-proxy pods, CoreDNS Available.
+- KubePrism intact — `KUBERNETES_SERVICE_HOST=localhost` / `_PORT=7445` on both
+  the agent DaemonSet and the operator Deployment, `talosctl get
+  kubeprismstatuses` → `127.0.0.1:7445 HEALTHY true`. **Those land as env vars,
+  not `cilium-config` keys** — worth knowing when checking by hand.
+- The **policy** path works too, not just connectivity: module 05's fault 03 is a
+  NetworkPolicy fault, and it both enforced while injected and stopped enforcing
+  after the fix, inside the verify poll window.
 
-## WATCH — local-path-provisioner v0.0.37 is the wave-0 gate
+Blast radius if a future bump breaks it is still total: nodes never Ready,
+`wait_rollout` times out, and nothing else in the day happens. One machine, one
+architecture — re-run module 01 on the next bump before believing it again.
+
+## PROVEN ONCE — local-path-provisioner v0.0.37 is still the wave-0 gate
 
 v0.0.37's entire upstream diff is a new health server: port 8080, startup and
 liveness on `/health`, **readiness on `/ready`** (a different path — easy to
 mis-copy). `bootstrap-gitops.sh` installs this imperatively before GitOps
-exists, and everything else queues behind it.
+exists, and everything else queues behind it. If the health server misbehaves,
+bootstrap stalls at "Installing local-path-provisioner" and nothing past module
+02 runs.
 
-Probe budget ≈ 65s before restart against `wait_rollout`'s 300s × 2 — headroom
-is comfortable. But if the health server misbehaves, bootstrap stalls at
-"Installing local-path-provisioner" and nothing past module 02 runs.
+2026-08-17, in `bootstrap-gitops.sh`'s 54 seconds: the split is **not**
+mis-copied (`startup=/health live=/health ready=/ready`), the deployment went
+`Progressing` → `Available` in **~10 seconds** with **0 restarts**, and the PSA
+`privileged` namespace label — the curation whose loss makes every PVC hang
+Pending — is present. Gitea's 5Gi PVC `Bound` within the same minute. Against
+`wait_rollout`'s 300 s × 2 the "probe budget ≈ 65 s" worry is a non-event.
 
-## WATCH — Knative 1.23.0 kourier and the IPv6 stats listener
+## PROVEN ONCE — Knative 1.23.0 kourier, and the IPv6 retire condition is now met
 
 1.23.0 moves the Envoy **static** stats listener from `0.0.0.0` to `"::"`. A
 static listener that cannot bind is fatal at process start, not degraded: the
@@ -105,9 +256,25 @@ target and nothing here reaches it over IPv6, so restoring the address proven in
 1.22.1 costs nothing and removes an unprovable module-killer. This is a
 curation upstream does not have — a maintenance cost, taken knowingly.
 
-**Retire when:** a rehearsal shows the gateway healthy *and* `cat
-/proc/net/if_inet6` inside the pod shows usable IPv6. Then drop it at the next
-re-vendor.
+**With the curation, module 06 works:** gateway **1/1 within ~20 s** of the pod
+appearing, 0 restarts, all five knative-serving Deployments 1/1 within 12 s, and
+`curl -H 'Host: hello.demo.127.0.0.1.sslip.io' http://localhost:31080` returned
+`Hello your own cloud!` (200, 0.694 s warm); scale-to-zero observed after ~30 s
+of silence.
+
+**The documented retire condition is met.** Inside the gateway pod
+`/proc/net/if_inet6` is populated (lo + eth0 `fe80::…`), `bindv6only=0` and
+`disable_ipv6=0` on all/lo/eth0; and something in the same cluster on the same
+CNI already binds the IPv6 wildcard successfully — `argocd-server` holds real
+`[::]:8080` and `[::]:8083` listeners in `/proc/net/tcp6`.
+
+**The curation was deliberately not removed on 2026-08-17, and that is pickable
+work, not load-bearing.** Dropping `address: 0.0.0.0` from
+`gitops/components/knative-serving/kourier.yaml` is only worth doing in a change
+that can re-test it in the same breath — note that the gateway's own
+`/proc/net/tcp6` is empty of listeners *because* of the curation, so nothing yet
+proves the `"::"` static listener itself binds here, only that the netns would
+allow it. Whoever picks it up: drop it, re-run module 06, keep the result.
 
 ## LIVE — VENDOR.md curation lists were wrong 11 times out of 19
 
@@ -138,6 +305,19 @@ the manifest to match the doc would have broken the integration; and
 `application-xr` documented a curation **that does not exist** (see the
 `spec.env` TRAP below).
 
+**The same shape turned up once more on 2026-08-17, in code rather than prose.**
+The Console's Workshop page — advertised in `lab/README.md` as "a live dashboard
+of which modules your cluster has reached" — could never mark module 04 Done:
+`apps/portal/internal/web/workshop.go` listed `WorkshopDatabases` **cluster-wide**
+while the portal's only grant is the namespaced Role module 08 hands it, so the
+403 zeroed `WDBCount` and the row could score at most 1/2. It read *In progress*
+on a cluster with crossplane Synced/Healthy, two Ready WorkshopDatabases and
+`lab/04-self-service/verify.sh` at 10/10. Fixed `c1faf23` by scoping to `demo` —
+which is what the field's own comment (`// WorkshopDatabases in ns demo`) and the
+row's own hint already claimed. **It is Go source, so it needs a portal release to
+reach `ghcr.io/randax/cloudbox-portal` before anyone sees the fix**; until then the
+deployed Console still shows the old behaviour.
+
 **The shape is always the same:** the doc was accurate the day it was written
 and rotted at the next bump, because nothing ever compared it to anything.
 Prose cannot stay honest about a file that changes for other reasons — which is
@@ -160,6 +340,27 @@ x86_64 Rosetta shell on Apple Silicon reports the wrong one.
 linux/amd64 and linux/arm64, so an upstream dropping an arch shows up in the
 weekly report rather than on a laptop.
 
+**The other half of offline-first is the reaches nothing gates, and the 2026-08-17
+rehearsal found the earlier leak fix was incomplete.** `solutions/module-07/post.sh`
+still copied `docker.io/library/busybox:1.37.0` straight from Docker Hub, and
+`solutions/module-{08,09,10}/post.sh` all chain into it — so **every `catch-up.sh`
+from module 07 onward** depended on the one registry that is rate-limited at the
+venue, on the recovery path, at the venue, for someone already behind. What made
+it invisible is that its sibling `lab/07-ci/solve.sh` had *already* been fixed to
+source `localhost:5001/library/busybox:1.37.0` from the mirror with a fallback and
+a warning: the earlier fix landed in the lab and not in the solution. Fixed
+`941d043` by copying that logic verbatim. **When auditing internet reaches, grep
+`lab/` and `solutions/` — a fixed lab says nothing about its `post.sh`.** CI never
+saw it because CI runs online, where both sources work.
+
+Still open, same class: `install.sh --check` proves the mirror is reachable from
+container context with `docker run … docker.io/library/busybox:1.37.0`, which is
+in `images.txt`'s `[mirror]` section but **not `[host]`**, so `cloudbox-init.sh`
+never `docker pull`s it. Invisible in the documented order (the first `--check` at
+home warms the host cache), but it bites anyone whose first `--check` is offline —
+including a helper debugging an attendee's laptop in the room. Adding the ~2 MB
+image to `[host]` closes it, at the cost of touching the pin surface.
+
 ## TRAP — digest-pinned refs must keep the full multi-arch index
 
 Do not "optimize" the digest-pinned refs in `cloudbox-init.sh` the way tag pins
@@ -181,11 +382,12 @@ in an index regardless of platform. Passing at home, failing at the venue.
 | kagent's latest release is v0.10.0-beta | Upstream does not mark its beta/rc tags as prereleases. `upstream.list` reads kagent from **tags**, stable-only. |
 | CNPG is stuck on 1.28.x | Deliberate hold — the mature minor. 1.29/1.30 exist and are ignored by a `track` regex. |
 | envoy is behind at v1.37.x | net-kourier ships `v1.37-latest`; we pin the exact patch it resolves to. A `track ^1\.37\.` regex stops the weekly report recommending 1.39. |
-| Backstage is amd64-only | Upstream ships it that way; Apple Silicon runs it emulated. Listed in `MIRROR_ARCH_EXEMPT`. Under Colima it may need `--vm-type vz --vz-rosetta`. |
+| Backstage is amd64-only | Upstream ships it that way; Apple Silicon runs it emulated. Listed in `MIRROR_ARCH_EXEMPT`. **Rosetta turns out not to be required:** on 2026-08-17 it ran under Colima with `vmType: vz` and **`rosetta: false`** — 1/1, 0 restarts, `:30700` → 200, zero error lines. The cost is time: **9 min 03 s** from pod creation to Ready, against seconds for the Go Console. Say so in the module 08 text so a presenter starts it early instead of concluding it is broken. |
+| module 10 scenario 3 never shows `ImagePullBackOff` at home | Correct by design. `create-cluster.sh` sets `skipFallback: false`, so the Docker Hub mirror miss falls back to the real registry and the poisoned commit pulls fine with working internet — the lesson is the policy violation in git; the outage is reserved for a rate-limited venue. Do not "fix" the manifest. **Do** note that `verify.sh` currently emits a FAIL telling the attendee to wait for a symptom that will not arrive, which reads as a broken scenario to anyone rehearsing at home — unresolved, content decision. Scenario 2 has the same shape for a different reason: `helloworld-go` fits in the 8Mi limit while idle (ten minutes, zero restarts), and only OOMKilled after ~2000 requests were driven at the Service. |
 | `application-xr`'s `spec.env` does nothing | Correct — it is **RESERVED, not implemented**. The Composition emits no patch for it; the field stays in the XRD so the v2 append lands without an API break. The VENDOR.md claimed for months that it was "appended"; git history shows the patch never existed. The XRD description now says so. |
 | `docker.io/grafana/grafana` vanished from `images.txt` | It was only the `FROM` line in `apps/grafana/Dockerfile`, consumed by CI. No pod ever pulled it. The deployed image is `ghcr.io/randax/cloudbox-grafana`. |
 
-## WATCH — helm 4 on the apply path
+## PROVEN ONCE — helm 4 on the apply path
 
 `helm` is pinned to **4.2.3**, used by three real `helm upgrade --install` calls
 (Cilium in `create-cluster.sh` and `kind-fallback.sh`, Gitea in
@@ -199,11 +401,25 @@ server-side apply. All three invocations therefore pass **`--server-side=false`*
 explicitly, keeping helm 3's proven client-side path, so this is a
 same-behaviour-newer-binary bump rather than a behaviour change.
 
-**This is the first thing to revert if module 01 or 02 misbehaves** — set
+**Both real installs took the client-side path on 2026-08-17, verifiably.** After
+Cilium (module 01) and Gitea (module 02):
+
+    kubectl -n kube-system get ds cilium -o jsonpath='{…managedFields…}'
+    manager=helm operation=Update          # server-side apply would read operation=Apply
+
+Same for `deploy/gitea` in ns `gitea`. Both releases `deployed` at revision 1, no
+field-ownership complaints, no `--force-conflicts` needed anywhere. That is
+exactly what `--server-side=false` promises, so the bump is confirmed inert on
+the apply path as well as the render.
+
+**This is still the first thing to revert if module 01 or 02 misbehaves** — set
 `helm = "3.21.3"` in `mise.toml` and drop the three flags. Nothing in the repo
 needs a helm 4 feature.
 
 **Retire the flags when:** a full `bootstrap-test` is green with them removed.
+Nothing was odd on 2026-08-17, so there was nothing to A/B against; the flags
+were left in place. On this evidence the experiment looks safe to try, but it is
+a separate change, not a side effect of the rehearsal.
 
 ## TRAP — Grafana must not be allowed to phone home at boot
 
@@ -218,15 +434,25 @@ Related, deliberate: `victoriametrics-logs-datasource` is held at **0.29.0**
 though 0.30.1/0.31.0 exist — all three declare `>=10.4.0`, so nothing forces a
 move and holding keeps the Grafana major a one-variable change.
 
-## WATCH — smaller things the rehearsal settles
+## PROVEN ONCE — smaller things the rehearsal settled
 
-| What | Why it matters |
+| What | What 2026-08-17 measured |
 |---|---|
-| **NATS 2.14 liveness** | 2.14 surfaces filestore I/O errors in `/healthz`, which our liveness probe reads. A full `local-path` PVC now **CrashLoops** the pod where 2.12 stayed silently up. |
-| **BuildKit v0.32.2, module 07** | New variable is runc v1.4.3 under rootlesskit on the Talos kernel. Fails at daemon start if at all — unambiguous. |
-| **zot v2.1.20 under chart 0.1.122** | The chart still declares appVersion v2.1.18; we override the image tag deliberately. Check anonymous push and the search/UI extensions on `:30500`. |
-| **Grafana Explore deep-link** | `/explore?schemaVersion=1&orgId=1&panes={…}` is a frontend URL contract with no stability guarantee. Datasources and queries verified on 13.1.3; that pane rendering *prefilled* needs one human click. |
-| **OTel 0.158.0 deprecation WARNs** | Expect 5 gateway / 3 agent `alias is deprecated` warnings. Attendees will read them in module 09 — consider pre-empting in the lab text. Legacy IDs stay on purpose: renaming makes the config unloadable on 0.149.0, breaking rollback. |
+| **NATS 2.14 liveness** | Ready **2/2 in 25 s**, 0 restarts, `/healthz` and `/healthz?js-enabled-only=true` both `{"status":"ok"}`, JetStream up, PVC Bound. **And the premise was wrong:** `local-path` is a hostPath bind that does not enforce the 1Gi request — inside the pod `/data` reports the node's whole 97.9 G — so "a full PVC CrashLoops the pod" needs the *node* disk to fill, not the PVC. Much less reachable than feared, and also: nothing bounds JetStream's growth. |
+| **BuildKit v0.32.2, module 07** | `moby/buildkit:v0.32.2-rootless` came up **2/2 in 15 s** and the workflow reached `Succeeded` inside the 91 s solve, on kernel 6.8.0-117 arm64 / containerd 2.2.6, PSA-privileged `builds` namespace. No runc or rootlesskit trouble at all. |
+| **zot v2.1.20 under chart 0.1.122** | Tag override in effect (`:v2.1.20` over the chart's declared v2.1.18), 1/1 in 16 s. **Anonymous push works** — `crane copy --insecure` with no credentials — and `:30500` answered 200 on `/v2/`, `/` (UI extension) and `/v2/_zot/ext/search` (GraphQL). One non-finding: `/v2/_zot/ext/discover` **404s** at 2.1.20; that endpoint does not exist there, the extensions are plainly enabled. |
+| **Grafana Explore deep-link** | **This was not an unproven nicety — it was broken.** Anonymous Viewer does not carry the `datasources:explore` RBAC action (26 actions, without it), so Grafana answered every `/explore…` request with `302 → /?redirectTo=…` and, since an anonymous session never logs in, **discarded the `panes` payload entirely**: every Console deep-link landed on the Grafana home page. `/` and `/dashboards` returning 200 is what made it easy to miss. Fixed in `d608d88` with `GF_USERS_VIEWERS_CAN_EDIT=true` (marked load-bearing in the component's VENDOR.md) and verified served: bare `/explore` **200**, deep-link **200**, `datasources:explore` granted, `dashboards:write` still denied (27 actions), the `panes` JSON parses, its uids resolve, and both carried expressions return data through the proxy (`sum(k8s_pod_cpu_usage{k8s_namespace_name="observability"})` → 0.0623, `sum(cnpg_backends_total{cnpg_cluster="my-db-pg"})` → 1). **Still one human click from "renders prefilled"** — the rehearsal had no browser. (`GF_AUTH_ANONYMOUS_ORG_ROLE=Editor` is the one-line alternative; it grants more than Explore.) |
+| **OTel 0.158.0 deprecation WARNs** | **The count was wrong: 4 on the agent, not 3.** Gateway is 5 as predicted (`otlphttp` ×3, `spanmetrics`, `servicegraph`); the agent emits `otlphttp` ×2, `kubeletstats` **and `filelog`**, identically on both DaemonSet pods — so **13 cluster-wide**, once at startup each. Legacy IDs stay on purpose: renaming makes the config unloadable on 0.149.0, breaking rollback. Pre-empt the corrected count in the module 09 text. |
+| **Module 09 trace waterfall** | **One connected trace: 37 spans, exactly 1 root, 0 spans with a missing parent** — `cloudbox-portal POST /gallery/upload` → activator → uploader → `s3 put original` → `broker.ingress` → in-memory channel → `broker.filter` → activator → resizer → `s3 download` / `decode and resize` / `s3 upload thumbnail and meta`. It does not fragment: the re-applied `config-observability` keys (nine in serving, six in eventing — the curation the VENDOR.md audit found missing) are what buys this. VictoriaTraces knew all 10 services. Whole observability stack Synced/Healthy in ~90 s. |
+
+**Louder than any of those 13 one-shot WARNs, and unresolved:** the OTel gateway
+logs a **failed Prometheus scrape every 30 s, forever**.
+`net-kourier-controller` ships the `prometheus.io/scrape` annotations and
+declares port 9090, but Knative 1.23 moved its metrics to the OTel pipeline and
+opens nothing there — so `connection refused`, one target, one WARN per interval.
+Harmless, permanent, and the only *recurring* error-shaped line in the stack.
+Silencing it needs either a curation dropping the upstream annotation or a drop
+rule in the receiver; both are curation decisions nobody has taken.
 
 **Rollback hazards:** downgrading the OTel Collector below 0.156 needs
 `/var/lib/otelcol` wiped. The kagent whitespace normalization produces a large
