@@ -45,7 +45,7 @@ slides/      Slidev deck
 
 - **Single source of version pins: `scripts/versions.env`** (plus pinned `mise.toml`).
   Never introduce `:latest` or a second place where a version is written down.
-- Pinned stack: Talos **v1.13.8** (never 1.12.x), Cilium **1.20.0**, ArgoCD **v3.5.0**,
+- Pinned stack: Talos **v1.13.8** (never 1.12.x), Cilium **1.20.0**, ArgoCD **v3.5.1**,
   Crossplane **v2**, CloudNativePG, RustFS (standalone, beta — SeaweedFS is Plan B),
   Knative + Kourier (stretch), Argo Workflows + BuildKit + Zot (stretch),
   NATS JetStream (durable messaging, stretch), Backstage CNOE image (stretch),

@@ -45,8 +45,8 @@ quay.io/cilium/cilium-envoy:v1.37.5-1782911245-7cffc778c923f68a77954a53b1a98d6b5
 # --- Gitea (chart 12.7.0, rootless single-pod)
 docker.gitea.com/gitea:1.27.0-rootless
 
-# --- ArgoCD v3.5.0 (images from the vendored install.yaml)
-quay.io/argoproj/argocd:v3.5.0
+# --- ArgoCD v3.5.1 (images from the vendored install.yaml)
+quay.io/argoproj/argocd:v3.5.1
 ghcr.io/dexidp/dex:v2.45.0
 public.ecr.aws/docker/library/redis:8.2.3-alpine
 

@@ -60,7 +60,7 @@ Cilium tradeoff to name honestly: eBPF wants a modern kernel — Docker Desktop 
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
 <tr><td>Git server</td><td><span class="we"><Logo name="gitea" size="1.3rem"/> <b>Gitea 1.27.0</b></span></td><td>external GitHub</td><td>One more pod, but the write-path is offline and <em>yours</em></td></tr>
-<tr><td>GitOps engine</td><td><span class="we"><Logo name="argocd" size="1.3rem"/> <b>Argo CD v3.5.0</b></span></td><td>Flux · manual kubectl</td><td>Drift detection + self-heal; app-of-apps is one-cluster, not fleet</td></tr>
+<tr><td>GitOps engine</td><td><span class="we"><Logo name="argocd" size="1.3rem"/> <b>Argo CD v3.5.1</b></span></td><td>Flux · manual kubectl</td><td>Drift detection + self-heal; app-of-apps is one-cluster, not fleet</td></tr>
 </tbody>
 </table>
 

@@ -19,7 +19,7 @@ these picks flip — reading the tradeoff is the transferable skill, not memoris
 | K8s OS | **Talos Linux** v1.13.8 (K8s 1.36.2) | kubeadm · minikube · kind | Immutable, API-only OS — no shell, no SSH, no package manager, no drift. kind stays as the strictly-more-robust fallback. |
 | CNI + service proxy | **Cilium** 1.20.0 | flannel + kube-proxy | eBPF datapath, kube-proxy-free — no O(services) iptables, identity-based policy, Hubble. |
 | Git server | **Gitea** 1.27.0 (in-cluster) | external GitHub / GitLab | Offline, self-contained write-path; no per-IP NAT rate-limits; attendees can actually push. |
-| GitOps engine | **ArgoCD** v3.5.0, app-of-apps | Flux · manual kubectl | Drift detection + self-heal; app-of-apps is the one-cluster shape; plain `install.yaml` teaches better than Helm. |
+| GitOps engine | **ArgoCD** v3.5.1, app-of-apps | Flux · manual kubectl | Drift detection + self-heal; app-of-apps is the one-cluster shape; plain `install.yaml` teaches better than Helm. |
 | Managed Postgres | **CloudNativePG** 1.28.4 (PG 18.4) | bitnami/stock Postgres · cloud RDS | A real control loop (primary+replica, failover, backup) — the operator *is* the "managed" service. |
 | Object storage (S3) | **RustFS** 1.0.0-rc.2 | MinIO | Apache-2.0, single ~90 MB Rust binary; MinIO's community edition was discontinued for proprietary AIStor. SeaweedFS is Plan B. |
 | OCI registry | **Zot** v2.1.20 | Harbor · Docker registry:2 | One CNCF-native binary with search + UI; Harbor is a Postgres/Redis/Trivy/ChartMuseum fleet. |

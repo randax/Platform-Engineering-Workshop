@@ -59,7 +59,7 @@ deliberate hold: `helm` stays at 3.21.3.
 
 ## 3. GitOps: ArgoCD v3 + in-cluster Gitea — the write-path answer
 
-- **ArgoCD v3.5.0** current (v3.5 went GA in August 2026; v3.4.5 was the pre-event
+- **ArgoCD v3.5.1** current (v3.5 went GA in August 2026; v3.4.5 was the pre-event
   pin). Pin an exact patch.
   Install with `kubectl apply --server-side --force-conflicts` (ApplicationSet CRD exceeds
   client-side annotation limits since 3.3). Plain install.yaml beats Helm for teaching.
