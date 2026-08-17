@@ -118,7 +118,7 @@ ghcr.io/kagent-dev/kagent/skills-init:0.9.12
 # --- Observability v2 (Victoria stack, issue #57) — the on-demand observability
 # capability that REPLACED otel-lgtm: metrics + logs + traces + Grafana, fed by
 # the OTel Collector below.
-docker.io/victoriametrics/victoria-metrics:v1.149.0@sha256:13b8951e35bb3589626816538483127785a9d8b53f9f5123769db0fcab1d961f
+docker.io/victoriametrics/victoria-metrics:v1.150.0@sha256:54467c7764a3e6579199af1914bb779f01ce32265cd552eb5ae0d4f8a2b80a97
 docker.io/victoriametrics/victoria-logs:v1.52.0@sha256:47b820890d64c4575a2a0a46415dcd8a4fd59a0f1fcd6a377693d7aea639442e
 docker.io/victoriametrics/victoria-traces:v0.10.0@sha256:66e784a595c4a88e5b1dfab5d153dea442cf1caaeae4d67839c550414c33b3b0
 # Grafana itself is ghcr.io/randax/cloudbox-grafana below. Stock

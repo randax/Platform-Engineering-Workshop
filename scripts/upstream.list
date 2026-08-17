@@ -109,6 +109,8 @@ kagent                   | github-tag     | kagent-dev/kagent                   
 # to be ahead of it, and a real 1.150.0 could have gone unreported. Read the
 # tag list and take the highest stable instead. The sibling VictoriaLogs and
 # VictoriaTraces repos each have a single line, so they stay on github-release.
+# That change paid off on 2026-08-17: 1.150.0 shipped and this row reported it
+# as `minor` — /releases/latest was still pointing at an LTS patch.
 victoria-metrics         | github-tag     | VictoriaMetrics/VictoriaMetrics                 | image:docker.io/victoriametrics/victoria-metrics | ^[0-9]+\.[0-9]+\.[0-9]+$
 victoria-logs            | github-release | VictoriaMetrics/VictoriaLogs                    | image:docker.io/victoriametrics/victoria-logs |
 victoria-traces          | github-release | VictoriaMetrics/VictoriaTraces                  | image:docker.io/victoriametrics/victoria-traces |

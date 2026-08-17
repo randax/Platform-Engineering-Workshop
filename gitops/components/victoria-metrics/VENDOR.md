@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Component | VictoriaMetrics 1.149.0 — single-node TSDB (observability rework, [issue #57](https://github.com/) — replaces otel-lgtm's Prometheus) |
-| Image | `docker.io/victoriametrics/victoria-metrics:v1.149.0` — `sha256:13b8951e35bb3589626816538483127785a9d8b53f9f5123769db0fcab1d961f` (crane, 2026-08-11; linux/amd64 + arm64 + arm + 386 + ppc64le) |
+| Component | VictoriaMetrics 1.150.0 — single-node TSDB (observability rework, [issue #57](https://github.com/) — replaces otel-lgtm's Prometheus) |
+| Image | `docker.io/victoriametrics/victoria-metrics:v1.150.0` — `sha256:54467c7764a3e6579199af1914bb779f01ce32265cd552eb5ae0d4f8a2b80a97` (crane, 2026-08-17; linux/amd64 + arm64 + arm + 386 + ppc64le) |
 | Source | Official image, https://hub.docker.com/r/victoriametrics/victoria-metrics · docs https://docs.victoriametrics.com |
 | Files | `victoria-metrics.yaml` (PVC + Service + Deployment) |
 
@@ -26,9 +26,13 @@ the whole thing, matching the rustfs / nats treatment.
 - **`-opentelemetry.usePrometheusNaming=true`** is what makes OTLP metric names
   come out as `k8s_pod_cpu_usage` / `k8s_pod_memory_working_set_bytes` — the
   names `apps/portal/internal/metrics/prom.go` and the CI sparkline assertion
-  hard-code. 1.149.0 carries a bugfix to OTLP `Unit`-suffix handling, so the
-  re-pin was checked by pushing the exact names+units we emit into 1.147.0 and
-  1.149.0 side by side: the resulting `__name__` sets are identical.
+  hard-code. 1.149.0 carried a bugfix to OTLP `Unit`-suffix handling, so every
+  re-pin since is checked by pushing the exact names+units we emit into the old
+  and the new build side by side and diffing the resulting `__name__` sets.
+  1.147.0 → 1.149.0: identical. 1.149.0 → 1.150.0: identical again —
+  `k8s_pod_cpu_usage`, `k8s_pod_cpu_time_seconds`,
+  `k8s_pod_memory_working_set_bytes`, `http_server_request_duration_seconds`,
+  `cnpg_backends_total`, i.e. exactly the names the live cluster's VM reports.
 - **Data on a PVC** (`local-path`, `2Gi`) at `/victoria-metrics-data`
   (`-storageDataPath`). `argocd.argoproj.io/sync-options: Prune=false` so
   disabling the app doesn't wipe the TSDB
@@ -50,7 +54,7 @@ the whole thing, matching the rustfs / nats treatment.
 Bump the tag, then re-resolve the digest:
 
 ```sh
-mise x crane@0.21.9 -- crane digest docker.io/victoriametrics/victoria-metrics:v1.149.0
+mise x crane@0.21.9 -- crane digest docker.io/victoriametrics/victoria-metrics:v1.150.0
 ```
 
 This is a hand-written component, so "re-vendor" means: diff the new binary's
@@ -59,13 +63,23 @@ with the same default —
 
 ```sh
 docker run --rm --entrypoint /victoria-metrics-prod \
-  docker.io/victoriametrics/victoria-metrics:v1.149.0 --help 2>&1
+  docker.io/victoriametrics/victoria-metrics:v1.150.0 --help 2>&1
 ```
 
 — then boot it with our exact args under the same hardening
 (`--read-only --tmpfs /tmp --user 1000:1000 --cap-drop ALL`) and curl the paths
 above. 1.147.0 → 1.149.0: zero flags removed, one added (`-maxBackfillAge`),
-all four of ours byte-identical in help text and default.
+all four of ours byte-identical in help text and default. **1.149.0 → 1.150.0
+(2026-08-17):** 276 → 277 flags, **zero removed**, one added
+(`-promscrape.linodeSDCheckInterval`, for the new `linode_sd_configs`); all four
+of ours — `-storageDataPath`, `-httpListenAddr`, `-retentionPeriod`,
+`-opentelemetry.usePrometheusNaming` — byte-identical in help text and default.
+Booted with our exact args under `--read-only --tmpfs /tmp --user 1000:1000
+--cap-drop ALL`: `/health` 200, OTLP protobuf ingest 200, PromQL returns the
+points, zero error lines. The one changed default in the release notes,
+`-enableMultitenancyViaHeaders` false → true, belongs to **vmselect / vminsert /
+vmagent** — cluster binaries we do not run — and is not a flag of the
+single-node build at all.
 
 Keep the `image:` in `victoria-metrics.yaml` and the entry in
 `scripts/images.txt` in lockstep (`check-consistency.sh` enforces it).

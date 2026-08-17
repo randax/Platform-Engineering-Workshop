@@ -1,5 +1,5 @@
 ---
-# VictoriaMetrics 1.149.0 — single-node TSDB (observability rework, issue #57).
+# VictoriaMetrics 1.150.0 — single-node TSDB (observability rework, issue #57).
 # The metrics store of the Victoria stack that replaced otel-lgtm's Prometheus.
 # Listens on :8428 for everything:
 #   - OTLP metrics ingest  → POST /opentelemetry/v1/metrics
@@ -51,7 +51,7 @@ metadata:
   labels:
     app.kubernetes.io/name: victoria-metrics
     app.kubernetes.io/instance: victoria-metrics
-    app.kubernetes.io/version: "1.149.0"
+    app.kubernetes.io/version: "1.150.0"
 spec:
   replicas: 1
   # Recreate (not RollingUpdate): the data PVC is ReadWriteOnce, so a second
@@ -80,7 +80,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: victoria-metrics
-          image: "docker.io/victoriametrics/victoria-metrics:v1.149.0@sha256:13b8951e35bb3589626816538483127785a9d8b53f9f5123769db0fcab1d961f"
+          image: "docker.io/victoriametrics/victoria-metrics:v1.150.0@sha256:54467c7764a3e6579199af1914bb779f01ce32265cd552eb5ae0d4f8a2b80a97"
           imagePullPolicy: IfNotPresent
           args:
             - -storageDataPath=/victoria-metrics-data
