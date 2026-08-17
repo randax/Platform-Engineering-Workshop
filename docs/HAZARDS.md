@@ -389,11 +389,24 @@ in an index regardless of platform. Passing at home, failing at the venue.
 
 ## PROVEN ONCE — helm 4 on the apply path
 
-`helm` is pinned to **4.2.3**, used by three real `helm upgrade --install` calls
+`helm` is pinned to **4.2.4**, used by three real `helm upgrade --install` calls
 (Cilium in `create-cluster.sh` and `kind-fallback.sh`, Gitea in
 `bootstrap-gitops.sh`). Renders were verified identical to 3.21.3 — crossplane
 and gitea byte-for-byte, cilium differing only by three empty-string ConfigMap
 keys that helm 4 strips as null chart defaults, functionally inert.
+
+**The 4.2.3 → 4.2.4 patch (2026-08-17) is not render-neutral, and the vendor
+gate caught it.** 4.2.4 fixes "vanishing empty lines", which changes *how much
+blank line* a chart render carries: `check-vendor-drift.sh` guard 1 went red on
+`kagent.yaml` and `rustfs.yaml` with a new hunk id `0972f4d7` — two blank lines
+before a `---` where 4.2.3 emitted one — and on `rustfs.yaml` it also *retired* a
+curation, because 4.2.4 no longer emits the empty trailing KMS `secret.yaml`
+document at all. Same hunks, more of them, on crossplane (9 → 20) and kagent
+(21 → 25). All whitespace, no object changed; the allowlists were updated rather
+than the manifests re-rendered, and each component's VENDOR.md says so. **The
+lesson for the next helm patch: expect the render gate to move, and read the
+hunks before blessing them** — a real chart change would arrive looking exactly
+the same at first glance.
 
 The untested part is **apply**, not render. helm 4 defaults `--server-side` to
 `auto`, which for a *fresh* release — every workshop cluster — resolves to
@@ -401,8 +414,11 @@ server-side apply. All three invocations therefore pass **`--server-side=false`*
 explicitly, keeping helm 3's proven client-side path, so this is a
 same-behaviour-newer-binary bump rather than a behaviour change.
 
-**Both real installs took the client-side path on 2026-08-17, verifiably.** After
-Cilium (module 01) and Gitea (module 02):
+**Both real installs took the client-side path on 2026-08-17, verifiably** (on
+4.2.3 — the rehearsal predates the 4.2.4 patch by hours, and nothing in 4.2.4's
+notes touches the client-side path; its only server-side change is a *conflict
+retry* fix that `--server-side=false` never reaches). After Cilium (module 01)
+and Gitea (module 02):
 
     kubectl -n kube-system get ds cilium -o jsonpath='{…managedFields…}'
     manager=helm operation=Update          # server-side apply would read operation=Apply

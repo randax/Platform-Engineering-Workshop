@@ -3,8 +3,8 @@
 #
 # Tool pins for the workshop. Everything is pinned (principle 14) — versions
 # verified 2026-08-11 (the pre-event pass) and re-verified 2026-08-16, when
-# `helm` went to 4.2.3 and the three `helm upgrade --install` call sites gained
-# an explicit `--server-side=false` (docs/HAZARDS.md).
+# `helm` went to 4.2.x and the three `helm upgrade --install` call sites gained
+# an explicit `--server-side=false` (docs/HAZARDS.md) — kept at 4.2.4.
 # Keep in sync with scripts/versions.env when bumping.
 #
 #   mise install        # install all tools below
@@ -16,7 +16,7 @@
 "aqua:siderolabs/talos" = "1.13.8"
 # kubectl matches the Kubernetes version Talos v1.13.8 ships
 kubectl = "1.36.2"
-helm = "4.2.3"
+helm = "4.2.4"
 # kind — only for scripts/kind-fallback.sh
 kind = "0.32.0"
 # crane — mirrors pinned images (host arch for tag pins, full index for digest pins)

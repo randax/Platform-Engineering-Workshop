@@ -104,7 +104,7 @@ values
     port: 5000
 
 # --- accepted curation: one line per diff hunk (id, then why) ---
-allow  zot.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm 4.2.3
+allow  zot.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm (4.2.4)
 allow  zot.yaml  3c282743  the comment above the added requests
 allow  zot.yaml  f688b02e  50m/128Mi requests replacing the chart's `resources: null`
 ```

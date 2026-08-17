@@ -203,10 +203,11 @@ values
     enabled: false # chart default; no in-cluster auth needed (workshop-grade)
 
 # --- accepted curation: one line per diff hunk (id, then why) ---
-allow  kagent-crds.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm 4.2.3
-allow  kagent.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm 4.2.3
+allow  kagent-crds.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm (4.2.4)
+allow  kagent.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm (4.2.4)
 allow  kagent.yaml  c0b80476  helm 4 keeps two whitespace-only lines in the config ConfigMap that helm 3 stripped — inert, same fix as above
 allow  kagent.yaml  277cc02f  helm 4 keeps a single-space line that helm 3 stripped — inert, same fix as above
+allow  kagent.yaml  0972f4d7  helm 4.2.4 (the "vanishing empty lines" fix) keeps TWO blank lines before one `---` — after the `kagent-tools` Service — where 4.2.3 kept one. Same helm-3-era artifact as `39cdd0de`, one hunk with its own content id; inert whitespace, no manifest changes
 ```
 
 ## Security posture (workshop decisions, reviewed on PR #151)

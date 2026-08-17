@@ -45,7 +45,7 @@ values
       memory: 256Mi
 
 # --- accepted curation: one line per diff hunk (id, then why) ---
-allow  crossplane.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm 4.2.3
+allow  crossplane.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm (4.2.4)
 ```
 
 ## Workshop additions (`config/`, picked up via `directory.recurse: true`)

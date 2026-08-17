@@ -79,7 +79,7 @@ Chart 1.0.0-rc.2 notes (vs the 1.0.0-rc.1 we vendored before):
 
 This list is **complete and mechanically verified**, and stays that way:
 `./scripts/check-vendor-drift.sh --only rustfs` re-runs the recipe below and
-fails on any hunk that is not one of the five items here.
+fails on any hunk that is not one of the items here — four live, one retired.
 
 1. **Credentials comment** above the `rustfs-secret` Secret.
 2. **`argocd.argoproj.io/sync-options: Prune=false`** on the `rustfs-data`
@@ -90,13 +90,21 @@ fails on any hunk that is not one of the five items here.
 3. **The `RUSTFS_OBS_LOGGER_LEVEL` comment** in the `rustfs-config` ConfigMap
    — now three lines recording that the rc.1 log-flood workaround was removed
    in rc.2, so the next reader knows why a filter suffix is *not* there.
-4. **Dropped the empty trailing YAML document** that the disabled KMS
-   `secret.yaml` template emits (`---\n# Source: …/secret.yaml\n---`). Inert,
-   but it is noise in a file attendees read.
-5. **Dropped the blank line helm 4 emits before each `---` separator.** This
+4. **RETIRED at the helm 4.2.4 bump (2026-08-17) — nothing to re-apply.**
+   Was: *dropped the empty trailing YAML document* that the disabled KMS
+   `secret.yaml` template emits (`---\n# Source: …/secret.yaml\n---`). helm
+   4.2.4 fixed "vanishing empty lines", and one consequence is that the
+   pristine render no longer emits that trailing document at all — the two
+   blank lines it used to become now stay inside the preceding Secret instead
+   (see curation 5). So `rustfs.yaml` matches upstream here and the `allow`
+   line for it is gone. Nothing changed in the vendored file.
+5. **Dropped the blank lines helm 4 emits before each `---` separator.** This
    is a renderer artifact, not a chart change: helm 3 did not emit it and the
-   file was first vendored under helm 3. Purely cosmetic — strip it to keep
-   re-vendor diffs readable.
+   file was first vendored under helm 3. helm **4.2.4** emits *two* of them in
+   one place (after the `rustfs-secret` Secret's `data:` block, where the
+   retired curation 4's empty document used to be) and one everywhere else,
+   which is why there are two whitespace hunk ids below rather than one.
+   Purely cosmetic — strip it to keep re-vendor diffs readable.
 
 ### The same list, machine-readable
 
@@ -105,13 +113,16 @@ version, flags and the whole values document — and diffs the result against
 `rustfs.yaml`. Every hunk needs an `allow` line, and each one names the numbered
 curation above rather than re-explaining it; an unlisted hunk fails (the chart
 moved under a value we set, or someone hand-edited the render) and an `allow`
-line whose hunk has **disappeared** fails too, because that is one of the five
-curations lost in a re-vendor.
+line whose hunk has **disappeared** fails too, because that is how curations get
+lost in a re-vendor.
 
 Curation 5 is why there are whitespace hunks here at all. This file was rendered
-with the pinned helm 4.2.3, so it carries none of the helm-3-era layout drift
-the other rendered components allow — the blank lines below are stripped on
-purpose, by us, and hunk `39cdd0de` is that strip and nothing else.
+with helm **4.2.3** (the version pinned at the time), so it carries none of the
+helm-3-era layout drift the other rendered components allow — the blank lines
+below are stripped on purpose, by us, and hunks `39cdd0de` (one blank line) and
+`0972f4d7` (two) are that strip and nothing else. The file has **not** been
+re-rendered under helm 4.2.4; doing so would change nothing but whitespace, so
+it is left for the next real chart bump.
 
 ```curation
 render rustfs.yaml
@@ -153,12 +164,12 @@ values
     dataStorageSize: 2Gi
 
 # --- accepted curation: one line per diff hunk (id, then why) ---
-allow  rustfs.yaml  39cdd0de  curation 5 — the blank line helm 4 emits before each `---`, stripped on purpose (4 hunks share this id: identical content). Not the same thing crossplane/zot/kagent allow — those are helm-3-era files nobody has re-rendered; this one WAS rendered with the pinned helm 4.2.3 and then stripped
+allow  rustfs.yaml  39cdd0de  curation 5 — the single blank line helm 4 emits before a `---`, stripped on purpose (4 hunks share this id: identical content). Not the same thing crossplane/zot/kagent allow — those are helm-3-era files nobody has re-rendered; this one WAS rendered with helm 4.2.3 and then stripped
 allow  rustfs.yaml  641f354b  curation 1 — the WORKSHOP-GRADE CREDENTIALS comment above the `rustfs-secret` Secret
 allow  rustfs.yaml  27322aea  curation 3 — the `RUSTFS_OBS_LOGGER_LEVEL` comment recording that the rc.1 log-flood workaround was removed in rc.2 (so nobody re-adds the EnvFilter suffix)
 allow  rustfs.yaml  a81b83fa  curation 2 — the comment explaining why the PVC carries two keep-annotations (ArgoCD ignores helm.sh/resource-policy)
 allow  rustfs.yaml  a3b94d12  curation 2 — `argocd.argoproj.io/sync-options: Prune=false` on the `rustfs-data` PVC; without it, disabling the app deletes the volume and every uploaded image
-allow  rustfs.yaml  12664c73  curation 4 — the empty trailing YAML document the disabled KMS `secret.yaml` template emits, plus its preceding blank line (curation 5)
+allow  rustfs.yaml  0972f4d7  curation 5 — the DOUBLE blank line helm 4.2.4 emits after the `rustfs-secret` Secret's `data:` block, where the retired curation 4's empty KMS document used to be. Stripped on the same grounds as `39cdd0de`; it is one hunk, not two, so it needs its own id
 ```
 
 ## History: the rc.1 log-flood workaround (upstream rustfs/rustfs#5927) — RESOLVED
