@@ -95,9 +95,9 @@ quay.io/argoproj/argoexec:v4.0.8
 quay.io/argoproj/argocli:v4.0.8
 # Rootless BuildKit (in-cluster image builds)
 docker.io/moby/buildkit:v0.32.2-rootless
-# NATS 2.14.4 + JetStream — durable messaging (PRD-0001). Upstream skipped the
+# NATS 2.14.5 + JetStream — durable messaging (PRD-0001). Upstream skipped the
 # 2.13 line entirely, so this is one minor, not two.
-docker.io/library/nats:2.14.4-alpine@sha256:f2123f533c2b0cada0a5c5ec434fb2b8cfe1cf220215ef9d7517e1372917ad66
+docker.io/library/nats:2.14.5-alpine@sha256:d4ac35882ac65aff236cd65b9d3fa4d24332c681e1a85f94eedccd3cdd65b1da
 # prometheus-nats-exporter sidecar — turns NATS's :8222 JSON into Prometheus
 # metrics for the console's Streams Monitoring panel (#56)
 docker.io/natsio/prometheus-nats-exporter:0.20.1@sha256:4fbf6dacb84780a45a1c3af9b1080c69451a288d20902deae671b80717bb8f61

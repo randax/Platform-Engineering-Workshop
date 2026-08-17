@@ -27,7 +27,7 @@ these picks flip — reading the tradeoff is the transferable skill, not memoris
 | Self-service API | **Crossplane** v2.3.4 | Helm/operators · Crossplane v1 | Namespaced XRs (no Claims) compose arbitrary K8s resources directly — one YAML → whole stack. |
 | Serverless | **Knative** Serving v1.23.0 + Eventing v1.23.0 (Kourier) | plain Deployments · KEDA | Scale-to-zero with request buffering + CloudEvents broker/trigger; it's what Cloud Run is built on. |
 | In-cluster CI | **Argo Workflows** v4.0.8 + **BuildKit** v0.32.2 | Tekton · external/cloud CI | Rootless in-cluster image builds → your own Zot, no cloud minutes; Kaniko was archived June 2025. |
-| Durable messaging | **NATS** 2.14.4 + JetStream | Kafka · RabbitMQ | The durable streaming primitive in ~15 MB of Go vs. GBs of JVM/Erlang + coordination. |
+| Durable messaging | **NATS** 2.14.5 + JetStream | Kafka · RabbitMQ | The durable streaming primitive in ~15 MB of Go vs. GBs of JVM/Erlang + coordination. |
 | Metrics store | **VictoriaMetrics** 1.149.0 | Prometheus | PromQL-compatible, columnar TSDB + `vmrange` histograms — far less RAM for the same series. |
 | Log store | **VictoriaLogs** 1.52.0 | Loki | LogsQL via its own native Grafana plugin, single node, minimal RAM. |
 | Trace store | **VictoriaTraces** 0.10.0 | Grafana Tempo | Jaeger-compatible API; one vendor for metrics/logs/traces (built on VictoriaLogs internally). |

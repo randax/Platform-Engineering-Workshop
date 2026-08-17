@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Component | NATS server 2.14.4 with JetStream (durable messaging, [PRD-0001](../../../docs/prd/0001-durable-messaging-nats.md)) |
-| Image | `nats:2.14.4-alpine` — `sha256:f2123f533c2b0cada0a5c5ec434fb2b8cfe1cf220215ef9d7517e1372917ad66` (crane, 2026-08-11; linux/amd64 + arm64) |
+| Component | NATS server 2.14.5 with JetStream (durable messaging, [PRD-0001](../../../docs/prd/0001-durable-messaging-nats.md)) |
+| Image | `nats:2.14.5-alpine` — `sha256:d4ac35882ac65aff236cd65b9d3fa4d24332c681e1a85f94eedccd3cdd65b1da` (crane, 2026-08-17; linux/amd64 + arm64) |
 | Sidecar image | `docker.io/natsio/prometheus-nats-exporter:0.20.1` — `sha256:4fbf6dacb84780a45a1c3af9b1080c69451a288d20902deae671b80717bb8f61` (crane, 2026-08-11; linux/amd64 + arm64) |
 | Source | Official NATS image, https://hub.docker.com/_/nats · docs https://docs.nats.io |
 | Files | `nats.yaml` (ConfigMap + PVC + Service + Deployment), `service-nodeport.yaml` |
@@ -63,7 +63,7 @@ and is the entire data source for the Console's Streams Monitoring panel (#56).
 ## Re-vendor
 
 ```sh
-mise x crane@0.21.9 -- crane digest docker.io/library/nats:2.14.4-alpine
+mise x crane@0.21.9 -- crane digest docker.io/library/nats:2.14.5-alpine
 mise x crane@0.21.9 -- crane digest docker.io/natsio/prometheus-nats-exporter:0.20.1
 ```
 
@@ -75,9 +75,28 @@ onto the new one on the same volume, confirm `Restored N messages` — the catch
 reuses the `nats-jetstream` PVC. 2.12.12 → 2.14.4 passed all of this in both directions
 (upstream **skipped the 2.13 line entirely**, so this is one minor, not two).
 
+**2.14.4 → 2.14.5 (2026-08-17) re-ran the whole recipe** on the pinned digest:
+`nats-server --help` is byte-identical between the two images; booted under
+`--user 1000:1000 --read-only --cap-drop ALL` with this ConfigMap's literal
+`nats.conf`, `/varz` reports exactly our caps (`max_memory 67108864`,
+`max_storage 536870912`, `store_dir /data/jetstream`), and both `/healthz` and
+`/healthz?js-enabled-only=true` answer `{"status":"ok"}`. Store round-trip passed
+**both ways** on one volume: 25 messages written on 2.14.4 →
+`Restored 25 messages for stream '$G > ROUNDTRIP' in 1ms` on 2.14.5, then 5 more
+written on 2.14.5 → `Restored 30 messages` back on 2.14.4. Upstream's notes are a
+leafnode `dial_timeout` option, a logger deadlock fix and a JetStream
+idempotent-stream-create data-loss fix that only reaches clustered metalayer
+catch-up — none of it touches a single-node broker, our config keys, or the
+monitoring endpoints.
+
 Watch on 2.14: filestore I/O errors now freeze the stream and surface in `/healthz`,
-which our *liveness* probe reads — a full PVC that 2.12 tolerated silently now
-restarts the container. Better failure mode, new failure mode.
+which our *liveness* probe reads. **The obvious corollary — "a full PVC now restarts
+the container" — was wrong and is not the claim to carry forward.** The 2026-08-17
+rehearsal measured it (docs/HAZARDS.md): `local-path` is a hostPath bind that does
+**not** enforce the PVC's 1Gi request, so inside the pod `/data` reports the node's
+whole disk. Filling "the PVC" means filling the *node*, which is far less reachable
+than it sounds — and the flip side is that nothing bounds JetStream's growth either;
+the 512 MiB `max_file_store` cap in `nats.conf` is the only real limit.
 
 ## Workshop addition (not upstream)
 

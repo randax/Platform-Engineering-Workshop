@@ -1,5 +1,5 @@
 ---
-# NATS 2.14.4 + JetStream — single-node durable messaging (PRD-0001).
+# NATS 2.14.5 + JetStream — single-node durable messaging (PRD-0001).
 # Client :4222 (NodePort 30422), monitoring :8222. JetStream persists to a PVC
 # so the "kill the pod, watch the stream replay" demo actually survives a restart.
 apiVersion: v1
@@ -72,7 +72,7 @@ metadata:
   labels:
     app.kubernetes.io/name: nats
     app.kubernetes.io/instance: nats
-    app.kubernetes.io/version: "2.14.4"
+    app.kubernetes.io/version: "2.14.5"
 spec:
   replicas: 1
   # Recreate (not RollingUpdate): the JetStream PVC is RWO, so a second pod
@@ -108,7 +108,7 @@ spec:
       # gid on mount, so JetStream can create its store under /data directly.
       containers:
         - name: nats
-          image: "nats:2.14.4-alpine@sha256:f2123f533c2b0cada0a5c5ec434fb2b8cfe1cf220215ef9d7517e1372917ad66"
+          image: "nats:2.14.5-alpine@sha256:d4ac35882ac65aff236cd65b9d3fa4d24332c681e1a85f94eedccd3cdd65b1da"
           imagePullPolicy: IfNotPresent
           args: ["--config", "/etc/nats/nats.conf"]
           securityContext:

@@ -1,4 +1,4 @@
-# NATS 2.14.4 + JetStream — durable messaging (PRD-0001). Single-node broker
+# NATS 2.14.5 + JetStream — durable messaging (PRD-0001). Single-node broker
 # with persistent JetStream: client nats://localhost:30422, monitoring :8222.
 # The durable counterpart to Knative's in-memory broker, and the queue backing
 # the golden-path Application XR (PRD-0003, spec.queue).
