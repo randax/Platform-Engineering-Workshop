@@ -147,6 +147,21 @@ step "Creating Talos cluster '${CLUSTER_NAME}' (Talos ${TALOS_VERSION}, Kubernet
 info "1 controlplane (${TALOS_MEMORY_CONTROLPLANE} MB) + 1 worker (${TALOS_MEMORY_WORKER} MB)"
 
 # NodePorts are published on the controlplane container; Cilium's
+# CPU caps: talosctl defaults both to 2.0, which caps the whole cluster at 4
+# cores regardless of the host — enough for modules 00-05, not for the module 10
+# end state (21 apps, ~125 containers). Scale with the daemon's CPU count and
+# floor at talosctl's own default, so the published MIN_CPUS=4 machine gets
+# exactly what it got before and a bigger laptop actually gets used.
+# See TALOS_CPU_SHARE_* in versions.env and docs/HAZARDS.md.
+host_cpus="$(docker info -f '{{.NCPU}}' 2>/dev/null || echo 0)"
+cpu_share() { # <fraction> -> cores, floored at TALOS_CPU_FLOOR, integer
+  awk -v n="${host_cpus}" -v f="$1" -v floor="${TALOS_CPU_FLOOR}" \
+    'BEGIN { c = int(n * f + 0.5); if (c < floor) c = floor; printf "%d", c }'
+}
+CPUS_CONTROLPLANE="$(cpu_share "${TALOS_CPU_SHARE_CONTROLPLANE}")"
+CPUS_WORKER="$(cpu_share "${TALOS_CPU_SHARE_WORKER}")"
+info "Node CPU caps: ${CPUS_CONTROLPLANE} control-plane / ${CPUS_WORKER} worker (host has ${host_cpus})"
+
 # kube-proxy replacement makes every NodePort answer on every node.
 talosctl cluster create docker \
   --name "${CLUSTER_NAME}" \
@@ -155,6 +170,8 @@ talosctl cluster create docker \
   --workers 1 \
   --memory-controlplanes "${TALOS_MEMORY_CONTROLPLANE}" \
   --memory-workers "${TALOS_MEMORY_WORKER}" \
+  --cpus-controlplanes "${CPUS_CONTROLPLANE}" \
+  --cpus-workers "${CPUS_WORKER}" \
   --subnet "${TALOS_SUBNET}" \
   --exposed-ports "${NODEPORT_GITEA}:${NODEPORT_GITEA}/tcp,${NODEPORT_ARGOCD}:${NODEPORT_ARGOCD}/tcp,${NODEPORT_ZOT}:${NODEPORT_ZOT}/tcp,${NODEPORT_PORTAL}:${NODEPORT_PORTAL}/tcp,${NODEPORT_BACKSTAGE}:${NODEPORT_BACKSTAGE}/tcp,${NODEPORT_RUSTFS_S3}:${NODEPORT_RUSTFS_S3}/tcp,${NODEPORT_GRAFANA}:${NODEPORT_GRAFANA}/tcp,${NODEPORT_KOURIER}:${NODEPORT_KOURIER}/tcp,${NODEPORT_NATS}:${NODEPORT_NATS}/tcp" \
   "${patches[@]}"
