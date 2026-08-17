@@ -154,13 +154,14 @@ info "1 controlplane (${TALOS_MEMORY_CONTROLPLANE} MB) + 1 worker (${TALOS_MEMOR
 # exactly what it got before and a bigger laptop actually gets used.
 # See TALOS_CPU_SHARE_* in versions.env and docs/HAZARDS.md.
 host_cpus="$(docker info -f '{{.NCPU}}' 2>/dev/null || echo 0)"
-cpu_share() { # <fraction> -> cores, floored at TALOS_CPU_FLOOR, integer
-  awk -v n="${host_cpus}" -v f="$1" -v floor="${TALOS_CPU_FLOOR}" \
-    'BEGIN { c = int(n * f + 0.5); if (c < floor) c = floor; printf "%d", c }'
-}
-CPUS_CONTROLPLANE="$(cpu_share "${TALOS_CPU_SHARE_CONTROLPLANE}")"
-CPUS_WORKER="$(cpu_share "${TALOS_CPU_SHARE_WORKER}")"
-info "Node CPU caps: ${CPUS_CONTROLPLANE} control-plane / ${CPUS_WORKER} worker (host has ${host_cpus})"
+# Give BOTH containers the whole host and let the kernel share it. Deliberately
+# oversubscribed: a --cpus value equal to the host count is not a meaningful
+# quota, which is the point — nothing throttles. See TALOS_CPU_FLOOR above.
+NODE_CPUS="$(awk -v n="${host_cpus}" -v floor="${TALOS_CPU_FLOOR}" \
+  'BEGIN { c = int(n); if (c < floor) c = floor; printf "%d", c }')"
+CPUS_CONTROLPLANE="${NODE_CPUS}"
+CPUS_WORKER="${NODE_CPUS}"
+info "Node CPUs: ${NODE_CPUS} each, uncapped by design (host has ${host_cpus})"
 
 # kube-proxy replacement makes every NodePort answer on every node.
 talosctl cluster create docker \
