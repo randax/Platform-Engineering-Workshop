@@ -176,6 +176,7 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 	// evidence the panel shows). Best-effort diagnostics: a read error just yields
 	// a leaner opening prompt, never an error.
 	var prompt string
+	followup := strings.TrimSpace(body.Question) != ""
 	if question := strings.TrimSpace(body.Question); question != "" {
 		prompt = buildFollowupPrompt(body.Kind, body.Namespace, body.Name, question)
 	} else {
@@ -202,8 +203,8 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		UserID:    uid,
 		SessionID: sessionID(uid, body.Namespace, body.Kind, body.Name),
 	}
-	emitted := 0
-	err := s.Kagent.Stream(r.Context(), req, func(e kagent.Event) error {
+	emitted, messages := 0, 0
+	stats, err := s.Kagent.Stream(r.Context(), req, func(e kagent.Event) error {
 		var emitErr error
 		switch e.Kind {
 		case kagent.KindToolCall:
@@ -211,9 +212,21 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		case kagent.KindToolResult:
 			emitErr = emit("tool_result", s.fragment("cf-toolresult", e))
 		case kagent.KindMessage:
+			messages++
 			emitErr = emit("message", s.fragment("cf-message", e))
 		case kagent.KindVerdict:
+			// Kagent's final answer arrives twice: once as narration (a text part)
+			// and again as the artifact this verdict came from. On the OPENING
+			// investigation that is fine — they land in different panes (log vs. the
+			// pinned panel). On a FOLLOW-UP the client routes both into the log
+			// (case-file.js), so a second verbatim copy is pure duplication: skip it,
+			// unless nothing else carried the answer.
+			if followup && messages > 0 {
+				return nil
+			}
 			emitErr = emit("verdict", s.fragment("cf-verdict", verdictFor(e.Verdict)))
+		default:
+			return nil // an event kind this build doesn't render is not a rendered event
 		}
 		if emitErr != nil {
 			return emitErr
@@ -225,15 +238,38 @@ func HandleAgentAsk(s *Server, w http.ResponseWriter, r *http.Request) {
 		emit("error", s.fragment("cf-error", "The investigation didn't complete: "+err.Error()))
 		return
 	}
-	// A clean stream that produced nothing means every frame fell through the
-	// translation — almost always an A2A envelope mismatch. Make it visible
-	// rather than ending on a silent "complete" with an empty log (reconcile
-	// against live kagent at rehearsal — see spec #133 rehearsal gates).
+	// A clean stream that produced nothing: every frame fell through the
+	// translation. Say only what is observable — the run itself SUCCEEDED, so
+	// don't send the attendee after a version mismatch that may not exist (that
+	// wording shipped once and misdirected a whole rehearsal). Point at the one
+	// place the truth is: the agent's own log.
 	if emitted == 0 {
-		emit("error", s.fragment("cf-error", "The agent responded in a format this console doesn't recognize. Check that your kagent version matches the workshop pin."))
+		emit("error", s.fragment("cf-error", noEventsMessage(stats)))
 		return
 	}
 	emit("done", "")
+}
+
+// noEventsMessage explains a completed run that rendered nothing, in terms of
+// what was actually seen on the wire. It never blames the attendee's kagent
+// version: the run finished, so the mismatch — if there is one — is between this
+// console build and whatever kagent sent, and the frame counts are the evidence.
+func noEventsMessage(st kagent.Stats) string {
+	const where = " The agent did run — see what it did with: kubectl -n kagent logs deploy/k8s-agent"
+	switch {
+	case st.Frames == 0 && st.Malformed == 0:
+		return "The agent closed the stream without sending a single frame." + where
+	case st.Frames == 0:
+		return fmt.Sprintf("The agent sent %d frame(s), none of which was readable JSON.", st.Malformed) + where
+	default:
+		msg := fmt.Sprintf("The agent's run completed and sent %d frame(s), but none carried a tool step, "+
+			"narration or answer this console could read — so this console build is behind (or ahead of) "+
+			"the kagent it is talking to.", st.Frames)
+		if st.Malformed > 0 {
+			msg += fmt.Sprintf(" A further %d frame(s) were not readable JSON.", st.Malformed)
+		}
+		return msg + where
+	}
 }
 
 // verdictView is the sanitised verdict the cf-verdict fragment renders — same

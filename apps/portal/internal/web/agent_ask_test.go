@@ -182,9 +182,9 @@ func TestAgentAskLockedNoBackendCall(t *testing.T) {
 	}
 }
 
-// emptyStream is an answer made entirely of A2A frames the console doesn't
-// translate (a Task, then a clean terminal) — the exact shape a real controller
-// produces against the console's invented tool-call format if they diverge.
+// emptyStream is an answer made entirely of frames that carry nothing renderable
+// (a Task, then a clean terminal) — what a future kagent whose frames have
+// diverged again would look like from here.
 const emptyStream = `data: {"result":{"kind":"task","id":"t1","status":{"state":"working"}}}
 
 data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}
@@ -616,5 +616,183 @@ func TestCaseFileView(t *testing.T) {
 	}
 	if strings.Contains(l, `id="case-file"`) || strings.Contains(l, "Open investigation") {
 		t.Errorf("locked affordance must not render an investigation mount")
+	}
+}
+
+// kagent0912SSE is the stream the PINNED kagent 0.9.12 actually sends, captured
+// from the wire on 2026-08-17 (see internal/kagent/kagent_test.go for the exact
+// capture command and the per-frame notes). Structurally verbatim; the repeated
+// per-frame metadata is trimmed. Note what is NOT here: no top-level `message`
+// frame and no `tool-call`/`tool-result` kind. Everything rides `status-update`,
+// and the answer arrives as an `artifact-update`.
+const kagent0912SSE = `data: {"result":{"kind":"status-update","final":false,"status":{"message":{"kind":"message","parts":[{"kind":"text","text":"You are a read-only Kubernetes troubleshooting agent. Investigate…"}],"role":"user","taskId":"t"},"state":"submitted"},"taskId":"t"}}
+
+data: {"result":{"kind":"status-update","final":false,"status":{"state":"working"},"taskId":"t"}}
+
+data: {"result":{"kind":"status-update","final":false,"status":{"message":{"kind":"message","parts":[{"kind":"data","data":{"args":{"namespace":"demo-app","resource_name":"demo-app","resource_type":"Deployment"},"id":"c1","name":"k8s_describe_resource"},"metadata":{"kagent_type":"function_call"}}],"role":"agent","taskId":"t"},"state":"working"},"taskId":"t"}}
+
+data: {"result":{"kind":"status-update","final":false,"status":{"message":{"kind":"message","parts":[{"kind":"data","data":{"id":"c1","name":"k8s_describe_resource","response":{"content":[{"text":"Name: demo-app\nReason: OOMKilled\nLimits: memory 48Mi","type":"text"}],"isError":false}},"metadata":{"kagent_type":"function_response"}}],"role":"agent","taskId":"t"},"state":"working"},"taskId":"t"}}
+
+data: {"result":{"kind":"status-update","final":false,"status":{"message":{"kind":"message","parts":[{"kind":"text","text":"The container was OOMKilled; the limit looks too low."}],"role":"agent","taskId":"t"},"state":"working"},"taskId":"t"}}
+
+data: {"result":{"kind":"artifact-update","artifact":{"artifactId":"a1","parts":[{"kind":"text","text":"**Status:** Diagnosed — unverified\n\n**Hypothesis:** the memory limit 48Mi is below the real working set\n\n**Kill-test:** kubectl -n demo-app get pod -o jsonpath='{..lastState.terminated.reason}'\n\n**Fix:**\ngit revert HEAD\ngit push"}]},"lastChunk":true,"taskId":"t"}}
+
+data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"},"taskId":"t"}}
+
+`
+
+// TestAgentAskRendersKagent0912Stream is THE regression for the bug the
+// 2026-08-17 rehearsal found: against the pinned kagent, every frame fell
+// through translate(), emitted stayed 0, and the browser got
+// "the agent responded in a format this console doesn't recognize. Check that
+// your kagent version matches the workshop pin." — while the agent run had
+// SUCCEEDED. A status-update-only stream must render a case file, not an error.
+func TestAgentAskRendersKagent0912Stream(t *testing.T) {
+	ts, calls, _ := fakeKagent(t, kagent0912SSE)
+	s := serverWithKagent(t, ts.URL, true)
+
+	rec := httptest.NewRecorder()
+	HandleAgentAsk(s, rec, askRequest(t))
+
+	body := rec.Body.String()
+	if *calls != 1 {
+		t.Errorf("kagent called %d times, want 1", *calls)
+	}
+	if strings.Contains(body, "event: error") {
+		t.Errorf("a successful kagent 0.9.12 run must not render an error:\n%s", body)
+	}
+	indexOrder(t, body,
+		"event: tool_call",
+		"event: tool_result",
+		"event: message",
+		"event: verdict",
+		"event: done",
+	)
+	for _, want := range []string{
+		"k8s_describe_resource",       // the tool, out of data.name
+		"namespace=demo-app",          // its args, flattened
+		"Name: demo-app",              // the tool output, unwrapped from the MCP envelope
+		"The container was OOMKilled", // the narration, from a text part
+		"Diagnosed — unverified",      // Status, parsed out of the artifact
+		"48Mi",                        // Hypothesis
+		"kubectl -n demo-app get pod", // Kill-test
+		"git revert HEAD",             // Fix — copy-paste git
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("stream missing %q:\n%s", want, body)
+		}
+	}
+	// The echoed prompt (frame 0, role "user") must never appear as a log line.
+	if strings.Contains(body, "You are a read-only Kubernetes troubleshooting agent") {
+		t.Errorf("the echoed user prompt must not be rendered into the log:\n%s", body)
+	}
+	// Still read-only: no mutating affordance anywhere in the stream.
+	for _, forbidden := range []string{"hx-post", "hx-delete", "<button", "<form", "kubectl apply"} {
+		if strings.Contains(body, forbidden) {
+			t.Errorf("case file must not offer a mutating action, found %q", forbidden)
+		}
+	}
+}
+
+// TestAgentAskUnstructuredAnswerDegrades: kagent answers, but the model ignores
+// the requested Status/Hypothesis/Kill-test/Fix shape (module 10's first beat, a
+// small local model). The console must show the plain answer — a workshop is
+// better served by a plain answer than an error card.
+func TestAgentAskUnstructuredAnswerDegrades(t *testing.T) {
+	sse := `data: {"result":{"kind":"artifact-update","artifact":{"parts":[{"kind":"text","text":"The pods are crashing because the image tag is wrong."}]},"lastChunk":true}}` + "\n\n" +
+		`data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}` + "\n\n"
+	ts, _, _ := fakeKagent(t, sse)
+	s := serverWithKagent(t, ts.URL, true)
+
+	rec := httptest.NewRecorder()
+	HandleAgentAsk(s, rec, askRequest(t))
+
+	body := rec.Body.String()
+	if strings.Contains(body, "event: error") {
+		t.Errorf("an unstructured but real answer must not be an error:\n%s", body)
+	}
+	if !strings.Contains(body, "the image tag is wrong") {
+		t.Errorf("the plain answer must still reach the panel:\n%s", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Errorf("a run that produced an answer is done:\n%s", body)
+	}
+}
+
+// TestNoEventsMessageIsObservable pins the wording of the zero-event error. The
+// old text blamed the attendee's kagent version for a run that had succeeded,
+// which cost a rehearsal an afternoon; the replacement may only state what was
+// seen on the wire and where the truth is.
+func TestNoEventsMessageIsObservable(t *testing.T) {
+	cases := []struct {
+		name  string
+		stats kagent.Stats
+		want  []string
+	}{
+		{"frames but nothing readable", kagent.Stats{Frames: 7}, []string{"7 frame", "completed", "kubectl -n kagent logs"}},
+		{"nothing at all", kagent.Stats{}, []string{"without sending a single frame", "kubectl -n kagent logs"}},
+		{"only malformed", kagent.Stats{Malformed: 3}, []string{"3 frame", "readable JSON"}},
+		{"frames plus malformed", kagent.Stats{Frames: 2, Malformed: 1}, []string{"2 frame", "A further 1 frame"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := noEventsMessage(tc.stats)
+			for _, w := range tc.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("message %q missing %q", got, w)
+				}
+			}
+			// Never send the attendee after a version pin they did not get wrong.
+			for _, forbidden := range []string{"workshop pin", "version matches"} {
+				if strings.Contains(got, forbidden) {
+					t.Errorf("message must not blame the version pin: %q", got)
+				}
+			}
+		})
+	}
+}
+
+// TestAgentAskFollowupDoesNotDoubleTheAnswer: kagent sends its final answer
+// twice — once as narration, once as the artifact. The client routes a
+// follow-up's verdict into the LOG, where the narration already is (case-file.js),
+// so the second copy would appear verbatim twice in one pane. Observed on a live
+// follow-up against kagent 0.9.12 on 2026-08-17.
+func TestAgentAskFollowupDoesNotDoubleTheAnswer(t *testing.T) {
+	// Narration and artifact carry the identical text, as kagent really does.
+	const answer = "Two pods are Completed, which is normal for jobs."
+	sse := `data: {"result":{"kind":"status-update","status":{"message":{"role":"agent","parts":[{"kind":"text","text":"` + answer + `"}]}}}}` + "\n\n" +
+		`data: {"result":{"kind":"artifact-update","artifact":{"parts":[{"kind":"text","text":"` + answer + `"}]},"lastChunk":true}}` + "\n\n" +
+		`data: {"result":{"kind":"status-update","final":true,"status":{"state":"completed"}}}` + "\n\n"
+
+	ask := func(question string) string {
+		ts, _, _ := fakeKagent(t, sse)
+		s := serverWithKagent(t, ts.URL, true)
+		payload := map[string]string{"namespace": "demo-app", "kind": "Application", "name": "demo-app"}
+		if question != "" {
+			payload["question"] = question
+		}
+		b, _ := json.Marshal(payload)
+		rec := httptest.NewRecorder()
+		HandleAgentAsk(s, rec, httptest.NewRequest(http.MethodPost, "/agent/ask", bytes.NewReader(b)))
+		return rec.Body.String()
+	}
+
+	// A follow-up: the answer streams into the log once, and no verdict repeats it.
+	follow := ask("which pods are not Running?")
+	if n := strings.Count(follow, answer); n != 1 {
+		t.Errorf("a follow-up must show its answer once, got %d copies:\n%s", n, follow)
+	}
+	if strings.Contains(follow, "event: verdict") {
+		t.Errorf("a follow-up whose answer already streamed must not repeat it as a verdict:\n%s", follow)
+	}
+	if !strings.Contains(follow, "event: done") {
+		t.Errorf("the follow-up still completes:\n%s", follow)
+	}
+
+	// The OPENING investigation keeps the verdict: log and panel are different
+	// panes, and the panel is the whole point of the Case file.
+	open := ask("")
+	if !strings.Contains(open, "event: verdict") {
+		t.Errorf("the opening investigation must still fill the panel:\n%s", open)
 	}
 }

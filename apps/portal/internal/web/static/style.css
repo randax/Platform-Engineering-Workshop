@@ -538,7 +538,15 @@ pre.code {
 .cf-line { margin: 0.15rem 0; }
 .cf-tool { color: var(--code-accent); }
 .cf-obs { color: var(--warn); margin-left: 1.2rem; }
-.cf-msg { color: var(--code-muted); font-style: italic; }
+.cf-msg { color: var(--code-muted); font-style: italic; white-space: pre-wrap; }
+/* A tool's raw output, collapsed under the one-line read: it is the evidence the
+   attendee checks the agent's claims against, so it is one click away, bounded
+   in height, and never expanded by default. */
+.cf-out > summary { cursor: pointer; color: var(--code-muted); }
+.cf-out pre.code {
+  margin: 0.3rem 0 0.5rem; padding: 0.5rem 0.6rem; font-size: 0.72rem;
+  max-height: 12rem; overflow: auto; white-space: pre-wrap;
+}
 .case-side { display: flex; flex-direction: column; gap: 0.8rem; }
 .case-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);

@@ -46,8 +46,13 @@
 {{/* One tool the agent invoked (a read of the cluster). */}}
 {{define "cf-toolcall"}}<div class="cf-line"><span class="cf-tool">{{.Tool}}</span>({{.Args}})</div>{{end}}
 
-{{/* The agent's one-line read of what a tool returned. */}}
-{{define "cf-toolresult"}}<div class="cf-line cf-obs">↳ {{.Observation}}</div>{{end}}
+{{/* What a tool returned: the one-line read, with the raw output behind a
+     collapsed <details> when there is one (kagent hands us the tool's real
+     output — that output is the evidence the attendee verifies the agent's
+     claims against). Bounded in the client (maxToolOutput), never a form or a
+     button — the agent stays read-only. */}}
+{{define "cf-toolresult"}}<div class="cf-line cf-obs">↳ {{.Observation}}{{if .Output}}
+  <details class="cf-out"><summary>output</summary><pre class="code">{{.Output}}</pre></details>{{end}}</div>{{end}}
 
 {{/* A plain agent message ("forming a hypothesis…"). */}}
 {{define "cf-message"}}<div class="cf-line cf-msg">{{.Text}}</div>{{end}}
