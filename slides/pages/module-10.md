@@ -11,7 +11,7 @@ layout: section
 <!--
 Everything up to now has been day 1: build it, ship it, watch it come up green. Day 2 is where platforms actually earn their keep — the moment something that was working breaks, usually because someone (maybe you) pushed a change. Module 05 taught the debugging discipline with a bring-your-own AI assistant sitting outside the platform; this module puts an agent INSIDE the platform as a first-class, GitOps-delivered capability, wired straight into the Console built in module 08.
 
-The shape of the module: three realistic faults land as plausible git commits against your own demo-app (a bad rollback, a "rightsizing" that OOMKills, an image reference that quietly points at Docker Hub). Work each one through an escalation ladder — signal, hint, agent — and fix everything with git revert, never a console apply button.
+The shape of the module: three realistic faults land as plausible git commits against your own demo-app (a bad rollback, a "rightsizing" whose memory limit is too small for the container to even start, an image reference that quietly points at Docker Hub). Work each one through an escalation ladder — signal, hint, agent — and fix everything with git revert, never a console apply button.
 
 This is a stretch module: nothing later depends on it, and module 05's muscle memory is the rehearsed fallback if anything about Kagent itself misbehaves on the day.
 -->
@@ -138,7 +138,7 @@ cd lab/10-day2-ops && ./verify.sh
 <span class="badge">~20 min</span> · beat 1: `qwen3:4b` flails · beat 2: one `ModelConfig` push fixes it
 
 <!--
-The task: enable kagent.yaml from the catalog (same push-to-Gitea dance as every capability today), pick one of three scenarios and inject it (inject.sh 1|2|3 — a bad rollback, an OOMKilling "rightsizing" commit, or a Docker Hub image reference that ImagePullBackOffs at the rate-limited venue), then open the affected Application's detail page in the Console and click "Open investigation."
+The task: enable kagent.yaml from the catalog (same push-to-Gitea dance as every capability today), pick one of three scenarios and inject it (inject.sh 1|2|3 — a bad rollback, a "rightsizing" commit that sets the memory limit below what the runtime needs to create the container, or a Docker Hub image reference that your own mirror answers for anyway — the guardrail there is the repo policy, not a crashing pod), then open the affected Application's detail page in the Console and click "Open investigation."
 
 Beat 1 runs entirely offline against qwen3:4b on host-side Ollama (never in-cluster, so it doesn't compete with the cluster's memory) — the point isn't to get a right answer, it's to watch the previous slide's table happen live: a plausible first tool call, then a loop, a dropped thread, or a malformed follow-up. Write down how it fails — that's the deliverable, same spirit as module 05's "agent claimed X" exercise.
 
