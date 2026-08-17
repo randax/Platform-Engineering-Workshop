@@ -103,7 +103,13 @@ prometheus-nats-exporter | github-release | nats-io/prometheus-nats-exporter    
 kagent                   | github-tag     | kagent-dev/kagent                               | env:KAGENT_VERSION                           | ^[0-9]+\.[0-9]+\.[0-9]+$
 
 # --- Observability (Victoria stack + OTel Collector) -------------------------
-victoria-metrics         | github-release | VictoriaMetrics/VictoriaMetrics                 | image:docker.io/victoriametrics/victoria-metrics |
+# VictoriaMetrics publishes several release lines on the SAME DAY (1.149.0,
+# 1.148.1 and LTS 1.136.15 all on 2026-08-05), and GitHub's /releases/latest
+# returned the LTS patch — so this row read `ok` only because our pin happened
+# to be ahead of it, and a real 1.150.0 could have gone unreported. Read the
+# tag list and take the highest stable instead. The sibling VictoriaLogs and
+# VictoriaTraces repos each have a single line, so they stay on github-release.
+victoria-metrics         | github-tag     | VictoriaMetrics/VictoriaMetrics                 | image:docker.io/victoriametrics/victoria-metrics | ^[0-9]+\.[0-9]+\.[0-9]+$
 victoria-logs            | github-release | VictoriaMetrics/VictoriaLogs                    | image:docker.io/victoriametrics/victoria-logs |
 victoria-traces          | github-release | VictoriaMetrics/VictoriaTraces                  | image:docker.io/victoriametrics/victoria-traces |
 # Stock Grafana is not in images.txt: it is only the FROM line of

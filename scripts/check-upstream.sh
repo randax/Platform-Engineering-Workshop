@@ -173,6 +173,9 @@ semver_parse() {
       alpha|alpha[.0-9-]*|beta|beta[.0-9-]*|rc|rc[.0-9-]*|pre|pre[.0-9-]*) pre="${lc}" ;;
       preview|preview[.0-9-]*|dev|dev[.0-9-]*|next|next[.0-9-]*)           pre="${lc}" ;;
       snapshot*|nightly*)                                                  pre="${lc}" ;;
+      # Milestone/early-access spellings. Nothing here uses one today, but an
+      # unrecognised prerelease word is read as release-grade and under-reports.
+      m[0-9]*|milestone*|devel*|eap*|ea|ea[.0-9-]*|cr[0-9]*)              pre="${lc}" ;;
     esac
     # a flavor may still trail the prerelease ("1.0.0-rc.1-glibc") — drop it,
     # otherwise the flavored tag sorts ABOVE the plain one

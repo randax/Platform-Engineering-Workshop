@@ -8,3 +8,8 @@ argo-workflows.yaml
 portal.yaml
 knative-eventing.yaml
 picture-pipeline.yaml
+victoria-metrics.yaml
+victoria-logs.yaml
+victoria-traces.yaml
+grafana.yaml
+otel-collector.yaml
