@@ -35,6 +35,31 @@ if [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" 
   die "A '${CLUSTER_NAME}' cluster already exists. Run ./scripts/destroy-cluster.sh first."
 fi
 
+# No containers, but a leftover talosconfig context named ${CLUSTER_NAME} makes
+# `talosctl cluster create` rename the NEW context to '${CLUSTER_NAME}-1' —
+# after which every `talosctl --context ${CLUSTER_NAME}` below dials the
+# endpoint of a cluster that no longer exists and this script fails at
+# "Merging kubeconfig". destroy-cluster.sh now clears it; this catches a stale
+# context left by an older destroy, a hand-run `talosctl cluster destroy`, or a
+# create that died halfway.
+talos_contexts() { # -> one context name per line, '*' marker stripped
+  talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'
+}
+if talos_contexts | grep -qx "${CLUSTER_NAME}"; then
+  warn "Removing a stale talosconfig context '${CLUSTER_NAME}' (no such cluster is running)"
+  other="$(talos_contexts | grep -vx "${CLUSTER_NAME}" | head -1)"
+  if [[ -n "${other}" ]]; then
+    # `talosctl config remove` refuses to remove the SELECTED context (and
+    # exits 0 anyway), so select something else first.
+    talosctl config context "${other}" >/dev/null 2>&1 || true
+    talosctl config remove "${CLUSTER_NAME}" --noconfirm >/dev/null 2>&1 || true
+  else
+    rm -f "${TALOSCONFIG:-${HOME}/.talos/config}"
+  fi
+  talos_contexts | grep -qx "${CLUSTER_NAME}" \
+    && die "Could not remove the stale talosconfig context '${CLUSTER_NAME}' — remove it by hand (talosctl config remove ${CLUSTER_NAME}) and re-run."
+fi
+
 # --- Machine config patches -----------------------------------------------------
 # Disable the default CNI (flannel) and kube-proxy: Cilium replaces both.
 # This is why Talos >= v1.13 is required — v1.12 hangs on cni:none (talos#12885).

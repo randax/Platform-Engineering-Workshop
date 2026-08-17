@@ -37,7 +37,38 @@ if have kubectl; then
   kubectl config delete-user "admin@${CLUSTER_NAME}" >/dev/null 2>&1 || true
   ok "kubeconfig entries removed"
 fi
-talosctl config remove "${CLUSTER_NAME}" --noconfirm >/dev/null 2>&1 || true
+# `talosctl config remove` SKIPS the context that is currently selected — and
+# still exits 0 while saying so ("skipping removal of current context ...,
+# please change it to another before removing"). create-cluster.sh always
+# leaves '${CLUSTER_NAME}' selected, so the bare call here silently removed
+# nothing, undetectably. The next create-cluster.sh then found the name taken,
+# `talosctl cluster create` renamed the NEW context to '${CLUSTER_NAME}-1', and
+# every `talosctl --context ${CLUSTER_NAME}` in create-cluster.sh talked to the
+# cluster that had just been destroyed:
+#   error copying: rpc error: ... dial tcp 127.0.0.1:53556: connect: connection refused
+# i.e. destroy + create (and `catch-up.sh --rebuild`) failed on the second
+# cluster of the day. So: switch away from it first, then remove.
+talos_contexts() { # -> one context name per line, '*' marker stripped
+  talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'
+}
+if talos_contexts | grep -qx "${CLUSTER_NAME}"; then
+  other="$(talos_contexts | grep -vx "${CLUSTER_NAME}" | head -1)"
+  if [[ -n "${other}" ]]; then
+    talosctl config context "${other}" >/dev/null 2>&1 || true
+    talosctl config remove "${CLUSTER_NAME}" --noconfirm >/dev/null 2>&1 || true
+  else
+    # Only one context, and it is the cluster we just destroyed: the whole
+    # talosconfig describes nothing that still exists. talosctl recreates it on
+    # the next cluster create.
+    rm -f "${TALOSCONFIG:-${HOME}/.talos/config}"
+  fi
+fi
+if talos_contexts | grep -qx "${CLUSTER_NAME}"; then
+  warn "talosconfig still has a '${CLUSTER_NAME}' context — remove it before recreating:"
+  warn "  talosctl config context <other> && talosctl config remove ${CLUSTER_NAME}"
+else
+  ok "talosconfig context removed"
+fi
 
 # --- Mirror ---------------------------------------------------------------------
 if [[ "${PURGE_MIRROR}" == "true" ]]; then
