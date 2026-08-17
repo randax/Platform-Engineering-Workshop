@@ -215,12 +215,12 @@ INJECTED_SHA="$(git -C "$CLONE" rev-parse --short HEAD)"
 git -C "$CLONE" push -q origin main
 argocd_refresh demo
 
-echo "💥 Scenario 03-dockerhub-imagepull injected as commit $INJECTED_SHA."
+echo "💥 Scenario 03-dockerhub-sneaks-in injected as commit $INJECTED_SHA."
 echo
 echo "Your job: follow the failed pull to its exact image reference, prove the Git change, then revert it."
 echo "Start with:"
 echo "  kubectl -n demo get pods -l app=demo-web"
 echo "  kubectl -n demo describe pod <pod>"
 echo
-echo "NO PEEKING at scenarios/03-dockerhub-imagepull/description.md"
+echo "NO PEEKING at scenarios/03-dockerhub-sneaks-in/description.md"
 echo "until you have written down a diagnosis. Give up / done: ./restore.sh 3"

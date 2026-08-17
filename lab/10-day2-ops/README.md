@@ -51,8 +51,14 @@ offline model that flails, then a one-line `ModelConfig` change that fixes it.
 | # | Scenario | Needs | Flavor |
 |---|----------|-------|--------|
 | 1 | `01-bad-release-rollback` | module 02's `demo` Application | a plausible release that crashes every new replica |
-| 2 | `02-oomkill-crashloop` | module 02's `demo` Application | a plausible rightsizing commit that OOMKills every replica on a cadence |
-| 3 | `03-dockerhub-imagepull` | module 02's `demo` Application | a plausible registry-migration commit that pulls from Docker Hub instead of the GHCR mirror |
+| 2 | `02-oomkill-nostart` | module 02's `demo` Application | a plausible rightsizing commit whose new replicas never start at all |
+| 3 | `03-dockerhub-sneaks-in` | module 02's `demo` Application | a plausible registry-migration commit that breaks nothing today and voids the offline guarantee |
+
+The three are deliberately different *shapes* of bad release, and the third one is the
+awkward one on purpose: **nothing about it is visibly broken on your laptop.** Scenario 1
+crashes loudly, scenario 2 stalls the rollout, scenario 3 goes green and still has to be
+reverted. Day-2 work includes the class of bad release whose only symptom is that a
+guarantee you rely on is gone.
 
 ```bash
 ./inject.sh 1        # first run: seeds the demo-web baseline, then stops
@@ -73,7 +79,9 @@ until you have committed to a diagnosis. `fix.sh` is the canonical scripted repa
 ## The task
 
 The guided path below uses scenario 1; scenarios 2 and 3 follow the same observe,
-diagnose, prove, and Git-revert loop using their own setup-table commands and hints.
+diagnose, prove, and Git-revert loop using their own setup-table commands and hints —
+with one twist in scenario 3, where step 2 has no failure to find and the observation
+you need is of a *healthy* pod. Its hints say so up front.
 
 1. Run `./inject.sh 1`. The first run only seeds the `demo-web` baseline and tells you to
    wait for ArgoCD; run it again once `kubectl -n demo rollout status deploy/demo-web`
@@ -144,35 +152,41 @@ Mechanically, `./restore.sh 1` finds the traced release commit, runs `git revert
 pushes the new commit. `./solve.sh` reverts every scenario that is currently injected.
 </details>
 
-### Scenario 2: OOMKill crashloop
+### Scenario 2: the rollout that never lands
 
 <details>
-<summary>Hint 1: Establish the goal from the live cadence</summary>
+<summary>Hint 1: Establish the goal from what did not happen</summary>
 
-Find why a `demo-web` container that can be `Running` now keeps restarting, connect that
-runtime evidence to one Git diff, and repair it through a forward revert—not a live edit.
+The app is still serving and nothing is crashing, yet the release is not live: one new
+`demo-web` pod never becomes Ready and `kubectl -n demo rollout status deploy/demo-web`
+never returns. Find why that pod cannot start, connect it to one Git diff, and repair it
+through a forward revert—not a live edit.
 </details>
 
 <details>
-<summary>Hint 2: Treat the restart count as evidence</summary>
+<summary>Hint 2: Notice what evidence is missing</summary>
 
-What does the restart **count** tell you that the `CrashLoopBackOff` reason does not?
-Watch it for long enough to distinguish a one-off restart from a process that repeatedly
-crosses the same failure boundary:
+`RESTARTS` is 0 and `kubectl -n demo logs <new-pod>` gives you nothing — not even a
+previous state. What does the *absence* of both tell you about how far the pod got?
 
 ```bash
-kubectl -n demo get pods -l app=demo-web -w
+kubectl -n demo get pods -l app=demo-web
+kubectl -n demo get rs
 ```
+
+A failure with no process output happened before your process existed. Kubernetes records
+that class of failure in exactly one place.
 </details>
 
 <details>
-<summary>Hint 3: Connect the previous process state to the resource budget</summary>
+<summary>Hint 3: Read the Events, then the resource budget</summary>
 
-Describe one restarting pod and read `Last State`, `Reason`, and `Exit Code`. Then inspect
-the `web` container's configured memory allocation in the Git-managed Deployment:
+Describe the stuck pod and read Events bottom-up — the container runtime names the cause
+in its own words. Then inspect the `web` container's configured memory allocation in the
+Git-managed Deployment:
 
 ```bash
-kubectl -n demo describe pod <pod>
+kubectl -n demo describe pod <new-pod>
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].resources}'
 git clone http://localhost:30300/cloudbox/platform.git && cd platform
@@ -180,16 +194,17 @@ git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
 
-Compare the configured memory allocation with what the Go binary actually needs to run
-and serve traffic. The current state may be `Running`; the previous terminated state
-records why kubelet had to restart it.
+The commit's own message tells you where its number came from. Ask what that number left
+out — a memory limit is the budget your container is *created* inside, not just a cap on
+your program once it runs.
 </details>
 
 <details>
 <summary>Full solution</summary>
 
-The complete OOMKill evidence chain, restart cadence, and canonical Git repair are in
-[scenarios/02-oomkill-crashloop/description.md](scenarios/02-oomkill-crashloop/description.md).
+The complete evidence chain, the rolling-update behaviour that keeps the app up, and the
+canonical Git repair are in
+[scenarios/02-oomkill-nostart/description.md](scenarios/02-oomkill-nostart/description.md).
 
 Mechanically, `./restore.sh 2` finds the traced rightsizing commit, runs `git revert`, and
 pushes the new commit. `./solve.sh` reverts every scenario that is currently injected.
@@ -197,28 +212,41 @@ pushes the new commit. `./solve.sh` reverts every scenario that is currently inj
 
 ### Scenario 3: Docker Hub sneaks in
 
-<details>
-<summary>Hint 1: Establish the goal from the pull failure</summary>
+**Read this before you inject it:** this one does **not** break your cluster. The pods go
+Ready and stay Ready. Your job is to find what the release gave away, prove where the
+image actually came from, and revert it anyway. If you are waiting for a red pod, you
+will wait forever — that is the exercise, not a bug.
 
-Find why the new `demo-web` pods cannot start, connect the pull failure to one Git diff,
-and repair it through a forward revert—not a live edit.
+<details>
+<summary>Hint 1: Establish the goal without a symptom</summary>
+
+A release landed and everything is green. Decide what you would have to check to be sure
+the release was *safe*, not merely working, then check it — and repair whatever you find
+through a forward revert, not a live edit.
 </details>
 
 <details>
-<summary>Hint 2: Distinguish startup from image retrieval</summary>
+<summary>Hint 2: Ask what the pods are running, and who answered</summary>
 
-The image pulled fine in scenarios 1 and 2. What is different about this failure mode
-from the start? Does the container have a previous process state or logs at all?
-</details>
-
-<details>
-<summary>Hint 3: Connect the pull Event to the Git-managed image</summary>
-
-Describe one affected pod and read Events bottom-up. Compare the exact registry and image
-string in the pull error with the Deployment and recent Git history:
+Compare what the pods were told to pull with what module 00 pre-pulled:
 
 ```bash
-kubectl -n demo describe pod <pod>
+kubectl -n demo get pods -l app=demo-web \
+  -o jsonpath='{range .items[*]}{.spec.containers[0].image}{"\n"}{end}'
+kubectl -n demo describe pod <pod> | grep -A2 Pulled
+```
+
+Then explain the pull *time* in that Event. Nothing on conference WiFi pulls an 8 MB
+image that fast. Which of the things you built in module 00 and 01 could have answered a
+`docker.io` request, and why would it answer for a registry it never fetched from?
+(`curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/v2/...` and
+`docker logs cloudbox-mirror | tail` are both fair game.)
+</details>
+
+<details>
+<summary>Hint 3: Connect the image reference to the Git-managed manifest</summary>
+
+```bash
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].image}'
 git clone http://localhost:30300/cloudbox/platform.git && cd platform
@@ -226,16 +254,17 @@ git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
 
-Pay attention to the registry host as well as the repository path and digest. The
-workshop pre-pulls the GHCR reference, not every equivalent registry location.
+Only the registry host changed; the path and digest are byte-identical. Work out which of
+the workshop's guarantees that costs you, and where the check that catches it has to live
+if the cluster is never going to complain.
 </details>
 
 <details>
 <summary>Full solution</summary>
 
-The complete ImagePullBackOff evidence chain, workshop registry constraint, and canonical
-Git repair are in
-[scenarios/03-dockerhub-imagepull/description.md](scenarios/03-dockerhub-imagepull/description.md).
+Why the pull succeeds (with the mirror's own access log as proof), where the outage
+actually waits, the workshop registry constraint, and the canonical Git repair are in
+[scenarios/03-dockerhub-sneaks-in/description.md](scenarios/03-dockerhub-sneaks-in/description.md).
 
 Mechanically, `./restore.sh 3` finds the traced registry commit, runs `git revert`, and
 pushes the new commit. `./solve.sh` reverts every scenario that is currently injected.
@@ -254,6 +283,11 @@ the **16 GB minimum spec, beat 1 does not fit next to the running stack** — sk
 to "Beat 2" below. That is not a lesser path; it costs no extra RAM, and it's the one
 that actually fits your machine.
 
+Concretely, measured on 2026-08-17 (32 GB Mac, 16 GB of it inside Colima, all 21 apps
+running): loading `qwen3:4b` with the ModelConfig's `num_ctx: 64000` cost **~11.5 GiB**
+outside the VM — 2.4 GiB of weights and **9 GiB of KV cache** — and one investigation took
+**87 s** of wall clock. The weights are small; the context window is what does not fit.
+
 ### Enable Kagent and point it at your platform
 
 If you haven't already, turn the capability on the same way as every other one in this
@@ -271,8 +305,19 @@ Wait for `kubectl -n argocd get application kagent` to report `Synced`/`Healthy`
 check what shipped: `kubectl -n kagent get modelconfig default-model-config -o yaml`. It
 defaults to host-side Ollama running `qwen3:4b`, reached at `host.docker.internal:11434`.
 
+**Expect `kagent-controller` to CrashLoopBackOff ~3 times on the way there, and leave it
+alone.** It runs its database migration at startup, and it starts before the
+`kagent-postgresql` Service has endpoints (`connect: no route to host`), so it dies and
+comes back — 1/1 within ~40–90 s in the 2026-08-17 rehearsal. This is a real day-2 texture
+worth two minutes of attention: a restart count is not a diagnosis, and *ordering*
+failures self-heal in a way *configuration* failures never do. If it is still restarting
+after ~3 minutes, then read the logs.
+
 **macOS and WSL2 (Docker Desktop, OrbStack): nothing else to do.** That address already
-resolves inside the containers your cluster nodes run in.
+resolves inside the containers your cluster nodes run in — including through to an Ollama
+listening only on `127.0.0.1`, which is its default. Verified on 2026-08-17 under Colima
+(`vmType: vz`): a pod resolved `host.docker.internal` to `192.168.5.2` and got
+`{"version":"0.32.14"}` back from `/api/version` with no `OLLAMA_HOST` change at all.
 
 **Native Linux Docker has no `host.docker.internal`.** This is the same host-vs-container
 addressing problem `cloudbox-mirror` already solved for you in module 00 (see
@@ -293,8 +338,25 @@ git push
 `10.5.0.1` is `TALOS_SUBNET_GATEWAY` in `scripts/versions.env` — the exact address
 `mirror_host_endpoint()` resolves to on native Linux for the same reason.
 
+On native Linux there is a second half to it: the macOS/WSL2 shortcut above works because
+those runtimes proxy `host.docker.internal` into the host's loopback, and a plain bridge
+does not. An Ollama bound to `127.0.0.1` is unreachable across `10.5.0.1`, so start it as
+`OLLAMA_HOST=0.0.0.0 ollama serve` (or set that in its systemd unit) and confirm from
+inside the cluster before blaming kagent:
+
+```bash
+# any pod with a shell will do — the kagent images are distroless, Gitea is not
+kubectl -n gitea exec deploy/gitea -c gitea -- wget -qO- http://10.5.0.1:11434/api/version
+```
+
 Ollama itself needs to be running on your host with `qwen3:4b` pulled — `cloudbox-init.sh`
-did that during module 00.
+did that during module 00, *if* Ollama was already installed when you ran it; if it wasn't,
+the script warned and skipped the pull rather than failing. Confirm before you blame the
+cluster:
+
+```bash
+ollama list | grep qwen3     # ~2.6 GB; ollama pull qwen3:4b if it is missing
+```
 
 ### Beat 1: watch the local model flail — and write down how
 
@@ -310,6 +372,33 @@ at *one* tool call and falls off a cliff the moment an investigation has to chai
 thread it drops after the third tool call, a hypothesis stated with no evidence behind
 it, a malformed follow-up. That sentence is beat 1's deliverable, not a diagnosis — same
 spirit as module 05's "the agent claimed X" exercise.
+
+For calibration, here is what it did on the rehearsal machine (scenario 1 injected,
+2026-08-17): **one** real tool call — `k8s_describe_resource` on the Deployment, which
+returned fine — and then, instead of calling the logs tool, it *printed* a tool call as
+prose: a `<function-call>` block naming pod `demo-web-69dfd9d57c-0`, a pod that does not
+exist. It never chained a second call, and closed with "the root cause is likely a failing
+application container startup" — the symptom restated as a cause, with nothing behind it.
+Yours will differ in the details; the shape (one tool call, then invention) is the point.
+
+> **Known issue, 2026-08-17 — the Console cannot render this run yet.** Against the pinned
+> kagent **0.9.12**, "Open investigation" ends in *"Investigation failed — the agent
+> responded in a format this console doesn't recognize"*. The message is misleading: your
+> kagent version is the pinned one, and the investigation really ran. kagent streams tool
+> steps inside A2A `status-update` frames (with `{name, args}` / `{name, response}` data
+> parts) and delivers the final answer as an `artifact-update`; the console still expects
+> top-level `tool-call` / `tool-result` / `message` frames, so it drops every frame and
+> reports an empty stream. Until the console is fixed, watch beat 1 from the agent side —
+> the tool calls and the model request are both in one log:
+>
+> ```bash
+> kubectl -n kagent logs deploy/k8s-agent -f
+> # POST http://host.docker.internal:11434/api/chat  →  your host model answered
+> # POST http://kagent-tools.kagent:8084/mcp        →  a tool call actually happened
+> ```
+>
+> Everything else in this module — the ModelConfig, the agent, the 78 registered tools,
+> the model switch in beat 2 — works; it is the console's translation layer that does not.
 
 ### Beat 2: one `ModelConfig` push, and it actually diagnoses
 
@@ -371,6 +460,14 @@ verdict comes with a real hypothesis and an explicit kill-test. Verify that kill
 against the live cluster yourself, then fix the fault the only way this module ever fixes
 anything: `git revert` and push.
 
+The switch itself is fast and observable, which is the platform lesson underneath the
+model lesson: on 2026-08-17 a one-field push reached
+`kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.model}'`
+**within 20 s**, and kagent rolled a new `k8s-agent` pod to pick it up — the same
+git-is-the-write-path mechanic as every scenario above, applied to the agent's own brain.
+(What that rehearsal could not check was Zen's endpoint itself — no key. The mechanism was
+proven by switching between two *local* Ollama models and watching the second one answer.)
+
 **No Zen key, or the free tier is gone?** Same shape, your own key. Create the Secret the
 same way (`kubectl create secret generic kagent-byo -n kagent --from-literal="API_KEY=$YOUR_KEY"`
 — one line, quoted), then set `apiKeySecret: kagent-byo` / `apiKeySecretKey: API_KEY` in
@@ -386,16 +483,22 @@ provider at Zen's endpoint instead of OpenAI's own. Full field reference:
 ./verify.sh
 ```
 
-The check fails while Git still contains the poisoned value. Once Git is clean, it also
-requires the live Deployment rollout to complete and rejects crashlooping or repeatedly
-restarting pods. These checks are intentionally separate: a live-only fix cannot bypass
-the platform's Git-only write path.
+The check fails while Git still contains the poisoned value, and next to that FAIL it
+prints which live symptom it found — a `CrashLoopBackOff` (1), a pod the runtime refuses
+to start (2), or, for scenario 3, a perfectly healthy pod running a `docker.io/`
+reference. It never asks you to wait for a symptom that cannot arrive.
+
+Once Git is clean, it separately requires the live Deployment rollout to complete and
+rejects crashlooping, OOMKilled or repeatedly restarting pods across a short stability
+window. Git-clean and live-healthy are deliberately separate assertions: a live-only fix
+cannot bypass the platform's Git-only write path.
 
 ## Explain-back
 
-Tell your neighbor which observation connected the pod's restart loop to the exact Git
-diff, and why reverting Git is safer here than editing the live Deployment—even if the
-live edit appears to work for a minute.
+Tell your neighbor which observation connected the failure to the exact Git diff, and why
+reverting Git is safer here than editing the live Deployment—even if the live edit appears
+to work for a minute. If you ran scenario 3, tell them instead why a green cluster was not
+evidence that the release was good.
 
 ## Going deeper
 

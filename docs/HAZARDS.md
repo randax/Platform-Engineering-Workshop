@@ -383,7 +383,9 @@ in an index regardless of platform. Passing at home, failing at the venue.
 | CNPG is stuck on 1.28.x | Deliberate hold — the mature minor. 1.29/1.30 exist and are ignored by a `track` regex. |
 | envoy is behind at v1.37.x | net-kourier ships `v1.37-latest`; we pin the exact patch it resolves to. A `track ^1\.37\.` regex stops the weekly report recommending 1.39. |
 | Backstage is amd64-only | Upstream ships it that way; Apple Silicon runs it emulated. Listed in `MIRROR_ARCH_EXEMPT`. **Rosetta turns out not to be required:** on 2026-08-17 it ran under Colima with `vmType: vz` and **`rosetta: false`** — 1/1, 0 restarts, `:30700` → 200, zero error lines. The cost is time: **9 min 03 s** from pod creation to Ready, against seconds for the Go Console. Say so in the module 08 text so a presenter starts it early instead of concluding it is broken. |
-| module 10 scenario 3 never shows `ImagePullBackOff` at home | Correct by design. `create-cluster.sh` sets `skipFallback: false`, so the Docker Hub mirror miss falls back to the real registry and the poisoned commit pulls fine with working internet — the lesson is the policy violation in git; the outage is reserved for a rate-limited venue. Do not "fix" the manifest. **Do** note that `verify.sh` currently emits a FAIL telling the attendee to wait for a symptom that will not arrive, which reads as a broken scenario to anyone rehearsing at home — unresolved, content decision. Scenario 2 has the same shape for a different reason: `helloworld-go` fits in the 8Mi limit while idle (ten minutes, zero restarts), and only OOMKilled after ~2000 requests were driven at the Service. |
+| module 10 scenario 3 never shows `ImagePullBackOff` — anywhere, even offline | Correct by design, and for a **deeper reason than the `skipFallback: false` fallback** everyone assumed. `cloudbox-init.sh` stores mirror content under the **registry-stripped** repo path (`ghcr.io/knative/helloworld-go` → `knative/helloworld-go`) and `create-cluster.sh` points the *docker.io* mirror at that same registry, so the poisoned `docker.io/…` ref with an identical path and digest is a **mirror HIT**. Measured 2026-08-17: `containerd/v2.2.6` requested manifest and every blob with `?ns=docker.io` and got `200` from `cloudbox-mirror`; pull time 265 ms; the traffic never left the laptop. So the pull succeeds offline too — the failure is reserved for refs the mirror does not carry, or clusters built without the pre-pull. Do not "fix" the manifest, and do not restore an `ImagePullBackOff` expectation to the check: the scenario and `verify.sh` were rewritten to assert the policy violation reaching the cluster instead (see `lab/10-day2-ops`). |
+| module 10 scenario 2's poison is `2Mi`, which "cannot be a plausible rightsizing" | Deliberate and calibrated, and it replaced an `8Mi` that produced **no symptom at all**. On containerd 2.2.6 + runc, `helloworld-go` is Ready and restart-free at 4/6/8/12Mi (8Mi survived 300 sequential and 4800 concurrent requests before *one* replica OOMKilled — unusable as a lab), while ≤3Mi never starts. At `2Mi` the sandbox fails in seconds with the runtime naming the cause: `FailedCreatePodSandBox … container init was OOM-killed (memory limit too low?)`. The scenario now teaches "a limit is the budget your container is created inside", not a `lastState: OOMKilled` cadence — that signature is not reachable with this image without a load generator. Do not raise the value back toward plausible-looking numbers without re-measuring. |
+| `kagent-controller` CrashLoopBackOffs ~3× right after you enable kagent | Ordering, not configuration. It runs its DB migration at startup and starts before `kagent-postgresql` has endpoints (`connect: no route to host`), then self-heals — 1/1 within ~40–90 s, app Synced/Healthy, seen in both 2026-08-17 runs. Module 10 now says so in the text and uses it as a teaching moment. Only read the logs if it is still restarting after ~3 minutes. |
 | `application-xr`'s `spec.env` does nothing | Correct — it is **RESERVED, not implemented**. The Composition emits no patch for it; the field stays in the XRD so the v2 append lands without an API break. The VENDOR.md claimed for months that it was "appended"; git history shows the patch never existed. The XRD description now says so. |
 | `docker.io/grafana/grafana` vanished from `images.txt` | It was only the `FROM` line in `apps/grafana/Dockerfile`, consumed by CI. No pod ever pulled it. The deployed image is `ghcr.io/randax/cloudbox-grafana`. |
 
@@ -449,6 +451,97 @@ and 13 made it worse.
 Related, deliberate: `victoriametrics-logs-datasource` is held at **0.29.0**
 though 0.30.1/0.31.0 exist — all three declare `>=10.4.0`, so nothing forces a
 move and holding keeps the Grafana major a one-variable change.
+
+## LIVE — the Console's Case file cannot read kagent 0.9.12's stream
+
+Module 10's second half is "open an investigation in the Console and watch the
+tool-call log". Against the pinned kagent **0.9.12** that surface produces exactly
+one thing: *"Investigation failed — the agent responded in a format this console
+doesn't recognize. Check that your kagent version matches the workshop pin."* The
+message sends the attendee after a version problem that does not exist.
+
+**The run is fine; the translation is not.** Driven end to end on 2026-08-17 (the
+Console's own endpoint, `POST /agent/ask` for `demo/Component/demo-web`, scenario 1
+injected), the controller answered `200` after **87 s** and the agent really worked:
+`k8s-agent` logged `POST http://host.docker.internal:11434/api/chat 200` and a tool
+call to `kagent-tools`. Capturing the raw A2A stream from the controller
+(`POST /api/a2a/kagent/k8s-agent/`, `message/stream`) shows why the console sees
+nothing — the frame shapes kagent actually emits are:
+
+    result.kind = "status-update"   … status.message.parts[].kind = "data",
+                                      data = {name, args, id}          ← tool call
+    result.kind = "status-update"   … data = {name, id, response:{content:[…]}}  ← tool result
+    result.kind = "status-update"   … status.message.parts[].kind = "text"       ← narration
+    result.kind = "artifact-update" … artifact.parts[].text                      ← final answer
+    result.kind = "status-update", final = true                                  ← terminus
+
+`apps/portal/internal/kagent/kagent.go`'s `translate()` accepts top-level
+`kind: "message"`, `"tool-call"` and `"tool-result"` — kagent emits none of those,
+so every frame is dropped, `emitted == 0`, and `agent_ask.go:233` renders the error
+card. The code's own comment (`reconcile against live kagent at rehearsal — see
+spec #133 rehearsal gates`) marked this exact gate; this is that reconciliation, and
+it failed.
+
+**Fix belongs in the portal** (`translate()` + `rpcResult`: read tool steps out of
+`status-update.status.message.parts[].data`, narration out of its `text` parts, and
+the answer out of `artifact-update`), and it needs a portal image release before it
+reaches a cluster. Until then module 10's README says so and points at
+`kubectl -n kagent logs deploy/k8s-agent -f`, which shows the same tool calls and the
+host model request. **Retires when:** one investigation renders tool calls and a
+verdict in the browser against kagent 0.9.12.
+
+## PROVEN ONCE — the kagent inference path, and what is still unproven
+
+The 2026-08-17 rehearsal could not exercise this at all (no `ollama` on the host, so
+`cloudbox-init.sh` warned and skipped the model pull). Re-driven the same day against
+the still-running cluster, with `ollama 0.32.14` installed from Homebrew and
+`qwen3:4b` pulled:
+
+- **Host reachability works, including the default loopback bind.** A pod resolved
+  `host.docker.internal` → `192.168.5.2` (Colima `vmType: vz`) and got
+  `{"version":"0.32.14"}` from `/api/version` with Ollama listening on
+  **`127.0.0.1:11434` only** — Colima proxies it, as Docker Desktop does. No
+  `OLLAMA_HOST` change needed on macOS.
+- **The default ModelConfig resolves and the model answers.** `provider: Ollama`,
+  `model: qwen3:4b`, `num_ctx: 64000`, unchanged from the chart: `k8s-agent` logged
+  `POST http://host.docker.internal:11434/api/chat 200`.
+- **Beat 1 flails exactly as the module claims.** One real tool call
+  (`k8s_describe_resource`, which returned), then a *printed* `<function-call>` block
+  naming a pod that does not exist, then the symptom restated as a cause. No second
+  tool call. 87 s wall clock.
+- **The model switch beat 2 teaches is real and fast.** One field pushed to Gitea
+  reached `modelconfig/default-model-config` in **20 s**; kagent rolled a new
+  `k8s-agent` pod; the newly named model loaded in Ollama and answered
+  (`POST /api/chat 200`, 25 s). Proven by switching between two *local* models.
+- **The honest-spec line now has a number.** `qwen3:4b` at the chart's
+  `num_ctx: 64000` costs **~11.5 GiB** on the host — 2.4 GiB weights, **9 GiB KV
+  cache** — measured from Ollama's own memory breakdown. The context window, not the
+  4B of weights, is what does not fit beside a 16 GiB Colima VM. A 7–8B model at the
+  same context asked for 7.8 GiB and Ollama evicted the previous model to get it
+  (`system_free 3.3 GiB, system_limited=true`).
+
+**WATCH — the residue, in the order it would bite:**
+
+1. **The Console surface is broken** (previous entry). Everything above was driven
+   through logs and the raw A2A stream, not the browser.
+2. **Beat 2's actual provider is untested.** No OpenCode Zen key existed, so
+   `provider: OpenAI` + `baseUrl: https://opencode.ai/zen/v1` + `apiKeySecret` has
+   never been exercised — nor has the Anthropic fallback. The *switch* is proven; the
+   *endpoint, secret plumbing and auth* are not. Zen's free tier is also explicitly
+   time-boxed and may simply be gone.
+3. **Native Linux is unproven twice over:** the `10.5.0.1` ModelConfig edit, and the
+   fact that a loopback-bound Ollama cannot be reached across a plain bridge (module
+   10's README now says to use `OLLAMA_HOST=0.0.0.0` there — untested).
+4. **The "16 GB does not fit" claim is still a claim.** It was measured on a 32 GB
+   Mac; the 11.5 GiB figure supports it arithmetically, nothing has run it on a
+   16 GB machine.
+5. **`cloudbox-init.sh` skips the model pull silently-ish** if Ollama is not
+   installed *yet* when module 00 runs — which is the likely order for an attendee
+   who installs it after reading module 10. The README now says to check
+   `ollama list`.
+
+**Retires when:** one investigation renders in the browser, and one beat-2 run
+against a hosted provider returns a verdict.
 
 ## PROVEN ONCE — smaller things the rehearsal settled
 

@@ -18,7 +18,14 @@ COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
 BASELINE_SRC="$DIR/baseline/demo-web.yaml"
 POISON_VALUE="8080-canary"
 SCENARIO_TRAILER="Cloudbox-Scenario: day2-01"
-OOM_POISON_VALUE="8Mi"
+# 2Mi is below the floor the container runtime itself needs to start a pod
+# sandbox, so the fault lands deterministically and without traffic. Measured
+# on this stack (Talos v1.13.x, containerd 2.2.6 + runc, arm64) on 2026-08-17:
+# 4Mi/6Mi/8Mi/12Mi all start and idle happily (8Mi survived 4800 requests
+# before one replica finally OOMKilled), 3Mi and below never start. Do not
+# raise this value expecting a lastState OOMKilled instead — see
+# scenarios/02-oomkill-nostart/inject.sh for the full calibration.
+OOM_POISON_VALUE="2Mi"
 OOM_POISON_MARKER="memory: $OOM_POISON_VALUE"
 OOM_SCENARIO_TRAILER="Cloudbox-Scenario: day2-02"
 # Predicate-based, not tied to a specific digest: any image: value
@@ -38,6 +45,30 @@ pod_status_sample() {
   kubectl --request-timeout=3s -n demo get pods -l app=demo-web \
     -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{range .status.containerStatuses[*]}{.name}{":"}{.state.waiting.reason}{":"}{.state.terminated.reason}{":"}{.lastState.terminated.reason}{":"}{.restartCount}{","}{end}{"\n"}{end}' \
     2>/dev/null || true
+}
+
+# Every image reference the demo-web pods were asked to run, one line per pod.
+# Read from .spec (what Git told the cluster to pull), not .status, so the
+# assertion is about the release that landed rather than what containerd
+# happened to resolve.
+pod_image_sample() {
+  kubectl --request-timeout=3s -n demo get pods -l app=demo-web \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{range .spec.containers[*]}{.image}{","}{end}{"\n"}{end}' \
+    2>/dev/null || true
+}
+
+# Events for the demo-web pods. Events carry no labels, so this walks the pod
+# names — the sandbox-level failures scenario 2 produces exist only here (a
+# container that never starts has no state to read on the pod itself).
+pod_event_sample() {
+  local pods pod
+  pods="$(kubectl --request-timeout=3s -n demo get pods -l app=demo-web \
+    -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)"
+  for pod in $pods; do
+    kubectl --request-timeout=3s -n demo get events \
+      --field-selector "involvedObject.name=$pod" \
+      -o jsonpath='{range .items[*]}{.reason}{"|"}{.message}{"\n"}{end}' 2>/dev/null || true
+  done
 }
 
 pod_restart_total() {
@@ -104,43 +135,59 @@ if grep -Fq -- "$POISON_VALUE" "$CLONE/$COMPONENT_PATH"; then
 elif grep -Fq -- "$OOM_POISON_MARKER" "$CLONE/$COMPONENT_PATH"; then
   fail "scenario 2 is still present in Git ($COMPONENT_PATH contains $OOM_POISON_MARKER) — inspect git log, then run git revert <scenario-commit> && git push"
 
-  # Periodic OOMKills can leave a Deployment Available, so rollout completion
-  # is not a reliable symptom. Confirm the prior OOMKilled state and a non-zero
-  # restart count instead.
+  # The symptom is a new replica that never gets as far as a running process:
+  # the pod cgroup limit is below what the runtime needs to start the sandbox,
+  # so kubelet loops on FailedCreatePodSandBox ("container init was OOM-killed
+  # (memory limit too low?)") while the old ReplicaSet keeps serving. That lives
+  # in Events only — the pod has no container state to read and no restarts —
+  # so this asserts the event, and accepts a container-level OOMKilled as the
+  # alternative signature in case a runtime manages to start the process first.
   if ! command -v kubectl >/dev/null 2>&1 || \
     ! kubectl --request-timeout=3s get namespace demo >/dev/null 2>&1; then
-    fail "could not confirm scenario 2's live symptoms — restore cluster access, then run kubectl -n demo get pods -l app=demo-web -w"
+    fail "could not confirm scenario 2's live symptoms — restore cluster access, then run kubectl -n demo get pods -l app=demo-web"
   else
     POD_STATE="$(pod_status_sample)"
-    if printf '%s\n' "$POD_STATE" | grep -Fq 'OOMKilled'; then
+    POD_EVENTS="$(pod_event_sample)"
+    if printf '%s\n' "$POD_EVENTS" | grep -Eq 'FailedCreatePodSandBox|OOM'; then
+      ok "scenario 2 confirmed live: a demo-web pod cannot be started at that memory limit (see kubectl -n demo describe pod <pod>, Events)"
+    elif printf '%s\n' "$POD_STATE" | grep -Fq 'OOMKilled'; then
       ok "scenario 2 confirmed live: a demo-web container was OOMKilled"
     else
-      fail "Git is poisoned but no demo-web container reports a previous OOMKilled termination yet — wait for ArgoCD, then run kubectl -n demo describe pod <pod>"
+      fail "Git is poisoned but no demo-web pod reports a memory-related failure yet — the rightsizing commit has not reached the cluster; run kubectl -n argocd get application demo, then kubectl -n demo describe pod <newest-pod>"
     fi
 
-    if printf '%s\n' "$POD_STATE" | awk -F '[:|,]' '
-      { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/ && $i > 0) found = 1 }
-      END { exit(found ? 0 : 1) }
-    '; then
-      ok "scenario 2 confirmed live: a demo-web container has restarted"
+    if kubectl --request-timeout=3s -n demo rollout status deploy/demo-web \
+      --timeout=5s >/dev/null 2>&1; then
+      fail "Git is poisoned but the demo-web rollout reports complete — inspect the ArgoCD Application and run kubectl -n demo get rs,pods"
     else
-      fail "Git is poisoned but demo-web restart counts are still zero — watch kubectl -n demo get pods -l app=demo-web -w until the rightsizing commit takes effect"
+      ok "scenario 2 confirmed live: the demo-web rollout is not completing"
     fi
   fi
 elif grep -Eq -- "$IMAGE_POISON_PATTERN" "$CLONE/$COMPONENT_PATH"; then
   fail "scenario 3 is still present in Git ($COMPONENT_PATH references a docker.io/ image) — inspect git log, then run git revert <scenario-commit> && git push"
 
-  # An image-pull failure has no previous process logs: confirm the waiting
-  # reason and send the attendee to pod Events for the registry error.
+  # This fault does NOT normally break the pull, and the check must not pretend
+  # otherwise. cloudbox-init.sh stores every pre-pulled image in cloudbox-mirror
+  # under its registry-STRIPPED repository path (knative/helloworld-go), and
+  # create-cluster.sh points the nodes' docker.io mirror at that same registry —
+  # so a docker.io ref with an identical path and digest is a mirror HIT, not
+  # even a fallback. Proven on 2026-08-17: containerd/v2.2.6 asked the mirror
+  # with ?ns=docker.io and got 200 for the manifest and every blob, pull time
+  # 265 ms. The live assertion is therefore that the policy violation reached
+  # the cluster, with a genuine pull failure accepted as the other honest
+  # outcome (a laptop with no mirror, or a ref the mirror does not carry).
   if ! command -v kubectl >/dev/null 2>&1 || \
     ! kubectl --request-timeout=3s get namespace demo >/dev/null 2>&1; then
     fail "could not confirm scenario 3's live symptoms — restore cluster access, then run kubectl -n demo get pods -l app=demo-web"
   else
     POD_STATE="$(pod_status_sample)"
+    POD_IMAGES="$(pod_image_sample)"
     if printf '%s\n' "$POD_STATE" | grep -Eq 'ImagePullBackOff|ErrImagePull'; then
-      ok "scenario 3 confirmed live: a demo-web container is waiting on an image pull"
+      ok "scenario 3 confirmed live: a demo-web container is stuck on the pull — this is what the venue (or a laptop without the mirror) does with this commit"
+    elif printf '%s\n' "$POD_IMAGES" | grep -Eq '(\||,)docker\.io/'; then
+      ok "scenario 3 confirmed live: demo-web is running a docker.io/ reference, and it pulled fine — your own mirror answers for docker.io too, so nothing in the cluster stops this commit; the ghcr.io/ rule is enforced in Git, which is why it still has to be reverted"
     else
-      fail "Git is poisoned but no demo-web container reports ImagePullBackOff or ErrImagePull yet — wait for ArgoCD, then run kubectl -n demo describe pod <pod>"
+      fail "Git is poisoned but no demo-web pod is running a docker.io/ image yet — the registry commit has not reached the cluster; run kubectl -n argocd get application demo, then kubectl -n demo get pods -l app=demo-web -o jsonpath='{.items[*].spec.containers[*].image}'"
     fi
   fi
 else
@@ -236,12 +283,13 @@ else
   if [ -z "$POD_STATE_1" ]; then
     fail "no demo-web pod status was readable — run kubectl -n demo get pods -l app=demo-web and restore cluster access or the workload"
   else
-    # A periodic OOMKill can be briefly Running at a single snapshot. Sample a
-    # second time within a bounded window and require both states to be clean,
-    # with the aggregate restart count not increasing. This is scenario 2's
-    # stability gate specifically — it runs on EVERY green (no-poison-marker)
-    # verify, not just after scenario 2, since it's the only way to catch a
-    # periodic OOMKilled cadence that a single snapshot could miss.
+    # A single snapshot cannot tell "healthy" from "between restarts": scenario
+    # 1's crashloop and a memory limit that is tight rather than impossible (an
+    # 8Mi demo-web survives idle and OOMKills only under sustained load, measured
+    # 2026-08-17) both look Running for seconds at a time. So sample twice within
+    # a bounded window and require both states clean and the aggregate restart
+    # count flat. This runs on EVERY green (no-poison-marker) verify, whichever
+    # scenario the attendee just reverted.
     sleep 15
     POD_STATE_2="$(pod_status_sample)"
     POD_STABLE=1

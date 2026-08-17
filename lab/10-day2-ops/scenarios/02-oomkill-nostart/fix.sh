@@ -10,7 +10,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/../../../common.sh"
 
 COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
-POISON_VALUE="8Mi"
+# Must match inject.sh's POISON_VALUE (calibrated there, with the measurements).
+POISON_VALUE="2Mi"
 POISON_MARKER="memory: $POISON_VALUE"
 SCENARIO_TRAILER="Cloudbox-Scenario: day2-02"
 

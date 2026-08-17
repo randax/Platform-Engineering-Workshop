@@ -21,14 +21,30 @@ source "$DIR/../../../common.sh"
 COMPONENT_PATH="gitops/components/demo/demo-web.yaml"
 BASELINE_SRC="$DIR/../../baseline/demo-web.yaml"
 CONTAINER_NAME="web"
-# 8Mi is a placeholder tight enough to be implausible for a Go HTTP server;
-# rehearsal should calibrate this against helloworld-go's real RSS. The
-# invariant this scenario asserts is lastState.terminated.reason: OOMKilled —
-# whether the process dies at startup or later under probe/request traffic,
-# that reason (not the exact millisecond it fires) is what verify.sh and the
-# attendee both read, so the precise number matters less than staying tight
-# enough to guarantee an OOM at rehearsal.
-POISON_VALUE="8Mi"
+# 2Mi is CALIBRATED, not a placeholder — measured on this stack (Talos v1.13.x,
+# containerd 2.2.6 + runc, arm64) on 2026-08-17 with the module's own baseline
+# manifest and probes:
+#
+#   12Mi / 8Mi / 6Mi / 4Mi   container starts, Ready, 0 restarts while idle.
+#                            8Mi survived 300 sequential and then 4800
+#                            concurrent requests before ONE replica finally
+#                            OOMKilled — a cadence nobody can wait for in a
+#                            240-minute workshop, and the reason this value
+#                            used to be 8Mi and produced no symptom at all.
+#   3Mi                      sandbox fails with an inscrutable containerd
+#                            message ("cannot start a stopped process").
+#   2Mi / 1Mi                sandbox fails within seconds, deterministically,
+#                            with the runtime naming the cause itself:
+#                            FailedCreatePodSandBox … "container init was
+#                            OOM-killed (memory limit too low?)".
+#
+# So the invariant this scenario asserts is NOT lastState OOMKilled — that
+# signature is not reachable with this image without sustained load. It is: the
+# new replica never gets a running container, the rolling update stalls, the old
+# ReplicaSet keeps serving, and the Events name the memory limit. Do not raise
+# this value back toward "plausible-looking" numbers without re-measuring; at
+# 4Mi and above there is no fault left to diagnose.
+POISON_VALUE="2Mi"
 POISON_MARKER="memory: $POISON_VALUE"
 
 CLONE="$(gitops_clone)" || exit 1
@@ -253,16 +269,18 @@ mv "$MUTATED" "$CLONE/$COMPONENT_PATH"
 git -C "$CLONE" add "$COMPONENT_PATH"
 git -C "$CLONE" -c user.name="cloudbox" -c user.email="cloudbox@localhost" \
   commit -q -m "release: demo-web memory rightsizing" \
+  -m "Observed idle RSS is ~2 MiB; align requests and limits with it." \
   -m "Cloudbox-Scenario: day2-02"
 INJECTED_SHA="$(git -C "$CLONE" rev-parse --short HEAD)"
 git -C "$CLONE" push -q origin main
 argocd_refresh demo
 
-echo "💥 Scenario 02-oomkill-crashloop injected as commit $INJECTED_SHA."
+echo "💥 Scenario 02-oomkill-nostart injected as commit $INJECTED_SHA."
 echo
-echo "Your job: follow the restart cadence to its cause, prove it, then revert the rightsizing commit."
+echo "Your job: find out why the new replicas never come up, prove it, then revert the rightsizing commit."
 echo "Start with:"
-echo "  kubectl -n demo get pods -l app=demo-web -w"
+echo "  kubectl -n demo get pods -l app=demo-web"
+echo "  kubectl -n demo describe pod <newest-pod>"
 echo
-echo "NO PEEKING at scenarios/02-oomkill-crashloop/description.md"
+echo "NO PEEKING at scenarios/02-oomkill-nostart/description.md"
 echo "until you have written down a diagnosis. Give up / done: ./restore.sh 2"
