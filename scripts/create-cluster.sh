@@ -168,15 +168,42 @@ step "Merging kubeconfig"
 TALOS_CP_IP="${TALOS_SUBNET_GATEWAY%.*}.2"
 talosctl --context "${CLUSTER_NAME}" config node "${TALOS_CP_IP}"
 talosctl --context "${CLUSTER_NAME}" kubeconfig --force
+# `talosctl kubeconfig` writes the server address from the machine config's
+# cluster.controlPlane.endpoint, which for a docker cluster is the node's
+# in-network address (https://10.5.0.2:6443). That is reachable from the host
+# ONLY on native Linux. On macOS and Windows — Docker Desktop, OrbStack,
+# Colima — the host cannot route into the Talos docker network, so the line
+# above silently replaces the working kubeconfig `talosctl cluster create` had
+# just merged, and every kubectl call from here on hangs on TCP connect.
+# Point it at the port the controlplane container publishes instead: talosctl
+# puts 127.0.0.1 in the API server's certSANs for exactly this purpose, so the
+# address is valid on every platform (Linux included).
+CP_CONTAINER="$(docker ps -q \
+  --filter "label=talos.cluster.name=${CLUSTER_NAME}" \
+  --filter "label=talos.type=controlplane" | head -1)"
+API_PORT="$(docker port "${CP_CONTAINER}" 6443/tcp 2>/dev/null | head -1 | awk -F: '{print $NF}')"
+if [[ -n "${API_PORT}" ]]; then
+  kubectl config set-cluster "${CLUSTER_NAME}" \
+    --server="https://127.0.0.1:${API_PORT}" >/dev/null
+  info "Kubernetes API: https://127.0.0.1:${API_PORT} (published by the controlplane container)"
+else
+  warn "Could not read the published API port from the controlplane container —"
+  warn "leaving the kubeconfig as talosctl wrote it (fine on native Linux)."
+fi
 kubectl config use-context "admin@${CLUSTER_NAME}" >/dev/null
 ok "kubectl context: admin@${CLUSTER_NAME}"
 
 step "Waiting for the Kubernetes API"
+# --request-timeout is load-bearing: without it kubectl blocks on the OS TCP
+# connect timeout (~75s on macOS) per attempt, so an unreachable API server
+# turned this "2 minutes" into over an hour of apparent hang instead of a
+# failure with the message below.
 for _ in $(seq 1 60); do
-  kubectl get nodes >/dev/null 2>&1 && break
+  kubectl --request-timeout=5s get nodes >/dev/null 2>&1 && break
   sleep 2
 done
-kubectl get nodes >/dev/null 2>&1 || die "Kubernetes API did not come up within 2 minutes"
+kubectl --request-timeout=5s get nodes >/dev/null 2>&1 \
+  || die "Kubernetes API did not come up within 2 minutes"
 ok "API server is answering (nodes are NotReady until Cilium arrives — expected)"
 
 # --- 3. Cilium ------------------------------------------------------------------------
