@@ -6,16 +6,18 @@ set -euo pipefail
 
 for attempt in 1 2 3; do
   if kubectl -n demo run "catchup-s3-$$" --rm -i --restart=Never --quiet \
-      --image=public.ecr.aws/aws-cli/aws-cli:2.36.24 \
+      --image=docker.io/peakcom/s5cmd:v2.3.0 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
       --env AWS_REGION=us-east-1 \
       --command -- /bin/sh -c '
         set -e
         EP=http://rustfs-svc.rustfs.svc.cluster.local:9000
-        aws --endpoint-url $EP s3api head-bucket --bucket app-assets 2>/dev/null \
-          || aws --endpoint-url $EP s3 mb s3://app-assets
+        # `ls` on a bucket is the head-bucket of s5cmd: exit 0 if it exists
+        # (even empty), exit 1 + NoSuchBucket if it does not.
+        /s5cmd --endpoint-url $EP ls s3://app-assets >/dev/null 2>&1 \
+          || /s5cmd --endpoint-url $EP mb s3://app-assets
         echo "hello from my own cloud" > /tmp/hello.txt
-        aws --endpoint-url $EP s3 cp /tmp/hello.txt s3://app-assets/hello.txt'; then
+        /s5cmd --endpoint-url $EP cp /tmp/hello.txt s3://app-assets/hello.txt'; then
     echo "✅ bucket app-assets ready"
     exit 0
   fi

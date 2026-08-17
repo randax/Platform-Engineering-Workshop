@@ -102,6 +102,15 @@ for an ephemeral lab sandbox and teachable material. **SeaweedFS is the rehearse
 (single-pod `allInOne`, stronger IAM) with explicit mid-August switch triggers in
 [RESEARCH.md](RESEARCH.md).
 
+The client side is the part attendees touch, and it is deliberately vendor-neutral:
+the labs and the bucket Jobs use **[s5cmd](https://github.com/peak/s5cmd) v2.3.0** — one
+12 MiB Go binary that reads the standard `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
+`AWS_REGION` and takes `--endpoint-url` — while the first-party uploader and resizer talk
+to the same bucket through `minio/minio-go`. Three clients, one API, and RustFS cannot
+tell them apart: that *is* the S3-compatibility claim, demonstrated instead of asserted.
+It replaced the AWS CLI on 2026-08-17 (129 MiB → 12 MiB of pre-pull, and no
+AWS-branded CLI in a workshop about not using AWS — [HAZARDS.md](HAZARDS.md)).
+
 ### Zot — vs. Harbor / Docker registry:2
 Zot is a CNCF, OCI-native registry: one binary, anonymous read/write (workshop-grade),
 search + UI extensions on for a visible win at `:30500`. Harbor is the right *enterprise*

@@ -98,17 +98,20 @@ else
 fi
 
 # Bucket really exists in RustFS?
+# `s5cmd ls s3://<bucket>` is the head-bucket of s5cmd: exit 0 if the bucket
+# exists (empty or not), exit 1 + NoSuchBucket if it does not. Only the exit
+# code is read below, so the stderr/stdout folding kubectl does is irrelevant.
 s3ls() {
-  if command -v aws >/dev/null 2>&1; then
+  if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1 \
-      aws --endpoint-url http://localhost:30900 s3api head-bucket --bucket my-db-assets 2>/dev/null
+      s5cmd --endpoint-url http://localhost:30900 ls s3://my-db-assets 2>/dev/null
   else
     kubectl -n demo run "verify-s3-$$" --rm -i --restart=Never --quiet \
-      --image=public.ecr.aws/aws-cli/aws-cli:2.36.24 \
+      --image=docker.io/peakcom/s5cmd:v2.3.0 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
       --env AWS_REGION=us-east-1 \
       -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 \
-      s3api head-bucket --bucket my-db-assets 2>/dev/null
+      ls s3://my-db-assets 2>/dev/null
   fi
 }
 if s3ls >/dev/null 2>&1; then

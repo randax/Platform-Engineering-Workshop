@@ -67,12 +67,12 @@ rm -f "$TMP_PNG"
 
 # The resizer scales from zero to process the event — poll S3 for its output.
 s3() {
-  if command -v aws >/dev/null 2>&1; then
+  if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1 \
-      aws --endpoint-url http://localhost:30900 "$@" 2>/dev/null
+      s5cmd --endpoint-url http://localhost:30900 "$@" 2>/dev/null
   else
     kubectl -n pipeline run "solve-s3-$$-${RANDOM}" --rm -i --restart=Never --quiet \
-      --image=public.ecr.aws/aws-cli/aws-cli:2.36.24 \
+      --image=docker.io/peakcom/s5cmd:v2.3.0 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
       --env AWS_REGION=us-east-1 \
       -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 "$@" 2>/dev/null
@@ -81,8 +81,17 @@ s3() {
 
 echo "waiting for the resizer (scaling from zero) to write the thumbnail..."
 WAITED=0
-until s3 s3api list-objects-v2 --bucket images --prefix thumbs/ \
-        --query 'Contents[].Key' --output text | grep -q thumbs/; do
+# --show-fullpath makes s5cmd print keys rather than "date size basename"; the
+# anchored grep is also what discards its ERROR line while the prefix is still
+# empty (kubectl folds the container's stderr into stdout). Capture before
+# matching: while thumbs/ is empty s5cmd exits 1 ("no object found"), and under
+# `pipefail` that would outrank grep and could never let the loop finish.
+thumb_landed() {
+  local out
+  out="$(s3 ls --show-fullpath "s3://images/thumbs/" || true)"
+  printf '%s\n' "$out" | grep -q '^s3://images/thumbs/'
+}
+until thumb_landed; do
   [ "$WAITED" -ge 240 ] && { echo "no thumbnail after ${WAITED}s — check: kubectl -n pipeline logs -l serving.knative.dev/service=resizer -c user-container" >&2; exit 1; }
   sleep 10; WAITED=$((WAITED + 10))
 done

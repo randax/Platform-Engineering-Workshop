@@ -85,31 +85,45 @@ were generated for you: `kubectl -n demo get secret app-db-app -o yaml`. CNPG ma
 </details>
 
 <details>
-<summary>Hint 4: The S3 part with aws CLI</summary>
+<summary>Hint 4: The S3 part — with a plain S3 client</summary>
 
-```bash
-export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
-aws --endpoint-url http://localhost:30900 s3 mb s3://app-assets
-echo "hello from my own cloud" > hello.txt
-aws --endpoint-url http://localhost:30900 s3 cp hello.txt s3://app-assets/
-aws --endpoint-url http://localhost:30900 s3 presign s3://app-assets/hello.txt --expires-in 3600
-```
+The interesting thing about this half of the module is how *boring* it is. RustFS is not
+"S3-like": it speaks the S3 API, so any S3 client points at it and works — same
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION`, same signed requests, one
+`--endpoint-url` to say "not Amazon". We use [**s5cmd**](https://github.com/peak/s5cmd),
+a single 12 MiB Go binary, precisely to make that point without importing a cloud
+vendor's CLI into a workshop about *not* using one.
 
-No `aws` on your machine? Run the whole sequence in the cluster instead (`verify.sh`
-wants the uploaded object too, not just the bucket):
+Run the whole sequence in the cluster (`verify.sh` wants the uploaded object too, not
+just the bucket) — this needs nothing installed on your laptop and no internet:
 
 ```bash
 kubectl -n demo run s3 --rm -i --restart=Never \
-  --image=public.ecr.aws/aws-cli/aws-cli:2.36.24 \
+  --image=docker.io/peakcom/s5cmd:v2.3.0 \
   --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
   --env AWS_REGION=us-east-1 \
   --command -- /bin/sh -c '
     set -e
     EP=http://rustfs-svc.rustfs.svc.cluster.local:9000
-    aws --endpoint-url $EP s3 mb s3://app-assets 2>/dev/null || true
+    /s5cmd --endpoint-url $EP mb s3://app-assets
     echo "hello from my own cloud" > /tmp/hello.txt
-    aws --endpoint-url $EP s3 cp /tmp/hello.txt s3://app-assets/hello.txt
-    aws --endpoint-url $EP s3 presign s3://app-assets/hello.txt --expires-in 3600'
+    /s5cmd --endpoint-url $EP cp /tmp/hello.txt s3://app-assets/hello.txt
+    /s5cmd --endpoint-url $EP presign --expire 1h s3://app-assets/hello.txt'
+```
+
+(The image's `ENTRYPOINT` is the binary itself, so `--command -- /bin/sh -c` is what
+buys you a shell for the multi-step script; the binary is at `/s5cmd`.)
+
+Got `s5cmd` on your laptop already (`brew install s5cmd`), or the AWS CLI, or `rclone`?
+Point any of them at the NodePort instead — that is the whole lesson:
+
+```bash
+export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
+s5cmd --endpoint-url http://localhost:30900 mb s3://app-assets
+echo "hello from my own cloud" > hello.txt
+s5cmd --endpoint-url http://localhost:30900 cp hello.txt s3://app-assets/
+s5cmd --endpoint-url http://localhost:30900 presign --expire 1h s3://app-assets/hello.txt
+# the same four with the AWS CLI: s3 mb / s3 cp / s3 presign --expires-in 3600
 ```
 </details>
 
@@ -128,11 +142,12 @@ git add . && git commit -m "module 03: cnpg + rustfs + app-db" && git push
 kubectl -n demo get cluster app-db -w        # until 'Cluster in healthy state'
 kubectl -n demo exec -it app-db-1 -- psql -U postgres -d app -c 'SELECT 1;'
 
+# any S3 client works; hint 4 has the in-cluster form if you have none installed
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
-aws --endpoint-url http://localhost:30900 s3 mb s3://app-assets
+s5cmd --endpoint-url http://localhost:30900 mb s3://app-assets
 echo "hello from my own cloud" > /tmp/hello.txt
-aws --endpoint-url http://localhost:30900 s3 cp /tmp/hello.txt s3://app-assets/
-aws --endpoint-url http://localhost:30900 s3 presign s3://app-assets/hello.txt --expires-in 3600
+s5cmd --endpoint-url http://localhost:30900 cp /tmp/hello.txt s3://app-assets/
+s5cmd --endpoint-url http://localhost:30900 presign --expire 1h s3://app-assets/hello.txt
 # open the printed URL in your browser
 
 cd "$WORKSHOP/lab/03-data" && ./verify.sh

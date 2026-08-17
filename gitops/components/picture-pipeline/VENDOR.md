@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Source | `apps/uploader` + `apps/resizer` **in this repo** — nothing vendored from upstream; the manifest is ours |
-| Images | `ghcr.io/randax/cloudbox-uploader`, `ghcr.io/randax/cloudbox-resizer` (multi-arch; deployed tags below) — built and pushed by this repo's CI from `apps/`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. `public.ecr.aws/aws-cli/aws-cli:2.36.24` (bucket Job) is pinned and verified pullable, amd64+arm64 (crane, 2026-08-17) — already in the pre-pull list for module 03. |
+| Images | `ghcr.io/randax/cloudbox-uploader`, `ghcr.io/randax/cloudbox-resizer` (multi-arch; deployed tags below) — built and pushed by this repo's CI from `apps/`; published and public on GHCR, anonymous `crane` pull verified 2026-08-10. In `scripts/images.txt`. `docker.io/peakcom/s5cmd:v2.3.0` (bucket Job) is pinned and verified pullable, amd64+arm64 (crane, 2026-08-17) — already in the pre-pull list for module 03. It replaced `public.ecr.aws/aws-cli/aws-cli:2.36.24` on 2026-08-17 (docs/HAZARDS.md): same AWS_* env vars, same `--endpoint-url`, 12 MiB instead of 129 MiB. |
 | File | `picture-pipeline.yaml` |
 
 <!-- x-release-please-start-version -->
@@ -71,14 +71,27 @@ honest by review.
   pipeline. Halve the resizer's limit and the capstone fails as an
   OOMKill on the *second* hop — after the upload appears to succeed.
 - **Job `create-images-bucket`** carries the one thing GitOps can't: the
-  S3 bucket. Same pinned `aws-cli` image and idempotent
-  `head-bucket || create-bucket` pattern as `solutions/*/post.sh` and the
+  S3 bucket. Same pinned `s5cmd` image and idempotent
+  `ls || mb` pattern as `solutions/*/post.sh` and the
   platform-api composition. `backoffLimit: 20` + `restartPolicy: OnFailure`
   rides out RustFS still starting; no TTL so the completed Job persists and
   ArgoCD doesn't re-create it every reconcile. It needs
   `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (the same workshop creds, under
-  the names the aws-cli reads) **and `AWS_REGION=us-east-1`** — the CLI
-  refuses to sign a request without a region even though RustFS ignores it.
-  Requests 50m/64Mi, limit 256Mi.
+  the standard names s5cmd reads, exactly as the AWS CLI did) **and
+  `AWS_REGION=us-east-1`** — the client refuses to sign a SigV4 request
+  without a region even though RustFS ignores it.
+  Requests 50m/64Mi, limit 256Mi (unchanged from the aws-cli era; s5cmd is a
+  single Go binary and uses far less, but the numbers were not re-measured).
+  Two load-bearing details of the swap: the image's `ENTRYPOINT` is `/s5cmd`,
+  so `command: ["/bin/sh","-c"]` is what buys the shell the script needs (the
+  image is alpine-minirootfs 3.20.3, so busybox *is* present) and the binary
+  must be called by absolute path `/s5cmd`; and `s5cmd ls s3://<bucket>` is
+  the `head-bucket` stand-in — exit 0 when the bucket exists even if empty,
+  exit 1 + `NoSuchBucket` when it does not (measured against RustFS
+  1.0.0-rc.2, 2026-08-17). `mb` on an existing bucket also exits 0 against
+  RustFS, so the guard is belt-and-braces rather than load-bearing — but it
+  keeps the Job independent of a store-specific `CreateBucket` behaviour,
+  which matters because `restartPolicy: OnFailure` would hot-loop on a
+  non-zero exit.
 - S3 credentials `cloudbox`/`cloudbox123` are workshop-grade on purpose
   (ephemeral lab sandbox) and must match the rustfs component.

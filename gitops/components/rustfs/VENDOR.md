@@ -39,7 +39,7 @@ What the render exposes, since the labs address it directly:
   `S3_ENDPOINT` points at in portal, picture-pipeline and the module 03/04
   bucket Jobs. `service-nodeport.yaml` (a workshop addition, not in the chart)
   re-exposes the same port on **NodePort `30900`** = `NODEPORT_RUSTFS_S3` in
-  `scripts/versions.env`, so presigned URLs and `aws --endpoint-url` work from
+  `scripts/versions.env`, so presigned URLs and `s5cmd --endpoint-url` work from
   the laptop with no port-forward. Those two numbers must move together with
   that variable.
 - **`9001` — the built-in console**, ClusterIP only. Deliberately not on a

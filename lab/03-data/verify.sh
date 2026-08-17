@@ -85,27 +85,37 @@ else
   fail "nothing answering on :30900 — kubectl -n rustfs get svc; is the NodePort up?"
 fi
 
-# Bucket check: local aws CLI if present, else a short-lived in-cluster pod.
+# Bucket check: local s5cmd if present, else a short-lived in-cluster pod.
+# `s5cmd ls s3://<bucket>` is what `s3api head-bucket` used to be here: exit 0
+# when the bucket exists (empty or not), exit 1 + NoSuchBucket when it does not.
+# So the exit code answers "does it exist" and stdout answers "has it anything".
 s3ls() {
-  if command -v aws >/dev/null 2>&1; then
+  if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1 \
-      aws --endpoint-url http://localhost:30900 s3 ls "s3://app-assets" 2>/dev/null
+      s5cmd --endpoint-url http://localhost:30900 ls "s3://app-assets" 2>/dev/null
   else
     kubectl -n demo run "verify-s3-$$" --rm -i --restart=Never --quiet \
-      --image=public.ecr.aws/aws-cli/aws-cli:2.36.24 \
+      --image=docker.io/peakcom/s5cmd:v2.3.0 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
       --env AWS_REGION=us-east-1 \
-      -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 s3 ls "s3://app-assets" 2>/dev/null
+      -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 ls "s3://app-assets" 2>/dev/null
   fi
 }
 
-LISTING="$(s3ls || true)"
-if [ -n "$LISTING" ]; then
-  ok "bucket app-assets exists and has objects"
-elif s3ls >/dev/null 2>&1; then
-  fail "bucket app-assets exists but is empty — upload any file (aws s3 cp) so you can presign it"
+# One call, not two. `kubectl run -i` folds the container's stderr into ITS
+# stdout whenever the container exits before the attach lands — and s5cmd is a
+# single Go binary, so it always does — hence the ERROR filter before judging
+# "empty". The exit code is unaffected either way, which is why it decides
+# existence.
+if LISTING="$(s3ls)"; then
+  LISTING="$(printf '%s\n' "$LISTING" | grep -v '^ERROR ' || true)"
+  if [ -n "$LISTING" ]; then
+    ok "bucket app-assets exists and has objects"
+  else
+    fail "bucket app-assets exists but is empty — upload any file (s5cmd cp) so you can presign it"
+  fi
 else
-  fail "bucket app-assets not found — create it: aws --endpoint-url http://localhost:30900 s3 mb s3://app-assets (creds cloudbox/cloudbox123)"
+  fail "bucket app-assets not found — create it: s5cmd --endpoint-url http://localhost:30900 mb s3://app-assets (creds cloudbox/cloudbox123)"
 fi
 
 echo

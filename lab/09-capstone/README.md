@@ -50,7 +50,7 @@ runs on your laptop, readable end to end.
 3. **Find the results.** Both views of the same bucket:
    - the Gallery (refresh) shows the thumbnail + its metadata (dimensions, dominant color);
    - raw S3: `originals/`, `thumbs/`, and `meta/<key>.json` under bucket `images`
-     (`aws s3 ls` against :30900 — module 03 muscle memory; hint 3 has the exact lines).
+     (`s5cmd ls` against :30900 — module 03 muscle memory; hint 3 has the exact lines).
 4. **Inspect the plumbing.** `kubectl -n pipeline get broker,trigger` — find what the
    Trigger filters on. Then read the resizer's logs and find the `ce-type`, `ce-source`,
    `ce-id` headers: a CloudEvent is just an HTTP POST with five headers. Where did your
@@ -107,14 +107,23 @@ Follow the event, hop by hop:
 
 ```bash
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
-aws --endpoint-url http://localhost:30900 s3 ls s3://images/originals/
-aws --endpoint-url http://localhost:30900 s3 ls s3://images/thumbs/
-aws --endpoint-url http://localhost:30900 s3 cp s3://images/meta/<key>.json - | cat
+s5cmd --endpoint-url http://localhost:30900 ls s3://images/originals/
+s5cmd --endpoint-url http://localhost:30900 ls s3://images/thumbs/
+s5cmd --endpoint-url http://localhost:30900 cat s3://images/meta/<key>.json
 ```
 
 The metadata JSON (dimensions, dominant color) is the resizer's proof of work — the
-gallery page renders exactly this file. No `aws` CLI? The in-cluster pattern from
-module 03's hint 4 works verbatim (endpoint `http://rustfs-svc.rustfs.svc.cluster.local:9000`).
+gallery page renders exactly this file. No S3 client installed? The in-cluster pattern
+from module 03's hint 4 works verbatim (endpoint
+`http://rustfs-svc.rustfs.svc.cluster.local:9000`).
+
+Two `s5cmd` details worth knowing, because `verify.sh` depends on both: plain `ls`
+prints `date size basename` **relative to the prefix**, so `ls --show-fullpath` is what
+gives you whole keys (`s3://images/thumbs/…`); and `ls` on a prefix with nothing in it
+exits **1** with `no object found`, which here means "the resizer hasn't landed yet",
+not "something is broken". The apps on either side of this bucket use `minio-go`, not a
+CLI — same API, three different clients, and RustFS cannot tell them apart. That is the
+whole claim of S3 compatibility, tested rather than asserted.
 </details>
 
 <details>
@@ -167,7 +176,7 @@ kubectl -n pipeline get pods -w &                    # the watcher
 kill %1
 
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
-aws --endpoint-url http://localhost:30900 s3 ls s3://images/ --recursive   # originals/ thumbs/ meta/
+s5cmd --endpoint-url http://localhost:30900 ls --show-fullpath "s3://images/*"   # originals/ thumbs/ meta/
 
 kubectl -n pipeline logs -l serving.knative.dev/service=resizer -c user-container --tail=20   # ce-* headers
 

@@ -15,10 +15,12 @@
 # both linux/amd64 and linux/arm64 (the images-gate.yaml predicate, run over the
 # whole file; the one bare single-arch manifest, cnoe-io/backstage-app, is in
 # MIRROR_ARCH_EXEMPT on purpose). Re-pinned in that pass: argocd v3.5.1, the
-# three Argo Workflows v4.1.1 images, nats 2.14.5-alpine, victoria-metrics
-# v1.150.0 (both by digest) and aws-cli 2.36.24. The [mirror] component list
-# must track what gitops/ actually deploys, which check-consistency.sh enforces
-# on every push.
+# three Argo Workflows v4.1.1 images, nats 2.14.5-alpine and victoria-metrics
+# v1.150.0 (both by digest). Also on 2026-08-17: the AWS CLI was REPLACED by
+# s5cmd v2.3.0 (see the lab workload section, and docs/HAZARDS.md) — the pin
+# count is unchanged, the pre-pull is ~118 MiB lighter. The [mirror] component
+# list must track what gitops/ actually deploys, which check-consistency.sh
+# enforces on every push.
 # =============================================================================
 
 [host]
@@ -134,8 +136,15 @@ docker.io/victoriametrics/victoria-traces:v0.10.0@sha256:66e784a595c4a88e5b1dfab
 docker.io/otel/opentelemetry-collector-contrib:0.158.0@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5
 
 # --- Lab workload images (modules 3, 4, 6)
-# aws-cli: bucket tooling in modules 03/04 (public.ecr.aws is in the mirror map)
-public.ecr.aws/aws-cli/aws-cli:2.36.24
+# s5cmd: S3 tooling in modules 03/04/09 and in the platform-api / application-xr
+# compositions' bucket Jobs. One statically-linked Go binary on alpine-minirootfs
+# 3.20.3 — 12 MiB compressed on arm64 against the AWS CLI's 129 MiB, which it
+# replaced on 2026-08-17. It reads the same AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+# / AWS_REGION and takes --endpoint-url, so it makes the "RustFS speaks S3, any S3
+# client works unchanged" point without an AWS-branded CLI in a workshop about not
+# using AWS (docs/HAZARDS.md). ENTRYPOINT is /s5cmd; the image does carry busybox,
+# so `command: ["/bin/sh","-c"]` works. docker.io is in the mirror map.
+docker.io/peakcom/s5cmd:v2.3.0
 # Standalone postgres for module 05's fault scenarios — the OFFICIAL image
 # (its docker-entrypoint honors POSTGRES_PASSWORD; the CNPG image does not).
 docker.io/library/postgres:18-alpine

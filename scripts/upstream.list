@@ -126,8 +126,12 @@ grafana                  | github-release | grafana/grafana                     
 otel-collector-contrib   | github-release | open-telemetry/opentelemetry-collector-releases | image:docker.io/otel/opentelemetry-collector-contrib |
 
 # --- Lab workload images -----------------------------------------------------
-# aws/aws-cli publishes no GitHub releases, and the repo still carries v1 tags.
-aws-cli                  | github-tag     | aws/aws-cli                                     | image:public.ecr.aws/aws-cli/aws-cli         | ^2\.
+# s5cmd (replaced the AWS CLI on 2026-08-17 — docs/HAZARDS.md). Unlike the four
+# `github-tag` rows above, peak/s5cmd's releases are well-formed: /releases/latest
+# answers 200 with v2.3.0, and every beta/rc is correctly flagged
+# `prerelease: true`, so `github-release` needs no `track` regex. Note the split
+# between source repo (peak/s5cmd) and Docker Hub org (peakcom).
+s5cmd                    | github-release | peak/s5cmd                                      | image:docker.io/peakcom/s5cmd                |
 
 # =============================================================================
 # Deliberately NOT tracked — DERIVED from something that IS tracked above, or

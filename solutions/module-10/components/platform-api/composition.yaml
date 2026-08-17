@@ -133,16 +133,22 @@ spec:
                     restartPolicy: OnFailure
                     containers:
                       - name: make-bucket
-                        image: public.ecr.aws/aws-cli/aws-cli:2.36.24
+                        # s5cmd: one 12 MiB Go binary that speaks plain S3 and
+                        # reads the same AWS_* env vars as any other S3 client.
+                        image: docker.io/peakcom/s5cmd:v2.3.0
+                        # ENTRYPOINT is /s5cmd, so command: overrides it to get
+                        # a shell; the binary itself lives at /s5cmd.
                         command: ["/bin/sh", "-c"]
                         args:
                           - |
                             set -e
                             EP=http://rustfs-svc.rustfs.svc.cluster.local:9000
-                            if aws --endpoint-url "$EP" s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+                            # `ls` on a bucket is the head-bucket of s5cmd: exit 0
+                            # if it exists (even empty), exit 1 + NoSuchBucket if not.
+                            if /s5cmd --endpoint-url "$EP" ls "s3://$BUCKET" >/dev/null 2>&1; then
                               echo "bucket $BUCKET already exists"
                             else
-                              aws --endpoint-url "$EP" s3 mb "s3://$BUCKET"
+                              /s5cmd --endpoint-url "$EP" mb "s3://$BUCKET"
                             fi
                         env:
                           - name: AWS_ACCESS_KEY_ID

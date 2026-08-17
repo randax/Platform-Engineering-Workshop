@@ -26,7 +26,7 @@ Crossplane v2 pipeline + `function-patch-and-transform` — no new components.
    composes a CNPG `Cluster` + a bucket Job. This is the make-or-break
    **composition-of-compositions**.
 3. **bucket** — the app's own S3 bucket `<name>-data`, via the module 03/04
-   idempotent aws-cli Job (Job named `<name>-storage`).
+   idempotent s5cmd Job (Job named `<name>-storage`).
 
 ## Secret wiring — how the app boots already connected
 
@@ -93,11 +93,23 @@ shared with module 04), three resources:
   These are what make the Application's own readiness mean something — without
   them the XR reports Ready while its database is still provisioning.
 - **The bucket Job** is `backoffLimit: 6`, `restartPolicy: OnFailure`, the
-  pinned `public.ecr.aws/aws-cli/aws-cli:2.36.24` image, `head-bucket || s3 mb`
+  pinned `docker.io/peakcom/s5cmd:v2.3.0` image, `ls || mb`
   for idempotency, and `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
-  `AWS_REGION=us-east-1` (the CLI refuses to sign without a region) — the same
-  workshop-grade `cloudbox`/`cloudbox123` credentials the workload gets as
-  `S3_ACCESS_KEY` / `S3_SECRET_KEY`.
+  `AWS_REGION=us-east-1` (the client refuses to sign SigV4 without a region) —
+  the same workshop-grade `cloudbox`/`cloudbox123` credentials the workload gets
+  as `S3_ACCESS_KEY` / `S3_SECRET_KEY`. s5cmd **replaced
+  `public.ecr.aws/aws-cli/aws-cli:2.36.24` on 2026-08-17** (docs/HAZARDS.md):
+  identical env-var and `--endpoint-url` plumbing, 12 MiB against 129 MiB, and
+  it does not put an AWS-branded CLI in a workshop about not using AWS. Two
+  details a re-vendor must keep: `ENTRYPOINT` is `/s5cmd`, so `command:
+  ["/bin/sh","-c"]` is what provides the shell the guard needs (busybox is
+  present — the image is alpine-minirootfs 3.20.3) and the binary is invoked by
+  absolute path; and `s5cmd ls s3://<bucket>` is the `head-bucket` stand-in,
+  exit 0 when the bucket exists even if empty, exit 1 + `NoSuchBucket` when it
+  does not. Keep the guard: `restartPolicy: OnFailure` would hot-loop on a
+  non-zero exit, and while `mb` on an existing bucket does exit 0 against RustFS
+  1.0.0-rc.2 (measured 2026-08-17), that is the store's `CreateBucket`
+  behaviour rather than a promise from s5cmd.
 - **Every composed container asks for 50m/64Mi** and limits memory at 256Mi —
   the small-cluster convention used by every other component here. Job name `<name>-storage`, bucket `<name>-data` — deliberately
   distinct from the WorkshopDatabase's own `<name>-bucket`/`<name>-assets` so

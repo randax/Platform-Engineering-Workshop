@@ -79,30 +79,41 @@ for s in uploader resizer; do
 done
 
 # --- Bucket + outcome ------------------------------------------------------------------
-# aws CLI locally against the NodePort if available, else the in-cluster
+# s5cmd locally against the NodePort if available, else the in-cluster
 # pattern from module 03.
 s3() {
-  if command -v aws >/dev/null 2>&1; then
+  if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1 \
-      aws --endpoint-url http://localhost:30900 "$@" 2>/dev/null
+      s5cmd --endpoint-url http://localhost:30900 "$@" 2>/dev/null
   else
     kubectl -n pipeline run "verify-s3-$$-${RANDOM}" --rm -i --restart=Never --quiet \
-      --image=public.ecr.aws/aws-cli/aws-cli:2.36.24 \
+      --image=docker.io/peakcom/s5cmd:v2.3.0 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
       --env AWS_REGION=us-east-1 \
       -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 "$@" 2>/dev/null
   fi
 }
 
-if s3 s3api head-bucket --bucket images >/dev/null; then
+# `ls s3://<bucket>` is s5cmd's head-bucket: exit 0 if it exists (even empty),
+# exit 1 + NoSuchBucket if not.
+if s3 ls s3://images >/dev/null; then
   ok "bucket 'images' exists in RustFS"
 else
   fail "bucket 'images' not found — kubectl -n pipeline logs job/create-images-bucket (is rustfs up?)"
 fi
 
 list_keys() { # <prefix>
-  s3 s3api list-objects-v2 --bucket images --prefix "$1" \
-    --query 'Contents[].Key' --output text | tr '\t' '\n' | grep -v '^None$' || true
+  # s5cmd's plain `ls` prints "date size basename" relative to the prefix, so
+  # --show-fullpath is what turns it into keys: it emits the full s3:// URI per
+  # object, recursively, and the sed strips the bucket back off. Result is
+  # byte-identical to what `list-objects-v2 --query 'Contents[].Key'` produced.
+  #
+  # Two exit-1 cases are legitimate "not yet, keep waiting", not errors: an
+  # absent prefix ("no object found") and, before the Job lands, a missing
+  # bucket. `sed -n …p` only prints lines that matched, so s5cmd's ERROR line —
+  # which kubectl folds into stdout — is dropped without a second filter.
+  # `|| true` because those exit-1 cases must not trip `set -e`/pipefail.
+  s3 ls --show-fullpath "s3://images/$1" | sed -n 's|^s3://images/||p' || true
 }
 
 ORIGINALS="$(list_keys originals/)"

@@ -620,22 +620,99 @@ release, wait for the build, verify every ref resolves, *then* pre-pull.
 
 Never hand a fresh laptop a pre-pull inside that window.
 
-## Open question — why the AWS CLI?
+## RESOLVED — the AWS CLI is gone; s5cmd does the S3 work
 
-`public.ecr.aws/aws-cli/aws-cli` is used by modules 03, 04 and 09 (and the
-platform-api compositions) to prove bucket operations against RustFS — roughly
-130 MB of the pre-pull. **No rationale is recorded anywhere in the repo.**
+**Decided and shipped 2026-08-17.** `public.ecr.aws/aws-cli/aws-cli:2.36.24` was
+used by modules 03, 04 and 09 and by the platform-api / application-xr bucket
+Jobs, with **no rationale recorded anywhere**. The choice was between writing the
+rationale down and changing the tool; the tool changed, to
+**`docker.io/peakcom/s5cmd:v2.3.0`**.
 
-The defensible reading is that it is the point: RustFS is S3-compatible, so the
-standard S3 client works unchanged, and that is the lesson. But note the
-first-party apps use `minio/minio-go` instead, so the workshop demonstrates two
-different S3 clients without saying why. Alternatives worth a thought: `s5cmd`
-or `rclone` (much smaller), or `mc` (awkward — MinIO's community edition was
-discontinued, which is the reason RustFS is here at all).
+**The deciding reason was honesty, not size.** A sharp attendee asks "why am I
+typing `aws` in a workshop about *not* using AWS?", and the only true answer was
+"nobody wrote it down". The lesson the call sites exist to teach is *RustFS
+speaks the S3 API, so standard S3 tooling works against it unchanged* — and a
+vendor-neutral client makes that point better than the vendor's own CLI, which
+invites exactly the wrong inference. The labs now say so where an attendee reads
+it (module 03 hint 4, module 09 hint 3), and module 09 names the third client in
+the same story: the uploader and resizer talk to the same bucket with
+`minio/minio-go`. Three clients, one API, indistinguishable to the server.
 
-Either write the rationale down or change the tool. Right now a sharp attendee
-asks "why am I typing `aws` in a workshop about not using AWS?" and the honest
-answer is undocumented.
+The size was the tiebreak, and it is not small: **12 MiB compressed on arm64
+against 129 MiB** (`crane manifest … | jq '[.layers[].size]|add'`), on a
+component every attendee pre-pulls. `rclone` (~30 MiB) lost because it needs its
+own `RCLONE_CONFIG_*` idiom; s5cmd reads the **same** `AWS_ACCESS_KEY_ID` /
+`AWS_SECRET_ACCESS_KEY` / `AWS_REGION` and takes `--endpoint-url`, so every
+credential block in the Jobs and compositions carried over byte-for-byte. `mc`
+was never in the running — MinIO's community edition being discontinued is the
+reason RustFS is here at all.
+
+**Two things that were expected to be hard and were not.** They are recorded
+because the *next* person to touch this will assume the same things:
+
+- **The image is not FROM scratch.** It is `alpine-minirootfs-3.20.3` + the
+  single binary (3 layers, `crane config … | jq .history`), so `/bin/sh` →
+  busybox 1.36.1 is present and `command: ["/bin/sh","-c"]` works exactly as it
+  did with the AWS CLI. There was no need for two containers, sequential
+  commands, or s5cmd's `run` subcommand. **What *is* different: `ENTRYPOINT` is
+  `/s5cmd`**, so `command:` must override it, `PATH` does not contain `/`, and
+  the binary must be called by absolute path `/s5cmd`.
+- **`mb` on an existing bucket exits 0** against RustFS 1.0.0-rc.2, printing
+  `mb s3://<bucket>` and, with `--json`, `{"operation":"mb","success":true,…}`.
+  So the feared hot-loop (a `restartPolicy: OnFailure` Job retrying a non-zero
+  `mb` forever) does not exist here. **The guard was kept anyway**, as
+  `s5cmd ls s3://<bucket> >/dev/null 2>&1 || s5cmd mb s3://<bucket>` — because
+  that exit 0 is the *store's* `CreateBucket` behaviour, not a promise from
+  s5cmd, and RustFS is a prerelease. `ls` on a bucket is a faithful
+  `s3api head-bucket`: exit 0 when it exists even if empty, exit 1 +
+  `NoSuchBucket` (404) when it does not.
+
+**The one real trap the swap exposed, and it was pre-existing.**
+`kubectl run --rm -i --restart=Never` folds the container's **stderr into
+kubectl's own stdout** when the container exits before the attach lands — which
+a 22 MB Go binary always does, and a Python CLI that takes a second to boot
+never did. So `2>/dev/null` on the kubectl side stopped suppressing the client's
+error text, and a naive port of module 03's "is the listing non-empty?" check
+would have read `ERROR "ls s3://app-assets": NoSuchBucket…` as *objects*, i.e. a
+**false pass in a graded check**. Reproduced 5/5. The fix is to stop reading
+stream separation as a signal:
+
+- **existence** comes from the **exit code**, which is unaffected (verified 5/5:
+  exit 1 for a missing bucket, 0 for an existing one, including an empty one);
+- **content** comes from stdout with s5cmd's own `ERROR ` lines filtered out.
+
+`lab/09-capstone/verify.sh` gets this for free, because the reshaped
+`list-objects-v2` equivalent —
+`s5cmd ls --show-fullpath "s3://images/<prefix>" | sed -n 's|^s3://images/||p'` —
+uses `sed -n …p`, which only prints lines that matched and therefore drops the
+ERROR line without a second filter. That reshape was needed regardless: plain
+`s5cmd ls` prints `date size basename` **relative to the prefix**, so
+`--show-fullpath` is what makes it emit keys. Its output is byte-identical to
+what `aws s3api list-objects-v2 --query 'Contents[].Key' --output text` produced,
+compared directly on the live cluster. Note also that an empty prefix exits **1**
+with `no object found`, so those call sites keep an explicit `|| true` under
+`set -euo pipefail`.
+
+`presign` translates as `presign --expire 1h` (aws: `--expires-in 3600`);
+s5cmd's default is 3h.
+
+**Residue worth knowing, none of it blocking:**
+
+- s5cmd lives on **Docker Hub** (`peakcom` org; there is no GHCR mirror — a
+  `ghcr.io/peak/s5cmd` pull is DENIED). At the venue that is irrelevant, because
+  `docker.io` is in the mirror map and `cloudbox-init.sh` pre-pulls it. On a
+  CI runner it is one more anonymous Docker Hub pull, on shared GitHub IPs.
+- The `command -v aws` fast paths became `command -v s5cmd`, which flips which
+  branch CI takes: `ubuntu-latest` ships the AWS CLI, so the *local* branch used
+  to run there and the in-cluster pod branch now does. That is the branch
+  attendees take, so it is better coverage — but it is slower (one pod per call,
+  and module 09's `solve.sh` polls in a loop), and it was not the branch CI
+  exercised before. Watch `bootstrap-test.yaml`'s module 09 timing.
+- **s5cmd was deliberately not added to `mise.toml`.** It would make the "run it
+  on your laptop" variant work for everybody, but it would put the version in a
+  second place with nothing comparing the two (`check-consistency.sh` only knows
+  the pairs it is told about). If someone wants it, add the pin *and* the
+  assertion, in its own PR.
 
 ## Minor — `check-upstream.sh` prerelease-word gap
 

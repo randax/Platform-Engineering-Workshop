@@ -140,7 +140,7 @@ spec:
       name: resizer
 ---
 # One-shot, idempotent bucket setup: GitOps can carry a Job, but not an S3
-# API call — same aws-cli image + head-bucket||mb pattern as
+# API call — same s5cmd image + `ls`-then-mb pattern as
 # solutions/module-03's post.sh. Generous backoff: rustfs may still be
 # starting when this lands. The completed Job stays around (no TTL) so
 # ArgoCD does not recreate it on every reconcile.
@@ -159,16 +159,20 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: create-bucket
-          # Same pinned image the platform-api composition and post.sh use.
-          image: public.ecr.aws/aws-cli/aws-cli:2.36.24
+          # Same pinned image the platform-api composition and post.sh use:
+          # s5cmd, one 12 MiB Go binary reading the same AWS_* env vars below.
+          image: docker.io/peakcom/s5cmd:v2.3.0
+          # ENTRYPOINT is /s5cmd; command: overrides it to get a shell.
           command:
             - /bin/sh
             - -c
             - |
               set -e
               EP=http://rustfs-svc.rustfs.svc.cluster.local:9000
-              aws --endpoint-url $EP s3api head-bucket --bucket images 2>/dev/null \
-                || aws --endpoint-url $EP s3api create-bucket --bucket images
+              # `ls` on a bucket is s5cmd's head-bucket: exit 0 if it exists
+              # (even empty), exit 1 + NoSuchBucket if it does not.
+              /s5cmd --endpoint-url $EP ls s3://images >/dev/null 2>&1 \
+                || /s5cmd --endpoint-url $EP mb s3://images
               echo "bucket images ready"
           env:
             # WORKSHOP-GRADE CREDENTIALS (see above).
