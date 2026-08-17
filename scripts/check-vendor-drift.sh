@@ -230,8 +230,43 @@ reproduce() {   # reproduce <stream> <out> <dest>
   url="$(directive "${stream}" "${out}" fetch)"
 
   if [[ -n "${url}" ]]; then
-    curl -fsSL --retry 2 --max-time 300 -o "${dest}" "${url}"
-    return
+    # --retry-all-errors is load-bearing: raw.githubusercontent.com rate-limits
+    # (HTTP 429) and plain --retry does not treat every such response as
+    # retryable, so a busy afternoon looked exactly like upstream drift.
+    local code auth=()
+    # Authenticate to github.com when we can. Unauthenticated fetches share a
+    # per-IP budget that this repo exhausts on a busy day — raw.githubusercontent
+    # and release-asset downloads both start answering 429, and a guard that goes
+    # red for reasons unrelated to drift is a guard people learn to ignore.
+    if [[ "${url}" == https://github.com/* || "${url}" == https://raw.githubusercontent.com/* ]]; then
+      local tok="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+      [[ -n "${tok}" ]] || tok="$(command -v gh >/dev/null 2>&1 && gh auth token 2>/dev/null || true)"
+      [[ -n "${tok}" ]] && auth=(-H "Authorization: Bearer ${tok}")
+    fi
+    # raw.githubusercontent.com rate-limits by IP and ignores a Bearer token for
+    # public content, so authenticating it changes nothing — but the API serves the
+    # identical bytes under the token's 5000/hour budget. Rewrite rather than retry:
+    #   raw.githubusercontent.com/O/R/<ref>/<path>
+    #     -> api.github.com/repos/O/R/contents/<path>?ref=<ref>   (Accept: …raw)
+    local fetch_url="${url}"
+    if [[ "${url}" == https://raw.githubusercontent.com/* && ${#auth[@]} -gt 0 ]]; then
+      local rest="${url#https://raw.githubusercontent.com/}"
+      local o="${rest%%/*}"; rest="${rest#*/}"
+      local r="${rest%%/*}"; rest="${rest#*/}"
+      local ref="${rest%%/*}"; local path="${rest#*/}"
+      if [[ -n "${o}" && -n "${r}" && -n "${ref}" && -n "${path}" ]]; then
+        fetch_url="https://api.github.com/repos/${o}/${r}/contents/${path}?ref=${ref}"
+        auth+=(-H "Accept: application/vnd.github.raw")
+      fi
+    fi
+    code="$(curl -sSL --retry 5 --retry-delay 2 --retry-all-errors \
+              "${auth[@]+"${auth[@]}"}" \
+              --max-time 300 -w '%{http_code}' -o "${dest}" "${fetch_url}" 2>/dev/null || echo 000)"
+    if [[ "${code}" != 2?? ]]; then
+      FETCH_FAILED="${code}"
+      return 1
+    fi
+    return 0
   fi
 
   chart="$(directive "${stream}" "${out}" chart)"
@@ -319,8 +354,16 @@ guard1_component() {   # guard1_component <comp> <stream>
       continue
     fi
     pristine="${WORK}/${comp}.${out}.pristine"
+    FETCH_FAILED=""
     if ! reproduce "${stream}" "${out}" "${pristine}"; then
-      bad "${comp}/${out}: could not reproduce the upstream artifact — see the \`render\` stanza in ${vendor}"
+      # A network failure is NOT drift, and saying so matters: an HTTP 429 from
+      # raw.githubusercontent.com once read as "the vendored file no longer
+      # matches upstream", which is the most alarming thing this script can say.
+      if [[ -n "${FETCH_FAILED}" ]]; then
+        bad "${comp}/${out}: could not FETCH the upstream artifact (HTTP ${FETCH_FAILED}) — this is a network failure, NOT drift. The vendored file was never compared. Re-run; if it persists check the \`fetch\` URL in ${vendor}."
+      else
+        bad "${comp}/${out}: could not reproduce the upstream artifact — see the \`render\` stanza in ${vendor}"
+      fi
       continue
     fi
 

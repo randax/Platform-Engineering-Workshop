@@ -374,8 +374,19 @@ gh_list() {
     # inside the unauthenticated rate limit for the common case
     printf '%s' "${all}" | best_of "${track}" >/dev/null 2>&1 && break
   done
+  # An EMPTY listing and "nothing matched your track" are different failures and
+  # must not share a message. GitHub's /releases LIST endpoint returns [] for some
+  # repos while /releases/latest answers fine (cloudnative-pg does exactly this),
+  # and reporting that as a track mismatch sent one investigation down the wrong
+  # path entirely. Count what we actually got.
+  local count
+  count="$(printf '%s' "${all}" | grep -c '[^[:space:]]' || true)"
   printf '%s' "${all}" | best_of "${track}" || {
-    set_err "no ${what} matching track '${track:-*}' in the first ${MAX_PAGES} page(s)"
+    if [[ "${count}" -eq 0 ]]; then
+      set_err "${repo}: the ${what} listing came back EMPTY — the endpoint gave us nothing, so this says nothing about track '${track:-*}'. Try the other kind (github-tag vs github-release); /releases lists are unreliable on some repos."
+    else
+      set_err "none of the ${count} ${what} on the first ${MAX_PAGES} page(s) of ${repo} match track '${track:-*}'"
+    fi
     return 1
   }
 }

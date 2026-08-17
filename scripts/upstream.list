@@ -70,7 +70,12 @@ local-path-provisioner   | github-release | rancher/local-path-provisioner      
 # DELIBERATE HOLD: CNPG is pinned to the mature 1.28.x minor (see
 # gitops/components/cnpg-operator/VENDOR.md) — 1.29/1.30 exist and are ignored
 # on purpose; this row only reports newer 1.28 patches.
-cnpg                     | github-release | cloudnative-pg/cloudnative-pg                   | image:ghcr.io/cloudnative-pg/cloudnative-pg  | ^1\.28\.
+# Reads TAGS, not releases: GitHub's /releases LIST endpoint returns an empty
+# array for this repo (while /releases/latest happily answers v1.30.0), so the
+# release-based path reported a bogus "no releases matching track". Tags are
+# reliable here. That makes four rows on github-tag for the same reason —
+# envoy, kagent, victoria-metrics and now this one.
+cnpg                     | github-tag     | cloudnative-pg/cloudnative-pg                   | image:ghcr.io/cloudnative-pg/cloudnative-pg  | ^1\.28\.
 rustfs-chart             | helm-index     | https://charts.rustfs.com#rustfs                | chart:gitops/components/rustfs/rustfs.yaml#rustfs |
 # RustFS is beta by design (RESEARCH.md §2) — prereleases are in scope here.
 rustfs-image             | registry-tag   | docker.io/rustfs/rustfs                         | image:docker.io/rustfs/rustfs                |
