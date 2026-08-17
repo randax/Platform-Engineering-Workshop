@@ -52,7 +52,13 @@ func workshopSnapshot(ctx context.Context, s *Server) (kube.Snapshot, error) {
 			}
 		}
 	}
-	if dbs, err := s.Kube.ListWorkshopDatabases(ctx, ""); err == nil {
+	// Namespace-scoped on purpose: the portal's only WorkshopDatabase grant is a
+	// Role in ns demo (lab/08-portal/portal-access.yaml — "the platform owner
+	// hands the portal its keys"), so a cluster-wide list 403s, err != nil, and
+	// WDBCount silently stays 0. That left module 04's row stuck on "In progress"
+	// forever, even with two Ready WorkshopDatabases in demo. `demo` is also what
+	// the field claims to count, and where the hint tells the attendee to create one.
+	if dbs, err := s.Kube.ListWorkshopDatabases(ctx, "demo"); err == nil {
 		snap.WDBCount = len(dbs)
 	}
 	if svcs, err := s.Kube.ListKnativeServices(ctx); err == nil {
