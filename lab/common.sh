@@ -112,7 +112,19 @@ wait_exists() {
 # (Recurring finding across modules 03/04/06 in rehearsal-in-CI.)
 wait_for_cr() {
   ns="$1"; resource="$2"; crd="${3:-}"
-  [ -n "$crd" ] && kubectl wait --for=condition=Established "crd/$crd" --timeout=180s
+  if [ -n "$crd" ]; then
+    # `kubectl wait` on a named object that does not exist YET fails immediately
+    # with "Error from server (NotFound)" — it waits for a condition, never for
+    # creation. wait_app returns on Healthy alone (see its comment), so an app can
+    # legitimately still be OutOfSync with its CRDs unapplied at this point, and
+    # under `set -e` that NotFound kills the whole solve script. Poll the CRD into
+    # existence first, then wait on the condition.
+    for _ in $(seq 1 60); do
+      kubectl get "crd/$crd" >/dev/null 2>&1 && break
+      sleep 5
+    done
+    kubectl wait --for=condition=Established "crd/$crd" --timeout=180s
+  fi
   kubectl -n argocd annotate application demo argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
   for _ in $(seq 1 60); do
     kubectl -n "$ns" get "$resource" >/dev/null 2>&1 && return 0
