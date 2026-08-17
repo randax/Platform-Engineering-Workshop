@@ -2,8 +2,11 @@
 
 Researched 2026-07-13 via parallel web-research agents with adversarial verification of
 load-bearing claims against primary sources. Version numbers were re-verified against
-upstream on **2026-08-11** (the pre-event pass) and are current as of that date, with one
-deliberate hold: `helm` stays at 3.21.3.
+upstream on **2026-08-17** (the second post-rehearsal drift pass) and are current as of
+that date. `helm` is on **4.2.4**, not held at 3.21.3 — the three
+`helm upgrade --install` call sites pass `--server-side=false` to keep helm 3's proven
+client-side apply path. The one deliberate hold left is **CNPG on the 1.28.x minor**
+(`scripts/upstream.list` carries the track regex and the reason).
 
 ## 1. Talos-in-Docker + Cilium — **GO**
 
