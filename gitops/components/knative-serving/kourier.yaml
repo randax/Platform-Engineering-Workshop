@@ -70,20 +70,9 @@ data:
         - name: stats_listener
           address:
             socket_address:
-              # Workshop curation: net-kourier#1455 (1.23.0) moved this static
-              # listener from 0.0.0.0 to "::" + ipv4_compat for dual-stack
-              # clusters. Ours is IPv4-only (Talos-in-Docker, Cilium with IPv6
-              # off). A STATIC listener that cannot bind is fatal at startup,
-              # so an unusable IPv6 stack in the pod netns would crashloop
-              # 3scale-kourier-gateway and take ALL of module 06's ingress with
-              # it — the readiness probe is on :8081 and would never be
-              # reached. Nothing here consumes the stats port over IPv6 (it is
-              # a Prometheus scrape target, see the pod annotations below), so
-              # restoring the 1.22.1 address costs nothing and removes the
-              # failure mode. Drop this curation if the cluster ever goes
-              # dual-stack, or once a rehearsal proves "::" binds.
-              address: 0.0.0.0
+              address: "::"
               port_value: 9000
+              ipv4_compat: true
           filter_chains:
             - filters:
                 - name: envoy.filters.network.http_connection_manager

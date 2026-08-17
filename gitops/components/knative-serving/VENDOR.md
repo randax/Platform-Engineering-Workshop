@@ -89,25 +89,39 @@ either a new upstream change or a curation someone forgot to write down.
    Talos-in-Docker). The `https` port gets no nodePort. A comment at the
    change site shows the `curl -H 'Host: …' http://localhost:31080` form.
 
-9. **Envoy `stats_listener` bound back to IPv4-any.** net-kourier#1455
-   (new in 1.23.0) changed the `kourier-bootstrap` ConfigMap's *static*
-   stats listener from `address: 0.0.0.0` to `address: "::"` +
-   `ipv4_compat: true`, for dual-stack clusters. We revert it to the 1.22.1
-   form (`0.0.0.0`, no `ipv4_compat`).
-   **Why:** a static listener is bound by Envoy at process start, so a bind
-   failure is fatal — not degraded. If the gateway pod's netns has no usable
-   IPv6 stack, `3scale-kourier-gateway` crashloops and **module 06 loses all
-   ingress**; the readiness probe is on `:8081` (a dynamic xDS listener) and
-   would never even be reached, so the symptom is a CrashLoopBackOff with an
-   "Address family not supported" / bind error in `kubectl logs`.
-   Talos-in-Docker with Cilium and IPv6 disabled is exactly the environment
-   where that can bite, and **it cannot be settled by reading YAML — it needs
-   a live cluster.** Port 9000 is only the admin/stats endpoint (a Prometheus
-   scrape target, see the pod annotations); nothing in the workshop reaches
-   it over IPv6, so restoring the IPv4 address costs nothing.
-   **Drop this curation** once the cluster is dual-stack, or once a rehearsal
-   proves `"::"` binds in our pod netns.
-   ⚠️ **Top rehearsal watch item for module 06** — see the note below.
+9. ~~**Envoy `stats_listener` bound back to IPv4-any.**~~ **RETIRED
+   2026-08-17 — there is nothing to re-apply, and re-applying it would be
+   wrong.** `kourier.yaml` now carries upstream's `address: "::"` +
+   `ipv4_compat: true` verbatim.
+
+   What it was: net-kourier#1455 (new in 1.23.0) changed the
+   `kourier-bootstrap` ConfigMap's *static* stats listener from
+   `address: 0.0.0.0` to `address: "::"` + `ipv4_compat: true`, for dual-stack
+   clusters, and we reverted it to the 1.22.1 form. The worry was sound: a
+   static listener is bound at Envoy process start, so a bind failure is fatal
+   rather than degraded — an unusable IPv6 stack in the pod netns would
+   crashloop `3scale-kourier-gateway` before the `:8081` readiness probe was
+   ever reached, and **module 06 would lose all ingress**.
+
+   Why it is gone: it was tested on the live rehearsal cluster (Talos v1.13.8 /
+   Cilium 1.20.0 / arm64) instead of reasoned about. With upstream's `"::"`
+   bootstrap applied, a **freshly created gateway pod came up 1/1 with 0
+   restarts**, and inside its netns `/proc/net/tcp6` holds **eight
+   `[::]:9000` listeners** (0x2328, one SO_REUSEPORT socket per Envoy worker) —
+   i.e. the static listener binds the IPv6 wildcard here, which the curation
+   had made unprovable. The IPv4 dynamic listeners (`:8080`, `:8081`, `:8090`)
+   and the `127.0.0.1:9901` admin are unchanged, the OTel Collector's
+   `GET /stats/prometheus` still answers **200** over IPv4 (v4-mapped through
+   `ipv4_compat`), and `curl -H 'Host: hello.demo.127.0.0.1.sslip.io'
+   http://localhost:31080` still returns `Hello your own cloud!`.
+   Full evidence in `docs/HAZARDS.md`.
+
+   **If this ever comes back**, the symptom is unmistakable and immediate:
+   `3scale-kourier-gateway` crashloops at process start with a bind /
+   "Address family not supported" error in `kubectl logs`, and module 06 has no
+   ingress at all. Re-add `address: 0.0.0.0` (and drop `ipv4_compat`) as the
+   fix — but re-check `/proc/net/if_inet6` and `bindv6only` in the pod first,
+   because the interesting question would be what removed IPv6 from the netns.
 
 ### The same list, machine-readable
 
@@ -138,8 +152,6 @@ allow  serving-core.yaml  62912f67  curation 4 — config-network ingress-class 
 allow  serving-core.yaml  09d0bf54  curation 5 — the nine real config-observability keys (tracing + metrics + request-metrics) to the OTel Collector
 allow  serving-core.yaml  32736b89  curation 1 — halved activator requests 300m/60Mi → 150m/30Mi
 allow  serving-core.yaml  02de06f1  curation 1 — halved requests 100m/100Mi → 50m/50Mi (autoscaler, controller, webhook)
-allow  kourier.yaml  434d5b5e  curation 9 — Envoy stats_listener bound back to 0.0.0.0 (a static listener that cannot bind is fatal; this cluster is IPv4-only)
-allow  kourier.yaml  2b705ea2  curation 9 — the matching ipv4_compat: true removed
 allow  kourier.yaml  3d26dade  curation 6 — halved requests 200m/200Mi → 100m/100Mi (net-kourier-controller, 3scale-kourier-gateway)
 allow  kourier.yaml  aff418f9  curation 7 — Envoy pinned: v1.37-latest (floating!) → v1.37.5
 allow  kourier.yaml  165f359a  curation 8 — the comment showing the curl -H 'Host: …' :31080 form
@@ -148,13 +160,15 @@ allow  kourier.yaml  4cb63f9a  curation 8 — Service kourier type LoadBalancer 
 ```
 
 Notes:
-- **Rehearsal watch item (module 06):** bring up `knative-serving` +
-  `kourier-system`, confirm `3scale-kourier-gateway` reaches Running (not
-  CrashLoopBackOff), then `curl -H 'Host: hello.demo.127.0.0.1.sslip.io'
-  http://localhost:31080`. If the gateway is healthy, additionally check
-  whether `"::"` would have worked (`kubectl -n kourier-system exec
-  deploy/3scale-kourier-gateway -- cat /proc/net/if_inet6`); if it would,
-  curation 9 can be retired at the next re-vendor.
+- **Module 06 smoke test (was the curation-9 watch item, now just the smoke
+  test):** bring up `knative-serving` + `kourier-system`, confirm
+  `3scale-kourier-gateway` reaches Running (not CrashLoopBackOff), then
+  `curl -H 'Host: hello.demo.127.0.0.1.sslip.io' http://localhost:31080`.
+  Since curation 9 was retired on 2026-08-17 the gateway runs upstream's
+  IPv6-wildcard stats listener, so the crashloop this test was watching for is
+  now a real regression rather than a known risk — `awk '$4=="0A"'
+  /proc/net/tcp6` inside the pod should show `[::]:9000` (0x2328), eight
+  SO_REUSEPORT sockets.
 - `serving-core.yaml` includes the CRDs too; applying both crds+core is
   upstream's documented flow and idempotent under server-side apply.
 - Knative control-plane images are `gcr.io/knative-releases/...@sha256:...`

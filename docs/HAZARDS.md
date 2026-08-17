@@ -244,37 +244,63 @@ mis-copied (`startup=/health live=/health ready=/ready`), the deployment went
 Pending — is present. Gitea's 5Gi PVC `Bound` within the same minute. Against
 `wait_rollout`'s 300 s × 2 the "probe budget ≈ 65 s" worry is a non-event.
 
-## PROVEN ONCE — Knative 1.23.0 kourier, and the IPv6 retire condition is now met
+## PROVEN ONCE — Knative 1.23.0 kourier, and the IPv6 curation is RETIRED
 
-1.23.0 moves the Envoy **static** stats listener from `0.0.0.0` to `"::"`. A
-static listener that cannot bind is fatal at process start, not degraded: the
-readiness probe on `:8081` is never reached, the gateway crashloops, and module
-06 loses all ingress.
+1.23.0 moves the Envoy **static** stats listener from `0.0.0.0` to `"::"` +
+`ipv4_compat: true`. A static listener that cannot bind is fatal at process
+start, not degraded: the readiness probe on `:8081` is never reached, the gateway
+crashloops, and module 06 loses all ingress. **We curated it back to `0.0.0.0`**
+because that failure mode could not be settled by reading YAML.
 
-**We curated it back to `0.0.0.0`.** Port 9000 is only the admin/stats scrape
-target and nothing here reaches it over IPv6, so restoring the address proven in
-1.22.1 costs nothing and removes an unprovable module-killer. This is a
-curation upstream does not have — a maintenance cost, taken knowingly.
-
-**With the curation, module 06 works:** gateway **1/1 within ~20 s** of the pod
+**With the curation, module 06 worked:** gateway **1/1 within ~20 s** of the pod
 appearing, 0 restarts, all five knative-serving Deployments 1/1 within 12 s, and
 `curl -H 'Host: hello.demo.127.0.0.1.sslip.io' http://localhost:31080` returned
 `Hello your own cloud!` (200, 0.694 s warm); scale-to-zero observed after ~30 s
 of silence.
 
-**The documented retire condition is met.** Inside the gateway pod
+**The curation is gone as of 2026-08-17** — `kourier.yaml` carries upstream's
+`"::"` + `ipv4_compat: true` verbatim, and the two `allow` lines for it are out
+of the component's ```curation block (kourier.yaml: 8 hunks → 6, gate green).
+The circumstantial retire condition was already recorded: inside the gateway pod
 `/proc/net/if_inet6` is populated (lo + eth0 `fe80::…`), `bindv6only=0` and
-`disable_ipv6=0` on all/lo/eth0; and something in the same cluster on the same
-CNI already binds the IPv6 wildcard successfully — `argocd-server` holds real
-`[::]:8080` and `[::]:8083` listeners in `/proc/net/tcp6`.
+`disable_ipv6=0` on all/lo/eth0, and `argocd-server` on the same cluster and CNI
+holds real `[::]:8080` / `[::]:8083` listeners. But that only proved the netns
+*would* allow it. **What retires it is the direct test, run on the live rehearsal
+cluster** (Talos v1.13.8 / Cilium 1.20.0 / arm64, ArgoCD auto-sync suspended for
+the window, the bootstrap ConfigMap applied by hand, the gateway rolled):
 
-**The curation was deliberately not removed on 2026-08-17, and that is pickable
-work, not load-bearing.** Dropping `address: 0.0.0.0` from
-`gitops/components/knative-serving/kourier.yaml` is only worth doing in a change
-that can re-test it in the same breath — note that the gateway's own
-`/proc/net/tcp6` is empty of listeners *because* of the curation, so nothing yet
-proves the `"::"` static listener itself binds here, only that the netns would
-allow it. Whoever picks it up: drop it, re-run module 06, keep the result.
+- a **freshly created** gateway pod reached **1/1 Running with 0 restarts** on
+  the `"::"` bootstrap — no crashloop, no bind error anywhere in its log;
+- inside that pod, `awk '$4=="0A"' /proc/net/tcp6` shows **eight
+  `00000000000000000000000000000000:2328` rows** — `[::]:9000`, one
+  SO_REUSEPORT socket per Envoy worker. **The static listener binds the IPv6
+  wildcard here.** That is the fact the curation had made unobservable;
+- the IPv4 side is untouched: 8× `:8080`, 8× `:8081`, 8× `:8090` (the dynamic
+  xDS listeners) and `127.0.0.1:9901` (admin);
+- the stats port still works **over IPv4**, v4-mapped through `ipv4_compat`:
+  the OTel Collector's `GET /stats/prometheus` answers **200** with ~197 KB
+  every 30 s;
+- `curl -H 'Host: hello.demo.127.0.0.1.sslip.io' http://localhost:31080` returned
+  `Hello your own cloud!` **200** repeatedly (51 s on the scale-from-zero call,
+  then 0.09–2.9 s).
+
+**If this ever regresses, the symptom is immediate and unmistakable:** the
+static listener cannot bind → `3scale-kourier-gateway` crashloops at process
+start (bind / "Address family not supported" in `kubectl logs`, readiness on
+`:8081` never reached) → **module 06 loses all ingress**. The fix is to put
+`address: 0.0.0.0` back and drop `ipv4_compat` — but check
+`/proc/net/if_inet6` and `bindv6only` in the pod first, because the real question
+would be what took IPv6 out of the netns.
+
+**Two honest caveats.** (1) One machine, one architecture, one CNI version —
+settled, not proven; re-run module 06 on the next Knative or Cilium bump. (2) The
+test ran against an already-loaded cluster and **the CPU cap hazard at the top of
+this file dominated it**: the gateway pod sat in `ContainerCreating` for ~11
+minutes waiting for the Cilium CNI ADD, and the *old* pod restarted twice on
+liveness `504`/timeout while it waited (both exits code 0 "Completed" —
+kubelet-initiated, not Envoy). None of that is about IPv6; all of it is what a
+saturated 4-CPU worker looks like. Do not read those restarts as evidence
+against the retirement — read them as more evidence for fixing the CPU caps.
 
 ## LIVE — VENDOR.md curation lists were wrong 11 times out of 19
 
