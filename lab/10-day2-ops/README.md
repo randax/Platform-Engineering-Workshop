@@ -381,15 +381,10 @@ exist. It never chained a second call, and closed with "the root cause is likely
 application container startup" — the symptom restated as a cause, with nothing behind it.
 Yours will differ in the details; the shape (one tool call, then invention) is the point.
 
-> **Known issue, 2026-08-17 — the Console cannot render this run yet.** Against the pinned
-> kagent **0.9.12**, "Open investigation" ends in *"Investigation failed — the agent
-> responded in a format this console doesn't recognize"*. The message is misleading: your
-> kagent version is the pinned one, and the investigation really ran. kagent streams tool
-> steps inside A2A `status-update` frames (with `{name, args}` / `{name, response}` data
-> parts) and delivers the final answer as an `artifact-update`; the console still expects
-> top-level `tool-call` / `tool-result` / `message` frames, so it drops every frame and
-> reports an empty stream. Until the console is fixed, watch beat 1 from the agent side —
-> the tool calls and the model request are both in one log:
+> **Watching from the agent side.** The Console renders this run — the Case file shows
+> `tool_call → tool_result → message → verdict`, with the tool's real output collapsed
+> under the one-line read. If you want to see the same run from underneath, or the Case
+> file is not available to you, both the model request and the tool call are in one log:
 >
 > ```bash
 > kubectl -n kagent logs deploy/k8s-agent -f
@@ -397,8 +392,10 @@ Yours will differ in the details; the shape (one tool call, then invention) is t
 > # POST http://kagent-tools.kagent:8084/mcp        →  a tool call actually happened
 > ```
 >
-> Everything else in this module — the ModelConfig, the agent, the 78 registered tools,
-> the model switch in beat 2 — works; it is the console's translation layer that does not.
+> (Until cloudbox-portal v0.2.1 the Console could not read kagent 0.9.12's frames at all
+> and reported "the agent responded in a format this console doesn't recognize" — which
+> was wrong twice over, since the run had succeeded and the version was the pinned one.
+> If you see that message, your portal image predates v0.2.1.)
 
 ### Beat 2: one `ModelConfig` push, and it actually diagnoses
 

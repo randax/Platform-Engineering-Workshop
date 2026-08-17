@@ -22,6 +22,25 @@ for d in "$DIR/faults/$NN"-*/; do
 done
 [ -n "$FAULT_DIR" ] || { echo "ERROR: no fault $NN"; usage; }
 
+# A fault namespace that already exists is almost certainly a RESTORED one, and
+# re-applying issue.yaml over it does not reliably re-break anything: some of the
+# fields these faults corrupt are immutable once created, so the apply is accepted
+# and changes nothing. You get a namespace with no fault in it — and verify.sh,
+# which looks for the symptom, then reports the fault "fixed". Silently handing an
+# attendee a confident wrong answer is precisely what this module is about, so it
+# is not something to leave in the module's own tooling.
+if kubectl get namespace "faultlab-$NN" >/dev/null 2>&1; then
+  echo "namespace faultlab-$NN already exists — this fault has been injected before." >&2
+  echo >&2
+  echo "Re-injecting over a restored namespace does not reliably re-break it, so" >&2
+  echo "this would leave you debugging a cluster with nothing wrong with it." >&2
+  echo "Start from a clean namespace instead:" >&2
+  echo >&2
+  echo "  ./restore.sh clean      # delete every fault namespace" >&2
+  echo "  ./inject.sh $1" >&2
+  exit 1
+fi
+
 if [ -x "$FAULT_DIR/issue.sh" ]; then
   "$FAULT_DIR/issue.sh"
 else
