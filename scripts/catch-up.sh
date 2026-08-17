@@ -131,6 +131,26 @@ else
   ok "Pushed module ${MODULE} state to Gitea"
 fi
 
+# Block until one ArgoCD Application is Synced + Healthy, or die with its last state.
+wait_app_converged() { # <app-name>
+  local app="$1" timeout=600 waited=0 st=""
+  while (( waited < timeout )); do
+    kubectl annotate application "${app}" -n argocd \
+      argocd.argoproj.io/refresh=normal --overwrite >/dev/null 2>&1 || true
+    st="$(kubectl get application "${app}" -n argocd \
+      -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || true)"
+    [[ "${st}" == "Synced Healthy" ]] && break
+    echo "   … ${app}: ${st:-not created yet} (${waited}s / ${timeout}s)"
+    sleep 10
+    waited=$((waited + 10))
+  done
+  if [[ "${st}" == "Synced Healthy" ]]; then
+    ok "${app}: Synced/Healthy"
+  else
+    die "Application '${app}' is still '${st:-missing}' after $((timeout / 60)) minutes — inspect it at ${ARGOCD_HOST_URL}, then re-run this catch-up."
+  fi
+}
+
 # --- 4. Nudge ArgoCD (it would poll within ~3 min anyway) ------------------------------
 if have kubectl && kubectl get application platform -n argocd >/dev/null 2>&1; then
   kubectl annotate application platform -n argocd \
@@ -138,29 +158,23 @@ if have kubectl && kubectl get application platform -n argocd >/dev/null 2>&1; t
   info "Asked ArgoCD to refresh — watch it converge: ${ARGOCD_HOST_URL}"
 
   # --- 5. Wait for convergence before the post-steps -----------------------------------
-  # post.sh scripts assume a converged platform (buckets need rustfs, the
+  # post.sh scripts assume a converged PLATFORM (buckets need rustfs, the
   # module-07 build needs the WorkflowTemplate synced, …), so block until every
-  # Application enabled above is Synced + Healthy. Generous timeout: first-time
-  # syncs pull manifests, boot databases and roll out operators.
-  step "Waiting for module ${MODULE} applications to converge (Synced + Healthy)"
+  # platform Application enabled above is Synced + Healthy. Generous timeout:
+  # first-time syncs pull manifests, boot databases and roll out operators.
+  #
+  # `demo` is deliberately NOT in that gate. It carries the attendee's own
+  # workloads, and from module 07 on those include hello-site, whose image
+  # (localhost:30500/hello-site:v1) does not exist until post.sh runs the
+  # in-cluster build — so gating post.sh on demo's health is a deadlock: demo
+  # sits ImagePullBackOff → Degraded, the gate dies at 10 minutes, and post.sh,
+  # the thing that would have fixed it, never runs. Wait for demo AFTER the
+  # post-steps instead.
+  step "Waiting for module ${MODULE} platform applications to converge (Synced + Healthy)"
   for name in "${enabled[@]}"; do
     app="${name%.yaml}"
-    timeout=600 waited=0 st=""
-    while (( waited < timeout )); do
-      kubectl annotate application "${app}" -n argocd \
-        argocd.argoproj.io/refresh=normal --overwrite >/dev/null 2>&1 || true
-      st="$(kubectl get application "${app}" -n argocd \
-        -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null || true)"
-      [[ "${st}" == "Synced Healthy" ]] && break
-      echo "   … ${app}: ${st:-not created yet} (${waited}s / ${timeout}s)"
-      sleep 10
-      waited=$((waited + 10))
-    done
-    if [[ "${st}" == "Synced Healthy" ]]; then
-      ok "${app}: Synced/Healthy"
-    else
-      die "Application '${app}' is still '${st:-missing}' after $((timeout / 60)) minutes — inspect it at ${ARGOCD_HOST_URL}, then re-run this catch-up."
-    fi
+    [[ "${app}" == "demo" ]] && continue
+    wait_app_converged "${app}"
   done
 fi
 
@@ -168,6 +182,13 @@ fi
 if [[ -x "${SOLUTION_DIR}/post.sh" ]]; then
   step "Running module ${MODULE} post-steps"
   "${SOLUTION_DIR}/post.sh"
+fi
+
+# --- 7. Now the attendee workloads, which the post-steps just made possible -----------
+if have kubectl && printf '%s\n' "${enabled[@]}" | grep -qx 'demo.yaml' \
+   && kubectl get application demo -n argocd >/dev/null 2>&1; then
+  step "Waiting for the demo workloads to converge (Synced + Healthy)"
+  wait_app_converged demo
 fi
 
 echo
