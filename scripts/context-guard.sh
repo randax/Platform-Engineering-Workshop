@@ -145,15 +145,31 @@ workshop_api_server() { # <server-url>
 # this workshop's cluster. Call it before the first kubectl call that could
 # reach a cluster; never at source time in scripts/lib.sh (see the header).
 require_workshop_context() {
-  local ctx server reason
+  local ctx server reason kubectl_err
   ctx="$(kubectl config current-context 2>/dev/null || true)"
   server=""
+  kubectl_err=""
   if [ -n "$ctx" ]; then
     server="$(kubectl config view --minify \
       -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
+  else
+    # An empty context has two very different causes and only one of them means
+    # "you have no cluster". The other is that kubectl DID NOT RUN — on a
+    # mise-shimmed laptop, `git clone <gitea>/platform && cd platform` without
+    # `mise trust` makes every shimmed tool hard-fail, because the clone carries
+    # this repo's mise.toml and its [env] KUBECONFIG needs trust. The cluster is
+    # up and healthy in that state, so sending the person to create-cluster.sh
+    # below would be exactly the confident wrong answer this guard exists to
+    # avoid. Repeat the call with stderr captured to tell the two apart; the
+    # happy path never pays for it. kubectl's own "no context" message is not a
+    # tool failure, so it is filtered back out.
+    kubectl_err="$(kubectl config current-context 2>&1 >/dev/null || true)"
+    case "${kubectl_err}" in *"current-context is not set"*) kubectl_err="" ;; esac
   fi
 
-  if [ -z "$ctx" ]; then
+  if [ -n "$kubectl_err" ]; then
+    reason="kubectl itself did not run, so nothing here can tell which cluster you are on"
+  elif [ -z "$ctx" ]; then
     reason="kubectl has no current context selected"
   elif [ "$ctx" != "admin@${CLUSTER_NAME}" ] && [ "$ctx" != "kind-${CLUSTER_NAME}" ]; then
     reason="the current context is '${ctx}', which is not this workshop's"
@@ -174,6 +190,31 @@ require_workshop_context() {
 The workshop scripts create, patch and delete resources in whatever cluster
 kubectl points at, so this stops here instead of guessing.
 EOF
+
+  # kubectl broke rather than answered. Print what it said — nothing below this
+  # point can be computed (workshop_cluster_is_elsewhere runs kubectl too, and
+  # would come back just as empty), and every remedy printed below assumes a
+  # kubectl that works.
+  if [ -n "$kubectl_err" ]; then
+    printf '\nkubectl failed instead of answering:\n\n' >&2
+    printf '%s\n' "${kubectl_err}" | sed 's/^/    /' >&2
+    case "${kubectl_err}" in
+      *"not trusted"*)
+        cat >&2 <<EOF
+
+⚠️  That is mise refusing an untrusted config — NOT a broken cluster. Your clone of
+    the platform repo carries this repo's mise.toml, which pins KUBECONFIG, and a
+    fresh clone is untrusted, so every mise-shimmed tool run from inside it fails.
+    Do NOT rebuild anything. Trust it once, from the clone:
+
+      mise trust
+
+    lab/02-gitops and lab/10-day2-ops print that next to every \`git clone\`.
+EOF
+        ;;
+    esac
+    exit 1
+  fi
 
   # The one failure the pinned kubeconfig can cause on its own: the cluster is
   # up and healthy, in ${CLOUDBOX_KUBECONFIG}, and this shell is reading a
