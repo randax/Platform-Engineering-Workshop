@@ -8,8 +8,8 @@
 
 <!-- x-release-please-start-version -->
 ```
-ghcr.io/randax/cloudbox-uploader:v0.2.1
-ghcr.io/randax/cloudbox-resizer:v0.2.1
+ghcr.io/randax/cloudbox-uploader:v0.2.2
+ghcr.io/randax/cloudbox-resizer:v0.2.2
 ```
 <!-- x-release-please-end-version -->
 

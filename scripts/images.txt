@@ -159,16 +159,16 @@ ghcr.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e
 # The version below is rewritten by release-please in the release PR; the
 # annotation comments around it are load-bearing, do not remove them.
 # x-release-please-start-version
-ghcr.io/randax/cloudbox-portal:v0.2.1
-ghcr.io/randax/cloudbox-uploader:v0.2.1
-ghcr.io/randax/cloudbox-resizer:v0.2.1
+ghcr.io/randax/cloudbox-portal:v0.2.2
+ghcr.io/randax/cloudbox-uploader:v0.2.2
+ghcr.io/randax/cloudbox-resizer:v0.2.2
 # x-release-please-end-version
 # Custom Grafana: stock Grafana + native VictoriaMetrics datasource plugins
 # baked in (apps/grafana/Dockerfile, #65). Built by the same build-images.yaml.
 # Its base image (docker.io/grafana/grafana) is only a BUILD input and is
 # therefore not listed here — see the observability section above.
 # x-release-please-start-version
-ghcr.io/randax/cloudbox-grafana:v0.2.1
+ghcr.io/randax/cloudbox-grafana:v0.2.2
 # x-release-please-end-version
 
 # --- Wave 3: Backstage (CNOE prebuilt image, tag pinned by gitops/catalog)
