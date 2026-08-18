@@ -318,6 +318,21 @@ lib.sh defines `ok()`/`fail()`, and `lab/01-cluster/verify.sh` defines its own
 *counting* `fail()` **before** sourcing `common.sh` — lib.sh's version would have
 clobbered it and module 01 would print `❌ FAIL:` lines while exiting 0.
 
+**The other half of the fix landed in `e292e25`:** `mise.toml` pins `KUBECONFIG` to
+`~/.kube/cloudbox.conf` for this repo, so on an activated machine the workshop cluster
+is the *only* thing in the file kubectl reads and a destroy leaves nothing to fall
+through to. The guard is unchanged and stays — it is the only protection for a shell
+the pin never reached (mise not activated), and it is what catches the one state the
+pin introduces: the cluster created through `mise run` while a self-installed `kubectl`
+in the same terminal reads `~/.kube/config`. That state is diagnosed by name now
+("do NOT rebuild"), `install.sh --check` fails on it, and `dev-setup.sh` offers the
+shell activation that prevents it. **Untested, and the reason to look here first if
+something is wrong at the venue: no cluster has been created with the pin in effect —
+`talosctl kubeconfig` and `kubectl config` are proven to honour `KUBECONFIG`, but
+`talosctl cluster create`'s own kubeconfig merge is not.** If it ignores the variable,
+it leaves a stale `admin@cloudbox` at `https://10.5.0.2:6443` in `~/.kube/config` —
+an address the guard *accepts*. One real `create-cluster.sh` run settles it.
+
 **The residual: CI still cannot see any of this.** A runner's kubeconfig holds exactly
 one cluster, so no job can distinguish a guard that works from one that is never
 reached. What is proven is static (checks 7 and 8, nine planted violations shown to
@@ -337,7 +352,17 @@ shim** — so `KUBECONFIG=/tmp/foo kubectl …` silently uses the real `~/.kube/
 including `kubectl config` subcommands, which then *mutate* it. An agent renamed the
 maintainer's live workshop context this way. Use `kubectl --kubeconfig=<file>`
 exclusively for fixture work: the flag outranks the env var, which is what makes it
-safe. Nothing in the workshop depends on `KUBECONFIG`, so attendees are unaffected.
+safe.
+
+**No longer only a maintainer hazard.** Since `e292e25` the workshop *does* depend on
+`KUBECONFIG`: `mise.toml` pins it to `{{env.HOME}}/.kube/cloudbox.conf` for this repo,
+so the CloudBox cluster lives in a file of its own and the fall-through above has
+nothing to fall through to. The same mechanism therefore now applies to attendees, in
+both directions — a mise shim (or an activated shell) will override a `KUBECONFIG=`
+prefix inside this repo, and `lab/05-debug-with-ai/make-readonly-kubeconfig.sh` still
+prints `KUBECONFIG=$OUT kubectl …` advice that is correct under mise *activation* (a
+real binary on PATH) and silently wrong under mise *shims*. Nobody has been bitten by
+that yet; `--kubeconfig` would be the robust spelling for the two sanity-check lines.
 
 ## RESOLVED — a re-injected module 05 fault could leave nothing wrong, and `verify.sh` called it fixed
 
