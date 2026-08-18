@@ -64,7 +64,7 @@ manages. `spec.source.path` (App details → Manifest) is the watched path: `git
 
 ```bash
 git clone http://gitea_admin:cloudbox123@localhost:30300/cloudbox/platform.git ~/cloudbox-platform
-cd ~/cloudbox-platform
+cd ~/cloudbox-platform && mise trust   # the clone carries this repo's mise.toml; untrusted, every mise tool run from here returns nothing
 ```
 
 This is a *different remote* than github.com — it's the copy your cluster watches. Pushes
@@ -106,7 +106,7 @@ experiment: which file would you edit to change the name *legitimately*?
 
 WORKSHOP="$(git rev-parse --show-toplevel)"
 git clone http://gitea_admin:cloudbox123@localhost:30300/cloudbox/platform.git /tmp/platform
-cd /tmp/platform
+cd /tmp/platform && mise trust
 cp "$WORKSHOP/lab/02-gitops/demo-app.yaml" gitops/apps/demo.yaml
 mkdir -p gitops/components/demo
 sed 's/CHANGE ME/Ada Lovelace/' "$WORKSHOP/lab/02-gitops/welcome.yaml" \

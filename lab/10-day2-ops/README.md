@@ -132,10 +132,15 @@ a different module, see the "Prerequisites" section above):
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].env}'
 kubectl -n demo rollout history deploy/demo-web
-git clone http://localhost:30300/cloudbox/platform.git && cd platform
+git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
+
+> `mise trust` is not ceremony: the clone carries this repo's `mise.toml`, and mise
+> refuses to load an untrusted config — so **every mise-installed tool run from inside
+> the clone exits 0 with empty output** until you trust it. `kubectl` is one of those.
+> A command that prints nothing and succeeds is the worst failure mode there is.
 
 The image still pulls. Look for configuration that controls what address the Go HTTP
 server listens on.
@@ -189,7 +194,7 @@ Git-managed Deployment:
 kubectl -n demo describe pod <new-pod>
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].resources}'
-git clone http://localhost:30300/cloudbox/platform.git && cd platform
+git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -249,7 +254,7 @@ image that fast. Which of the things you built in module 00 and 01 could have an
 ```bash
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].image}'
-git clone http://localhost:30300/cloudbox/platform.git && cd platform
+git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -303,7 +308,7 @@ If you haven't already, turn the capability on the same way as every other one i
 workshop — copy the catalog entry into `gitops/apps/` and push:
 
 ```bash
-git clone http://localhost:30300/cloudbox/platform.git && cd platform
+git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
 cp gitops/catalog/kagent.yaml gitops/apps/
 git add gitops/apps/kagent.yaml
 git commit -m "enable kagent"
@@ -464,7 +469,7 @@ whichever model is currently marked free at
 `deepseek-v4-flash-free`, `mimo-v2.5-free`, `nemotron-3-ultra-free`):
 
 ```bash
-cd platform   # the same clone from above, or a fresh `git clone .../cloudbox/platform.git`
+cd platform && mise trust   # the same clone from above, or a fresh `git clone .../cloudbox/platform.git`
 $EDITOR gitops/components/kagent/kagent.yaml   # find `kind: ModelConfig`, replace spec:
 ```
 
