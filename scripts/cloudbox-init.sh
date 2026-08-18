@@ -124,10 +124,28 @@ ok "All ${total} refs resolve upstream"
 # --- 1. Host images -------------------------------------------------------------
 step "Pulling host images into Docker"
 i=0
+# Registries drop connections. This is a ~7.5 GB download on somebody's home
+# wifi, and a single transient blob failure used to abort the whole prework run
+# — the 2026-08-17 rehearsal lost one at image 9 of 63. Retry with backoff
+# before giving up on any one image; a genuinely missing image still fails, it
+# just takes three attempts to say so.
+retry() { # retry <attempts> <what> -- <cmd...>
+  local attempts="$1" what="$2"; shift 3
+  local n=1
+  while true; do
+    "$@" && return 0
+    if [[ "${n}" -ge "${attempts}" ]]; then return 1; fi
+    warn "      ${what} failed (attempt ${n}/${attempts}) — retrying in $((n * 5))s"
+    sleep $((n * 5))
+    n=$((n + 1))
+  done
+}
+
 for image in "${host_images[@]}"; do
   i=$((i + 1))
   echo "  [${i}/${#host_images[@]}] ${image}"
-  docker pull --quiet "${image}"
+  retry 3 "docker pull" -- docker pull --quiet "${image}" \
+    || die "could not pull ${image} after 3 attempts — check your connection and re-run (already-pulled images are skipped)"
 done
 ok "Host images present"
 
@@ -211,11 +229,13 @@ for image in "${mirror_images[@]}"; do
     echo "  [${i}/${#mirror_images[@]}] ${image}"
   fi
 
-  if crane copy "${copy_args[@]}" "${image}" "${dest}" >/dev/null 2>"${CRANE_LOG}"; then
+  if retry 3 "crane copy" -- crane copy "${copy_args[@]}" "${image}" "${dest}" \
+       >/dev/null 2>"${CRANE_LOG}"; then
     continue
   fi
   if [[ ${#copy_args[@]} -gt 1 ]] \
-     && crane copy --insecure "${image}" "${dest}" >/dev/null 2>"${CRANE_LOG}"; then
+     && retry 3 "crane copy (all arch)" -- crane copy --insecure "${image}" "${dest}" \
+          >/dev/null 2>"${CRANE_LOG}"; then
     warn "      no ${NODE_PLATFORM} manifest — copied every architecture instead"
     continue
   fi
