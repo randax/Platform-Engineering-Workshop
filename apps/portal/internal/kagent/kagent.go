@@ -111,12 +111,19 @@ type Client struct {
 func New(baseURL string) *Client {
 	return NewWithHTTPClient(baseURL, &http.Client{
 		// An investigation is a multi-step agent run; give it room, but never hang
-		// a browser forever. Measured on the workshop's own pinned setup
-		// (kagent 0.9.12, host Ollama, qwen3:4b, 2026-08-17): a two-tool-call run
-		// took 2 m 54 s wall clock, which the previous 2-minute cap cut off before
-		// the answer arrived. The attendee is not staring at a spinner — the
-		// tool-call log streams as it happens — so the cap exists only to stop a
+		// a browser forever. The attendee is not staring at a spinner — the
+		// tool-call log streams as it happens — so this cap exists only to stop a
 		// wedged run from holding a connection forever.
+		//
+		// This is deliberately NOT the binding limit, and must stay above it:
+		// kagent-controller 0.9.12 cuts the A2A stream itself at a HARDCODED 180s
+		// (measured 2026-08-18: runs ending at 180.04 / 180.01 / 181.39 s; no
+		// flag, arg or env exists in chart 0.9.12 to change it). Keeping the
+		// client cap well above the server's means the server's own error frame
+		// wins the race, so the Console can say what actually happened instead of
+		// reporting a client-side abort. Do not "optimise" this down towards 3
+		// minutes — that reintroduces the race. The earlier 2-minute cap was below
+		// BOTH limits and cut answers off before they arrived.
 		Timeout:   6 * time.Minute,
 		Transport: otelhttp.NewTransport(nil),
 	})
