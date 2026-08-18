@@ -4,9 +4,11 @@ Everything we know is dangerous, deliberately weird, or unproven — with what
 would go wrong, how you would notice, and what retires it.
 
 Written during the pre-event bump pass on **2026-08-11**, three weeks before the
-workshop (JavaZone, Sept 2–3), and rewritten after **two** full end-to-end
-rehearsals, both on **2026-08-17** and both on the same Apple Silicon laptop
-(Colima, 8 CPU / ~16 GiB, Talos v1.13.8 / Kubernetes v1.36.2 / containerd 2.2.6):
+workshop (JavaZone, Sept 2–3), and rewritten after **four** full end-to-end
+rehearsals on **2026-08-17/18**, all on the same Apple Silicon laptop
+(Colima, 8 CPU / ~16 GiB, Talos v1.13.8 / Kubernetes v1.36.2 / containerd 2.2.6).
+`docs/REHEARSALS.md` carries the timing envelope those runs produced; this file
+carries what they taught us to be afraid of:
 
 - **Rehearsal 1** (morning, warm mirror, one cluster): modules 00→10, **11/11
   `verify.sh` exit 0**, 21/21 ArgoCD Applications Synced+Healthy, **~16 minutes of
@@ -20,6 +22,21 @@ rehearsals, both on **2026-08-17** and both on the same Apple Silicon laptop
   still against 240. It found four more bugs — one of them a blocker, and again in the
   place CI cannot look — all four fixed the same evening (`1f12353`, `ca4859e`,
   `92aac7a`, `4e2817b`).
+- **Rehearsal 3** (2026-08-17 evening into the morning of 2026-08-18, cold mirror,
+  uncapped nodes): **10/11**, ~24 minutes of script time — module 00 red on the
+  laptop's own free disk, everything else green. It produced the two findings that
+  changed the most code since: the context near-miss below (workshop scripts grading
+  a **36-node corporate cluster**) and a beat 1 that drove the machine into a
+  cluster-wide liveness cascade, which is what moved the kagent model pin.
+- **Rehearsal 4** (2026-08-18, **a brand-new Colima VM** — 0 images, 0 containers,
+  0 volumes at the start): modules 00→10 with **11/11 `verify.sh` exit 0, twice** —
+  the forward path, and again on the cluster `catch-up.sh 10 --rebuild` built from
+  nothing — in **~28 minutes of script time**. `cloudbox-init.sh` in one 13:39 pass,
+  7.87 GB, 66/66 refs, **0 retries**; module 00 all-green for the first time since
+  rehearsal 2 (92 GB free against the 40 GB gate). It found **two more blockers,
+  both in the recovery path** (`218a248`, `87231be`) — one of them introduced by us
+  fifteen minutes before the run started — and one open MAJOR that has since been
+  fixed and released (`024421e`, `cloudbox-portal:v0.2.2`).
 
 The extra ~16 minutes is coverage, not regression: s5cmd's in-cluster pod branch
 (+1:30 module 03, +1:09 module 04, +1:47 module 09), deliberately longer settle
@@ -28,12 +45,13 @@ symptoms and whose agent investigation actually runs. The machine is still not t
 constraint. `docs/MAINTENANCE.md` is how pins get bumped; this is what to be afraid
 of while doing it.
 
-Both runs landed on the same calendar day, so **"rehearsal 1" and "rehearsal 2" are
-used below** rather than the date, wherever it matters which one a number came from.
+All four runs landed inside two calendar days, so **rehearsal numbers are used
+below** rather than dates, wherever it matters which one a number came from.
 
 Status key: **LIVE** = a real risk today · **WATCH** = unproven, needs a
-rehearsal to settle · **PROVEN ONCE** = came out green in a 2026-08-17
-rehearsal, on one machine, one architecture — settled, not proven ·
+rehearsal to settle · **PROVEN ONCE** = came out green in a rehearsal, on one
+machine, one architecture — settled, not proven; several rows below are now
+four-for-four, and the machine count is still one ·
 **RESOLVED** = was a real hazard, is fixed, and the entry is kept because the next
 person needs the history ·
 **TRAP** = looks like a bug, is deliberate, do not "fix"
@@ -129,10 +147,10 @@ go with these braces. On 8 cores it does not bite; the next entry is where it mi
 
 ## LIVE — `MIN_CPUS="4"` is now under-specified rather than wrong
 
-Both rehearsals ran on an **8-CPU** host. `MIN_CPUS="4"` is a published promise
-(principle 12, honest specs) and `install.sh --check` enforces it, but what has
-actually been measured at the module 10 end state — 21 apps, 73 pods — is 8 cores,
-twice, and nothing else.
+All four rehearsals ran on the same **8-CPU** host. `MIN_CPUS="4"` is a published
+promise (principle 12, honest specs) and `install.sh --check` enforces it, but what has
+actually been measured at the module 10 end state — 21 apps, 66–73 pods — is 8 cores,
+four times, and nothing else.
 
 Uncapping helps a 4-core laptop rather than hurting it: with `TALOS_CPU_FLOOR="2"`
 and a 4-CPU daemon, both node containers now get **4/4 where they previously got
@@ -166,13 +184,24 @@ Desktop / OrbStack / Colima host does not** — and macOS is a fully supported
 platform in the published matrix (`docs/PRINCIPLES.md` §12) on which most of a
 JavaZone room will be sitting.
 
-**Two rehearsals have now *each* found a workshop-stopping bug that CI cannot see,
-and both were in the recovery path** — the second cluster of the day, and
-`catch-up.sh`. Say it plainly, because it is the strongest generalisation this
+**Rehearsals 1, 2 and 4 have each found a workshop-stopping bug that CI cannot see,
+and every one of them was in the recovery path** — the second cluster of the day,
+`catch-up.sh`, a create→destroy→create loop, and `catch-up.sh` again. (Rehearsal 3's
+worst finding, the context near-miss below, was in the same blind spot on the
+post-destroy path.) Say it plainly, because it is the strongest generalisation this
 project has earned: a CI runner creates exactly one cluster, runs the labs forward
 once, and is then discarded, so the *entire* "something went wrong, get me back on
 track" surface is untested **by construction**. That is also the surface reserved for
 people who are already in trouble.
+
+**And four rehearsals have now separated the two halves of this project.** The
+platform repeats itself run after run — Cilium 1.20.0 four times, Kourier's
+8 × `[::]:9000` four times, local-path v0.0.37 four times, RustFS at 2.69 MiB/h with
+a 4,158-byte longest line four times, one root and zero orphans in the capstone
+trace three times. Nothing in four runs has suggested the *platform* is fragile.
+What keeps breaking is the **recovery and setup paths**: the second cluster, the
+rebuild, the reset laptop, the clone. Budget the rehearsal time accordingly — the
+forward path is the part that has stopped paying for itself.
 
 **Rehearsal 1 — the two blockers CI could not see:**
 
@@ -240,9 +269,28 @@ people who are already in trouble.
   never hit it. Fixed by polling `kubectl get crd/$crd` into existence (60 × 5 s)
   *before* waiting on `Established`.
 
-**The standing lesson, now twice-earned: rehearse on a Mac before the event, and
-specifically rehearse the *recovery* — the second cluster and `catch-up.sh <n>` —
-not just the forward path.**
+**Rehearsal 4 — two more, same blind spot, and one of them ours:**
+
+- **A deleted Docker VM left a Talos state directory that nothing removed** (fixed
+  `218a248`) — `create-cluster.sh` died in 2 s and `destroy-cluster.sh` said
+  "nothing to destroy" and exited 0, an infinite create→destroy→create loop at
+  module 01. Its own entry is below.
+- **Every clone of the platform repo was an untrusted mise config** (fixed
+  `87231be` + `f64d319`), so `catch-up.sh` — which `cd`'d into one — would have
+  polled an empty string for ten minutes and then declared a *converged* cluster
+  broken, on every module. Its own entry is below too. **We introduced that one
+  ourselves, in `e292e25`, fifteen minutes before the run started** — it is the
+  parent of the commit the rehearsal ran on.
+
+Note the age of what broke. One bug was minutes old; the other was a gap in scripts
+rebuilt five weeks earlier that nothing had ever walked into, because every previous
+rehearsal reached `create-cluster.sh` through a `destroy-cluster.sh` that had
+containers to destroy. Neither is a place a green pipeline would have looked.
+
+**The standing lesson, now thrice-earned: rehearse on a Mac before the event, and
+specifically rehearse the *recovery* — the second cluster, `catch-up.sh <n>`, a
+laptop whose Docker VM has been reset, and a fresh clone — not just the forward
+path.**
 
 **Half of that is now automated** (`ae224f4`): `bootstrap-test.yaml` grew a
 `recovery-path` job that creates a cluster, runs the real attendee command
@@ -260,11 +308,68 @@ everything else, and the platform most of the room will be on is still covered o
 a human rehearsing before the event. Green CI is now evidence about Linux, forwards
 *and* backwards — and nothing else.
 
+## RESOLVED — a deleted Docker VM left a Talos state directory that nothing removed
+
+**Found in the first two seconds of rehearsal 4, fixed in `218a248`.** Kept because
+the loop it produced is the worst shape a module 01 bug can have: two commands that
+each look like they worked, forever.
+
+`talosctl cluster create` keeps a provisioner **state directory** at
+`~/.talos/clusters/<name>` (its `--state` flag; default `$HOME/.talos/clusters`). It
+lives on the **host**, not in Docker. So `colima delete`, Docker Desktop's *Reset to
+factory defaults*, a hand `docker rm` of the node containers, or a create that dies
+after PKI generation all leave it behind with no containers to match it. Rehearsal 4
+was the first run ever to start from a deleted VM — 0 images, 0 containers,
+0 volumes — and it broke module 01 immediately, on a `state.yaml` written hours
+earlier that named two container IDs which no longer existed:
+
+    $ ./scripts/create-cluster.sh
+    ⚠️  Removing a stale talosconfig context 'cloudbox' (no such cluster is running)
+    ==> Creating Talos cluster 'cloudbox' …
+    creating state directory in "/Users/hans/.talos/clusters/cloudbox"
+    failed to initialize provisioner state: state directory … already exists,
+    is the cluster "cloudbox" already running? remove cluster state with
+    talosctl cluster destroy                              ← exit 1, after 2 seconds
+
+**The blocker is the next command, not this one.** talosctl's message points at
+`talosctl cluster destroy`, and the workshop's wrapper for that gated on node
+containers existing — so it printed `⚠️  No 'cloudbox' cluster found — nothing to
+destroy`, `✅ Done. Recreate with: ./scripts/create-cluster.sh`, **exited 0**, and
+left `~/.talos/clusters/cloudbox/` exactly where it was. create → fail → destroy
+(says it worked) → create → fail, with nothing in the labs, the scripts or the hints
+naming the state directory. Module 01, minute 20 of 240, on the machine of anyone
+who has ever reset Docker because "Docker was being weird" — which is a very common
+thing to do the morning of a conference.
+
+**Why the repo nearly had this covered: it already self-heals the sibling.** The stale
+*talosconfig context* branch (`3a7848f`, itself a rehearsal-2 blocker) fired
+correctly on the way in, one line above the failure. Same failure, different noun,
+and nobody had thought of the noun — because every previous rehearsal reached
+`create-cluster.sh` through a `destroy-cluster.sh` that *had* containers to destroy,
+which clears the directory as a side effect.
+
+**Fixed the same way and in the same two places as the sibling:** one
+`talos_cluster_state_dir()` in `scripts/lib.sh` so the path is written down once,
+`create-cluster.sh` removes a stale directory once it knows there are no node
+containers, and `destroy-cluster.sh` removes it **unconditionally** — a no-op after a
+real `talosctl cluster destroy`, and the entire point when there was nothing to
+destroy. Proven on the machine that produced the bug (`✅ Talos cluster state
+directory removed`, `~/.talos/clusters/` empty), and the run then built three
+clusters on that laptop without touching it again.
+
+**CI cannot see this either, for the reason above:** neither `bootstrap-test.yaml`
+nor its `recovery-path` job can produce the state "no containers, but state on
+disk" — a runner is discarded, not reset. If you ever need to reproduce it by hand:
+`docker rm -f cloudbox-controlplane-1 cloudbox-worker-1` and then run
+`create-cluster.sh`.
+
 ## RESOLVED — the workshop scripts ran against whatever cluster `kubectl` pointed at
 
 **Found in rehearsal 3, closed in `2b8de71` (lab/) and `b4f5e2d` (scripts/ +
-solutions/).** Kept in full: the near-miss is the evidence, and the residual at the
-bottom is live.
+solutions/), and the residual retired in rehearsal 4** — which reproduced rehearsal
+3's exact sequence on a real multi-context kubeconfig and got a refusal instead of a
+grade. Kept in full: the near-miss is the evidence, and the mechanism is still the
+only thing between a hurried attendee and their employer's cluster.
 
 `destroy-cluster.sh` removes the `admin@cloudbox` kubeconfig entries. `kubectl` then
 falls through to the next entry in the same `~/.kube/config` — and this audience
@@ -326,22 +431,82 @@ the pin never reached (mise not activated), and it is what catches the one state
 pin introduces: the cluster created through `mise run` while a self-installed `kubectl`
 in the same terminal reads `~/.kube/config`. That state is diagnosed by name now
 ("do NOT rebuild"), `install.sh --check` fails on it, and `dev-setup.sh` offers the
-shell activation that prevents it. **Untested, and the reason to look here first if
-something is wrong at the venue: no cluster has been created with the pin in effect —
-`talosctl kubeconfig` and `kubectl config` are proven to honour `KUBECONFIG`, but
-`talosctl cluster create`'s own kubeconfig merge is not.** If it ignores the variable,
-it leaves a stale `admin@cloudbox` at `https://10.5.0.2:6443` in `~/.kube/config` —
-an address the guard *accepts*. One real `create-cluster.sh` run settles it.
+shell activation that prevents it.
 
-**The residual: CI still cannot see any of this.** A runner's kubeconfig holds exactly
-one cluster, so no job can distinguish a guard that works from one that is never
-reached. What is proven is static (checks 7 and 8, nine planted violations shown to
-fail) and manual (fixture kubeconfigs driven through `--kubeconfig`: every guarded
-script exits 1 before acting, on a foreign context, on a workshop-named context aimed
-elsewhere, and on no context at all). **Nobody has reproduced rehearsal 3's actual
-sequence since the fix** — `destroy-cluster.sh`, then a lab script, on a laptop with a
-real multi-context kubeconfig. That is a ten-minute check and the only evidence that
-would retire this entry rather than settle it.
+**The one unproven link in that pin is now proven, by talosctl's own output.** The
+worry was that `talosctl cluster create`'s internal kubeconfig merge might ignore
+`KUBECONFIG` and leave a stale `admin@cloudbox` at `https://10.5.0.2:6443` in
+`~/.kube/config` — an address the guard *accepts*, so a dead cluster would have
+looked alive to it. Rehearsal 4 ran three real creates with the pin in effect:
+
+    waiting for all k8s nodes to report schedulable: OK
+    merging kubeconfig into "/Users/hans/.kube/cloudbox.conf"
+
+— printed by talosctl itself, before `create-cluster.sh`'s own merge step runs. And
+the negative, which is the half that matters: `~/.kube/config` was **byte-identical
+across the entire create** (md5 `b97b6342…` before and after, mtime untouched, 33
+contexts before and after, **0** occurrences of `cloudbox`, **0** of `10.5.0.2`), and
+still identical after three creates, three destroys, the whole 00→10 path and a
+`catch-up.sh 10 --rebuild`. **The feared failure mode does not exist.** talosctl
+v1.13.8 respects the variable; `talosctl kubeconfig --force` and `kubectl config`
+already did.
+
+**And `destroy-cluster.sh`'s surgery on the real file is exact.** The one time it
+did modify `~/.kube/config` in that run it was by design — a stale `admin@cloudbox`
+from an earlier cluster was sitting in it, and leaving it there re-arms the very
+fall-through the pin exists to disarm. Diffing context names before and after:
+**exactly one line removed, 34 → 33**, 13 lines, `current-context` untouched. (The
+file's md5 also moved once for a reason that was not us at all — a `kubectx` switch
+onto a GKE cluster in the same second the maintainer's own shell wrote
+`~/.kube/kubectx`. Worth knowing only as measurement hygiene: on a live maintainer
+laptop, "the kubeconfig changed" is not evidence that the workshop changed it —
+diff the context names, do not compare hashes.)
+
+**The residual this entry carried is discharged.** It asked for one thing —
+rehearsal 3's actual sequence, re-run after the fix, on a laptop with a real
+multi-context kubeconfig — and rehearsal 4 ran it: `destroy-cluster.sh`, then
+`lab/01-cluster/verify.sh`, in an un-activated shell with a **real** `kubectl` first
+on `PATH` (a mise shim would re-apply the pin and hide the difference) and
+`KUBECONFIG=~/.kube/config`, whose current context was the same 33-context file's
+genuine corporate cluster:
+
+    ❌ FAIL: expected 2 running Talos node containers, found 0 — run ./scripts/create-cluster.sh
+    ❌ FAIL: refusing to touch this cluster — the current context is 'nav-management-v2',
+             which is not this workshop's.
+      current context : nav-management-v2
+      API server      : https://172.16.4.2
+      expected        : admin@cloudbox (or kind-cloudbox) on https://127.0.0.1:<port>
+                                                                          exit 1
+
+**No `✅ kubectl reaches the API server`. No `36/36`. No API call at all** — the
+kubeconfig's md5 was identical afterwards. The destructive scripts were driven
+against throwaway fixtures at the same time: `bootstrap-gitops.sh` and
+`seed-gitea.sh` refuse on **both** shapes (a foreign context, and a *workshop-named*
+context aimed at a foreign server), `catch-up.sh 3` refuses on the foreign-context
+shape — the workshop-named-but-foreign shape was not re-run against `catch-up.sh`,
+and is the one gap left in the manual matrix. And create→destroy→create left no
+stale entry, no `admin@cloudbox` anywhere in `~/.kube/config`, and no `cloudbox-1`
+rename.
+
+**What has not changed: CI still cannot see any of it.** A runner's kubeconfig holds
+exactly one cluster, so no job can distinguish a guard that works from one that is
+never reached. The evidence is static (checks 7 and 8, nine planted violations shown
+to fail), fixture-driven (`--kubeconfig` against synthesised kubeconfigs), and now
+one human rehearsal. Re-run that ten-minute check after any change to the guard, the
+kubeconfig pin, or `destroy-cluster.sh`.
+
+**One cosmetic wrinkle, on the most-travelled post-destroy path, not fixed.**
+`destroy-cluster.sh` removes the cluster/context/user entries from
+`~/.kube/cloudbox.conf` but leaves `current-context: admin@cloudbox` dangling, and
+`kubectl config current-context` happily returns a context that no longer exists. So
+in the *pinned* shell the guard takes its third branch and says "context
+'admin@cloudbox' points at an API server it does not name" (API server `<none>`)
+rather than the truthful "kubectl has no current context selected". It reads as
+"your context is misconfigured" when the fact is "you have no cluster". Exit code and
+the paragraph underneath are both right, so nobody is misled for long. Two defensible
+one-line cures — `kubectl config unset current-context` in `destroy-cluster.sh`, or a
+"context is not in the kubeconfig" branch in the guard — and choosing between them is
+a design call, not a defect fix.
 
 ## TRAP — a `KUBECONFIG=` prefix does nothing to a mise-shimmed `kubectl`
 
@@ -363,6 +528,85 @@ prefix inside this repo, and `lab/05-debug-with-ai/make-readonly-kubeconfig.sh` 
 prints `KUBECONFIG=$OUT kubectl …` advice that is correct under mise *activation* (a
 real binary on PATH) and silently wrong under mise *shims*. Nobody has been bitten by
 that yet; `--kubeconfig` would be the robust spelling for the two sanity-check lines.
+
+The same `[env]` block has one more consequence, and it *did* bite — the next entry.
+
+## RESOLVED — the kubeconfig pin made every fresh clone an untrusted mise config
+
+**A regression we introduced ourselves, in `e292e25`, fifteen minutes before
+rehearsal 4 started and about ninety before it found it. Script half fixed in
+`87231be`, attendee-facing half in `f64d319`.** Recorded plainly, including whose
+fault it was, because the shape is one this file already names and we walked into it
+anyway: a fix landed in one place (the
+maintainer's checkout, which `dev-setup.sh` trusts) and said nothing about its sibling
+(every clone of that checkout, which nothing trusts).
+
+**The mechanism.** `seed-gitea.sh` pushes the **whole repository** to Gitea,
+`mise.toml` included, so every `git clone http://localhost:30300/cloudbox/platform.git`
+carries a copy of the file `e292e25` had just given an `[env]` block:
+
+```toml
+[env]
+KUBECONFIG = "{{env.HOME}}/.kube/cloudbox.conf"
+```
+
+mise's own `trust --help` states the rule: a config holding only `min_version`, plain
+`[tools]` and `[tasks]` loads **without** trust; anything with templating does not. A
+fresh clone is untrusted by definition, so inside it mise refuses to load the config —
+and refuses hard, on every shimmed tool:
+
+    $ cd <clone> && kubectl get nodes
+    mise ERROR Config files in <clone>/mise.toml are not trusted. …
+    exit=0                                    ← and nothing on stdout
+
+Bisected to the pin rather than to mise: the same clone at `e292e25^` works, HEAD does
+not, and HEAD *minus* the `KUBECONFIG` line still fails — the `{{env.HOME}}` in the
+**comment** is enough templating to require trust. Both mise modes are affected;
+under `mise activate` the `cd` prints `mise WARN … is not trusted` and the tool then
+fails the same way.
+
+**Why it was a blocker rather than an annoyance.** `scripts/catch-up.sh` did
+`cd "${TMP_DIR}/platform"` at step 3 and made every remaining `kubectl` call from
+inside the clone. The failure is silent in the worst available way — exit **0**, empty
+stdout — which is exactly what `wait_app_converged` reads:
+
+    from the repo (trusted):    st='Synced Healthy'   rc=0
+    from inside the clone:      st=''                 rc=0
+
+So the recovery command would have polled an empty string for its full 600 s and then
+declared
+
+    ❌ Application 'rustfs' is still 'missing' after 10 minutes
+
+**on a cluster that had already converged, on every module, for every attendee who
+took `dev-setup.sh`'s activation advice** — which the whole kubeconfig design now
+depends on. It was found live, not reasoned about: the maintainer's own module 09
+hint-5 loop counted zero of five observability apps for ten minutes while all five
+went Synced+Healthy in about six.
+
+**Fixed by not `cd`-ing at all.** `catch-up.sh`'s three git calls take `-C`, which is
+the pattern the rest of the repo already used — `lab/common.sh`'s `gitops_clone` /
+`gitops_push` / `enable_catalog` and all three module 10 `inject.sh` scripts drive the
+same clone with `git -C "$CLONE"` and were never exposed. `catch-up.sh` was the only
+script that did it the other way. Afterwards `catch-up.sh 9` on the converged cluster
+exited **0 in 10 seconds**, ordering intact.
+
+**The other half was prose, and humans do what the prose says.** `lab/02-gitops` and
+`lab/10-day2-ops` tell attendees to `git clone … && cd platform` — module 10 four
+times — and then run `kubectl` in the same block. `f64d319` appends `mise trust` to
+every clone-and-cd instruction, with one explanation of why rather than five. That is
+the cheapest of the three options considered; the other two (do not seed `mise.toml`
+into Gitea; keep the pin in a file the clone does not carry) both change what
+attendees see in their own repo or split the pin across two files, which the pin's own
+comment argues against. Module 09 re-enters module 02's clone by path, so it inherits
+that trust rather than needing its own line — if module 02's clone path ever changes,
+check module 09 with it.
+
+**What to watch:** any future `[env]`, `[hooks]` or template expression added to
+`mise.toml` keeps this property. The rule to remember is that **a config we trust on
+our own machine is untrusted in every copy of itself**, and a mise shim's failure mode
+for that is exit 0 with no output — the single hardest failure to notice in a room of
+80 people.
 
 ## RESOLVED — a re-injected module 05 fault could leave nothing wrong, and `verify.sh` called it fixed
 
@@ -404,7 +648,86 @@ exists and names the cure, `./restore.sh clean`, which already existed and does
 exactly this (verified: after `clean`, all four faults inject correctly, 4/4 caught).
 The lesson generalises past module 05 — **an idempotent-looking `kubectl apply` is not
 an idempotent *fault*, and a check that looks for a symptom cannot tell "fixed" from
-"never injected".**
+"never injected".** It also generalises to the *Console*, in the next entry, where the
+same surging Deployment fooled a different check a day later.
+
+## RESOLVED — a full ready count is not evidence that the release was good
+
+**Found in rehearsal 4, fixed in `024421e`, shipped as `cloudbox-portal:v0.2.2`**
+(pinned in `scripts/images.txt` and `gitops/components/portal/portal.yaml`), with a
+README follow-up in `858c9e2`. Kept because it is the same mechanism as the module 05
+entry above wearing different clothes, and because the *rejected* fix is as
+instructive as the shipped one.
+
+With a module 10 scenario injected and `demo-web` visibly in `CrashLoopBackOff`, the
+Console's **Components → demo** page read
+
+    Demo workloads   Operational
+    … namespace demo · 3/3 workloads ready.
+
+and offered **no Diagnostics panel and no Open investigation button** — so module 10's
+centrepiece, "point an AI agent at your own cluster and then verify it", was
+unreachable by the path the README tells 80 people to click. `grep -c "Open
+investigation"` on the rendered page: **0**.
+
+**The API server was telling the truth.** `handleComponentDetail` gated both the panel
+and the Case file on `h.Ready < h.Total`, counted per *workload* — and **a Deployment
+surges**. While the new pods crashloop, get OOM-killed at sandbox creation, or cannot
+pull, the old ReplicaSet keeps serving every desired replica. Captured live, ten
+seconds after `./inject.sh 1`:
+
+    spec.replicas 2 · readyReplicas 2 · replicas 3 · updatedReplicas 1
+    unavailableReplicas 1 · Progressing=True/ReplicaSetUpdated,
+    lastUpdateTime frozen at the moment the new ReplicaSet appeared
+
+`2/2` ready, forever, on a broken release. Scenario 2 produces **byte-identical
+Deployment status** with a benign `ContainerCreating` pod, so an *empty* pod-troubles
+list — any fix reasoning from pod state would have missed it. Scenario 3 is healthy
+on purpose. The button therefore appeared for none of the three.
+
+**The signal is a gap in progress, not a count.** Kubernetes' own verdict,
+`ProgressDeadlineExceeded`, is accepted when it arrives — but it takes **600 s**,
+longer than the module, so what actually fires is `Progressing.lastUpdateTime` frozen
+for more than `kube.StallAfter` = **120 s**. That number is calibrated, not chosen: on
+the same cluster a *healthy* `demo-web` roll is in flight for 14 s and advances its
+`Progressing` timestamp every **~6 s**, so 120 s is ~2× the slowest healthy rollout on
+record (Backstage, 57 s) and one fifth of the cluster's own deadline. A release in
+flight now reads **"Rolling out"** (blue, informational) and only a release that has
+gone quiet is Degraded — because the honest answer to a rollout in progress is not
+"degraded", and a badge that flaps is worse than one that is late.
+
+**Record the fix that was rejected, because it is the obvious one.** Making the gate
+`unhealthy || !diag.Empty()` would have used data already modelled and cost one API
+list — and it would have called a **healthy** cluster broken: the diagnostics rollup
+includes the namespace's recent `type=Warning` events, and a healthy `demo` carries
+stale ones for up to ~17 minutes after a Knative cold start. Warning events are
+deliberately not part of the verdict.
+
+**The second condition was separate, and also wrong.** The Case file button hung off
+the same health verdict; it now shows on **any component that has workloads**, which
+is what makes scenario 3 — a bad release whose pods all come up `Running` — an
+investigation at all. The opening prompt no longer asserts "explain why it is
+unhealthy" without evidence for it.
+
+**Proven with the fixed binary against the live rehearsal cluster:** a healthy roll →
+`Rolling out` for 14 s, back to `Operational`, no Diagnostics panel; scenarios 1 and 2
+→ `Degraded`, with the button and the failing container named; scenario 3 →
+`Operational`, with the button; each `restore.sh` → `Operational`.
+
+**The backend was never the problem** and this entry should not be read as one: the
+same run drove four Case files through `POST /agent/ask` with 200s, 25.8–44.2 s, 2–6
+real tool calls and zero error frames. **Only the mount condition was wrong** — which
+is why nothing before rehearsal 4 caught it: rehearsals 2 and 3 both drove the agent
+through the endpoint directly and neither ever loaded the page the README names.
+
+**Two things to watch.** (1) This needs `cloudbox-portal:v0.2.2` or later; pin an
+older image and the symptom returns exactly as written above. (2) `858c9e2` had to
+follow, because the README claimed the Diagnostics panel was "already showing your
+broken `demo-web`" — with the fix it is *not*, for the first 120 s, and an attendee
+staring at a page that looks fine would conclude they had mis-injected the fault. It
+is now the teaching beat it should have been: the previous version is still serving,
+which is exactly why the ready count cannot see the problem — the same trap the agent
+falls into thirty seconds later.
 
 ## PROVEN ONCE — the RustFS scanner log flood is fixed, and confirmed on a cluster
 
@@ -420,7 +743,7 @@ scan spans", merged 2026-08-11, commit `727a10e1`, one of the 215 commits in
 the `rc.1...rc.2` comparison; issue closed). **Pinned rc.2 and removed the
 workaround on 2026-08-16, after re-measuring** — a release note is not
 evidence. Idle stdout, our exact config and pod hardening, 300 s windows on the
-bench; the last two rows are live clusters, one rehearsal each:
+bench; the last four rows are live clusters, one rehearsal each:
 
 | image | `log_level` | store | idle stdout | longest line |
 |---|---|---|---|---|
@@ -433,31 +756,44 @@ bench; the last two rows are live clusters, one rehearsal each:
 | `1.0.0-rc.2` | `info` | **empty** | 1.21 MiB/h | 4,068 B |
 | **`1.0.0-rc.2`** | **`info`** | **on cluster, 247 objects (reh. 1)** | **3.44 MiB/h** | **4,158 B** |
 | **`1.0.0-rc.2`** | **`info`** | **on cluster, 244 objects (reh. 2)** | **2.61 MiB/h** | **4,158 B** |
+| **`1.0.0-rc.2`** | **`info`** | **on cluster, ~250 objects (reh. 3)** | **2.70 MiB/h** | **4,156 B** |
+| **`1.0.0-rc.2`** | **`info`** | **on cluster, 245 objects (reh. 4)** | **2.69 MiB/h** | **4,158 B** |
 
 On rc.2 the workaround measures *worse* than no workaround (6.37 vs 5.45 —
 noise): it has nothing left to suppress, which is why it went rather than
 being kept "just in case".
 
-Those two cluster rows are the measurement this entry existed to demand, taken after
-modules 03/04/09 had put objects in the store, same
-pod, **0 restarts**, ~2 h old both times. Rehearsal 1: 247 objects (241 in
-`app-assets`, 6 in `images` from the capstone), 60 minutes, **3.44 MiB/hour**.
-Rehearsal 2, independently, on a **cold-built** cluster and mirror: 244 objects,
-**31.6 minutes**, **2.61 MiB/hour** — and a longest line of **4,158 B, the same byte
-both times**, against the bench's recorded 4,157 B. The #5927 shape (332,800-byte
-lines) is gone: the biggest line in half an hour is 4 KB. `rustfs_scanner::scanner_io`
-is still the chattiest scanner target — **504 lines/hour against rehearsal 1's 502** —
+Those four cluster rows are the measurement this entry existed to demand, taken after
+modules 03/04/09 had put objects in the store, same pod, **0 restarts**, 1–2 h old
+each time, on four independently built clusters: rehearsal 1, 247 objects over
+60 minutes, **3.44 MiB/hour**; rehearsal 2, cold-built cluster and mirror, 244 objects
+over 31.6 minutes, **2.61**; rehearsal 3, ~250 objects over 32.3 minutes, **2.70**;
+rehearsal 4, on a brand-new Docker VM, 245 objects over 34 minutes, **2.69**. The
+longest line is **4,158 B in three of the four** (rehearsal 3 read 4,156 B), against
+the bench's recorded 4,157 B. The #5927 shape (332,800-byte lines) is gone: the
+biggest line in half an hour is 4 KB. `rustfs_scanner::scanner_io` is still the
+chattiest scanner target — 502 / 504 / 516 / **476** lines per hour across the four —
 so the EnvFilter directive would still have something to bite on if it regressed. Over
-a 240-minute workshop this is ~10–14 MiB of container log.
+a 240-minute workshop this is ~11 MiB of container log.
 
-**Two measurement traps, and the first one has now been reproduced twice — keep this
-prominent. Window length matters as much as seeding.** Rehearsal 1: with 247 objects
-present, a 300-second window read **0.06 MiB/hour**; 30 min → 2.98, 60 min → 3.44;
-during the 240-object upload burst, 27.8 MiB/h. Rehearsal 2 reproduced it from the
-other direction — a 300-second sub-window *inside* the 31.6-minute measurement read
-**0.17 MiB/hour, 15× below the true rate**. The scanner runs on a cadence, so a
-short window lands between passes and reads clean. Measure for half an hour, not five
-minutes.
+**Four runs, four times the same number, is what this row is really evidence for.**
+Not that RustFS is fast, but that the measurement is stable enough that a *different*
+number at the next bump means something.
+
+**Two measurement traps, and the first one has now been reproduced in all four
+rehearsals — keep this prominent. Window length matters as much as seeding.**
+Rehearsal 1: with 247 objects present, a 300-second window read **0.06 MiB/hour**;
+30 min → 2.98, 60 min → 3.44; during the 240-object upload burst, 27.8 MiB/h.
+Rehearsal 2: a 300-second sub-window *inside* the 31.6-minute measurement read
+**0.17 MiB/hour**, 15× below the true rate. Rehearsal 4 reproduced that almost
+exactly — 300 s → **0.17**, 900 s → **1.86**, against a true **2.69**.
+
+**Rehearsal 3 is the one to remember, because it broke the mental model:** on a single
+log, 300 s read **5.23 MiB/h** (*high* — it landed **on** a scan pass) while 900 s read
+**1.85** (low — it landed between them), a 2.8× spread from window choice alone. So the
+rule is not "a short window reads low". It is **a short window reads wrong, in whichever
+direction the cadence happens to put it**. Measure for half an hour, not five minutes,
+and do not trust a `--since=5m` reading in either direction.
 
 **And take the rate from `kubectl logs --since=<window>`, never from a difference of
 two totals.** Rehearsal 2's naive byte delta came out **negative** — −3.09 MiB/h, with
@@ -494,8 +830,9 @@ with operations.
 `1.0.0-rc.2` is an rc, on a component modules 03, 04 and 09 depend on. Chosen
 deliberately by the maintainer with the above evidence in hand. RustFS is beta
 by design in this workshop (`docs/RESEARCH.md` §2); SeaweedFS is Plan B. It held
-up in **both** 2026-08-17 rehearsals — modules 03, 04 and 09 green each time and on
-both of rehearsal 2's clusters, the same pod alive 2h+ with **0 restarts**,
+up in **all four** rehearsals — modules 03, 04 and 09 green every time, on every
+cluster they ran on, including both of rehearsal 4's (the forward one and the
+`--rebuild`), the same pod alive 1–2 h+ with **0 restarts**,
 presigned URLs and the capstone's thumbnail path working, `mb` on an existing bucket
 still exiting 0 and `ls` on an empty bucket still behaving as head-bucket — which
 settles the log flood, not the prerelease.
@@ -533,6 +870,12 @@ kube-proxy pods, both nodes Ready at **52 s** of age — and module 05's fault 0
 enforced and then stopped enforcing again, so the **policy** path is twice-confirmed
 too, not just connectivity.
 
+**Rehearsals 3 and 4 make it four for four**, the last of them on a cluster built from
+a brand-new Docker VM and repeated on that day's second and third clusters:
+`Ok 1.20.0 (v1.20.0-450c5314)`, image `quay.io/cilium/cilium:v1.20.0@sha256:383968cd…`,
+`KubeProxyReplacement: True [eth0 10.5.0.2 (Direct Routing)]`, tunnel/vxlan, IPAM
+kubernetes, 0 kube-proxy pods, agent/operator/envoy 2/2 each, nodes Ready at 67 s.
+
 Blast radius if a future bump breaks it is still total: nodes never Ready,
 `wait_rollout` times out, and nothing else in the day happens. One machine, one
 architecture — re-run module 01 on the next bump before believing it again.
@@ -556,6 +899,10 @@ Pending — is present. Gitea's 5Gi PVC `Bound` within the same minute. Against
 Rehearsal 2 re-confirmed it on a cold cluster in a 1:09 bootstrap: image
 `docker.io/rancher/local-path-provisioner:v0.0.37` deployed, `storageclass
 local-path` present, wave 0 Synced/Healthy inside module 02's **8-second** solve.
+**Rehearsal 4 makes it four for four**, in a 0:51 bootstrap: same image, probe split
+still `startup=/health live=/health ready=/ready`, pod 1/1 with **0 restarts** at 82 s
+old, the PSA `privileged` namespace label present, and Gitea's 5Gi PVC `Bound` 72 s
+after the namespace existed.
 
 ## PROVEN ONCE — Knative 1.23.0 kourier, and the IPv6 curation is RETIRED
 
@@ -606,6 +953,13 @@ saturated worker — and it came out the same shape byte for byte: **1/1 Running
 8 × `:8081`, 8 × `:8090`, `127.0.0.1:9901`), and `GET /stats/prometheus` over IPv4
 answering **200 with 171,452 bytes** through `ipv4_compat`. Module 06 passed 8/8 with
 the cold-start curl and scale-to-zero at ~40 s.
+
+**Rehearsal 4 makes it four for four, byte for byte:** `ready=true restarts=0`, zero
+bind / "Address family not supported" lines in the log, **8 × `[::]:9000`** in
+`/proc/net/tcp6`, the IPv4 side untouched (8 × `:8080`, 8 × `:8081`, 8 × `:8090`,
+`127.0.0.1:9901`), module 06 8/8 and scale-to-zero at ~40 s. The
+`GET /stats/prometheus` leg was *not* re-run by hand that time — the gateway image has
+no `wget`/`curl` and the OTel Collector scrapes it on the same 30 s cadence anyway.
 
 **If this ever regresses, the symptom is immediate and unmistakable:** the
 static listener cannot bind → `3scale-kourier-gateway` crashloops at process
@@ -668,6 +1022,15 @@ anyone could see the fix — **released as `cloudbox-portal:v0.2.1` and confirme
 rehearsal 2**: `GET :30600/workshop` renders module 04 as **Done**, with every other
 module inferring correctly around it (05 correctly "Manual check", 09 correctly "Not
 started" before the capstone ran). The page is not merely rendering, it is inferring.
+Rehearsals 3 and 4 both re-read `04 Self-service → Done`, so that fix is three times
+confirmed.
+
+**One gap in the same page, unfixed and deliberately small: it stops at module 09.**
+`lab/README.md` advertises it as "a live dashboard of which modules your cluster has
+reached", it says "Where you are in the 10 modules", and it renders **00–09** — true
+if you count 00–09 as ten, and confusing next to a `lab/10-day2-ops` that exists and
+has a `verify.sh`. Everything it does render is correct. A content decision, not a
+defect, and listed here so the next person does not rediscover it as a bug.
 
 **The shape is always the same:** the doc was accurate the day it was written
 and rotted at the next bump, because nothing ever compared it to anything.
@@ -700,6 +1063,25 @@ reported **mirror arch matches (arm64)** across 62 repositories, and every modul
 downstream pulled from it. (Rehearsal 1 lost one image to a transient blob fetch and
 needed an 11:03 + 2:29 two-pass; that retry gap has since been closed in
 `cloudbox-init.sh`, and rehearsal 2 never had to exercise it.)
+
+**Rehearsal 4 went one step colder — a brand-new Docker VM, 0 images, 0 containers,
+0 volumes, so the host Docker cache was built from nothing too — and it holds: one
+13:39 pass, 66/66 refs, 0 retries, 0 warnings, `mirror arch matches (arm64)` across
+62 repositories.** ~100 s of that was the "checking that all 66 refs exist upstream"
+preflight.
+
+**But the published figure is now a floor, and it does not include the model — a
+documentation debt worth one clause.** RX on `en0` across the pre-pull window:
+7.25 GB (reh. 2) → 7.41 (reh. 3) → **7.87 GB (reh. 4)**. `en0` counts all host traffic
+in the window, so each is an upper bound on the workshop's own share and the README's
+"~7.5 GB (arm64)" is not dishonest — but the trend is upward, and **on top of it sits
+the ~1.4 GB `qwen3:1.7b` pull** that `cloudbox-init.sh` performs and the "~7.5 GB" line
+does not mention. Every rehearsal machine already had that model, so no run has ever
+measured its download. **An attendee doing the documented prework from nothing pays
+roughly 9 GB of download**, not 7.5. (Disk lands near the same number by coincidence:
+free space fell 101 → 92 GiB across rehearsal 4's pre-pull — a 6.807 GB mirror volume
+plus 1.655 GB of host images.) Wording, not code: `lab/00-setup/README.md` and the
+script's own size warning.
 
 **The other half of offline-first is the reaches nothing gates, and rehearsal 1
 found the earlier leak fix was incomplete.** `solutions/module-07/post.sh`
@@ -1041,10 +1423,44 @@ also running Zoom, Slack and a photo-library index; the idle control over the sa
 cluster read `some avg10=3.92`. The footprint numbers in the first table are the
 deterministic evidence; treat the pressure numbers as this-machine-that-afternoon.
 
-**Retires when:** one full rehearsal runs module 10 beat 1 end to end at the new pin on a
-quiet machine, and one run happens on a 16 GB laptop — the "beat 1 does not fit on 16 GB"
-line is *still* a claim, now with 3.4 GB in it instead of 11.5 GB, and still unmeasured
-there.
+**Rehearsal 4 ran the whole beat end to end at the new pin, and it costs the cluster
+nothing measurable.** Four back-to-back investigations through the Console's own
+`POST /agent/ask` against a live scenario-1 fault, on a module 10 end state of 21 apps
+and 66 pods:
+
+| | rehearsal 3 (`qwen3:4b`, `num_ctx 64000`) | **rehearsal 4 (`qwen3:1.7b`, `num_ctx 16384`)** |
+|---|---|---|
+| investigations completing with a verdict | — | **4 of 4**, 200 each, 25.8–44.2 s |
+| real tool calls per run | — | 2–6, **0 error frames** |
+| runs hitting kagent's 180 s cut | — | **0** — the slowest was a quarter of the ceiling |
+| `ollama ps` | 12 GB | **3.3 GB**, 100% GPU, context 16384 |
+| `/proc/pressure/cpu some avg10` peak | **93.48** (avg300 78.06) | **28.16** (avg300 peak 6.46) |
+| `/proc/pressure/memory some avg10` peak | 50.65 (`full` 3.61) | **0.94** (`full` ~0) |
+| VM memory available, minimum | (host had 57 MB free pages) | never below **7,575 MB** |
+| pods entering liveness restart loops | ~25 | **0** |
+| cluster-wide restart delta over the batch | ~25 | **1** |
+| ArgoCD apps leaving Synced+Healthy | 5 | **0** |
+| nodes | worker `NotReady` | **2 Ready throughout** |
+| `ollama stop` needed to recover | **yes** | **no — nothing to recover** |
+
+The liveness cascade is simply gone — **and beat 1 is still beat 1**, which is the
+other half of what had to hold. Rehearsal 4's first run made two real tool calls that
+both returned, including `k8s_get_pod_logs` on the crashing pod (the log line naming
+`PORT=8080-canary` was *in its hands*), and then narrated the events JSON instead:
+*"No Failures … the logs indicate a normal operation, and no issues are detected"* —
+about leftover helper pods, while `demo-web` crashlooped throughout, with empty
+Kill-test and Fix cards. That is the README's calibration paragraph, live.
+
+Same caveat as above on the pressure numbers — the host's load average ran 15–31
+through that batch because it was doing other work — so read the restart delta, the
+app count and the node states as the deterministic evidence, and the pressure figures
+as corroboration.
+
+**Retires when:** ~~one full rehearsal runs module 10 beat 1 end to end at the new
+pin~~ (done, rehearsal 4, on the deterministic evidence — the host was not idle), and
+one run happens on a **16 GB laptop**. That second half is the whole of what is left:
+"beat 1 does not fit on 16 GB" is *still* a claim, now with 3.4 GB in it instead of
+11.5 GB, and no rehearsal machine can answer it.
 
 ## PROVEN ONCE — smaller things the rehearsals settled
 
@@ -1060,6 +1476,7 @@ Unlabelled rows are rehearsal 1; rehearsal 2's re-confirmations are marked inlin
 | **Module 09 trace waterfall** | **One connected trace: 37 spans, exactly 1 root, 0 spans with a missing parent** — `cloudbox-portal POST /gallery/upload` → activator → uploader → `s3 put original` → `broker.ingress` → in-memory channel → `broker.filter` → activator → resizer → `s3 download` / `decode and resize` / `s3 upload thumbnail and meta`. It does not fragment: the re-applied `config-observability` keys (nine in serving, six in eventing — the curation the VENDOR.md audit found missing) are what buys this. VictoriaTraces knew all 10 services. Whole observability stack Synced/Healthy in ~90 s. **Rehearsal 2, cold cluster: 122 spans, still exactly 1 root (`POST /gallery/upload`), still 0 orphans**, 9 services in the trace and 10 known to VictoriaTraces; five observability apps Synced/Healthy in 2:06. More spans, same shape — the property is the root/orphan count, not the span count. |
 | **Argo Workflows v4.1.1** (rehearsal 2) | The bump was made on static evidence; a real rootless BuildKit build now backs it. `workflow-controller:v4.1.1`, workflow **Succeeded**, `hello-site` in the zot catalog and serving, and the pod layout is `init=init, containers=wait,main` — **the legacy init+wait layout is intact**, which is what rootless BuildKit depends on. v4.1.0's opt-in `initlessPod` did not arrive with the bump: `grep -rn initlessPod gitops/ --include='*.yaml'` → **0 hits**. |
 | **`catch-up.sh` as a rebuild path** (rehearsal 2) | After the `92aac7a` fix, one `catch-up.sh 10` on a cluster that had not existed twenty minutes earlier reproduced the entire workshop end state in **4:13**: 19/19 Applications Synced+Healthy (module 10's canonical set), 63 pods all Running or Completed, and an eleven-module `verify.sh` sweep at **11/11 exit 0**. The two `○` star tasks are correctly *not* restored — they are human moments, and both `verify.sh` scripts say so and pass anyway. |
+| **`catch-up.sh 10 --rebuild`, the whole recovery command** (rehearsal 4) | **The first successful `--rebuild` in four rehearsals** — R1 never ran it, R2's died at 12:01 on the `92aac7a` deadlock, R3 skipped it for disk. **Exit 0 in 7:07**: destroy + create + `bootstrap-gitops` + `seed-gitea` + force-push module 10's canonical state + converge 18 Applications + `post.sh` (a real in-cluster BuildKit build, with busybox coming from the **mirror**, so `941d043` holds) + converge `demo`. End state **19/19 Synced+Healthy, 63 pods**, both nodes Ready at 6 minutes old, kubeconfig invariants intact (no `cloudbox-1` rename, `~/.kube/config` untouched), and an eleven-module sweep at **11/11 exit 0 on a cluster that had not existed seven minutes earlier**. `nats` and `backstage` are correctly absent — catalog extras, not the canonical set — and because a rebuild starts from a fresh cluster there are no orphaned Application objects, so the `platform` root is Synced/Healthy rather than permanently `OutOfSync` as it is on the non-rebuild path. |
 
 **Louder than any of those 13 one-shot WARNs, and unresolved:** the OTel gateway
 logs a **failed Prometheus scrape every 30 s, forever**.
