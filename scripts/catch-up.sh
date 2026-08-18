@@ -11,7 +11,11 @@
 #      solutions/module-0N/apps/* (each module's dir is cumulative — it
 #      contains everything enabled by the end of that module), the platform
 #      component manifests from this repo, and the module's solution
-#      components — broken extra files do not survive
+#      components — broken extra FILES do not survive in git. Note what that
+#      does and does not mean: the root app-of-apps runs with `prune: false`
+#      on purpose (gitops/README.md), so an Application an attendee added and
+#      pushed keeps RUNNING in the cluster after its file is gone. Removing the
+#      workload too is `kubectl -n argocd delete application <name>`.
 #   3. Commits and force-pushes to Gitea, waits for ArgoCD to converge,
 #      then runs the module's imperative post-steps (post.sh)
 #
@@ -93,6 +97,13 @@ step "Enabling applications for module ${MODULE}"
 # (principle 11: scripted state, not hope) — a broken extra file the attendee
 # pushed must not survive the catch-up. Everything removed here is restored
 # from the canonical trees below.
+#
+# GIT state only. The root app-of-apps is `prune: false` by design, so deleting
+# the file does not delete the Application: an extra app an attendee enabled is
+# still Synced+Healthy afterwards, and a BACKWARD jump (10 -> 3) leaves every
+# later module's apps running. Measured in the 2026-08-18 recovery pass. That is
+# the right trade for a workshop — a stale sync can never wipe someone's work —
+# but it means catch-up guarantees the git state, not the cluster state.
 git -C "${TMP_DIR}/platform" rm -r -q --ignore-unmatch gitops/apps gitops/components
 
 mkdir -p "${TMP_DIR}/platform/gitops/apps"

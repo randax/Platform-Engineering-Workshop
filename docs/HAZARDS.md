@@ -176,6 +176,54 @@ count, which since the fix is also what the cluster gets, so it no longer unders
 the truth — it just cannot tell a 4-core machine that modules 08–10 are untested
 on it.
 
+## RESOLVED — the lifeboat needed the internet, and sank without it
+
+**Found in the 2026-08-18 recovery pass, fixed in `a40852a`.** The single worst
+finding of five rehearsals, because of *who* reaches it.
+
+`scripts/kind-fallback.sh` is the documented Plan B: the thing a helper points
+someone at when Talos-in-Docker will not run on their laptop. It ran
+`helm repo add cilium https://helm.cilium.io` **at run time** — so on venue WiFi,
+reached by someone whose cluster has already failed, it timed out and exited 1
+**after creating the kind cluster**, leaving a CNI-less wreck whose
+`kind-cloudbox` context the workshop's own context guard happily accepts.
+
+`create-cluster.sh` has vendored that chart since day one, with a comment saying
+*"so this needs no internet at the venue"*. The lifeboat simply never got the same
+treatment — and **nothing had ever run it.** It is exercised by no CI job and no
+rehearsal; four full end-to-end passes never touched it, because a lifeboat is
+only reached when something else has already gone wrong.
+
+Now uses the same vendored chart: **exit 0 in 49 s, both nodes Ready, offline.**
+
+**The general lesson: the paths that only run when someone is already in trouble
+are the least-tested code you ship, and the most expensive to get wrong.** Every
+blocker in five rehearsals came from recovery or setup, never from the platform.
+
+## TRAP — recovery tooling that lies is worse than recovery tooling that breaks
+
+The first four rehearsals found recovery paths that **broke**. The recovery pass
+found recovery paths that **lie**, which is harder to notice and worse to hit:
+
+- `destroy-cluster.sh` cleaned `~/.kube/config` and left `admin@cloudbox` in the
+  pinned `cloudbox.conf`, still selected, pointing at a dead API server — so
+  modules 03–10 reported `❌ FAIL: ArgoCD app 'cnpg-operator' is 'missing' — did
+  you cp … and push?` to someone who simply had no cluster (`db58fc8`).
+- `kubeconfig_in_use()` guessed the wrong file in three places, because a mise
+  shim overrides an inherited `KUBECONFIG` — which made `install.sh --check`
+  **exit 1 on a machine where all 19 apps were green and every lab passed**
+  (`c34c653`, `c7f5ca8`).
+- In an untrusted clone the context guard said *"no current context … Build one:
+  ./scripts/create-cluster.sh"* against a healthy 19/19 cluster — the exact
+  confident wrong answer its own comment says it must never give (`baf52ed`).
+
+All three failed **closed** — no API call against a foreign cluster, nothing
+applied, the maintainer's kubeconfig byte-identical across four destroys, four
+creates, two kind clusters, nine catch-ups and a mirror purge. The bug each time
+was the *diagnosis*, not the action. In a workshop that teaches people to check
+what a tool tells them, tooling that is confidently wrong about a working machine
+is the failure mode to hunt first.
+
 ## TRAP — a green `bootstrap-test.yaml` means "the workshop works on Linux"
 
 `bootstrap-test.yaml` runs on `ubuntu-latest`, where the host routes straight
