@@ -64,7 +64,7 @@ manages. `spec.source.path` (App details → Manifest) is the watched path: `git
 
 ```bash
 git clone http://gitea_admin:cloudbox123@localhost:30300/cloudbox/platform.git ~/cloudbox-platform
-cd ~/cloudbox-platform && mise trust   # the clone carries this repo's mise.toml; untrusted, every mise tool run from here returns nothing
+cd ~/cloudbox-platform && mise trust   # the clone carries this repo's mise.toml; untrusted, every mise tool run from here fails
 ```
 
 This is a *different remote* than github.com — it's the copy your cluster watches. Pushes

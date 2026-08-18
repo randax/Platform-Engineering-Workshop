@@ -49,7 +49,7 @@ Deployment, because ArgoCD will reconcile it back to Git.
 
 ```bash
 git clone http://localhost:30300/cloudbox/platform.git
-cd platform
+cd platform && mise trust   # the clone carries this repo's mise.toml; untrusted, mise tools refuse to run
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git revert <sha>
 git push

@@ -139,7 +139,9 @@ git show <suspicious-sha>
 
 > `mise trust` is not ceremony: the clone carries this repo's `mise.toml`, and mise
 > refuses to load an untrusted config — so **every mise-installed tool run from inside
-> the clone exits 0 with empty output** until you trust it. `kubectl` is one of those.
+> the clone fails** until you trust it, and `kubectl` is one of those. Recent mise says
+> so loudly (`mise ERROR … are not trusted`, exit 1); older ones just **exit 0 with
+> empty output**, which is the worst failure mode there is.
 > A command that prints nothing and succeeds is the worst failure mode there is.
 
 The image still pulls. Look for configuration that controls what address the Go HTTP
