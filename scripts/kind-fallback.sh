@@ -109,17 +109,32 @@ fi
 # --- 3. Cilium ------------------------------------------------------------------------
 step "Installing Cilium ${CILIUM_VERSION} (CNI + kube-proxy replacement)"
 # Same install as the Talos path minus the Talos-specific values (no KubePrism,
-# no cgroup/securityContext overrides — kind doesn't need them).
-helm repo add cilium "${CILIUM_HELM_REPO}" --force-update >/dev/null
+# no cgroup/securityContext overrides — kind doesn't need them), and from the
+# same VENDORED chart. This used to `helm repo add cilium ${CILIUM_HELM_REPO}`
+# and pull cilium/cilium from the internet, which is the one thing the lifeboat
+# cannot afford: it is reached by someone whose cluster already failed, on venue
+# WiFi, and it fails AFTER creating the kind cluster — leaving a CNI-less
+# wreck whose kind-cloudbox context the workshop guard happily accepts. Measured
+# on the first run this script has ever had:
+#
+#   ==> Installing Cilium 1.20.0 (CNI + kube-proxy replacement)
+#   Error: looks like "https://helm.cilium.io" is not a valid chart repository or
+#   cannot be reached: Get "https://helm.cilium.io/index.yaml": context deadline
+#   exceeded                                                            exit 1
+#
+# create-cluster.sh has vendored the chart since the beginning, for this reason,
+# in a comment that says so. Re-vendor both from CILIUM_HELM_REPO when bumping;
+# check-consistency.sh fails if the tarball for CILIUM_VERSION is missing.
+#
 # --server-side=false pins helm 3's client-side apply. helm 4 defaults this to
 # "auto", which for a FRESH release (every workshop cluster) resolves to
 # server-side apply — a behaviour change on the one path `helm template`
 # cannot exercise. Nothing here needs server-side; keeping the proven path
 # makes this a same-behaviour-newer-binary bump. Drop the flag once a full
 # bootstrap-test has been green with it removed.
-helm upgrade --install cilium cilium/cilium \
+helm upgrade --install cilium \
   --server-side=false \
-  --version "${CILIUM_VERSION}" \
+  "${SCRIPT_DIR}/manifests/cilium-${CILIUM_VERSION}.tgz" \
   --namespace kube-system \
   --set ipam.mode=kubernetes \
   --set kubeProxyReplacement=true \
