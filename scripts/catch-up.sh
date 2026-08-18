@@ -129,14 +129,28 @@ if [[ -d "${SOLUTION_DIR}/components" ]]; then
 fi
 
 # --- 3. Commit + push -----------------------------------------------------------------
-cd "${TMP_DIR}/platform"
-git add -A gitops
-if git diff --cached --quiet; then
+# Everything below stays in the directory the attendee ran this from — `git -C`
+# rather than `cd`, the same way lab/common.sh and module 10's inject.sh already
+# do it. Do NOT reintroduce a `cd` into the clone: the clone contains this
+# repo's own mise.toml (seed-gitea.sh pushes the whole repository), and since
+# the [env] KUBECONFIG pin that file needs `mise trust`. A fresh clone is
+# untrusted, so on a mise-activated laptop EVERY mise-shimmed tool run from
+# inside it hard-errors — and does so with exit 0 and empty stdout:
+#
+#   $ cd <clone> && kubectl get application platform -n argocd -o jsonpath=…
+#   mise ERROR Config files in <clone>/mise.toml are not trusted.
+#   st=''  rc=0
+#
+# which is exactly what wait_app_converged reads, so it would poll an empty
+# string for ten minutes and then die on a cluster that was already converged.
+git -C "${TMP_DIR}/platform" add -A gitops
+if git -C "${TMP_DIR}/platform" diff --cached --quiet; then
   ok "Gitea already matches module ${MODULE} — nothing to push."
 else
-  git -c user.name="catch-up" -c user.email="catch-up@cloudbox.local" \
+  git -C "${TMP_DIR}/platform" \
+    -c user.name="catch-up" -c user.email="catch-up@cloudbox.local" \
     commit --quiet -m "catch-up: enable module ${MODULE} applications"
-  git_as_gitea_admin push --force --quiet origin main
+  git_as_gitea_admin -C "${TMP_DIR}/platform" push --force --quiet origin main
   ok "Pushed module ${MODULE} state to Gitea"
 fi
 
