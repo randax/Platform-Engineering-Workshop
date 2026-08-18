@@ -97,9 +97,32 @@ CLOUDBOX_KUBECONFIG="${HOME}/.kube/cloudbox.conf"
 #     $KUBECONFIG is empty. (This is CI's configuration, and the same mechanism
 #     as the `KUBECONFIG=... kubectl` trap in docs/HAZARDS.md.)
 #   * neither: kubectl's own default.
+#
+# When kubectl IS a shim, ask mise rather than guessing, because the two guesses
+# above are each wrong in a case that happens: a shell that exports KUBECONFIG
+# (a .zshrc export, or mise activated at $HOME where the user-level [env] sets
+# it) still gets the shim's value, not its own — while a shim invoked from a
+# directory mise.toml does not cover gets the user-level value, not the pin.
+# `mise env` answers for the current directory, which is exactly what the shim
+# will apply, in ~40 ms. Untrusted config or no mise: it prints nothing and the
+# two guesses below still apply.
+#
+# Before this, the answer was wrong wherever the two disagreed, and it is a
+# reported answer: create-cluster.sh prints it, the guard prints it, and
+# install.sh --check FAILED on it ("your workshop cluster is in cloudbox.conf,
+# but this shell reads ~/.kube/config") on a laptop where every tool was already
+# reading cloudbox.conf and all 19 Applications were Synced+Healthy.
 kubeconfig_in_use() {
-  local kubectl_path
+  local kubectl_path mise_kc
   kubectl_path="$(command -v kubectl 2>/dev/null || true)"
+  if [ "${kubectl_path%/shims/kubectl}" != "${kubectl_path}" ] && command -v mise >/dev/null 2>&1; then
+    mise_kc="$(mise env -s bash 2>/dev/null | sed -n 's/^export KUBECONFIG=//p' | tail -1)"
+    mise_kc="${mise_kc%\"}"; mise_kc="${mise_kc#\"}"
+    if [ -n "${mise_kc}" ]; then
+      echo "${mise_kc%%:*}"
+      return 0
+    fi
+  fi
   if [ -n "${KUBECONFIG:-}" ]; then
     echo "${KUBECONFIG%%:*}"
   elif [ "${kubectl_path%/shims/kubectl}" != "${kubectl_path}" ]; then
