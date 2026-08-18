@@ -16,6 +16,20 @@ else
   fail "expected 2 running Talos node containers, found ${CONTAINERS:-0} — run ./scripts/create-cluster.sh"
 fi
 
+# --- Workshop-context guard ------------------------------------------------
+# Sourced HERE, not at the top of the file, and the ordering is deliberate: the
+# docker check above is the one thing in this script that does not depend on a
+# kubeconfig, and its message is module 01's teaching ("run create-cluster.sh").
+# Everything BELOW this line talks to whatever cluster kubectl points at, which
+# in rehearsal 3 was a 36-node corporate cluster this script happily graded
+# ("want 2 Ready nodes, have 36/36") after destroy-cluster.sh removed the
+# workshop context and kubectl fell through to the next entry in ~/.kube/config.
+# The guard reads the kubeconfig only — a workshop cluster that is merely down
+# still passes it, so the reachability check below keeps its own diagnosis.
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../common.sh
+source "$DIR/../common.sh"
+
 # --- kubectl reachability --------------------------------------------------
 if kubectl version >/dev/null 2>&1; then
   ok "kubectl reaches the API server"

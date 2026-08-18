@@ -4,6 +4,12 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Sourcing common.sh runs the workshop-context guard. The scenario scripts below
+# source it too; running it here as well means the refusal comes from the command
+# the attendee actually typed, before any scenario work starts.
+# shellcheck source=../common.sh
+source "$DIR/../common.sh"
+
 usage() {
   echo "usage: ./inject.sh <scenario-number>"
   echo "scenarios:"

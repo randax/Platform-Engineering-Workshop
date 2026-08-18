@@ -18,6 +18,8 @@
 #      local-path version in the gitops component)
 #   6. every row in scripts/upstream.list still resolves to a real pin, so the
 #      upstream-drift manifest cannot rot when a file moves
+#   7. every lab/ script that uses kubectl sources lab/common.sh, so the
+#      workshop-context guard fires there (and common.sh still calls it)
 #
 # Offline and fast — the upstream comparison itself lives in the maintainer-only
 # ./scripts/check-upstream.sh, which needs internet.
@@ -221,6 +223,37 @@ done <<<"$(./scripts/check-upstream.sh --pins-only || true)"
   || bad "check-upstream.sh --pins-only produced no rows — the check could not run"
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "all ${rows} upstream.list rows resolve to a current pin"
+
+# --- 7. every lab script that talks to a cluster passes the context guard ------
+# The workshop-context guard lives in lab/common.sh and fires on source: it
+# refuses to continue unless kubectl's current context is admin@cloudbox (or
+# kind-cloudbox) pointing at a local API server. Rehearsal 3 found the hole it
+# closes — destroy-cluster.sh removed the workshop context, kubectl fell through
+# to the next entry in ~/.kube/config, and lab/01-cluster/verify.sh graded a
+# 36-node corporate cluster. A new lab script that uses kubectl without sourcing
+# common.sh reopens that hole silently, so the coupling is checked, not
+# remembered. See docs/HAZARDS.md.
+before_fail=${FAILURES}
+grep -qx 'require_workshop_context' lab/common.sh \
+  || bad "lab/common.sh no longer CALLS require_workshop_context — the guard is defined but never fires"
+# Scripts that legitimately run before any cluster (and therefore any workshop
+# context) exists. Keep this list short and justified.
+GUARD_EXEMPT=(
+  "lab/common.sh"            # defines the guard
+  "lab/00-setup/verify.sh"   # pre-flight: only checks that the kubectl BINARY
+                             # exists; must work with no cluster and no kubeconfig
+)
+count=0
+while IFS= read -r f; do
+  skip=""
+  for e in "${GUARD_EXEMPT[@]}"; do [[ "${f}" == "${e}" ]] && skip=1; done
+  [[ -n "${skip}" ]] && continue
+  count=$((count + 1))
+  grep -qE '^[[:space:]]*(source|\.)[[:space:]].*common\.sh' "${f}" \
+    || bad "${f} uses kubectl but never sources lab/common.sh — the workshop-context guard would not fire there"
+done < <(grep -rl --include='*.sh' 'kubectl' lab | sort)
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "all ${count} kubectl-using lab scripts source the context guard"
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then

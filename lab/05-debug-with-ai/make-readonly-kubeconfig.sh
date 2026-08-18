@@ -6,6 +6,13 @@ set -euo pipefail
 
 OUT="${1:-$PWD/ai-readonly.kubeconfig}"
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Sourcing common.sh runs the workshop-context guard. This binds a read-everything
+# ClusterRole to a ServiceAccount and mints a token for it — never on a cluster
+# that is not the workshop's.
+# shellcheck source=../common.sh
+source "$DIR/../common.sh"
+
 kubectl apply -f - >/dev/null <<'EOF'
 apiVersion: v1
 kind: ServiceAccount

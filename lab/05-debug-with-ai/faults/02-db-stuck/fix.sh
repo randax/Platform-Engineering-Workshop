@@ -4,6 +4,10 @@
 # delete-and-recreate (fine for a fresh cluster; on a real one you'd migrate).
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Sourcing common.sh runs the workshop-context guard. restore.sh already ran it,
+# but this deletes a Cluster and its PVCs, so it refuses on its own too.
+# shellcheck source=../../../common.sh
+source "$DIR/../../../common.sh"
 
 kubectl -n faultlab-02 delete cluster orders-db --ignore-not-found --wait=true
 kubectl -n faultlab-02 delete pvc -l cnpg.io/cluster=orders-db --ignore-not-found

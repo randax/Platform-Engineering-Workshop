@@ -2,6 +2,13 @@
 # Module 03 — verify Postgres-as-a-service and S3-as-a-service.
 set -euo pipefail
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Sourcing common.sh runs the workshop-context guard — this script must never
+# report on a cluster that is not the workshop's (rehearsal 3: verify.sh cheerfully
+# graded a 36-node corporate cluster). Guard first, then check.
+# shellcheck source=../common.sh
+source "$DIR/../common.sh"
+
 FAILED=0
 ok()   { echo "✅ $1"; }
 fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }

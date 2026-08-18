@@ -7,6 +7,11 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Sourcing common.sh runs the workshop-context guard. This script writes to the
+# cluster kubectl points at, so it must refuse an unknown one before it does.
+# shellcheck source=../common.sh
+source "$DIR/../common.sh"
+
 restore_one() { # <NN>
   local NN="$1" fault_dir=""
   for d in "$DIR/faults/$NN"-*/; do
