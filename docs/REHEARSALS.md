@@ -13,22 +13,28 @@ the run scratchpads referenced from each hazard entry.
 240 is people reading, typing, asking and getting stuck, which is the workshop.
 Nothing measured is close to the budget.
 
-| | rehearsal 1 | rehearsal 2 | rehearsal 3 |
-|---|---|---|---|
-| mirror | warm | cold | cold |
-| total script time | ~16 min | ~32 min | ~24 min |
-| modules green | 11/11 | 11/11 | 10/11 *(00 red on host disk)* |
+| | rehearsal 1 | rehearsal 2 | rehearsal 3 | rehearsal 4 |
+|---|---|---|---|---|
+| mirror | warm | cold | cold | **cold, brand-new VM** |
+| total script time | ~16 min | ~32 min | ~24 min | ~28 min |
+| modules green | 11/11 | 11/11 | 10/11 *(00 red on host disk)* | **11/11, twice** |
 
 Rehearsal 2 is the slow one because it ran with capped node CPUs; rehearsal 3 is
 the same workshop with the caps removed. That difference is the single biggest
 lever in the table and it is worth understanding before optimising anything else.
+
+Rehearsal 4 ran on a Colima instance created minutes earlier — 0 images, 0
+containers, 0 volumes — and passed the eleven modules **twice**: once forward,
+once on the cluster `catch-up.sh 10 --rebuild` built. That was the first
+successful `--rebuild` in four attempts.
 
 ## Prework, at home
 
 | step | cold | notes |
 |---|---|---|
 | `dev-setup.sh` | 0:01–0:02 | tools already installed; a real first run pulls them |
-| `cloudbox-init.sh` | **11:03 – 12:19** | 7.25–7.41 GB, 66 refs, 0 retries |
+| `cloudbox-init.sh` | **11:03 – 13:39** | 7.25–7.87 GB, 66 refs, 0 retries |
+| *(plus the host Ollama model)* | — | ~1.4 GB, pulled by the same script, never separately measured |
 | `cloudbox-init.sh` (re-run) | 2:17 | idempotent; nothing re-downloaded |
 | `install.sh --check` | 0:08–0:09 | identical **with the network down** |
 
@@ -70,7 +76,12 @@ These are the lessons that generalise. Each one was paid for.
 Both blockers that made module 01 **impossible on macOS** were invisible to
 `bootstrap-test.yaml` by construction — an `ubuntu-latest` runner can route into
 the Talos docker network, and a Mac cannot. A green CI run means "the workshop
-works on Linux".
+works on Linux, on one cluster, with no timing races".
+
+Four rehearsals in, the split is stark: **the platform itself produced the same
+numbers every time**, while rehearsals 1, 2 and 4 each found a blocker in the
+*recovery or setup* path — the code an attendee reaches for when they are already
+stuck, and the code CI exercises least.
 
 ### Rehearse the *second* cluster, and the recovery path
 
@@ -82,10 +93,13 @@ for people already in trouble is the least exercised one in the project.
 
 ### A short measurement window reads *wrong*, not *clean*
 
-RustFS log volume on the same log, same cluster: **300 s read 5.23 MiB/h, 900 s
-read 1.85** — a 2.8× spread from window choice alone. And it only floods once the
-scanner has objects to scan, so an empty-store test sees nothing at all. Seed the
-state, then measure for half an hour.
+RustFS log volume on the same log, same cluster: **300 s read 5.23 MiB/h where
+900 s read 1.85** — a 2.8× spread from window choice alone. Reproduced in **all
+four** rehearsals, and crucially *in both directions*: a short window read high
+in one run and low in another, depending where the scan cadence fell. The rule is
+not "short windows read low", it is **short windows read wrong**. And it only
+floods once the scanner has objects, so an empty-store test sees nothing at all.
+Seed the state, then measure for half an hour.
 
 Related: take rates from `kubectl logs --since=<window>`, never from two `wc -c`
 snapshots. One rehearsal's naive byte-delta came out **negative**, because kubelet
@@ -134,3 +148,18 @@ Module 05's re-injected faults were fixed on the strength of a wrong explanation
 zero on one replica, and an already-Bound PVC. Same fix, different reason — and
 the wrong reason was about to ship in a comment attendees read, in the module
 about not trusting confident explanations.
+
+### Two lessons rehearsal 4 added
+
+**A fix can be a regression.** The `KUBECONFIG` pin landed fifteen minutes before
+rehearsal 4 started, and made every fresh clone of the platform repo an *untrusted*
+mise config — so every mise-installed tool run from inside a clone exited 0 with
+empty output. `catch-up.sh` `cd`'d into that clone. The change was individually
+correct, reviewed, and shipped with tests; it broke a path nothing tested.
+
+**Summarising is where the errors enter.** Every register update in this project
+was written by re-reading the raw evidence rather than the previous summary, and
+every one of them caught real mistakes in the hand-off: a count of contexts, which
+rehearsal failed which module, a download figure quoted as a disk figure, a "same
+byte four times" that was three. The measurements were sound each time. The prose
+about them was not.
