@@ -16,8 +16,15 @@
 # Usage:
 #   ./scripts/seed-gitea.sh
 #
-# Idempotent: force-pushes, so re-running resets Gitea's main branch to your
-# local checkout. Only COMMITTED changes are pushed.
+# Force-pushes, so re-running resets Gitea's main branch to your local checkout.
+# Only COMMITTED changes are pushed.
+#
+# ⚠️ That is idempotent with respect to ITSELF and destructive with respect to
+# catch-up.sh. After `catch-up.sh 9`, Gitea holds that module's end state — 18
+# Application files in gitops/apps/ — while a fresh checkout has one. Re-running
+# this then force-pushes the other 17 out of existence and ArgoCD prunes what
+# they deployed. If you want to get back to a known module, use catch-up.sh; this
+# script is for the FIRST seed, or for deliberately resetting to your checkout.
 # =============================================================================
 set -euo pipefail
 

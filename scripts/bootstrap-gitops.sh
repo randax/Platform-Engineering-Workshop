@@ -37,7 +37,11 @@ need helm
 # the top costs nothing. See scripts/context-guard.sh.
 require_workshop_context
 
-kubectl get nodes >/dev/null 2>&1 \
+# --request-timeout, for the same reason create-cluster.sh needs it (see 1129983
+# and docs/HAZARDS.md): against an address that blackholes rather than refuses,
+# a bare kubectl blocks on the OS TCP connect timeout — ~75s on macOS — so this
+# one-line reachability check becomes a silent hang instead of the message below.
+kubectl --request-timeout=5s get nodes >/dev/null 2>&1 \
   || die "Cannot reach a cluster. Run ./scripts/create-cluster.sh first."
 
 # --- 1. Storage class -----------------------------------------------------------
