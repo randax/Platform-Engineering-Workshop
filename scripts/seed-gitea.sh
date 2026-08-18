@@ -27,6 +27,12 @@ source "${SCRIPT_DIR}/lib.sh"
 need git
 need kubectl
 
+# Guard first: this script force-pushes over the platform repo and applies the
+# root app-of-apps Application, and even the Gitea it pushes to is reached on a
+# NodePort that only the workshop cluster publishes. A cluster must already
+# exist here (bootstrap-gitops.sh ran), so guarding at the top costs nothing.
+require_workshop_context
+
 # Credentials are supplied via GIT_ASKPASS (git_as_gitea_admin), not the URL.
 PUSH_URL="http://localhost:${NODEPORT_GITEA}/${PLATFORM_REPO_PATH}.git"
 

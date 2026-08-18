@@ -4,6 +4,15 @@
 # Idempotent.
 set -euo pipefail
 
+# The workshop-context guard. Normally reached through catch-up.sh, which guards
+# already — but these post-steps are independently executable (module 07's is run
+# directly by 08/09/10's, and by hand when debugging the recovery path), and they
+# `kubectl run` pods into ns demo of whatever cluster kubectl points at. One copy
+# of the guard, in scripts/context-guard.sh; sourcing only defines it.
+# shellcheck source=../../scripts/context-guard.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)/context-guard.sh"
+require_workshop_context
+
 for attempt in 1 2 3; do
   if kubectl -n demo run "catchup-s3-$$" --rm -i --restart=Never --quiet \
       --image=docker.io/peakcom/s5cmd:v2.3.0 \

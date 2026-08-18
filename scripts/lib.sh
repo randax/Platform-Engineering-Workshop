@@ -8,7 +8,8 @@
 #
 # Provides: colored ok/fail/warn/info/step logging, die, have, need,
 # confirm, detect_arch, is_wsl2, mirror_running, mirror_host_endpoint —
-# and sources versions.env so every pin is available as a variable.
+# sources versions.env so every pin is available as a variable, and defines
+# (but does not call) require_workshop_context from context-guard.sh.
 # =============================================================================
 
 # Guard against direct execution — this file is meant to be sourced.
@@ -23,6 +24,16 @@ export REPO_ROOT
 
 # shellcheck source=versions.env
 source "${LIB_DIR}/versions.env"
+
+# The workshop-context guard — DEFINED here, deliberately NOT called. Sourcing
+# lib.sh must stay safe before a cluster exists: create-cluster.sh and
+# kind-fallback.sh source this file and are what CREATE the workshop context, so
+# a source-time call would make the workshop impossible to start. Every script
+# that talks to an existing cluster calls require_workshop_context explicitly,
+# after its own create/rebuild branch; check-consistency.sh check 8 enforces
+# that and carries the justified allowlist of the pre-cluster exceptions.
+# shellcheck source=context-guard.sh
+source "${LIB_DIR}/context-guard.sh"
 
 # --- Logging -----------------------------------------------------------------
 if [[ -t 1 ]]; then

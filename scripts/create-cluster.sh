@@ -211,6 +211,13 @@ fi
 kubectl config use-context "admin@${CLUSTER_NAME}" >/dev/null
 ok "kubectl context: admin@${CLUSTER_NAME}"
 
+# NOT guarded at the top of this script — it is what creates the workshop
+# context, so there is nothing to assert until now. Here it is a post-condition
+# on the kubeconfig work above (both branches: the published 127.0.0.1:<port>
+# and the native-Linux 10.5.0.2:6443 fallback are accepted), asserted before
+# the Cilium helm install and every kubectl call below start changing a cluster.
+require_workshop_context
+
 step "Waiting for the Kubernetes API"
 # --request-timeout is load-bearing: without it kubectl blocks on the OS TCP
 # connect timeout (~75s on macOS) per attempt, so an unreachable API server

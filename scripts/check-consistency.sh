@@ -20,6 +20,9 @@
 #      upstream-drift manifest cannot rot when a file moves
 #   7. every lab/ script that uses kubectl sources lab/common.sh, so the
 #      workshop-context guard fires there (and common.sh still calls it)
+#   8. every scripts/ and solutions/ script that uses kubectl CALLS
+#      require_workshop_context, with a short self-policing allowlist for the
+#      pre-cluster ones (and lib.sh still only defines the guard, never calls it)
 #
 # Offline and fast — the upstream comparison itself lives in the maintainer-only
 # ./scripts/check-upstream.sh, which needs internet.
@@ -254,6 +257,85 @@ while IFS= read -r f; do
 done < <(grep -rl --include='*.sh' 'kubectl' lab | sort)
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "all ${count} kubectl-using lab scripts source the context guard"
+
+# --- 8. the same rule for scripts/ and solutions/ ------------------------------
+# scripts/ had the same exposure as lab/ and arguably worse: bootstrap-gitops.sh
+# installs Gitea AND ArgoCD, seed-gitea.sh force-pushes the platform repo and
+# applies the root Application, catch-up.sh plus the solutions post.sh it invokes
+# rewrite the whole platform. Run against the cluster kubectl fell through to,
+# that installs a GitOps control plane into someone else's cluster.
+#
+# Here the guard CANNOT fire on source: create-cluster.sh and kind-fallback.sh
+# source lib.sh and legitimately run before any workshop context exists — they
+# are what create it. So the call is explicit per script, placed after each
+# script's create/rebuild branch, and this check is what makes "explicit" safe.
+before_fail=${FAILURES}
+
+if ! grep -qE '^[[:space:]]*(source|\.)[[:space:]].*context-guard\.sh' scripts/lib.sh; then
+  bad "scripts/lib.sh no longer sources scripts/context-guard.sh — every scripts/ guard call would be an undefined command"
+fi
+if ! grep -qE '^[[:space:]]*(source|\.)[[:space:]].*context-guard\.sh' lab/common.sh; then
+  bad "lab/common.sh no longer sources scripts/context-guard.sh — the guard has been copied instead of shared, or lost"
+fi
+if grep -qE '^[[:space:]]*require_workshop_context[[:space:]]*$' scripts/lib.sh; then
+  bad "scripts/lib.sh CALLS require_workshop_context at source time — create-cluster.sh sources lib.sh BEFORE any workshop context exists, so the workshop could never be started again"
+fi
+
+# Scripts that use kubectl and are deliberately NOT guarded. Keep this list
+# short and justified — each entry is re-checked below, so an exemption cannot
+# quietly grow into a script that talks to a cluster.
+GUARD_EXEMPT_SCRIPTS=(
+  "scripts/context-guard.sh"      # defines the guard
+  "scripts/lib.sh"                # defines it (never calls it — asserted above)
+  "scripts/check-consistency.sh"  # this file: offline, greps for the string
+  "scripts/destroy-cluster.sh"    # must work when the context is ALREADY wrong
+  "scripts/dev-setup.sh"          # pre-cluster: kubectl version --client only
+  "scripts/install.sh"            # pre-cluster preflight: likewise
+)
+count=0
+while IFS= read -r f; do
+  skip=""
+  for e in "${GUARD_EXEMPT_SCRIPTS[@]}"; do [[ "${f}" == "${e}" ]] && skip=1; done
+  [[ -n "${skip}" ]] && continue
+  count=$((count + 1))
+  grep -qE '^[[:space:]]*require_workshop_context[[:space:]]*$' "${f}" \
+    || bad "${f} uses kubectl but never calls require_workshop_context — it would happily run against whatever cluster kubectl fell through to"
+done < <(grep -rl --include='*.sh' 'kubectl' scripts solutions | sort)
+
+# The two pre-cluster preflights are exempt only for as long as they stay
+# client-side. `kubectl version --client` needs no cluster and no kubeconfig,
+# which is the whole reason they may run before module 01; the moment one grows
+# a real API call the exemption is wrong, so assert the reason, not the name.
+for f in scripts/dev-setup.sh scripts/install.sh; do
+  offenders="$(grep -n 'kubectl' "${f}" | grep -vE '^[0-9]+:[[:space:]]*#' \
+    | grep -v 'version --client' || true)"
+  [[ -z "${offenders}" ]] \
+    || bad "${f} is on the pre-cluster allowlist but now runs kubectl against a cluster: ${offenders//$'\n'/ | } — guard it or take it off the list"
+done
+
+# destroy-cluster.sh is exempt because nothing in it resolves through the
+# current context: `talosctl cluster destroy --name` is scoped by the container
+# label, and its kubectl calls are `kubectl config` edits of NAMED kubeconfig
+# entries. That is also why it MUST stay unguarded — it is the script that
+# causes the fall-through, so it has to work when the context is already wrong,
+# and catch-up.sh --rebuild calls it first. Assert the premise.
+offenders="$(grep -n 'kubectl' scripts/destroy-cluster.sh | grep -vE '^[0-9]+:[[:space:]]*#' \
+  | grep -vE 'kubectl config |have kubectl' || true)"
+[[ -z "${offenders}" ]] \
+  || bad "scripts/destroy-cluster.sh is unguarded on the premise that it only edits NAMED kubeconfig entries, but it now makes a cluster call: ${offenders//$'\n'/ | }"
+
+# catch-up.sh --rebuild destroys the cluster and creates a new one. Its guard
+# call must sit AFTER that branch: in front of it, the recovery command — the
+# one reserved for people already in trouble — would refuse on a cluster it is
+# about to rebuild anyway.
+guard_ln="$(grep -nE '^[[:space:]]*require_workshop_context[[:space:]]*$' scripts/catch-up.sh | head -1 | cut -d: -f1)"
+rebuild_ln="$(grep -n 'create-cluster.sh' scripts/catch-up.sh | head -1 | cut -d: -f1)"
+if [[ -n "${guard_ln}" && -n "${rebuild_ln}" && "${guard_ln}" -lt "${rebuild_ln}" ]]; then
+  bad "scripts/catch-up.sh calls require_workshop_context (line ${guard_ln}) BEFORE the --rebuild branch (line ${rebuild_ln}) — --rebuild would refuse to run on the very cluster it is about to replace"
+fi
+
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "all ${count} kubectl-using scripts/ + solutions/ scripts call the context guard"
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then

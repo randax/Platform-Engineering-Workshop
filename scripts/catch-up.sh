@@ -65,6 +65,15 @@ if [[ "${REBUILD}" == "true" ]]; then
   "${SCRIPT_DIR}/seed-gitea.sh"
 fi
 
+# AFTER the --rebuild branch, never before it. --rebuild destroys the cluster
+# and builds a new one, so on that path there is no workshop context at the top
+# of this script and guarding there would make the recovery command — the one
+# reserved for people already in trouble — permanently unusable. By here, either
+# create-cluster.sh has just selected admin@${CLUSTER_NAME}, or we were asked to
+# converge an existing cluster and it had better be the workshop's: everything
+# below force-pushes the canonical platform state and runs post.sh against it.
+require_workshop_context
+
 need git
 
 # Credentials are supplied via GIT_ASKPASS (git_as_gitea_admin), not the URL.

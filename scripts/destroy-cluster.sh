@@ -21,6 +21,21 @@ PURGE_MIRROR="false"
 need talosctl
 need docker
 
+# DELIBERATELY NOT guarded — the one script in scripts/ that must keep working
+# when kubectl points at the wrong cluster, because that is the state it exists
+# to clean up (and, per docs/HAZARDS.md, the state it CAUSES: removing the
+# workshop kubeconfig entries is what makes kubectl fall through to the next
+# ~/.kube/config entry). Guarding it would also break `catch-up.sh --rebuild`,
+# whose first act is to destroy.
+#
+# Safe to leave unguarded because nothing here is resolved through the current
+# context: `talosctl cluster destroy --name` only touches docker containers
+# labelled talos.cluster.name=${CLUSTER_NAME}, and the kubectl calls below are
+# `kubectl config` edits of NAMED entries (admin@${CLUSTER_NAME} and friends) —
+# local kubeconfig surgery, not API calls. This script cannot delete a foreign
+# cluster's resources; the CI recovery-path job asserts exactly that by proving
+# an unrelated context survives a destroy.
+
 step "Destroying Talos cluster '${CLUSTER_NAME}'"
 # Talos labels every node container with talos.cluster.name=<cluster>
 if [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" ]]; then

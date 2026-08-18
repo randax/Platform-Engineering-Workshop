@@ -65,6 +65,12 @@ nodes:
         hostPort: ${NODEPORT_KOURIER}
 EOF
 
+# NOT guarded at the top — like create-cluster.sh, this script is what creates
+# the workshop context. `kind create cluster` selects kind-${CLUSTER_NAME} and
+# publishes the API on 127.0.0.1, so from here the guard is a post-condition,
+# asserted before the Cilium helm install and the kubectl calls below.
+require_workshop_context
+
 # --- 2. Wire up the image mirror (if present) --------------------------------------
 if mirror_running; then
   # kind's containerd uses hosts.toml files (config_path is enabled by default).

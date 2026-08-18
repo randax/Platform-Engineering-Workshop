@@ -29,6 +29,14 @@ source "${SCRIPT_DIR}/lib.sh"
 need kubectl
 need helm
 
+# BEFORE the first kubectl call, and before helm installs anything. This script
+# is the worst case the guard exists for: it installs Gitea and ArgoCD, i.e. a
+# whole GitOps control plane, into whatever cluster kubectl points at — and
+# after destroy-cluster.sh that is silently the next entry in ~/.kube/config.
+# A cluster must already exist here (create-cluster.sh made it), so guarding at
+# the top costs nothing. See scripts/context-guard.sh.
+require_workshop_context
+
 kubectl get nodes >/dev/null 2>&1 \
   || die "Cannot reach a cluster. Run ./scripts/create-cluster.sh first."
 

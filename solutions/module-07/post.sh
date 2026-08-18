@@ -8,6 +8,15 @@ set -euo pipefail
 SOLUTIONS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$SOLUTIONS_DIR/.." && pwd)"
 
+# The workshop-context guard. Normally reached through catch-up.sh, which guards
+# already — but this post-step is independently executable: modules 08, 09 and 10
+# run it directly, and so does a maintainer debugging the recovery path. It
+# creates an Argo Workflow and rolls a Deployment in whatever cluster kubectl
+# points at. One copy of the guard, in scripts/context-guard.sh.
+# shellcheck source=../../scripts/context-guard.sh
+source "$REPO_ROOT/scripts/context-guard.sh"
+require_workshop_context
+
 # 1. Bucket (same as module 03).
 "$SOLUTIONS_DIR/module-03/post.sh"
 

@@ -53,9 +53,10 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |
 | `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` + `gitops/components` state to Gitea, then run the module's post-steps; `--rebuild` for the full nuke-and-rebuild |
 | `kind-fallback.sh` | Same cluster shape on kind + Cilium (loses the Talos content, gains robustness) |
-| `check-consistency.sh` | Drift detection between everything that must agree: solutions↔catalog copies, deployed images ⊆ `images.txt`, `versions.env`↔`mise.toml`, devcontainer pins, `upstream.list` pin-sources. Offline; runs in CI on every push |
+| `check-consistency.sh` | Drift detection between everything that must agree: solutions↔catalog copies, deployed images ⊆ `images.txt`, `versions.env`↔`mise.toml`, devcontainer pins, `upstream.list` pin-sources, and that every `lab/`, `scripts/` and `solutions/` script touching a cluster passes the workshop-context guard. Offline; runs in CI on every push |
 | `check-upstream.sh` | **Maintainer only, needs internet** — reports which pins have fallen *behind* upstream (`ok`/`patch`/`minor`/`major`). Reads `upstream.list`; never edits a pin. `--strict`, `--json`, `--only <name>` |
 | `lib.sh` | Shared logging/helpers — sourced by every script |
+| `context-guard.sh` | The workshop-context guard, defined once and shared with `lab/common.sh`. Sourcing it only *defines* `require_workshop_context`; each script calls it explicitly after its own create/rebuild step, because `create-cluster.sh` legitimately runs before the context exists |
 | `versions.env` | Every version pin, in one place |
 | `images.txt` | Every image the workshop uses, pinned, split into `[host]` and `[mirror]` sections |
 | `upstream.list` | Where each pin comes from upstream (GitHub release/tag, Helm index, registry tag) and where it is currently written down — the manifest `check-upstream.sh` reads |
@@ -88,6 +89,10 @@ a stale mirror can never break the cluster, it just costs bandwidth.
 
 - `bash` with `set -euo pipefail`; every script has a usage header comment
 - ✅/❌/⚠️ log lines via `lib.sh`; scripts are safe to re-run unless stated
+- Anything that talks to a cluster calls `require_workshop_context` first and
+  **refuses** on any context that is not this workshop's — there is no override.
+  `destroy-cluster.sh` is the deliberate exception: it must work when the context
+  is already wrong, and only ever touches named kubeconfig entries
 - **Everything is pinned** — no `:latest` anywhere. Bump pins in
   `versions.env` + `mise.toml` + `images.txt` together, and re-verify with
   `./scripts/install.sh --check` and CI
