@@ -60,6 +60,18 @@ if talos_contexts | grep -qx "${CLUSTER_NAME}"; then
     && die "Could not remove the stale talosconfig context '${CLUSTER_NAME}' — remove it by hand (talosctl config remove ${CLUSTER_NAME}) and re-run."
 fi
 
+# Second half of the same problem: `talosctl cluster create` also keeps a
+# provisioner STATE DIRECTORY, and it survives everything Docker-side. We know
+# there are no node containers by here, so a state directory left over from a
+# deleted Docker VM or a half-finished create describes nothing that exists —
+# and talosctl refuses to create over it ("state directory ... already exists").
+# See talos_cluster_state_dir() in lib.sh.
+STALE_STATE_DIR="$(talos_cluster_state_dir)"
+if [[ -d "${STALE_STATE_DIR}" ]]; then
+  warn "Removing a stale Talos state directory '${STALE_STATE_DIR}' (no such cluster is running)"
+  rm -rf "${STALE_STATE_DIR}"
+fi
+
 # --- Machine config patches -----------------------------------------------------
 # Disable the default CNI (flannel) and kube-proxy: Cilium replaces both.
 # This is why Talos >= v1.13 is required — v1.12 hangs on cni:none (talos#12885).

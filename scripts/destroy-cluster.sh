@@ -45,6 +45,19 @@ else
   warn "No '${CLUSTER_NAME}' cluster found — nothing to destroy"
 fi
 
+# `talosctl cluster destroy` removes the provisioner state directory itself, so
+# this is a no-op on the happy path. It is NOT a no-op on the path that brings
+# people here: no node containers (deleted Docker VM, hand-pruned containers, a
+# create that died after PKI generation) means the branch above found nothing
+# to destroy, while the state directory still blocks the next
+# create-cluster.sh. Without this, the documented recovery command does not
+# recover. See talos_cluster_state_dir() in lib.sh.
+STATE_DIR="$(talos_cluster_state_dir)"
+if [[ -d "${STATE_DIR}" ]]; then
+  rm -rf "${STATE_DIR}"
+  ok "Talos cluster state directory removed (${STATE_DIR})"
+fi
+
 # --- Clean up kubeconfig / talosconfig contexts (best effort) -----------------
 # Cleaned in EVERY file the workshop could have written to, not just the one in
 # effect right now. mise.toml pins KUBECONFIG to ~/.kube/cloudbox.conf for this

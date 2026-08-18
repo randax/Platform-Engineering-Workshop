@@ -58,6 +58,24 @@ need() {
   have "$1" || die "'$1' not found. ${2:-Run ./scripts/dev-setup.sh first, or restart your shell so mise activation takes effect.}"
 }
 
+# talos_cluster_state_dir — where `talosctl cluster create` keeps a cluster's
+# provisioner state (its --state flag, default $HOME/.talos/clusters).
+#
+# It outlives the node containers, and nothing in the Docker world removes it:
+# deleting the Docker VM (Colima `colima delete`, Docker Desktop "Reset to
+# factory defaults"), pruning containers by hand, or a create that died after
+# PKI generation all leave it behind. The next `talosctl cluster create` then
+# refuses before it does anything:
+#
+#   failed to initialize provisioner state: state directory ".../cloudbox"
+#   already exists, is the cluster "cloudbox" already running?
+#
+# Exactly the same shape as the stale talosconfig context both scripts already
+# self-heal, so both clear this too — otherwise destroy-cluster.sh reports
+# "nothing to destroy" (there are no containers) and create-cluster.sh keeps
+# failing, with no documented command in between that fixes it.
+talos_cluster_state_dir() { echo "${HOME}/.talos/clusters/${CLUSTER_NAME}"; }
+
 # wait_rollout <ns> <kind/name> [timeout-seconds] — a robust rollout wait for the
 # bootstrap path. A single `kubectl rollout status --timeout` fails HARD the
 # moment a cold cluster's first image pull or a scheduling delay overruns the
