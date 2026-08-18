@@ -51,6 +51,11 @@ crane = "0.21.9"
 "aqua:cilium/cilium-cli" = "0.19.7"
 # jq — JSON plumbing in verify scripts and lab hints
 jq = "1.8.2"
+# shellcheck — pinned because CI used the runner's preinstalled copy (0.9.0)
+# while maintainers had a newer brew one. "clean locally" then did not mean
+# "green in CI": 0.9.0 flagged an SC2015 that 0.11.0 does not. Principle 14
+# applies to the linters too.
+shellcheck = "0.11.0"
 # node — only for the Slidev presentation
 node = "24"
 

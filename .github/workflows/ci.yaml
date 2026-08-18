@@ -34,7 +34,20 @@ jobs:
           done < <(find . -path ./slides -prune -o -name '*.sh' -print0)
           exit "${rc}"
 
-      - name: shellcheck (preinstalled on ubuntu runners)
+      # Use the PINNED shellcheck, not the runner's. They disagree: ubuntu-latest
+      # ships 0.9.0, which flags an SC2015 that 0.11.0 does not — so a script that
+      # was clean on a maintainer's machine failed here, which is the drift this
+      # repo pins everything to avoid.
+      - name: Install shellcheck (pinned via mise)
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" sh
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          echo "${HOME}/.local/share/mise/shims" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/mise" trust && "${HOME}/.local/bin/mise" install shellcheck
+
+      - name: shellcheck
         run: |
           set -euo pipefail
           shellcheck --version

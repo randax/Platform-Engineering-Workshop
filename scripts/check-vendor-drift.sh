@@ -240,8 +240,12 @@ reproduce() {   # reproduce <stream> <out> <dest>
     # red for reasons unrelated to drift is a guard people learn to ignore.
     if [[ "${url}" == https://github.com/* || "${url}" == https://raw.githubusercontent.com/* ]]; then
       local tok="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
-      [[ -n "${tok}" ]] || tok="$(command -v gh >/dev/null 2>&1 && gh auth token 2>/dev/null || true)"
-      [[ -n "${tok}" ]] && auth=(-H "Authorization: Bearer ${tok}")
+      if [[ -z "${tok}" ]] && command -v gh >/dev/null 2>&1; then
+        tok="$(gh auth token 2>/dev/null || true)"
+      fi
+      if [[ -n "${tok}" ]]; then
+        auth=(-H "Authorization: Bearer ${tok}")
+      fi
     fi
     # raw.githubusercontent.com rate-limits by IP and ignores a Bearer token for
     # public content, so authenticating it changes nothing — but the API serves the
