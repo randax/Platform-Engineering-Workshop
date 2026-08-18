@@ -1,6 +1,6 @@
 # Kagent v0.9.12 — day-2 Kubernetes AI agent (module 10).
 # Minimal profile: k8s-agent only, UI scaled to zero and tool RBAC read-only;
-# the default ModelConfig uses host-side Ollama qwen3:4b.
+# the default ModelConfig uses host-side Ollama qwen3:1.7b (num_ctx 16384).
 # ServerSideApply covers large CRDs; SkipDryRun covers CRs installed with them.
 #
 # Enable with:  cp gitops/catalog/kagent.yaml gitops/apps/ && git add . && git commit -m 'enable kagent' && git push

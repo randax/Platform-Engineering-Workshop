@@ -278,15 +278,24 @@ file" on the demo component's page in the Console. This is the module's second h
 same fault, worked twice, with one field changed in between.
 
 **Say the honest-spec line out loud before you start:** beat 1 runs a real model on your
-host, *beside* the whole running cluster. That needs the **32 GB "comfortable" spec from module 00**. On
-the **16 GB minimum spec, beat 1 does not fit next to the running stack** — skip straight
-to "Beat 2" below. That is not a lesser path; it costs no extra RAM, and it's the one
-that actually fits your machine.
+host, *beside* the whole running cluster. That needs the **32 GB "comfortable" spec from
+module 00**. On the **16 GB minimum spec, treat beat 1 as optional** — skip straight to
+"Beat 2" below. That is not a lesser path; it costs no extra RAM, and it's the one that
+actually fits your machine.
 
-Concretely, measured on 2026-08-17 (32 GB Mac, 16 GB of it inside Colima, all 21 apps
-running): loading `qwen3:4b` with the ModelConfig's `num_ctx: 64000` cost **~11.5 GiB**
-outside the VM — 2.4 GiB of weights and **9 GiB of KV cache** — and one investigation took
-**87 s** of wall clock. The weights are small; the context window is what does not fit.
+Concretely, measured on 2026-08-18 (32 GB M1 Max, 16 GB of it inside Colima, all 21 apps
+and 76 pods running): `qwen3:1.7b` at this repo's `num_ctx: 16384` costs **3.4 GB**
+outside the VM — 1.4 GiB of weights and **1.8 GiB of KV cache** — and ten investigations
+took **31–106 s** of wall clock each.
+
+That is a deliberate climb-down from the chart's own defaults, and the arithmetic is the
+whole reason. The chart ships `qwen3:4b` at `num_ctx: 64000`, which `ollama ps` reports
+as **12 GB**: 2.6 GiB of weights and **9.0 GiB of KV cache**. On a 32 GB laptop with a
+16 GB Colima VM that leaves about 4 GB for macOS itself, and the machine spends the
+investigation swapping. **The weights were never the problem — the context window was
+75% of the footprint.** Shrinking it to 16384 gives back 7.2 GiB for free, and 16384 is a
+floor rather than a preference: a single `k8s_get_events` result on this cluster is
+~8.2 k tokens on its own, so 8192 overflows the moment the agent reads one.
 
 ### Enable Kagent and point it at your platform
 
@@ -303,7 +312,7 @@ git push
 
 Wait for `kubectl -n argocd get application kagent` to report `Synced`/`Healthy`, then
 check what shipped: `kubectl -n kagent get modelconfig default-model-config -o yaml`. It
-defaults to host-side Ollama running `qwen3:4b`, reached at `host.docker.internal:11434`.
+defaults to host-side Ollama running `qwen3:1.7b`, reached at `host.docker.internal:11434`.
 
 **Expect `kagent-controller` to CrashLoopBackOff ~3 times on the way there, and leave it
 alone.** It runs its database migration at startup, and it starts before the
@@ -349,13 +358,13 @@ inside the cluster before blaming kagent:
 kubectl -n gitea exec deploy/gitea -c gitea -- wget -qO- http://10.5.0.1:11434/api/version
 ```
 
-Ollama itself needs to be running on your host with `qwen3:4b` pulled — `cloudbox-init.sh`
+Ollama itself needs to be running on your host with `qwen3:1.7b` pulled — `cloudbox-init.sh`
 did that during module 00, *if* Ollama was already installed when you ran it; if it wasn't,
 the script warned and skipped the pull rather than failing. Confirm before you blame the
 cluster:
 
 ```bash
-ollama list | grep qwen3     # ~2.6 GB; ollama pull qwen3:4b if it is missing
+ollama list | grep qwen3     # ~1.4 GB; ollama pull qwen3:1.7b if it is missing
 ```
 
 ### Beat 1: watch the local model flail — and write down how
@@ -365,21 +374,46 @@ Console, open **Components → demo** — the detail page whose Diagnostics pane
 already showing your broken `demo-web` — and click **Open investigation**. Watch the
 tool-call log stream.
 
-Don't grade it on whether it gets the right answer — it mostly won't. `qwen3:4b` is fine
-at *one* tool call and falls off a cliff the moment an investigation has to chain several
-(get → describe → logs → events → hypothesis), which every real fault requires.
-**Write down exactly how it fails** — a loop that repeats the same `kubectl get`, a
-thread it drops after the third tool call, a hypothesis stated with no evidence behind
+Don't grade it on whether it gets the right answer — it mostly won't. A local ≤4B model
+is fine at *issuing* tool calls and falls off a cliff the moment an investigation has to
+**carry state across** several (get → describe → logs → events → hypothesis), which every
+real fault requires. **Write down exactly how it fails** — a loop that repeats the same
+call, a thread it drops after the third one, a hypothesis stated with no evidence behind
 it, a malformed follow-up. That sentence is beat 1's deliverable, not a diagnosis — same
 spirit as module 05's "the agent claimed X" exercise.
 
-For calibration, here is what it did on the rehearsal machine (scenario 1 injected,
-2026-08-17): **one** real tool call — `k8s_describe_resource` on the Deployment, which
-returned fine — and then, instead of calling the logs tool, it *printed* a tool call as
-prose: a `<function-call>` block naming pod `demo-web-69dfd9d57c-0`, a pod that does not
-exist. It never chained a second call, and closed with "the root cause is likely a failing
-application container startup" — the symptom restated as a cause, with nothing behind it.
-Yours will differ in the details; the shape (one tool call, then invention) is the point.
+For calibration, here is what `qwen3:1.7b` did across ten Console investigations on the
+rehearsal machine (scenario 1 injected, 2026-08-18). It calls tools *enthusiastically* —
+4 to 26 of them per run, all real, all answered. The failure is never "it didn't try";
+it is what happens to the evidence afterwards:
+
+- **breadth instead of depth.** One run issued `k8s_get_resources(all_namespaces=true)`
+  nineteen times, walking every resource *type* in the cluster — services, pods,
+  deployments, configmaps, secrets, pv, pvc, events, nodes — and never once asked the
+  crashing pod for its logs, where the answer is one line long;
+- **it narrates the evidence instead of reading it.** Verdicts come back as a
+  *description of the JSON it just downloaded* ("this is a Kubernetes event log, here is
+  what each field means") while `demo-web` is crashlooping the whole time;
+- **it diagnoses its own tooling.** One run's entire hypothesis was that a `k8s_get_resources`
+  call had failed and "the issue is likely localized to your environment" — a real
+  finding about nothing, in place of the fault it was asked about;
+- **it addresses things that don't exist** — a pod name passed as a `Deployment`, or a
+  `demo` pod looked up in namespace `default` — takes `tool error:` back, and carries on
+  as if the call had returned.
+
+Roughly one run in ten it *does* land on the real cause (`PORT=8080-canary`) — it reaches
+`k8s_get_pod_logs`, and the answer is right there in the first line of output. Even then,
+read the verdict carefully: the run that got it right also asserted that "the Service is
+configured to use 8080-canary", which is simply false. **A correct headline with an
+invented supporting fact is the most dangerous output on this page**, and finding it is
+worth more than the diagnosis. Yours will differ in the details; the shape — real tool
+calls, then evidence that goes unread — is the point.
+
+> **If the Case file ends on "The investigation didn't complete"**, that is the model
+> generating without stopping: `kagent-controller` 0.9.12 cuts the A2A stream at a
+> hardcoded **180 s**, and a small model handed a large tool result will happily run past
+> it (runs of 9,000+ tokens in a single turn were measured). The ModelConfig's
+> `num_predict: "1200"` is what bounds each turn; if you removed it, put it back.
 
 > **Watching from the agent side.** The Console renders this run — the Case file shows
 > `tool_call → tool_result → message → verdict`, with the tool's real output collapsed

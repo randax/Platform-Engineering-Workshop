@@ -82,13 +82,14 @@ Scoping facts worth saying out loud: kagent is a CNCF Sandbox project (accepted 
 - A seeded fault needs 5–15 chained tool calls
 - Stock ≤8B models: **single digits to ~16%** in that regime
 - The drop is **~5–16×** for small models — ~2× for GPT-4o-class
+- Beat 1 runs **Qwen3-1.7B**, one size below the table's Qwen3 row
 
 <div class="hint" style="font-size:.7em;opacity:.7">Source: BFCL v3 multi-turn — https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html; exact small-model figures via papers using BFCL v3 baselines (see issue #124 for the research trail — treat the digits as indicative, the cliff as robust)</div>
 
 <!--
 Every model in this table is fine at a SINGLE well-formed tool call — that's what most benchmarks measure, and it's why a quick demo of a small local model looks deceptively competent. The Berkeley Function-Calling Leaderboard v3 added a multi-turn, state-based category specifically because real agents don't stop after one call — they chain get → describe → logs → events → hypothesis, carrying state across every step. That's exactly the shape of a day-2 diagnosis, and it's exactly where small models fall off a cliff: Qwen3-4B goes from ~80%+ single-turn to ~16% multi-turn; Llama-3.1-8B-Instruct drops to ~5%. GPT-4o-class models drop too — call chains are hard for everyone — but only by roughly 2x, landing at 41–48%, not into single digits.
 
-This isn't a random pick of numbers — qwen3:4b (2.5 GB, Ollama's own reference model for tool-calling docs) is the exact model beat 1 of the lab runs, host-side, fully offline, pre-pulled by cloudbox-init.sh. Watching it flail on your OWN fault, live, teaches this table better than reading it ever could — that's why beat 1 is built to fail instructively, not tightened until it accidentally succeeds.
+This isn't a random pick of numbers — beat 1 of the lab runs qwen3:1.7b host-side, fully offline, pre-pulled by cloudbox-init.sh, one size down from the Qwen3-4B row above. It was measured on 2026-08-18: it issues 4-26 real tool calls per investigation and still cannot carry the state between them, closing with a "hypothesis" that describes the JSON it just downloaded. Say the number that made us pick it, because it is the real lesson: the 4B model at the chart's default 64k context needs 12 GB on the host, 9 GB of which is KV cache — the weights were never the problem. Watching it flail on your OWN fault, live, teaches this table better than reading it ever could — that's why beat 1 is built to fail instructively, not tightened until it accidentally succeeds.
 
 Say plainly: this isn't a swipe at small models in general — it's a swipe at using a stock ≤8B chat model, unmodified, for a MULTI-TURN tool-calling job it wasn't tuned for. Purpose-built tool models (ToolACE-8B, xLAM-2) close much of this gap; that's just not the model an attendee pulls by default, and it's out of scope for a laptop lab.
 -->
@@ -135,12 +136,12 @@ Land the motto here, verbatim — it's the one line to leave hanging: the agent 
 cd lab/10-day2-ops && ./verify.sh
 ```
 
-<span class="badge">~20 min</span> · beat 1: `qwen3:4b` flails · beat 2: one `ModelConfig` push fixes it
+<span class="badge">~20 min</span> · beat 1: `qwen3:1.7b` flails · beat 2: one `ModelConfig` push fixes it
 
 <!--
 The task: enable kagent.yaml from the catalog (same push-to-Gitea dance as every capability today), pick one of three scenarios and inject it (inject.sh 1|2|3 — a bad rollback, a "rightsizing" commit that sets the memory limit below what the runtime needs to create the container, or a Docker Hub image reference that your own mirror answers for anyway — the guardrail there is the repo policy, not a crashing pod), then open the affected Application's detail page in the Console and click "Open investigation."
 
-Beat 1 runs entirely offline against qwen3:4b on host-side Ollama (never in-cluster, so it doesn't compete with the cluster's memory) — the point isn't to get a right answer, it's to watch the previous slide's table happen live: a plausible first tool call, then a loop, a dropped thread, or a malformed follow-up. Write down how it fails — that's the deliverable, same spirit as module 05's "agent claimed X" exercise.
+Beat 1 runs entirely offline against qwen3:1.7b on host-side Ollama (never in-cluster, so it doesn't compete with the cluster's memory — 3.4 GB resident, at num_ctx 16384 rather than the chart's 64000) — the point isn't to get a right answer, it's to watch the previous slide's table happen live: real tool calls, then the same call repeated, a dropped thread, a malformed follow-up, and a verdict that narrates the evidence instead of reading it. Write down how it fails — that's the deliverable, same spirit as module 05's "agent claimed X" exercise.
 
 Beat 2 is one git push: switch the same ModelConfig to the free OpenCode Zen key from the module 00 prep (or a personal Claude/OpenAI key as the documented fallback), and re-run the investigation — same fault, same Case file, now a real hypothesis with a kill-test. Verify it against the cluster, then fix it with the git revert the Case file hands you.
 
