@@ -72,6 +72,57 @@ CONTEXT_GUARD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=versions.env
 source "${CONTEXT_GUARD_DIR}/versions.env"
 
+# =============================================================================
+# Which kubeconfig file is any of this happening in?
+#
+# mise.toml pins KUBECONFIG to CLOUDBOX_KUBECONFIG for this repo, so on an
+# activated machine the workshop cluster lives in a file of its own and a
+# destroy leaves nothing to fall through to. The pin is mise's, not the
+# scripts': nothing here sets KUBECONFIG, because an attendee who never
+# activated mise must keep working exactly as before (everything in
+# ~/.kube/config), and forcing the pin from a script would split THEM instead.
+#
+# The value below is the one duplicate of mise.toml's `[env] KUBECONFIG` —
+# shell cannot read mise's {{env.HOME}} templating. check-consistency.sh fails
+# if the two ever drift apart.
+CLOUDBOX_KUBECONFIG="${HOME}/.kube/cloudbox.conf"
+
+# kubeconfig_in_use — the file the tools in this shell will actually read.
+# Three cases, because there are three populations:
+#   * KUBECONFIG set (mise activated, or `mise run`/`mise exec`): that file.
+#     A KUBECONFIG list is legal; kubectl WRITES to the first entry, so that is
+#     the one worth naming.
+#   * kubectl is a mise shim: the shim applies mise's [env] to the tool it
+#     execs even though this shell never saw it, so the pin is in force while
+#     $KUBECONFIG is empty. (This is CI's configuration, and the same mechanism
+#     as the `KUBECONFIG=... kubectl` trap in docs/HAZARDS.md.)
+#   * neither: kubectl's own default.
+kubeconfig_in_use() {
+  local kubectl_path
+  kubectl_path="$(command -v kubectl 2>/dev/null || true)"
+  if [ -n "${KUBECONFIG:-}" ]; then
+    echo "${KUBECONFIG%%:*}"
+  elif [ "${kubectl_path%/shims/kubectl}" != "${kubectl_path}" ]; then
+    echo "${CLOUDBOX_KUBECONFIG}"
+  else
+    echo "${HOME}/.kube/config"
+  fi
+}
+
+# workshop_cluster_is_elsewhere — true when the workshop cluster exists in
+# CLOUDBOX_KUBECONFIG but that is NOT the file this shell is reading. That is
+# the one genuinely new failure mode the pin introduces: the cluster was
+# created with mise in the picture (`mise run cluster:create`, or a shell that
+# was activated earlier) and is now being looked for from a shell where it is
+# not. Without this the guard would tell someone whose cluster is running
+# perfectly well to go and create one.
+workshop_cluster_is_elsewhere() {
+  [ "$(kubeconfig_in_use)" != "${CLOUDBOX_KUBECONFIG}" ] \
+    && [ -f "${CLOUDBOX_KUBECONFIG}" ] \
+    && kubectl --kubeconfig="${CLOUDBOX_KUBECONFIG}" config get-contexts -o name 2>/dev/null \
+       | grep -qxE "admin@${CLUSTER_NAME}|kind-${CLUSTER_NAME}"
+}
+
 # workshop_api_server <server-url> — true for an API server address that a
 # CloudBox cluster on this machine can legitimately have:
 #   https://127.0.0.1:<port>  create-cluster.sh repoints the kubeconfig at the
@@ -117,17 +168,46 @@ require_workshop_context() {
 
   current context : ${ctx:-<none>}
   API server      : ${server:-<none>}
+  kubeconfig      : $(kubeconfig_in_use)
   expected        : admin@${CLUSTER_NAME} (or kind-${CLUSTER_NAME}) on https://127.0.0.1:<port>
 
 The workshop scripts create, patch and delete resources in whatever cluster
 kubectl points at, so this stops here instead of guessing.
+EOF
+
+  # The one failure the pinned kubeconfig can cause on its own: the cluster is
+  # up and healthy, in ${CLOUDBOX_KUBECONFIG}, and this shell is reading a
+  # different file. Telling that person to run create-cluster.sh would be a
+  # confident wrong answer — they would destroy and rebuild a working cluster.
+  if workshop_cluster_is_elsewhere; then
+    cat >&2 <<EOF
+
+⚠️  Your workshop cluster is NOT missing — it is in another kubeconfig:
+
+      ${CLOUDBOX_KUBECONFIG}     <- has a ${CLUSTER_NAME} context
+      $(kubeconfig_in_use)     <- what this shell is reading
+
+    This shell never got the KUBECONFIG that mise.toml pins for this repo,
+    which happens when the cluster was created through mise (\`mise run
+    cluster:create\`, or a shell where mise was activated) and this shell is
+    not. Do NOT rebuild. Either of these fixes it:
+
+      export KUBECONFIG=${CLOUDBOX_KUBECONFIG}          # this shell, right now
+      eval "\$(mise activate bash)"                     # every shell (zsh/fish: see mise docs)
+
+    ./scripts/install.sh --check reports which of the two you are.
+EOF
+    exit 1
+  fi
+
+  cat >&2 <<EOF
 
 Point kubectl back at your workshop cluster:
   kubectl config use-context admin@${CLUSTER_NAME}
   kubectl config use-context kind-${CLUSTER_NAME}    # only if you used ./scripts/kind-fallback.sh
 
 No such context? Then you have no cluster right now — ./scripts/destroy-cluster.sh
-removes it and kubectl silently falls through to the next entry in ~/.kube/config.
+removes it and kubectl falls through to whatever else is in your kubeconfig.
 Build one:
   ./scripts/create-cluster.sh
 EOF

@@ -147,6 +147,36 @@ check_tool crane    ""                        crane version
 check_tool cilium   ""                        cilium version --client
 check_tool jq       ""                        jq --version
 
+# --- Kubeconfig ---------------------------------------------------------------------
+step "Kubeconfig (which cluster this laptop will talk to)"
+# mise.toml pins KUBECONFIG to a workshop-only file for this repo, so the cluster
+# lands somewhere that contains nothing else and a destroy leaves nothing to fall
+# through to (docs/HAZARDS.md, "the workshop scripts ran against whatever cluster
+# kubectl pointed at"). The pin only reaches you through mise — an activated shell,
+# a mise shim, or `mise run`/`mise exec`. Not having it is a supported way to run
+# the workshop; having it in one place and not the other is not, which is the only
+# thing this section is really looking for.
+kc_in_use="$(kubeconfig_in_use)"
+if [[ "${kc_in_use}" == "${CLOUDBOX_KUBECONFIG}" ]]; then
+  ok "workshop kubeconfig in effect: ${kc_in_use}"
+  info "It holds this workshop's cluster and nothing else — that is deliberate."
+elif workshop_cluster_is_elsewhere; then
+  # Both halves exist and they disagree: a cluster was created with mise in the
+  # picture, and this shell cannot see it. Nothing downstream can work.
+  check_fail "your workshop cluster is in ${CLOUDBOX_KUBECONFIG}, but this shell reads ${kc_in_use} — the cluster is fine, this shell is looking in the wrong file"
+  echo "     Fix it, do NOT rebuild:"
+  echo "       export KUBECONFIG=${CLOUDBOX_KUBECONFIG}   # this shell"
+  # shellcheck disable=SC2016  # deliberately printing an unexpanded snippet
+  echo '       eval "$(mise activate bash)"'"                  # every shell (zsh/fish: mise docs)"
+else
+  warn "mise's kubeconfig pin is not in effect in this shell"
+  info "Everything will land in ${kc_in_use} instead — supported, and exactly how"
+  info "this workshop behaved before the pin existed. One thing to avoid: driving the"
+  info "scripts through 'mise run' / 'mise exec' while typing bare commands in a shell"
+  info "without the pin — then the cluster and your terminal are in two different files."
+  info "Either stay consistent, or activate mise (see ./scripts/dev-setup.sh)."
+fi
+
 # --- Pre-pulled images --------------------------------------------------------------
 step "Pre-pulled images (populated by ./scripts/cloudbox-init.sh)"
 

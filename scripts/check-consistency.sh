@@ -307,7 +307,13 @@ done < <(grep -rl --include='*.sh' 'kubectl' scripts solutions | sort)
 # which is the whole reason they may run before module 01; the moment one grows
 # a real API call the exemption is wrong, so assert the reason, not the name.
 for f in scripts/dev-setup.sh scripts/install.sh; do
-  offenders="$(grep -n 'kubectl' "${f}" | grep -vE '^[0-9]+:[[:space:]]*#' \
+  # Match kubectl only where it is a COMMAND — start of line, or after a
+  # pipe/semicolon/&&/subshell — so that printed advice ("point kubectl back
+  # at ...") is allowed while an actual invocation is not. Both scripts now
+  # tell attendees which kubeconfig they are on, which is prose about kubectl,
+  # not a call to it.
+  offenders="$(grep -nE '(^|[;&|(]|\$\()[[:space:]]*kubectl[[:space:]]' "${f}" \
+    | grep -vE '^[0-9]+:[[:space:]]*#' \
     | grep -v 'version --client' || true)"
   [[ -z "${offenders}" ]] \
     || bad "${f} is on the pre-cluster allowlist but now runs kubectl against a cluster: ${offenders//$'\n'/ | } — guard it or take it off the list"
@@ -319,8 +325,11 @@ done
 # entries. That is also why it MUST stay unguarded — it is the script that
 # causes the fall-through, so it has to work when the context is already wrong,
 # and catch-up.sh --rebuild calls it first. Assert the premise.
+# `kubectl --kubeconfig=<file> config …` counts as named-entry surgery too: the
+# flag only says WHICH file to edit, and destroy-cluster.sh now cleans the
+# workshop's entries out of both the pinned kubeconfig and ~/.kube/config.
 offenders="$(grep -n 'kubectl' scripts/destroy-cluster.sh | grep -vE '^[0-9]+:[[:space:]]*#' \
-  | grep -vE 'kubectl config |have kubectl' || true)"
+  | grep -vE 'kubectl (--kubeconfig="[^"]*" )?config |have kubectl' || true)"
 [[ -z "${offenders}" ]] \
   || bad "scripts/destroy-cluster.sh is unguarded on the premise that it only edits NAMED kubeconfig entries, but it now makes a cluster call: ${offenders//$'\n'/ | }"
 
@@ -336,6 +345,33 @@ fi
 
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "all ${count} kubectl-using scripts/ + solutions/ scripts call the context guard"
+
+# --- 9. the workshop kubeconfig path is written down in exactly two places -----
+# mise.toml's `[env] KUBECONFIG` is what actually pins the file; shell cannot
+# read mise's {{env.HOME}} templating, so scripts/context-guard.sh carries the
+# same path as CLOUDBOX_KUBECONFIG for the guard's diagnosis, install.sh's
+# report and destroy-cluster.sh's cleanup. If those two ever drift apart the
+# guard would tell people to export a path nothing uses — the exact class of
+# confident-wrong-answer this repo keeps finding. Two places, one truth.
+before_fail=${FAILURES}
+# Section-aware: a KUBECONFIG line outside [env] pins nothing.
+mise_kc="$(awk -F= '
+  /^\[/            { in_env = ($0 ~ /^\[env\]/) ; next }
+  in_env && $1 ~ /^KUBECONFIG[[:space:]]*$/ {
+    v = $2; gsub(/^[[:space:]]*"|"[[:space:]]*$/, "", v); print v; exit
+  }' mise.toml)"
+guard_kc="$(grep -E '^CLOUDBOX_KUBECONFIG=' scripts/context-guard.sh | head -1 | sed -E 's/^[^=]*="(.*)"$/\1/')"
+if [[ -z "${mise_kc}" ]]; then
+  bad "mise.toml has no [env] KUBECONFIG pin — the workshop kubeconfig would fall back to ~/.kube/config, where a destroy makes kubectl fall through to whatever else is there (docs/HAZARDS.md)"
+elif [[ -z "${guard_kc}" ]]; then
+  bad "scripts/context-guard.sh no longer defines CLOUDBOX_KUBECONFIG — the guard cannot tell someone their cluster is in another kubeconfig"
+elif [[ "${mise_kc}" == /Users/* || "${mise_kc}" == /home/* ]]; then
+  bad "mise.toml pins KUBECONFIG to a hardcoded home directory ('${mise_kc}') — this file ships to 80 laptops; use mise templating ({{env.HOME}})"
+elif [[ "${mise_kc//\{\{env.HOME\}\}/\$\{HOME\}}" != "${guard_kc}" ]]; then
+  bad "the workshop kubeconfig path has drifted: mise.toml says '${mise_kc}', scripts/context-guard.sh says '${guard_kc}'"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "workshop kubeconfig path agrees in mise.toml and scripts/context-guard.sh (${guard_kc})"
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then

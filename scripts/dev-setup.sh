@@ -32,14 +32,20 @@ else
     export PATH="${HOME}/.local/bin:${PATH}"
     have mise || die "mise installed but not on PATH — open a new shell and re-run this script."
     ok "mise installed"
-    info "Add mise to your shell so tools are always on PATH, e.g. for bash:"
-    # shellcheck disable=SC2016  # deliberately printing an unexpanded snippet
-    echo '     echo '\''eval "$(~/.local/bin/mise activate bash)"'\'' >> ~/.bashrc'
-    echo "   (see https://mise.jdx.dev/getting-started.html for zsh/fish)"
   else
     die "Cannot continue without mise. Install it and re-run."
   fi
 fi
+
+# --- 1b. Trust this repo's mise.toml -----------------------------------------
+# mise refuses to read an UNTRUSTED config at all — `mise install`, `mise run`
+# and every shim hard-error with "Config files ... are not trusted". Trust is
+# per checkout, so a fresh clone (every attendee, and the devcontainer's
+# non-interactive postCreateCommand) starts untrusted and the next step would
+# simply fail. Trusting it here is also what makes mise.toml's [env] KUBECONFIG
+# pin take effect at all.
+(cd "${REPO_ROOT}" && mise trust >/dev/null)
+ok "mise.toml trusted for this checkout"
 
 # --- 2. Install pinned tools --------------------------------------------------
 step "Installing pinned tools from mise.toml (this can take a few minutes)"
@@ -81,6 +87,46 @@ if [[ ${failures} -gt 0 ]]; then
 fi
 
 ok "All tools installed and verified."
+
+# --- 4. Hook mise into your shell ---------------------------------------------
+# Offered, not merely suggested, and it matters more than "tools on PATH".
+#
+# mise.toml pins KUBECONFIG to a workshop-only file for this repo. Whether that
+# pin reaches you depends entirely on this step, and the two clean outcomes are:
+#   * activated   — your shell AND the scripts both use ~/.kube/cloudbox.conf.
+#   * not at all  — neither does; everything lands in ~/.kube/config, exactly as
+#                   this workshop behaved before the pin. Supported.
+# The bad outcome is HALF of it: `mise run cluster:create` (or `mise exec`)
+# applies the pin to the script while a bare `kubectl` in the same terminal —
+# one you installed yourself, from brew or Docker Desktop — reads
+# ~/.kube/config and answers about a different cluster entirely. Since talosctl
+# comes from mise and nothing else, "I never activated mise" pushes people
+# toward exactly that half-and-half state. Activating closes it.
+step "Shell activation (optional, strongly recommended)"
+
+mise_bin="$(command -v mise)"
+case "$(basename "${SHELL:-}")" in
+  bash) rc="${HOME}/.bashrc";                  snippet="eval \"\$(${mise_bin} activate bash)\"" ;;
+  zsh)  rc="${ZDOTDIR:-${HOME}}/.zshrc";       snippet="eval \"\$(${mise_bin} activate zsh)\"" ;;
+  fish) rc="${HOME}/.config/fish/config.fish"; snippet="${mise_bin} activate fish | source" ;;
+  *)    rc=""; snippet="" ;;
+esac
+
+if [[ -z "${rc}" ]]; then
+  warn "Unrecognised shell (\$SHELL=${SHELL:-unset}) — hook mise in yourself:"
+  echo "   https://mise.jdx.dev/getting-started.html"
+elif [[ -f "${rc}" ]] && grep -q 'mise activate' "${rc}"; then
+  ok "mise activation is already in ${rc/#${HOME}/\~}"
+elif confirm "Add mise activation to ${rc/#${HOME}/\~}?"; then
+  mkdir -p "$(dirname "${rc}")"
+  printf '\n# mise (CloudBox workshop tools + KUBECONFIG)\n%s\n' "${snippet}" >> "${rc}"
+  ok "Added to ${rc/#${HOME}/\~} — open a new terminal (or source it) to pick it up"
+else
+  warn "Skipped. Then run everything the same way, consistently:"
+  echo "     mise exec -- kubectl get nodes     # tools AND kubeconfig from mise"
+  echo "   or nothing through mise at all — do not mix the two in one terminal."
+  echo "   ./scripts/install.sh --check tells you which side you are on."
+fi
 info "Next steps (still at home, on good internet):"
 echo "   1. ./scripts/cloudbox-init.sh      # pre-pull all workshop images (~7.5 GB)"
 echo "   2. ./scripts/install.sh --check    # full pre-flight check"

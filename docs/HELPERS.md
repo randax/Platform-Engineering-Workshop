@@ -52,10 +52,55 @@ These are real — most were found by running the whole thing on clean machines.
   internet, the cluster still comes up (nodes pull upstream); it's just slower.
   At a hostile-wifi venue, pair them with a neighbor whose mirror is populated.
 - *A tool "not found" right after `dev-setup.sh`* → mise isn't on PATH yet.
-  **Restart the shell** (mise activation), or the message says so.
+  **Restart the shell** (mise activation), or the message says so. `dev-setup.sh`
+  now *offers* to add the activation line to their shell rc — if they said no,
+  say yes this time, or have them use `mise exec -- <tool>` for everything.
 - *Windows attendee stuck* → they must be inside **WSL2** with Docker Desktop's
   WSL2 backend, running the Linux tools. If it's fighting them, pair up — don't
   burn 20 minutes on it.
+
+**Which kubeconfig am I even looking at? — read this before you diagnose anything**
+
+`mise.toml` pins `KUBECONFIG` to **`~/.kube/cloudbox.conf`** for this repo, so the
+workshop cluster lives in a file of its own and never lands next to the dozen
+contexts a consultant arrives with. (A rehearsal found `lab/01-cluster/verify.sh`
+grading a real 36-node corporate cluster after a `destroy-cluster.sh`, because
+`kubectl` fell through to the next entry in `~/.kube/config`. The scripts refuse to
+run against a non-workshop context now, and this is the other half of that fix.)
+
+**The pin only reaches people through mise.** Three states, and you must know which
+one you are standing in front of:
+
+| | scripts | their bare `kubectl` | verdict |
+|---|---|---|---|
+| mise activated in their shell | `~/.kube/cloudbox.conf` | same | fine |
+| mise not involved at all | `~/.kube/config` | same | fine — this is how the workshop always worked |
+| **`mise run` / `mise exec` + a `kubectl` they installed themselves** | `~/.kube/cloudbox.conf` | `~/.kube/config` | **broken — the cluster is real, their terminal is looking in the wrong file** |
+
+First question when someone's cluster "disappeared", or `kubectl get nodes` shows a
+cluster that is obviously not theirs:
+
+```bash
+./scripts/install.sh --check      # names the file in effect, and fails on the third state
+echo "$KUBECONFIG"                # empty = the pin is not in this shell
+kubectl config get-contexts       # admin@cloudbox present?
+```
+
+If the cluster is in `~/.kube/cloudbox.conf` and their shell isn't reading it, the
+context guard says so in as many words and tells them **not** to rebuild. The fix is
+one line — **do not let them run `catch-up.sh --rebuild`, that is 10 minutes for
+nothing**:
+
+```bash
+export KUBECONFIG=~/.kube/cloudbox.conf      # this terminal, right now
+eval "$(mise activate bash)"                 # every terminal from now on
+```
+
+Two smaller consequences worth knowing: a terminal **outside the repo directory**
+does not get the pin either (mise env is per-directory), so `cd` back into the repo
+before debugging; and their own clusters are untouched — `~/.kube/config` is not
+modified except that `destroy-cluster.sh` cleans this workshop's own entries out of
+it, by name.
 
 **Cluster (module 01)**
 - *Nodes stay NotReady* → Cilium is still rolling out; give it a minute. If it
@@ -112,4 +157,7 @@ agent-and-human verify against the live cluster.
 ./scripts/catch-up.sh <N> --rebuild   # nuke + rebuild to module N
 ./lab/NN-*/verify.sh                  # did this module's outcome happen?
 kubectl get pods -A                   # the first thing to look at, always
+
+echo "$KUBECONFIG"                    # empty = mise's pin is not in this shell
+export KUBECONFIG=~/.kube/cloudbox.conf   # "my cluster vanished" — try this BEFORE rebuilding
 ```

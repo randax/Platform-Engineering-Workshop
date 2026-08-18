@@ -11,6 +11,32 @@
 #   mise tasks ls       # list workshop tasks
 # =============================================================================
 
+# =============================================================================
+# Environment
+# =============================================================================
+# One kubeconfig for the workshop, separate from whatever else you talk to.
+#
+# Attendees arrive with a dozen contexts in ~/.kube/config, and rehearsal 3
+# proved what that costs: destroy-cluster.sh removes the workshop's entries,
+# kubectl silently falls through to the NEXT entry in the same file, and
+# lab/01-cluster/verify.sh graded a real 36-node corporate cluster
+# ("want 2 Ready nodes, have 36/36"). scripts/context-guard.sh catches that and
+# is staying — but a file that contains ONLY the CloudBox cluster means there is
+# nothing to fall through TO, which is a fix rather than a catch.
+#
+# {{env.HOME}} is mise templating, not your shell: this file ships to 80 laptops
+# and must not name anyone's home directory. The value is duplicated ONCE, as
+# CLOUDBOX_KUBECONFIG in scripts/context-guard.sh (shell scripts cannot read
+# mise templating); check-consistency.sh fails if the two ever disagree.
+#
+# This only applies inside this repo, and only if mise reaches your shell —
+# `mise activate`, a mise shim, or `mise run`/`mise exec`. Without activation
+# nothing here is set and everything lands in ~/.kube/config exactly as before;
+# `./scripts/install.sh --check` tells you which of the two you are, and why it
+# matters. See docs/HELPERS.md ("Which kubeconfig am I even looking at?").
+[env]
+KUBECONFIG = "{{env.HOME}}/.kube/cloudbox.conf"
+
 [tools]
 # Talos v1.13.8 — never 1.12.x (cni:none docker clusters hang, talos#12885)
 "aqua:siderolabs/talos" = "1.13.8"

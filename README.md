@@ -101,6 +101,26 @@ If step 3 is all green, you're done. If it isn't, the output tells you what to f
 if it can't be fixed, the [devcontainer lifeboat](#plan-b-devcontainer--codespaces) below
 has you covered. Bring your laptop and its power supply.
 
+### Your `kubectl` gets a workshop-only kubeconfig
+
+Step 1 offers to hook [mise](https://mise.jdx.dev/) into your shell. **Say yes.** Besides
+putting the pinned tools on your PATH, it makes `KUBECONFIG` point at
+**`~/.kube/cloudbox.conf`** while you are inside this repo — a file that contains this
+workshop's cluster and nothing else.
+
+That is deliberate. You almost certainly arrive with a `~/.kube/config` full of real
+clusters, and the workshop scripts create, patch and delete things in whatever cluster
+`kubectl` currently points at. A separate file means tearing the workshop cluster down
+leaves nothing for `kubectl` to silently fall through to. Your own contexts are never
+modified, and `echo $KUBECONFIG` tells you which file you are on at any moment.
+
+If you decline the activation, everything lands in `~/.kube/config` as it always did and
+the workshop still works — the scripts refuse to touch a non-workshop context either way.
+The one thing to avoid is doing half of each: running the scripts through `mise run` /
+`mise exec` while typing bare `kubectl` in a shell that never got the pin, because then
+your cluster and your terminal are looking at two different files.
+`./scripts/install.sh --check` tells you which side you are on.
+
 ### Hardware — honest numbers
 
 | | Minimum | Recommended |

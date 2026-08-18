@@ -48,7 +48,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`; start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it |
 | `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
 | `create-cluster.sh` | `talosctl cluster create docker` (Talos v1.13.8, 1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm |
-| `destroy-cluster.sh` | `talosctl cluster destroy` + kubeconfig cleanup; `--purge-mirror` also removes the image mirror |
+| `destroy-cluster.sh` | `talosctl cluster destroy` + kubeconfig cleanup (this workshop's named entries, in both the pinned kubeconfig and `~/.kube/config`); `--purge-mirror` also removes the image mirror |
 | `bootstrap-gitops.sh` | local-path-provisioner + Gitea (single-pod SQLite, push-to-create) + ArgoCD (vendored manifest, NodePort 30080, Application health check) |
 | `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |
 | `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` + `gitops/components` state to Gitea, then run the module's post-steps; `--rebuild` for the full nuke-and-rebuild |
@@ -93,6 +93,16 @@ a stale mirror can never break the cluster, it just costs bandwidth.
   **refuses** on any context that is not this workshop's — there is no override.
   `destroy-cluster.sh` is the deliberate exception: it must work when the context
   is already wrong, and only ever touches named kubeconfig entries
+- **The workshop has its own kubeconfig.** `mise.toml` sets
+  `KUBECONFIG={{env.HOME}}/.kube/cloudbox.conf` for this repo, so the cluster lands in
+  a file containing nothing else and a destroy leaves nothing to fall through to. No
+  script sets or exports `KUBECONFIG` — that is mise's job alone, deliberately: an
+  attendee who never activated mise must keep working exactly as before (everything in
+  `~/.kube/config`), and forcing the pin from a script would split *them* into a shell
+  and a script reading different files. The path is written down in exactly two places,
+  `mise.toml` and `CLOUDBOX_KUBECONFIG` in `context-guard.sh`; check 9 of
+  `check-consistency.sh` fails if they drift. `install.sh --check` reports which file is
+  in effect, and fails outright if the cluster is in one file and the shell reads another
 - **Everything is pinned** — no `:latest` anywhere. Bump pins in
   `versions.env` + `mise.toml` + `images.txt` together, and re-verify with
   `./scripts/install.sh --check` and CI

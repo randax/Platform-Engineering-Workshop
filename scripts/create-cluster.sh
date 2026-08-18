@@ -210,6 +210,13 @@ else
 fi
 kubectl config use-context "admin@${CLUSTER_NAME}" >/dev/null
 ok "kubectl context: admin@${CLUSTER_NAME}"
+# Which FILE all of the above landed in is decided by KUBECONFIG, which
+# mise.toml pins to ~/.kube/cloudbox.conf for this repo — talosctl and kubectl
+# both honour it, so the cluster ends up somewhere that holds nothing else and
+# destroy-cluster.sh leaves nothing to fall through to. Without mise in the
+# picture this is your ordinary ~/.kube/config, which also works. Printed
+# because it is the first thing to check when kubectl later disagrees with you.
+info "kubeconfig: $(kubeconfig_in_use)"
 
 # NOT guarded at the top of this script — it is what creates the workshop
 # context, so there is nothing to assert until now. Here it is a post-condition

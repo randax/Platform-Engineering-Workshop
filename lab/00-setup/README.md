@@ -23,7 +23,10 @@ before the workshop** if you can; the room's first 15 minutes are the safety net
 From the repository root:
 
 1. Install the tool chain: `./scripts/dev-setup.sh` (uses [mise](https://mise.jdx.dev/) with
-   pinned versions — nothing floats).
+   pinned versions — nothing floats). It ends by offering to hook mise into your shell —
+   **say yes**: that is what puts the tools on your PATH *and* points `KUBECONFIG` at a
+   workshop-only file, `~/.kube/cloudbox.conf`, while you are in this repo. Open a new
+   terminal afterwards.
 2. Pre-pull the workshop images: `./scripts/cloudbox-init.sh` (fills a local registry
    mirror, `cloudbox-mirror`, on port 5001 — this is the slow step, do it on good WiFi).
 3. Run the pre-flight gate: `./scripts/install.sh --check`. It checks *everything*,
@@ -72,12 +75,29 @@ Target ≥10 GB.
 <summary>Hint 2: mise-installed tools "not found"?</summary>
 
 `dev-setup.sh` installs tools via mise, which activates through your shell. Either restart
-your shell, or check `mise doctor` — activation must be hooked into your shell rc. As a
-quick test: `mise exec -- talosctl version --client`.
+your shell, or check `mise doctor` — activation must be hooked into your shell rc (re-run
+`dev-setup.sh` and say yes when it offers). As a quick test:
+`mise exec -- talosctl version --client`.
 </details>
 
 <details>
-<summary>Hint 3: cloudbox-init.sh is slow or flaky on this network</summary>
+<summary>Hint 3: which kubeconfig will my kubectl use?</summary>
+
+`mise.toml` sets `KUBECONFIG=~/.kube/cloudbox.conf` for this repo, so the cluster you
+build lands in a file of its own instead of among your real clusters — and tearing it
+down leaves nothing for `kubectl` to quietly fall through to. `echo $KUBECONFIG` shows
+which file you are on; empty means mise is not activated in this shell and everything
+goes to `~/.kube/config` instead, which also works.
+
+What does **not** work is half of each: `mise run` / `mise exec` for the scripts, bare
+`kubectl` in a shell without the pin. Then the cluster is in one file and your terminal
+reads another. `./scripts/install.sh --check` prints the file in effect and fails if it
+catches you in that state. Note it is per-directory too: a terminal outside this repo
+does not get the pin.
+</details>
+
+<details>
+<summary>Hint 4: cloudbox-init.sh is slow or flaky on this network</summary>
 
 It is doing the only big download of the whole workshop — that's by design. It's resumable:
 run it again and it skips images already in the mirror. Check progress with

@@ -46,11 +46,29 @@ else
 fi
 
 # --- Clean up kubeconfig / talosconfig contexts (best effort) -----------------
+# Cleaned in EVERY file the workshop could have written to, not just the one in
+# effect right now. mise.toml pins KUBECONFIG to ~/.kube/cloudbox.conf for this
+# repo, but two things put ${CLUSTER_NAME} entries in ~/.kube/config anyway:
+# an attendee who never activated mise (the pin never reached them), and anyone
+# who created a cluster before the pin existed. A left-behind admin@${CLUSTER_NAME}
+# in ~/.kube/config is exactly the entry the context guard is built to accept,
+# so leaving it there would re-arm the fall-through the pin exists to disarm.
+#
+# Still only NAMED-entry surgery — no cluster is contacted, nothing that is not
+# this workshop's own context/cluster/user is touched — which is the premise
+# check-consistency.sh check 8 asserts to keep this script unguarded.
 if have kubectl; then
-  kubectl config delete-context "admin@${CLUSTER_NAME}" >/dev/null 2>&1 || true
-  kubectl config delete-cluster "${CLUSTER_NAME}" >/dev/null 2>&1 || true
-  kubectl config delete-user "admin@${CLUSTER_NAME}" >/dev/null 2>&1 || true
-  ok "kubeconfig entries removed"
+  cleaned=()
+  for kc in "$(kubeconfig_in_use)" "${HOME}/.kube/config"; do
+    [[ -f "${kc}" ]] || continue
+    # Same path twice (the usual non-mise case) — clean it once.
+    for seen in "${cleaned[@]+"${cleaned[@]}"}"; do [[ "${seen}" == "${kc}" ]] && continue 2; done
+    kubectl --kubeconfig="${kc}" config delete-context "admin@${CLUSTER_NAME}" >/dev/null 2>&1 || true
+    kubectl --kubeconfig="${kc}" config delete-cluster "${CLUSTER_NAME}" >/dev/null 2>&1 || true
+    kubectl --kubeconfig="${kc}" config delete-user "admin@${CLUSTER_NAME}" >/dev/null 2>&1 || true
+    cleaned+=("${kc}")
+  done
+  ok "kubeconfig entries removed (${cleaned[*]})"
 fi
 # `talosctl config remove` SKIPS the context that is currently selected — and
 # still exits 0 while saying so ("skipping removal of current context ...,

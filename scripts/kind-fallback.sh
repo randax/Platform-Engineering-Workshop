@@ -70,6 +70,10 @@ EOF
 # publishes the API on 127.0.0.1, so from here the guard is a post-condition,
 # asserted before the Cilium helm install and the kubectl calls below.
 require_workshop_context
+# Same as the Talos path: `kind create cluster` writes to KUBECONFIG, which
+# mise.toml pins to ~/.kube/cloudbox.conf for this repo (and which is your
+# ordinary ~/.kube/config when mise is not activated).
+info "kubeconfig: $(kubeconfig_in_use)"
 
 # --- 2. Wire up the image mirror (if present) --------------------------------------
 if mirror_running; then
