@@ -67,12 +67,25 @@ fi
 # in ~/.kube/config is exactly the entry the context guard is built to accept,
 # so leaving it there would re-arm the fall-through the pin exists to disarm.
 #
+# ${CLOUDBOX_KUBECONFIG} is listed EXPLICITLY rather than left to
+# kubeconfig_in_use(), which returns $KUBECONFIG whenever that is set and only
+# falls through to the pinned file when it is not. That is one case short: a
+# mise SHIM overrides an inherited KUBECONFIG (the same precedence docs/HAZARDS.md
+# records as "a KUBECONFIG= prefix does nothing to a mise-shimmed kubectl"), so a
+# shell that exports KUBECONFIG=~/.kube/config — a .zshrc export, or mise
+# activated at $HOME where the user-level [env] sets it — creates the cluster in
+# cloudbox.conf and would have cleaned ~/.kube/config. The stale admin@cloudbox
+# left behind is on 127.0.0.1:<port>, i.e. precisely what the context guard
+# accepts, so every later module diagnoses "you have no cluster" as "you forgot
+# to push". Nonexistent files are skipped below, so this is a no-op for anyone
+# who never had a pinned kubeconfig.
+#
 # Still only NAMED-entry surgery — no cluster is contacted, nothing that is not
 # this workshop's own context/cluster/user is touched — which is the premise
 # check-consistency.sh check 8 asserts to keep this script unguarded.
 if have kubectl; then
   cleaned=()
-  for kc in "$(kubeconfig_in_use)" "${HOME}/.kube/config"; do
+  for kc in "$(kubeconfig_in_use)" "${CLOUDBOX_KUBECONFIG}" "${HOME}/.kube/config"; do
     [[ -f "${kc}" ]] || continue
     # Same path twice (the usual non-mise case) — clean it once.
     for seen in "${cleaned[@]+"${cleaned[@]}"}"; do [[ "${seen}" == "${kc}" ]] && continue 2; done
