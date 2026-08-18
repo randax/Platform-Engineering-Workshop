@@ -260,6 +260,85 @@ everything else, and the platform most of the room will be on is still covered o
 a human rehearsing before the event. Green CI is now evidence about Linux, forwards
 *and* backwards — and nothing else.
 
+## RESOLVED — the workshop scripts ran against whatever cluster `kubectl` pointed at
+
+**Found in rehearsal 3, closed in `2b8de71` (lab/) and `b4f5e2d` (scripts/ +
+solutions/).** Kept in full: the near-miss is the evidence, and the residual at the
+bottom is live.
+
+`destroy-cluster.sh` removes the `admin@cloudbox` kubeconfig entries. `kubectl` then
+falls through to the next entry in the same `~/.kube/config` — and this audience
+arrives with a dozen. On the ordinary attendee path, `lab/01-cluster/verify.sh`
+printed
+
+    ✅ kubectl reaches the API server
+    ❌ FAIL: want 2 Ready nodes, have 36/36
+
+against a real **36-node corporate cluster** at `https://172.16.4.2`. `verify.sh`
+only reads, so nothing was harmed. Nothing else on the list only reads.
+
+**The second commit is the one that mattered.** The first guarded 18 lab scripts and
+left `scripts/` alone, where the exposure is worse: `bootstrap-gitops.sh` makes 13
+`kubectl` calls and installs Gitea **and** ArgoCD, `seed-gitea.sh` force-pushes the
+platform repo and applies the root app-of-apps, `catch-up.sh` and the
+`solutions/module-*/post.sh` it invokes rewrite the platform. The same fall-through
+would have installed **a complete GitOps control plane into an employer's cluster**.
+
+**It refuses rather than warns, and has no environment override** — the outcome it
+prevents is applying workshop manifests to someone's employer's cluster, and an
+override is precisely the line that gets copy-pasted past a safety check by someone
+in a hurry in a conference room. It asserts the context **name** *and* the **API
+server address**, because neither is sufficient: a name is one `rename-context` from
+wrong, and minikube, k3d and Docker Desktop are all on loopback too. Both cases were
+proven with fixtures — a context *named* `admin@cloudbox` pointing at a remote server,
+and a legitimate local `minikube`. It reads the kubeconfig only and makes no API
+call, so a merely stopped workshop cluster still passes and module 01 keeps its own
+"kubectl cannot reach the cluster" diagnosis.
+
+**Three placement facts, each enforced by `check-consistency.sh` rather than
+remembered:**
+
+- **It cannot fire on source in `scripts/lib.sh`.** `create-cluster.sh` and
+  `kind-fallback.sh` source lib.sh and legitimately run *before* any workshop context
+  exists — they create it. lib.sh only *defines* the guard; check 8 fails if it ever
+  calls it.
+- **`catch-up.sh` guards AFTER its `--rebuild` branch.** In front of it, the one
+  command reserved for people already in trouble would refuse on the very cluster it
+  is about to replace. Check 8 compares the line numbers.
+- **`destroy-cluster.sh` is deliberately NOT guarded** — it is what *causes* the
+  fall-through, so it must work when the context is already wrong. Safe only because
+  nothing in it resolves through the current context: `talosctl cluster destroy
+  --name` is scoped by container label, and its `kubectl` calls edit *named*
+  kubeconfig entries. Check 8 asserts that premise, so the exemption cannot quietly
+  grow a real cluster call.
+
+**One copy of the guard, in `scripts/context-guard.sh`,** shared by `scripts/lib.sh`
+and `lab/common.sh`. Folding it into lib.sh was tried and rejected on evidence:
+lib.sh defines `ok()`/`fail()`, and `lab/01-cluster/verify.sh` defines its own
+*counting* `fail()` **before** sourcing `common.sh` — lib.sh's version would have
+clobbered it and module 01 would print `❌ FAIL:` lines while exiting 0.
+
+**The residual: CI still cannot see any of this.** A runner's kubeconfig holds exactly
+one cluster, so no job can distinguish a guard that works from one that is never
+reached. What is proven is static (checks 7 and 8, nine planted violations shown to
+fail) and manual (fixture kubeconfigs driven through `--kubeconfig`: every guarded
+script exits 1 before acting, on a foreign context, on a workshop-named context aimed
+elsewhere, and on no context at all). **Nobody has reproduced rehearsal 3's actual
+sequence since the fix** — `destroy-cluster.sh`, then a lab script, on a laptop with a
+real multi-context kubeconfig. That is a ten-minute check and the only evidence that
+would retire this entry rather than settle it.
+
+## TRAP — a `KUBECONFIG=` prefix does nothing to a mise-shimmed `kubectl`
+
+Not a repo hazard — a maintainer-machine one, recorded because it cost real time and
+mutated a live kubeconfig. `~/.config/mise/config.toml` sets
+`[env] KUBECONFIG = "{{env.HOME}}/.kube/config"`, which mise applies to **every
+shim** — so `KUBECONFIG=/tmp/foo kubectl …` silently uses the real `~/.kube/config`,
+including `kubectl config` subcommands, which then *mutate* it. An agent renamed the
+maintainer's live workshop context this way. Use `kubectl --kubeconfig=<file>`
+exclusively for fixture work: the flag outranks the env var, which is what makes it
+safe. Nothing in the workshop depends on `KUBECONFIG`, so attendees are unaffected.
+
 ## RESOLVED — a re-injected module 05 fault could leave nothing wrong, and `verify.sh` called it fixed
 
 **Found in rehearsal 2, fixed in `4e2817b`.** Kept because it is the most instructive
