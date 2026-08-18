@@ -17,6 +17,10 @@ that pass costs an hour, not an afternoon.
 | Has any pin fallen **behind** upstream? | `scripts/check-upstream.sh` | weekly (`upstream-check.yaml`) |
 | Does the whole attendee flow still **work**? | `.github/workflows/bootstrap-test.yaml` | weekly |
 
+A green `bootstrap-test.yaml` means *the workshop works on Linux, on one cluster,
+with no timing races*. Three rehearsals each found blockers it cannot see by
+construction — see [`REHEARSALS.md`](REHEARSALS.md).
+
 Dependencies inside our own code (Go modules, the Slidev deck, GitHub Actions)
 are Dependabot's job — see `.github/dependabot.yml`.
 

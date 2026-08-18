@@ -19,6 +19,11 @@ on their own laptops. Working offline after image pre-pull is a hard requirement
 - **docs/MAINTENANCE.md** — the pin-rot runbook: the four mechanized checks, how to
   bump a pin and what to re-vendor with it. Read it before any "update the versions"
   work; do not re-derive that process.
+- **docs/HAZARDS.md** — known hazards, traps and unproven assumptions, with what
+  retires each. Read before changing anything load-bearing; several entries exist
+  because someone "fixed" a deliberate choice.
+- **docs/REHEARSALS.md** — what the day actually costs (script time is 16–32 min of
+  the 240) and what three end-to-end rehearsals taught about testing this thing.
 
 ## Repository layout
 
