@@ -21,6 +21,10 @@ type ObjMeta struct {
 	Namespace         string            `json:"namespace"`
 	CreationTimestamp string            `json:"creationTimestamp"`
 	Annotations       map[string]string `json:"annotations,omitempty"`
+	// Generation + a status.observedGeneration is how you tell "the controller
+	// has acted on this spec" from "it hasn't looked yet" — needed before any
+	// status field can be read as a verdict (see workload.rollout).
+	Generation int64 `json:"generation"`
 }
 
 // condition is the standard Kubernetes status condition shape.

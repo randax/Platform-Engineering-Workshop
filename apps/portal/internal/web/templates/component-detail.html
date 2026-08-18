@@ -3,6 +3,10 @@
 <p><a href="/components">← all components</a></p>
 <h1>{{.Name}} <span class="badge {{.StatusClass}}">{{.Status}}</span></h1>
 <p class="lede">{{.Description}} · namespace <code>{{.Namespace}}</code> · <b>{{.Ready}}</b>/<b>{{.Total}}</b> workloads ready.</p>
+{{/* The ready count alone cannot see a bad release — a Deployment surges, so
+     the old ReplicaSet keeps it full while the new pods fail. This line is what
+     says so. */}}
+{{if .RolloutNote}}<p class="hint rollout-note">{{.RolloutNote}}</p>{{end}}
 
 {{if .ShowDiag}}
 <h2>Diagnostics <small>why this component isn't healthy</small></h2>

@@ -2,12 +2,17 @@ package web
 
 import (
 	"bytes"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"cloudbox.io/portal/internal/kagent"
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/logs"
 	"cloudbox.io/portal/internal/metrics"
@@ -451,4 +456,169 @@ func sampleDatabaseDetail() dbDetailData {
 	d.CacheNow = "99.7%"
 	d.SizeNow = "14 MiB"
 	return d
+}
+
+// demoAPI stands in for the API server with the demo namespace exactly as it
+// was captured on 2026-08-18 during module 10 scenario 1: three "ready"
+// workloads, one of which is a Deployment whose surged new pod is in
+// CrashLoopBackOff while its old ReplicaSet still serves both replicas.
+//
+//	$ kubectl -n demo get deploy demo-web
+//	NAME       READY   UP-TO-DATE   AVAILABLE
+//	demo-web   2/2     1            2
+//	$ kubectl -n demo get pods -l app=demo-web
+//	demo-web-69dfd9d57c-zm6v2   0/1   CrashLoopBackOff   4
+//	demo-web-86c89df498-4k42z   1/1   Running            0
+//	demo-web-86c89df498-xbxtm   1/1   Running            0
+//
+// progressedAt is when the Progressing condition last moved; the Console judges
+// the rollout stalled once that stops advancing (kube.StallAfter).
+func demoAPI(t *testing.T, progressedAt time.Time) http.HandlerFunc {
+	t.Helper()
+	deployments := fmt.Sprintf(`{"items":[
+	  {"metadata":{"name":"demo-web","namespace":"demo","generation":2},
+	   "spec":{"replicas":2},
+	   "status":{"observedGeneration":2,"replicas":3,"readyReplicas":2,"availableReplicas":2,
+	     "updatedReplicas":1,"unavailableReplicas":1,
+	     "conditions":[
+	       {"type":"Available","status":"True","reason":"MinimumReplicasAvailable","lastUpdateTime":"2026-08-18T13:48:04Z"},
+	       {"type":"Progressing","status":"True","reason":"ReplicaSetUpdated","lastUpdateTime":%q}]}},
+	  {"metadata":{"name":"hello-00001-deployment","namespace":"demo","generation":1},
+	   "spec":{"replicas":0},"status":{"observedGeneration":1}},
+	  {"metadata":{"name":"hello-site","namespace":"demo","generation":1},
+	   "spec":{"replicas":1},
+	   "status":{"observedGeneration":1,"replicas":1,"readyReplicas":1,"updatedReplicas":1,
+	     "conditions":[{"type":"Progressing","status":"True","reason":"NewReplicaSetAvailable",
+	       "lastUpdateTime":"2026-08-18T13:50:00Z"}]}}]}`,
+		progressedAt.UTC().Format(time.RFC3339))
+
+	const pods = `{"items":[
+	  {"metadata":{"name":"demo-web-69dfd9d57c-zm6v2","namespace":"demo"},
+	   "status":{"phase":"Running","containerStatuses":[{"name":"web","ready":false,
+	     "state":{"waiting":{"reason":"CrashLoopBackOff",
+	       "message":"back-off 1m20s restarting failed container=web pod=demo-web-69dfd9d57c-zm6v2_demo"}}}]}},
+	  {"metadata":{"name":"demo-web-86c89df498-4k42z","namespace":"demo"},
+	   "status":{"phase":"Running","containerStatuses":[{"name":"web","ready":true,"state":{"running":{}}}]}}]}`
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/apis/apps/v1/deployments":
+			_, _ = io.WriteString(w, deployments)
+		case strings.HasSuffix(r.URL.Path, "/pods"):
+			_, _ = io.WriteString(w, pods)
+		default:
+			// statefulsets, daemonsets, events: nothing in this namespace.
+			_, _ = io.WriteString(w, `{"items":[]}`)
+		}
+	}
+}
+
+// withKagent makes the Case file's agent read as present and Healthy, so the
+// live mount renders rather than the locked hint.
+func withKagent(srv *Server) *Server {
+	srv.Kagent = kagent.New("http://kagent.invalid")
+	var app kube.ArgoApp
+	app.Status.Health.Status = "Healthy"
+	srv.snap = kube.Snapshot{Apps: map[string]kube.ArgoApp{"kagent": app}}
+	srv.snapAt = time.Now()
+	return srv
+}
+
+func renderComponent(t *testing.T, srv *Server, ns string) string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/components/"+ns, nil)
+	req.SetPathValue("namespace", ns)
+	rec := httptest.NewRecorder()
+	handleComponentDetail(srv, rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	return rec.Body.String()
+}
+
+// TestComponentDetailStalledRollout is the module-10 regression, end to end
+// from the captured API responses to the rendered page.
+//
+// Rehearsal 4 found that with any scenario injected this page read
+// "Operational · 3/3 workloads ready" and offered no Open investigation button
+// at all, because the mount condition counted Deployments and the old
+// ReplicaSet was still serving. The whole second half of module 10 hangs off
+// that button.
+func TestComponentDetailStalledRollout(t *testing.T) {
+	// The rollout has not moved for five minutes — well past kube.StallAfter,
+	// and still half of Kubernetes' own 600 s progressDeadlineSeconds.
+	srv := withKagent(newTestServer(t, demoAPI(t, time.Now().Add(-5*time.Minute))))
+	html := renderComponent(t, srv, "demo")
+
+	if strings.Contains(html, ">Operational<") {
+		t.Error("a component whose release has stalled must not read Operational")
+	}
+	for _, want := range []string{
+		">Degraded<",              // the badge
+		"stopped making progress", // why the ready count still says 3/3
+		"Open investigation",      // the module-10 centrepiece, reachable at last
+		`data-kind="Component"`,
+		"Diagnostics",      // the panel that explains the cause
+		"CrashLoopBackOff", // ...naming the container that is actually failing
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("stalled component page missing %q", want)
+		}
+	}
+}
+
+// The other half of the contract: a component mid-deploy on a healthy cluster
+// must not be libelled. The console polls this page's list fragment every 10 s
+// and a healthy demo-web roll is in flight for ~14 s, so calling that
+// "Degraded" — and offering a why-is-this-broken panel for it — would cry wolf
+// on every single push.
+func TestComponentDetailHealthyRollDoesNotCryWolf(t *testing.T) {
+	srv := withKagent(newTestServer(t, demoAPI(t, time.Now().Add(-6*time.Second))))
+	html := renderComponent(t, srv, "demo")
+
+	if !strings.Contains(html, ">Rolling out<") {
+		t.Error("a release in flight should say so")
+	}
+	for _, unwanted := range []string{">Degraded<", ">Down<", "stopped making progress", "CrashLoopBackOff"} {
+		if strings.Contains(html, unwanted) {
+			t.Errorf("healthy roll must not render %q", unwanted)
+		}
+	}
+	if !strings.Contains(html, "1 rollout is in progress.") {
+		t.Error("the in-flight note should say a rollout is running")
+	}
+}
+
+// A settled, genuinely healthy component reads Operational and shows no fault
+// panel — but STILL offers the investigation. Module 10's third scenario is a
+// bad release whose pods all come up Running: if the button only appeared for
+// visibly broken things, the one scenario about "green pods are not evidence
+// that the release was good" would be the one you could not investigate.
+func TestComponentDetailHealthyStillOffersInvestigation(t *testing.T) {
+	settled := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/apis/apps/v1/deployments" {
+			_, _ = io.WriteString(w, `{"items":[{"metadata":{"name":"demo-web","namespace":"demo","generation":1},
+			  "spec":{"replicas":2},
+			  "status":{"observedGeneration":1,"replicas":2,"readyReplicas":2,"availableReplicas":2,"updatedReplicas":2,
+			    "conditions":[{"type":"Progressing","status":"True","reason":"NewReplicaSetAvailable",
+			      "lastUpdateTime":"2026-08-18T13:48:04Z"}]}}]}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"items":[]}`)
+	}
+	html := renderComponent(t, withKagent(newTestServer(t, settled)), "demo")
+
+	if !strings.Contains(html, ">Operational<") {
+		t.Error("a settled, fully ready component must read Operational")
+	}
+	for _, unwanted := range []string{"Rolling out", "rollout is in progress", ">Diagnostics<"} {
+		if strings.Contains(html, unwanted) {
+			t.Errorf("healthy component must not render %q", unwanted)
+		}
+	}
+	if !strings.Contains(html, "Open investigation") {
+		t.Error("the investigation must stay reachable on a component that merely LOOKS fine")
+	}
 }

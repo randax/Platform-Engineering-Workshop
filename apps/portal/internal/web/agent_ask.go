@@ -55,22 +55,29 @@ var allowedKinds = map[string]bool{"Application": true, "Component": true}
 
 // caseFile is the view-model for the shared Case file affordance (module 10),
 // rendered by the "case-file" template. One value describes which resource to
-// investigate and whether the agent is available — so every surface that shows an
-// unhealthy resource (the Application detail, the demo component detail) mounts
+// investigate and whether the agent is available — so every surface that can
+// offer an investigation (the Application detail, the component detail) mounts
 // the SAME affordance without duplicating its markup. Kind is the surface
 // discriminator (see allowedKinds) and is rendered into data-kind.
 type caseFile struct {
-	Show      bool   // offer it at all — the resource is unhealthy
+	Show      bool   // offer it at all — there is a resource here to investigate
 	Available bool   // kagent present + Healthy → live mount; otherwise locked
 	Kind      string // "Application" | "Component" — the session/prompt discriminator
 	Namespace string // resource namespace (must be a DNS-1123 label)
 	Name      string // resource name (must be a DNS-1123 label)
 }
 
-// caseFileFor builds the affordance model: shown when the resource is unhealthy,
-// live when the agent capability is available.
-func caseFileFor(s *Server, unhealthy bool, kind, ns, name string) caseFile {
-	return caseFile{Show: unhealthy, Available: agentAvailable(s), Kind: kind, Namespace: ns, Name: name}
+// caseFileFor builds the affordance model: shown when the caller has a resource
+// worth investigating, live when the agent capability is available.
+//
+// `show` is the caller's decision, NOT a health check. It used to be "is this
+// unhealthy", which made the investigation unreachable for exactly the faults
+// module 10 injects: a bad release surges alongside a healthy old ReplicaSet, so
+// the health rollup said "fine" and the button never rendered. Health now
+// governs the Diagnostics panel; whether there is something here to investigate
+// governs this.
+func caseFileFor(s *Server, show bool, kind, ns, name string) caseFile {
+	return caseFile{Show: show, Available: agentAvailable(s), Kind: kind, Namespace: ns, Name: name}
 }
 
 // agentAvailable reports whether the Case file affordance can offer a live
@@ -348,13 +355,24 @@ func buildFollowupPrompt(kind, ns, name, question string) string {
 // questions bypass this (see buildFollowupPrompt).
 func buildInvestigationPrompt(kind, ns, name, why string, diag kube.Diagnostics) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "You are a read-only Kubernetes troubleshooting agent. Investigate %s and explain why it is unhealthy.\n\n", resourcePhrase(kind, ns, name))
+	// Only assert a fault when there is evidence of one. An investigation can now
+	// be opened on a resource that looks fine (module 10 scenario 3 is a bad
+	// release whose pods all come up Running), and telling a small local model
+	// "explain why it is unhealthy" about a healthy namespace is an invitation to
+	// invent a fault — the opposite of what a module about verifying agent output
+	// should ship.
+	evidence := why != "" || len(diag.PodTroubles) > 0 || len(diag.Warnings) > 0
+	if evidence {
+		fmt.Fprintf(&b, "You are a read-only Kubernetes troubleshooting agent. Investigate %s and explain why it is unhealthy.\n\n", resourcePhrase(kind, ns, name))
+	} else {
+		fmt.Fprintf(&b, "You are a read-only Kubernetes troubleshooting agent. Investigate %s and report what state it is actually in. Do not assume there is a fault: if the workloads are healthy, say so plainly, and report anything that looks questionable without calling it an outage.\n\n", resourcePhrase(kind, ns, name))
+	}
 	if why != "" {
 		fmt.Fprintf(&b, "The platform's status condition says: %s\n\n", why)
 	}
 	b.WriteString("What the console's diagnostics panel already shows:\n")
-	if len(diag.PodTroubles) == 0 && len(diag.Warnings) == 0 {
-		b.WriteString("- (no obvious container faults or warning events yet)\n")
+	if !evidence {
+		b.WriteString("- (no container faults or warning events)\n")
 	}
 	for _, t := range diag.PodTroubles {
 		fmt.Fprintf(&b, "- pod %s container %s: %s — %s\n", t.Pod, t.Container, t.Reason, t.Message)

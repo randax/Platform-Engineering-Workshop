@@ -796,3 +796,43 @@ func TestAgentAskFollowupDoesNotDoubleTheAnswer(t *testing.T) {
 		t.Errorf("the opening investigation must still fill the panel:\n%s", open)
 	}
 }
+
+// The opening prompt must not assert a fault it has no evidence for. The
+// investigation is now reachable on a component that looks fine — module 10's
+// third scenario is a bad release whose pods all come up Running — and telling
+// a 1.7B local model "explain why it is unhealthy" about a healthy namespace is
+// how you get a confidently invented outage, in the one module whose lesson is
+// that you must verify what the agent says.
+func TestBuildInvestigationPromptDoesNotAssumeAFault(t *testing.T) {
+	clean := buildInvestigationPrompt("Component", "demo", "demo", "", kube.Diagnostics{})
+	if strings.Contains(clean, "explain why it is unhealthy") {
+		t.Errorf("prompt asserts a fault with no evidence for one:\n%s", clean)
+	}
+	for _, want := range []string{
+		"Do not assume there is a fault", // the guardrail
+		"if the workloads are healthy, say so",
+		"read-only", "git", // the standing guardrails survive
+	} {
+		if !strings.Contains(clean, want) {
+			t.Errorf("evidence-free prompt missing %q:\n%s", want, clean)
+		}
+	}
+
+	// With evidence, it still says the thing plainly.
+	troubled := buildInvestigationPrompt("Component", "demo", "demo", "", kube.Diagnostics{
+		PodTroubles: []kube.PodTrouble{{Pod: "demo-web-69dfd9d57c-zm6v2", Container: "web", Reason: "CrashLoopBackOff"}},
+	})
+	if !strings.Contains(troubled, "explain why it is unhealthy") {
+		t.Errorf("prompt must name the fault when there IS one:\n%s", troubled)
+	}
+	if strings.Contains(troubled, "Do not assume there is a fault") {
+		t.Errorf("evidence present, so the no-fault framing must not appear:\n%s", troubled)
+	}
+	// A warning event alone is evidence enough.
+	warned := buildInvestigationPrompt("Component", "demo", "demo", "", kube.Diagnostics{
+		Warnings: []kube.Event{{Reason: "FailedCreatePodSandBox", Message: "container init was OOM-killed"}},
+	})
+	if !strings.Contains(warned, "explain why it is unhealthy") {
+		t.Errorf("a Warning event is evidence:\n%s", warned)
+	}
+}

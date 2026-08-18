@@ -7,6 +7,7 @@ package web
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	"cloudbox.io/portal/internal/kube"
 )
@@ -61,9 +62,72 @@ var componentCatalog = []component{
 type componentRow struct {
 	component
 	Ready, Total int
-	Status       string // Operational | Degraded | Down | Not installed
-	Class        string // dot color: ok | meh | bad | off
+	Status       string // Operational | Rolling out | Degraded | Down | Not installed
+	Class        string // dot color: ok | info | meh | bad | off
 	Hint         string // shown muted after the description
+}
+
+// componentStatus is THE status ladder for a namespace — one function, used by
+// both the Components list and the component detail page, so the two can never
+// disagree about what a component's state is called.
+//
+// The two rungs in the middle are the module-10 fix. A Deployment surges: while
+// a bad release crashloops, gets OOM-killed at sandbox creation, or can't pull,
+// the old ReplicaSet keeps serving and readyReplicas stays full — so Ready ==
+// Total is TRUE and says nothing. Rollout state is what expresses "something is
+// happening here", and only a rollout that has gone quiet for kube.StallAfter
+// is called Degraded. A release that is merely in flight says so, in blue:
+// mid-deploy is not a fault, and a console that reddens on every push teaches
+// people to ignore it.
+func componentStatus(h kube.NSHealth) (status, class string) {
+	switch {
+	case h.Total == 0:
+		return "Not installed", "off"
+	case h.Ready == 0:
+		return "Down", "bad"
+	case h.Ready < h.Total:
+		return "Degraded", "meh"
+	case h.Stalled > 0:
+		return "Degraded", "meh"
+	case h.Updating > 0:
+		return "Rolling out", "info"
+	default:
+		return "Operational", "ok"
+	}
+}
+
+// componentUnhealthy is the "something is actually wrong here" gate — what the
+// Diagnostics panel is shown for. Deliberately NOT "not Operational": a rollout
+// in flight is not a fault, and offering a why-is-this-broken panel for one
+// would be crying wolf on every deploy.
+func componentUnhealthy(h kube.NSHealth) bool {
+	return h.Total > 0 && (h.Ready < h.Total || h.Stalled > 0)
+}
+
+// rolloutNote is the sentence that stops the ready count from lying. "3/3
+// workloads ready" is literally true during module 10's scenarios — the old
+// ReplicaSet is serving all three — so when a rollout is in flight the page has
+// to say what the count cannot. Empty when nothing is rolling.
+func rolloutNote(h kube.NSHealth) string {
+	switch {
+	case h.Stalled > 0:
+		return plural(h.Stalled, "rollout has", "rollouts have") +
+			" stopped making progress: the new pods aren't coming up and the previous " +
+			"version is still serving, which is why the ready count above still looks full."
+	case h.Updating > 0:
+		return plural(h.Updating, "rollout is", "rollouts are") + " in progress."
+	default:
+		return ""
+	}
+}
+
+// plural renders "1 rollout is" / "2 rollouts are" — the count with whichever
+// wording agrees with it.
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return strconv.Itoa(n) + " " + many
 }
 
 func componentRows(health map[string]kube.NSHealth) []componentRow {
@@ -71,18 +135,9 @@ func componentRows(health map[string]kube.NSHealth) []componentRow {
 	for _, c := range componentCatalog {
 		h := health[c.Namespace]
 		row := componentRow{component: c, Ready: h.Ready, Total: h.Total}
-		switch {
-		case h.Total == 0:
-			row.Status, row.Class = "Not installed", "off"
-			if c.Catalog != "" {
-				row.Hint = "enable gitops/catalog/" + c.Catalog
-			}
-		case h.Ready == h.Total:
-			row.Status, row.Class = "Operational", "ok"
-		case h.Ready > 0:
-			row.Status, row.Class = "Degraded", "meh"
-		default:
-			row.Status, row.Class = "Down", "bad"
+		row.Status, row.Class = componentStatus(h)
+		if h.Total == 0 && c.Catalog != "" {
+			row.Hint = "enable gitops/catalog/" + c.Catalog
 		}
 		rows = append(rows, row)
 	}

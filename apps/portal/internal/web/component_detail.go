@@ -25,17 +25,25 @@ type componentDetailData struct {
 	Ready       int
 	Total       int
 	Status      string
-	StatusClass string // health dot/badge: ok | meh | bad | off
+	StatusClass string // health dot/badge: ok | info | meh | bad | off
 
-	// Diagnostics — the "why" (DR-0005), shown only when the component isn't
-	// Operational: the failing pods' container states + recent Warning events.
+	// RolloutNote says what Ready/Total cannot: that a release is in flight, or
+	// that one has stopped moving while the previous version keeps the ready
+	// count full. Empty when nothing is rolling out.
+	RolloutNote string
+
+	// Diagnostics — the "why" (DR-0005), shown only when something is actually
+	// wrong (componentUnhealthy, which a rollout merely in flight is not): the
+	// failing pods' container states + recent Warning events.
 	Diag     kube.Diagnostics
 	ShowDiag bool
 
-	// Case file — the agent investigation affordance (module 10), offered when
-	// this component is unhealthy. Closes the seam where lab faults (the demo
-	// namespace's workloads) had no path into the Console. Same shared "case-file"
-	// template as the Application detail.
+	// Case file — the agent investigation affordance (module 10), offered on any
+	// component that has workloads. Deliberately NOT gated on health: module 10's
+	// third scenario (a release that moves an image to Docker Hub) leaves every
+	// pod Running, and "the console looked fine, so I stopped looking" is the
+	// exact habit the module exists to break. Same shared "case-file" template as
+	// the Application detail, which offers it unconditionally too.
 	CaseFile caseFile
 
 	// Monitoring — populated only when the observability stack is running
@@ -77,36 +85,36 @@ func handleComponentDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 	h := health[ns]
 	data := componentDetailData{
 		Name: comp.Title, Namespace: ns, Description: comp.Description,
-		Ready: h.Ready, Total: h.Total,
+		Ready: h.Ready, Total: h.Total, RolloutNote: rolloutNote(h),
 	}
-	switch {
-	case h.Total == 0:
-		data.Status, data.StatusClass = "Not installed", "off"
-	case h.Ready == h.Total:
-		data.Status, data.StatusClass = "Operational", "ok"
-	case h.Ready > 0:
-		data.Status, data.StatusClass = "Degraded", "meh"
-	default:
-		data.Status, data.StatusClass = "Down", "bad"
-	}
+	// Same ladder as the Components list — see componentStatus for why a full
+	// ready count is not enough to call a component Operational.
+	data.Status, data.StatusClass = componentStatus(h)
 
 	// Diagnose the cause when the component isn't fully healthy (DR-0005) — the
 	// failing pods and Warning events for its namespace. Best-effort: a diag read
 	// error never breaks the page, it just leaves the section empty (hidden).
-	unhealthy := h.Total > 0 && h.Ready < h.Total
+	// Only read the pods when something is actually wrong: the rollup includes
+	// the namespace's recent Warning events, and a healthy namespace routinely
+	// carries stale ones (a Knative cold start's readiness probes, a since-fixed
+	// image pull) that would make a "why this isn't healthy" panel appear over a
+	// perfectly healthy component.
+	unhealthy := componentUnhealthy(h)
 	if unhealthy {
 		if diag, derr := s.Kube.NamespaceDiagnostics(r.Context(), ns); derr == nil {
 			data.Diag = diag
 			data.ShowDiag = !diag.Empty()
 		}
 	}
-	// Offer the Case file agent investigation on an unhealthy component (module
-	// 10) — the path lab faults (the demo workloads) take into the Console. Kind
+	// Offer the Case file agent investigation on any component that HAS workloads
+	// (module 10) — the path lab faults (the demo workloads) take into the
+	// Console. Not gated on health: see the field comment above. An empty
+	// namespace is excluded because there is nothing there to investigate. Kind
 	// "Component" keeps this session distinct from any Application named like the
 	// namespace. The resource name is the namespace itself: a DNS-valid identifier
 	// the /agent/ask contract accepts, and the agent's evidence comes from that
 	// namespace's diagnostics rollup regardless.
-	data.CaseFile = caseFileFor(s, unhealthy, "Component", ns, ns)
+	data.CaseFile = caseFileFor(s, h.Total > 0, "Component", ns, ns)
 
 	// Gate the Monitoring panel on the observability stack actually running —
 	// no point querying VM/VLogs (and paying their timeouts) when nothing is

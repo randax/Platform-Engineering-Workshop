@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"cloudbox.io/portal/internal/kube"
@@ -81,5 +82,96 @@ func TestFetchComponentsViaFake(t *testing.T) {
 	}
 	if gitea == nil || gitea.Status != "Operational" {
 		t.Errorf("gitea should be Operational in Running, got %+v", gitea)
+	}
+}
+
+// TestComponentStatusLadder pins the one ladder both component surfaces use.
+//
+// The two middle rows are the module-10 regression. A Deployment surges, so a
+// release that crashloops, gets OOM-killed at sandbox creation, or cannot pull
+// leaves the OLD ReplicaSet serving every desired replica: Ready == Total is
+// true and completely uninformative. Rehearsal 4 caught the Console printing
+// "Operational · 3/3 workloads ready" over exactly that.
+func TestComponentStatusLadder(t *testing.T) {
+	cases := []struct {
+		name          string
+		h             kube.NSHealth
+		status, class string
+		unhealthy     bool
+	}{
+		{"empty namespace", kube.NSHealth{}, "Not installed", "off", false},
+		{"all ready", kube.NSHealth{Ready: 3, Total: 3}, "Operational", "ok", false},
+		{"partially ready", kube.NSHealth{Ready: 1, Total: 2}, "Degraded", "meh", true},
+		{"nothing ready", kube.NSHealth{Ready: 0, Total: 1}, "Down", "bad", true},
+		{
+			// The captured state: demo, 3 workloads, all "ready", one Deployment
+			// whose new pods have not come up for over two minutes.
+			"full ready count over a stalled rollout",
+			kube.NSHealth{Ready: 3, Total: 3, Updating: 1, Stalled: 1},
+			"Degraded", "meh", true,
+		},
+		{
+			// The same namespace ten seconds into a NORMAL deploy. A healthy
+			// demo-web roll is in flight for ~14 s; saying "Degraded" and
+			// offering a fault panel every time someone pushes is how a console
+			// teaches people to ignore it.
+			"full ready count during a healthy roll",
+			kube.NSHealth{Ready: 3, Total: 3, Updating: 1},
+			"Rolling out", "info", false,
+		},
+		{
+			// A rollout in flight does not soften a component that is already
+			// down on the plain ready count.
+			"broken and rolling stays Degraded",
+			kube.NSHealth{Ready: 1, Total: 3, Updating: 1},
+			"Degraded", "meh", true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			status, class := componentStatus(c.h)
+			if status != c.status || class != c.class {
+				t.Errorf("componentStatus = (%q, %q), want (%q, %q)", status, class, c.status, c.class)
+			}
+			if got := componentUnhealthy(c.h); got != c.unhealthy {
+				t.Errorf("componentUnhealthy = %v, want %v", got, c.unhealthy)
+			}
+		})
+	}
+}
+
+// The note is what stops "3/3 workloads ready" from being the whole story.
+func TestRolloutNote(t *testing.T) {
+	if note := rolloutNote(kube.NSHealth{Ready: 3, Total: 3}); note != "" {
+		t.Errorf("a settled namespace must say nothing about rollouts, got %q", note)
+	}
+	stalled := rolloutNote(kube.NSHealth{Ready: 3, Total: 3, Updating: 1, Stalled: 1})
+	if !strings.HasPrefix(stalled, "1 rollout has") || !strings.Contains(stalled, "still serving") {
+		t.Errorf("stalled note must name the old version still serving, got %q", stalled)
+	}
+	if note := rolloutNote(kube.NSHealth{Ready: 3, Total: 3, Updating: 2}); note != "2 rollouts are in progress." {
+		t.Errorf("in-flight note = %q", note)
+	}
+}
+
+// The rows the list page renders must carry the new state through, and the
+// marketplace hint must still only appear on components that aren't installed.
+func TestComponentRowsCarryRolloutState(t *testing.T) {
+	rows := componentRows(map[string]kube.NSHealth{
+		"demo":  {Ready: 3, Total: 3, Updating: 1, Stalled: 1},
+		"gitea": {Ready: 1, Total: 1, Updating: 1},
+	})
+	byNS := map[string]componentRow{}
+	for _, r := range rows {
+		byNS[r.Namespace] = r
+	}
+	if got := byNS["demo"]; got.Status != "Degraded" || got.Ready != 3 || got.Total != 3 {
+		t.Errorf("demo row = %+v, want Degraded with its full 3/3 count intact", got)
+	}
+	if got := byNS["gitea"]; got.Status != "Rolling out" || got.Class != "info" {
+		t.Errorf("gitea row = (%q, %q), want (Rolling out, info)", got.Status, got.Class)
+	}
+	if got := byNS["backstage"]; got.Hint != "enable gitops/catalog/backstage.yaml" {
+		t.Errorf("uninstalled component lost its catalog hint: %q", got.Hint)
 	}
 }

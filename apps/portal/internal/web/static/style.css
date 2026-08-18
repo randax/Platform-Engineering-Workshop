@@ -395,6 +395,9 @@ td.actions a { margin-right: 0.5rem; }
 .dot.meh { background: var(--dot-meh); color: var(--dot-meh); }
 .dot.bad { background: var(--dot-bad); color: var(--dot-bad); }
 .dot.off { background: var(--dot-off); color: var(--dot-off); }
+/* "Rolling out" — a release in flight is news, not an alarm, so it reads blue
+   alongside the green/amber/red of actual health. */
+.dot.info { background: var(--info); color: var(--info); }
 
 .modnum { flex: none; font-weight: 700; font-size: 0.85rem; color: var(--muted); width: 1.6rem; }
 
