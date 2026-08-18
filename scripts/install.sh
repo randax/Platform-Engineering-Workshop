@@ -170,14 +170,29 @@ else
     # The cluster NODES are containers — reaching the mirror from localhost
     # proves nothing about them. Probe from container context too (docker-ce
     # inside WSL2, for example, has no host.docker.internal).
+    #
+    # The probe image is the MIRROR'S OWN image (registry:3.1.1, on the [host]
+    # list): the mirror container is running from it two lines above, so it is
+    # provably in the local cache, and `--pull=never` guarantees this preflight
+    # never reaches for a registry. It used to be busybox:1.37.0 — which is a
+    # [mirror] image, copied into the registry by crane and therefore NEVER
+    # pulled into the host Docker engine. Offline at the venue that pull fails
+    # and the check reported "mirror not reachable from containers": a red
+    # finding manufactured by the checker itself, on the one tool whose whole
+    # job is to be trustworthy. (registry:3.1.1 is Alpine-based and carries the
+    # same BusyBox 1.37.0 wget, so the probe command is unchanged.)
     mirror_ep="$(mirror_host_endpoint)"
     if [[ "${mirror_ep}" == "http://${TALOS_SUBNET_GATEWAY}:${MIRROR_PORT}" ]] && \
        ! docker network inspect "${CLUSTER_NAME}" >/dev/null 2>&1; then
       # Native Linux: the gateway address only exists once the cluster's
       # docker network does — nothing to probe yet, and nothing to fix.
       info "Container-side mirror probe skipped (${TALOS_SUBNET_GATEWAY} appears with the '${CLUSTER_NAME}' network)"
-    elif docker run --rm "docker.io/library/busybox:1.37.0" \
-         wget -q -T 5 -O- "${mirror_ep}/v2/" >/dev/null 2>&1; then
+    elif ! docker image inspect "${MIRROR_IMAGE}" >/dev/null 2>&1; then
+      # Nothing to probe WITH. Say so; do not count it as a mirror failure —
+      # the missing image is the host-image check's finding, below.
+      info "Container-side mirror probe skipped (${MIRROR_IMAGE} is not in the local Docker cache)"
+    elif docker run --rm --pull=never --entrypoint wget "${MIRROR_IMAGE}" \
+         -q -T 5 -O- "${mirror_ep}/v2/" >/dev/null 2>&1; then
       ok "Mirror reachable from containers at ${mirror_ep}"
     else
       check_fail "Mirror not reachable from containers at ${mirror_ep} — set CLOUDBOX_MIRROR_HOST to an address containers can reach (docker-ce in WSL2 has no host.docker.internal)"

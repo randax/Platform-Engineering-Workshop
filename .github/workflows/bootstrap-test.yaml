@@ -9,6 +9,12 @@
 # Results are summarized as a per-module PASS/FAIL + timing table on the run's
 # Summary page (no log-grepping); a diagnostics artifact is uploaded either way.
 #
+# A second job, `recovery-path`, runs in parallel on its own runner and covers
+# what one-cluster-per-runner cannot see: the SECOND cluster of the day
+# (destroy -> create, talos context sanity) and `catch-up.sh --rebuild` on a
+# module in the 07-10 range. Both are recovery-path bugs two cold rehearsals
+# found and this workflow could not.
+#
 # Runner: ubuntu-latest (4 vCPU / 16 GB). The core path (01-07) is proven green.
 # =============================================================================
 name: Bootstrap test
@@ -1116,5 +1122,220 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: bootstrap-diagnostics
+          path: /tmp/diag/
+          retention-days: 14
+
+  # ===========================================================================
+  # Recovery path — the two CI blind spots that let workshop-stoppers through.
+  #
+  # The job above creates exactly ONE cluster and never runs catch-up.sh, so by
+  # construction it cannot see either of the bugs the last two cold rehearsals
+  # found — and both were in the recovery path, the thing an attendee reaches
+  # for when they are already lost:
+  #
+  #  1. `talosctl config remove` SKIPS the currently-selected context (and exits
+  #     0 while saying so). create-cluster.sh leaves 'cloudbox' selected, so
+  #     destroy-cluster.sh silently removed nothing; the next create found the
+  #     name taken, `talosctl cluster create` renamed the NEW context to
+  #     'cloudbox-1', and every `talosctl --context cloudbox` in
+  #     create-cluster.sh then dialled the cluster that had just been destroyed.
+  #     i.e. destroy && create — and `catch-up.sh --rebuild` — failed on the
+  #     SECOND cluster of the day. Invisible with one cluster per runner.
+  #  2. catch-up.sh deadlocked on modules 07-10: it gated post.sh on the `demo`
+  #     Application going Healthy, but demo cannot be Healthy until post.sh
+  #     builds hello-site. Died at the 10-minute gate. Never exercised in CI.
+  #
+  # Runs on its own runner, in parallel with the rehearsal above, so it adds
+  # ~35 runner-minutes and ~0 workflow wall-clock. Deliberately NOT a matrix and
+  # deliberately module 07: it is inside the 07-10 deadlock range, it is the
+  # module the deadlock was actually reported on, and — unlike 08-10 — it needs
+  # none of the first-party images, so this job skips the mirror + image builds
+  # entirely and pulls from upstream like any laptop with WiFi.
+  # ===========================================================================
+  recovery-path:
+    name: recovery path — second cluster + catch-up 07
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # seed-gitea.sh (run by catch-up.sh --rebuild) pushes this checkout
+          # into the in-cluster Gitea, which rejects shallow pushes.
+          fetch-depth: 0
+
+      - name: Show runner resources
+        run: |
+          nproc; free -h; df -h /
+          docker info | grep -E 'CPUs|Total Memory'
+
+      - name: Install mise + pinned tools
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" sh
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          echo "${HOME}/.local/share/mise/shims" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/mise" trust
+          "${HOME}/.local/bin/mise" install
+
+      - name: First cluster of the day
+        run: ./scripts/create-cluster.sh
+
+      - name: Baseline — exactly one 'cloudbox' talos context, and it is selected
+        run: |
+          set -euo pipefail
+          # shellcheck source=../../scripts/versions.env
+          source scripts/versions.env
+          talos_ctx() { talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'; }
+          talosctl config contexts
+          [ "$(talos_ctx | grep -cx "${CLUSTER_NAME}" || true)" = 1 ] \
+            || { echo "❌ expected exactly one '${CLUSTER_NAME}' talos context after the first create"; exit 1; }
+          [ "$(talosctl config contexts | awk 'NR > 1 && $1 == "*" { print $2 }')" = "${CLUSTER_NAME}" ] \
+            || { echo "❌ '${CLUSTER_NAME}' is not the selected talos context"; exit 1; }
+          echo "✅ baseline talosconfig is sane"
+
+      - name: Recover — catch-up.sh 07 --rebuild (destroy → create #2 → bootstrap → seed → catch up)
+        id: rebuild
+        run: |
+          set -euo pipefail
+          # THE attendee recovery command, run for real: it destroys the live
+          # cluster above, creates the second cluster of the day, re-bootstraps
+          # GitOps, re-seeds Gitea and catches up to module 07. `confirm` reads
+          # stdin, so answer it; tee the log so the assertion below can read it.
+          ./scripts/catch-up.sh 07 --rebuild <<< "y" 2>&1 | tee /tmp/rebuild.log
+
+      - name: Assert the second cluster came up on a CLEAN talos context
+        id: ctx
+        run: |
+          set -euo pipefail
+          # shellcheck source=../../scripts/versions.env
+          source scripts/versions.env
+          talos_ctx() { talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'; }
+          talosctl config contexts
+
+          # create-cluster.sh carries its own belt-and-braces cleanup for a
+          # stale context, which would MASK a destroy-cluster.sh regression by
+          # silently fixing it. It announces itself when it fires — so a clean
+          # run must not contain that line. This is what makes the assertion a
+          # test of destroy-cluster.sh and not merely of the create.
+          if grep -q "Removing a stale talosconfig context" /tmp/rebuild.log; then
+            echo "❌ create-cluster.sh had to clean up after destroy-cluster.sh —"
+            echo "   'talosctl config remove' skipped the selected context again."
+            exit 1
+          fi
+          # And the symptom itself: exactly one context, named 'cloudbox', not
+          # the 'cloudbox-1' talosctl invents when the name is already taken.
+          [ "$(talos_ctx | grep -cx "${CLUSTER_NAME}" || true)" = 1 ] \
+            || { echo "❌ expected exactly one '${CLUSTER_NAME}' context after the rebuild"; exit 1; }
+          [ "$(talos_ctx | grep -c "^${CLUSTER_NAME}-[0-9]" || true)" = 0 ] \
+            || { echo "❌ talosctl renamed the new context (${CLUSTER_NAME}-N) — the stale one survived destroy"; exit 1; }
+          [ "$(talosctl config contexts | awk 'NR > 1 && $1 == "*" { print $2 }')" = "${CLUSTER_NAME}" ] \
+            || { echo "❌ '${CLUSTER_NAME}' is not the selected talos context"; exit 1; }
+          # The context is not just named right — it talks to the live cluster.
+          talosctl --context "${CLUSTER_NAME}" version >/dev/null
+          kubectl wait --for=condition=Ready nodes --all --timeout=120s
+          kubectl get nodes -o wide
+          echo "✅ second cluster of the day: one clean '${CLUSTER_NAME}' context, cluster reachable"
+
+      - name: Assert catch-up 07 actually converged (the post.sh deadlock)
+        id: catchup
+        run: |
+          set -euo pipefail
+          # shellcheck source=../../scripts/versions.env
+          source scripts/versions.env
+          # The deadlock's fingerprint: `demo` carries hello-site, whose image
+          # only exists after post.sh runs the in-cluster build. If catch-up.sh
+          # ever gates post.sh on demo again, the step above dies at the
+          # 10-minute wait and never gets here — but assert the end state too,
+          # so a PARTIAL regression (post.sh skipped, demo left Degraded) is
+          # named rather than passing quietly.
+          kubectl -n demo rollout status deploy/hello-site --timeout=180s
+          st="$(kubectl -n argocd get application demo \
+                 -o jsonpath='{.status.sync.status} {.status.health.status}')"
+          echo "demo Application: ${st}"
+          [ "${st}" = "Synced Healthy" ] \
+            || { echo "❌ demo is '${st}' after catch-up — post.sh did not complete the module-07 build"; exit 1; }
+          # bash pattern match, not `curl | grep -q`: under pipefail grep exits
+          # early on a match and SIGPIPEs curl (141), turning a PASS into a flake.
+          cat="$(curl -fsS "http://localhost:${NODEPORT_ZOT}/v2/_catalog" 2>/dev/null || true)"
+          [[ "${cat}" == *hello-site* ]] \
+            || { echo "❌ hello-site never reached Zot — the in-cluster build did not run (catalog: ${cat:-<empty>})"; exit 1; }
+          echo "✅ catch-up.sh 07 converged: post.sh built hello-site and demo went Synced/Healthy"
+
+      - name: Destroy again — the talosconfig must be clean for the NEXT cluster
+        id: teardown
+        run: |
+          set -euo pipefail
+          # The direct, wording-independent half of assertion 1: destroy a LIVE
+          # cluster and prove the context is gone, with no create-cluster.sh
+          # self-heal in the picture to paper over it.
+          # shellcheck source=../../scripts/versions.env
+          source scripts/versions.env
+          talos_ctx() { talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'; }
+
+          # …and specifically the MULTI-context branch of destroy-cluster.sh's
+          # cleanup, which is the branch the fix was written for and the one a
+          # runner never reaches on its own: a fresh runner's talosconfig holds
+          # only '${CLUSTER_NAME}', so destroy takes the "delete the whole file"
+          # branch instead. Synthesize a second, unrelated context (a renamed
+          # copy of the current one), then RE-SELECT '${CLUSTER_NAME}' — being
+          # the selected context is the precise state `talosctl config remove`
+          # silently refuses to act on, which is the whole bug.
+          tc="${TALOSCONFIG:-${HOME}/.talos/config}"
+          sed -E -e "s/^context: ${CLUSTER_NAME}\$/context: spare/" \
+                 -e "s/^( +)${CLUSTER_NAME}:\$/\1spare:/" "${tc}" > /tmp/spare-talosconfig.yaml
+          talosctl config merge /tmp/spare-talosconfig.yaml
+          talosctl config context "${CLUSTER_NAME}"
+          talosctl config contexts
+          # If the synthesis itself failed (talosctl changed the file layout),
+          # say THAT — do not let a broken harness masquerade as a finding.
+          talos_ctx | grep -qx spare \
+            || { echo "❌ test harness: could not synthesize a second talos context — talosconfig layout changed?"; exit 1; }
+
+          ./scripts/destroy-cluster.sh
+
+          talosctl config contexts || true
+          [ "$(talos_ctx | grep -cx "${CLUSTER_NAME}" || true)" = 0 ] \
+            || { echo "❌ destroy-cluster.sh left a '${CLUSTER_NAME}' talos context behind — the next create will be renamed"; exit 1; }
+          # And it must have been surgical: an attendee's OTHER talos clusters
+          # are not ours to delete.
+          talos_ctx | grep -qx spare \
+            || { echo "❌ destroy-cluster.sh removed an unrelated talos context ('spare')"; exit 1; }
+          [ -z "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" ] \
+            || { echo "❌ destroy-cluster.sh left node containers behind"; docker ps -a; exit 1; }
+          echo "✅ destroy left nothing of '${CLUSTER_NAME}' behind, and kept the unrelated context — a third cluster would create cleanly"
+
+      - name: Recovery-path summary
+        if: always()
+        run: |
+          {
+            echo ""
+            echo "## Recovery path — the two things one cluster per runner cannot see"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| \`catch-up.sh 07 --rebuild\` ran end to end | ${{ steps.rebuild.outcome == 'success' && '✅' || '❌' }} |"
+            echo "| second cluster of the day on a clean talos context (no \`cloudbox-1\`) | ${{ steps.ctx.outcome == 'success' && '✅' || '❌' }} |"
+            echo "| module-07 post.sh ran and \`demo\` went Synced/Healthy (no deadlock) | ${{ steps.catchup.outcome == 'success' && '✅' || '❌' }} |"
+            echo "| destroy leaves no talos context behind | ${{ steps.teardown.outcome == 'success' && '✅' || '❌' }} |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p /tmp/diag
+          cp /tmp/rebuild.log /tmp/diag/ 2>/dev/null || true
+          talosctl config contexts > /tmp/diag/talos-contexts.txt 2>&1 || true
+          docker ps -a > /tmp/diag/docker-ps.txt 2>&1 || true
+          kubectl get pods -A -o wide > /tmp/diag/pods.txt 2>&1 || true
+          kubectl -n argocd get applications -o wide > /tmp/diag/applications.txt 2>&1 || true
+          kubectl get events -A --sort-by=.lastTimestamp > /tmp/diag/events.txt 2>&1 || true
+          kubectl -n builds get workflows -o wide > /tmp/diag/workflows.txt 2>&1 || true
+
+      - name: Upload diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: recovery-path-diagnostics
           path: /tmp/diag/
           retention-days: 14
