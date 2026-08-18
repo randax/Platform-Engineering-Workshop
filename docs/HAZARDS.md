@@ -897,6 +897,12 @@ where `cloudbox-init.sh` also found the host model and reported
   same context asked for 7.8 GiB and Ollama evicted the previous model to get it
   (`system_free 3.3 GiB, system_limited=true`).
 
+**SUPERSEDED on 2026-08-18 by measurement, in both halves — read the entry below.**
+The 11.5 GiB number was right and the diagnosis ("the context window, not the weights")
+was right; the *fix* was not "live with it". `num_ctx` came down to **16384** and the
+model to **qwen3:1.7b**, and the pin is now `qwen3:1.7b` + `num_ctx: 16384` +
+`num_predict: 1200`.
+
 **WATCH — the residue, in the order it would bite:**
 
 1. ~~**The Console surface is broken.**~~ **Retired.** Everything above was originally
@@ -923,6 +929,97 @@ where `cloudbox-init.sh` also found the host model and reported
 **Retires when:** ~~one investigation renders in the browser~~ (done, rehearsal 2),
 and one beat-2 run against a hosted provider returns a verdict. Only the second half
 is outstanding.
+
+## RESOLVED — beat 1 took the laptop apart, and `num_ctx` was 75% of the reason
+
+**Fixed on 2026-08-18** (`qwen3:1.7b` + `num_ctx: 16384` + `num_predict: 1200` in
+`gitops/components/kagent/kagent.yaml` and `KAGENT_OLLAMA_MODEL` in `versions.env`).
+Rehearsal 3 ended a clean module 10 end state — 21/21 apps, 73 pods,
+`/proc/pressure/cpu some avg10=3.10` — and then ran two Case file investigations against
+host `qwen3:4b`. Pressure went to **93.48**, host load average to **86**, ~25 pods into
+liveness restart loops, module 09's Broker to `EndpointSlicesUnavailable`, five apps out
+of Synced+Healthy. `ollama stop` recovered it in 62 s, so it was a resource conflict, not
+a wedge.
+
+**The arithmetic, from Ollama's own memory breakdown** (M1 Max, 32 GB, 16 GB Colima VM,
+21 apps + 76 pods running):
+
+| model / `num_ctx` | `ollama ps` | weights | KV cache |
+|---|---|---|---|
+| `qwen3:4b` / **64000** (chart default) | **12 GB** | 2.68 GiB | **9000 MiB** |
+| `qwen3:4b` / 32768 | 7.5 GB | 2.68 GiB | 4608 MiB |
+| `qwen3:4b` / 16384 | 5.1 GB | 2.68 GiB | 2304 MiB |
+| `qwen3:4b` / 8192 | 3.9 GB | 2.68 GiB | 1152 MiB |
+| **`qwen3:1.7b` / 16384** (the pin) | **3.4 GB** | ~1.4 GiB | 1792 MiB |
+| `llama3.2:3b` / 16384 | 4.0 GB | ~2.0 GiB | 1792 MiB |
+
+**A smaller model alone would barely have helped.** The KV cache is **75% of the 12 GB**;
+the 4B of weights is 2.7 GiB of it. `num_ctx` is the lever, and the model size is the
+second one — 12 GB → 3.4 GB, i.e. **8.6 GB handed back to macOS**, is both together.
+
+**`8192` is disqualified, not merely tighter.** One `k8s_get_events` result on this
+cluster is **~8.2 k tokens on its own** (measured: `task.n_tokens = 8194` on the second
+turn), so the agent overflows its own context the first time it reads events. **16384 is
+a floor.**
+
+**The second finding is the one nobody was looking for: `kagent-controller` 0.9.12 cuts
+the A2A stream at a hardcoded 180 s.** Three runs ended at `duration 180.04 / 180.01 /
+181.39` on `POST /api/a2a/kagent/k8s-agent/`, and the Console renders that as
+*"The investigation didn't complete … SSE stream error: context deadline exceeded"*.
+The portal's own `Timeout: 6 * time.Minute` (`apps/portal/internal/kagent/kagent.go:120`)
+is **not** the binding limit and never was — it is twice the real ceiling. There is no
+flag, arg or env for the controller's 180 s in chart 0.9.12; re-check it at the next
+kagent bump. The failure mode that reaches it is always the same: a small model handed a
+large tool result generates without stopping (runs past **9,000 tokens in one turn** were
+recorded). `num_predict: "1200"` is what bounds it, and it is load-bearing.
+
+**Why the model changed too, and it is not the reason you would guess.** At
+`num_ctx: 16384`, `qwen3:4b` answered **with no tool call at all in four of five runs** —
+straight from the opening prompt to an invented verdict — which renders an *empty* Case
+file and costs module 10 its centrepiece. Ten investigations against a live scenario-1
+fault, all through the Console's own `POST /agent/ask`:
+
+| model / `num_ctx` / `num_predict` | runs | completed with a verdict | real tool calls | wall clock | hit the 180 s cap |
+|---|---|---|---|---|---|
+| `qwen3:4b` / 64000 / – | 1 | 0 | 1 | 179 s | **yes** |
+| `qwen3:4b` / 16384 / – | 5 | 4 | **0 in 4 of 5** | 95–178 s | 1 |
+| `qwen3:4b` / 16384 / 1200 | 3 | 0 | 0–1 | 42–86 s | 0 (truncation broke it instead) |
+| `qwen3:1.7b` / 16384 / – | 6 | 3 | 2–6 | 43–184 s | 3 |
+| **`qwen3:1.7b` / 16384 / 1200** | **10** | **9** | **4–26** | **31–106 s** | **0** |
+| `llama3.2:3b` / 16384 / 1200 | 6 | 6 | 4–18 | 21–33 s | 0 |
+
+`llama3.2:3b` measured slightly better and was **rejected on licence**: Llama 3.2 ships
+under Meta's Community License, not an OSI-open one, and "Cloud on your terms" should not
+pre-pull a non-open model when an Apache-2.0 one in the same family does the job.
+
+**Beat 1 still flails, and better than before** — 9 of 10 runs. The *shape* changed, so
+`lab/10-day2-ops/README.md`'s calibration paragraph was rewritten: it is no longer "one
+tool call, then a printed `<function-call>` block". It is 4–26 real tool calls, breadth instead of
+depth (one run walked `k8s_get_resources(all_namespaces=true)` across **nineteen**
+resource types and never asked the crashing pod for its logs), calls against objects that
+do not exist (a pod name passed as a *Deployment*, a `demo` pod looked up in namespace
+`default`), a verdict that **narrates the JSON it just downloaded** instead of reading
+it — and, once, a verdict diagnosing its own failed tool call as "likely localized to
+your environment". **~1 run in 10 it
+does land on `PORT=8080-canary`** — and that run also asserted "the Service is configured
+to use 8080-canary", which is false. A correct headline with an invented supporting fact
+is the best principle-9 artifact this module has ever produced; the README now points at
+it directly.
+
+**Criterion 4, live:** three and four back-to-back investigations at the new pin left the
+cluster at 21 apps unchanged, both nodes `Ready`, and a cluster-wide **restart delta of
+0–2** (against rehearsal 3's ~25 pods in liveness loops). VM memory pressure peaked at
+`some avg10=37`, never below **7.0 GB** available inside the VM. VM *CPU* pressure is
+**not** a usable discriminator on the machine this was measured on — two identical
+`qwen3:1.7b` batches twenty minutes apart peaked at 39.2 and 92.9 because the host was
+also running Zoom, Slack and a photo-library index; the idle control over the same
+cluster read `some avg10=3.92`. The footprint numbers in the first table are the
+deterministic evidence; treat the pressure numbers as this-machine-that-afternoon.
+
+**Retires when:** one full rehearsal runs module 10 beat 1 end to end at the new pin on a
+quiet machine, and one run happens on a 16 GB laptop — the "beat 1 does not fit on 16 GB"
+line is *still* a claim, now with 3.4 GB in it instead of 11.5 GB, and still unmeasured
+there.
 
 ## PROVEN ONCE — smaller things the rehearsals settled
 

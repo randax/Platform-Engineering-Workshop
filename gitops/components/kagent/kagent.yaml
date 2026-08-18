@@ -1452,11 +1452,12 @@ metadata:
     app.kubernetes.io/part-of: kagent
 spec:
   provider: "Ollama"
-  model: "qwen3:4b"
+  model: "qwen3:1.7b"
   ollama:
     host: host.docker.internal:11434
     options:
-      num_ctx: "64000"
+      num_ctx: "16384"
+      num_predict: "1200"
 ---
 # Source: kagent/templates/toolserver-kagent.yaml
 apiVersion: kagent.dev/v1alpha2

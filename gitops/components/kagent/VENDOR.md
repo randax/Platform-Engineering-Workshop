@@ -31,9 +31,10 @@ recipe, re-apply the curation below, then
   the default `false` "to avoid breaking changes." The explicit
   `--read-only` argument also rejects write and exec calls in the tool server.
 - **Host-side Ollama is the offline-honest baseline** — the default
-  `ModelConfig` uses `qwen3:4b` on the attendee host. Small local models are
-  not presented as hosted-model equivalents; a hosted provider is the
-  upgrade path (see the module 10 PRD, issue #132:
+  `ModelConfig` uses `qwen3:1.7b` on the attendee host, at `num_ctx: 16384`
+  and `num_predict: 1200` rather than the chart's `num_ctx: 64000`. Small
+  local models are not presented as hosted-model equivalents; a hosted
+  provider is the upgrade path (see the module 10 PRD, issue #132:
   https://github.com/randax/Platform-Engineering-Workshop/issues/132).
   Native Linux users must replace `host.docker.internal` with the Talos
   bridge gateway.
@@ -147,13 +148,17 @@ values
     # Default ModelConfig points at host-side Ollama — offline-honest baseline
     # (module 10 PRD, issue #132:
     # https://github.com/randax/Platform-Engineering-Workshop/issues/132 —
-    # local ≤8B models are unreliable at multi-step tool calling; qwen3:4b is
-    # the smallest verified tool-calling model and is what cloudbox-init.sh
-    # pre-pulls on the host).
+    # local ≤8B models are unreliable at multi-step tool calling). qwen3:1.7b
+    # is what cloudbox-init.sh pre-pulls on the host. It replaced qwen3:4b on
+    # 2026-08-18 on measurement, not taste: across ten Console investigations
+    # against a live scenario-1 fault, 1.7b emitted a real `function_call`
+    # every time (4-26 tool calls per run) and finished in 31-106 s, while 4b
+    # answered from the prompt with NO tool call in four of five runs — which
+    # renders an empty Case file and costs module 10 its centrepiece.
     default: ollama
     ollama:
       provider: Ollama
-      model: "qwen3:4b"
+      model: "qwen3:1.7b"
       # host.docker.internal:11434 is the chart's own default and matches this
       # repo's existing host-reachability convention for Docker Desktop/OrbStack
       # on macOS + WSL2 (see mirror_host_endpoint() in scripts/lib.sh). Native
@@ -163,6 +168,20 @@ values
       # CLOUDBOX_MIRROR_HOST.
       config:
         host: host.docker.internal:11434
+        # Measured on 2026-08-18 against this cluster's module 10 end state.
+        # num_ctx: the chart default 64000 costs 9000 MiB of KV cache on top of
+        # the weights — 75% of a 12 GB resident footprint, and the thing that
+        # does not fit beside a 16 GiB Colima VM. 16384 costs 1792 MiB and is
+        # the FLOOR, not a free choice: one k8s_get_events result on this
+        # cluster is ~8.2 k tokens on its own, so 8192 overflows on the second
+        # turn. num_predict: small models answer a large tool result by
+        # generating until something stops them — three runs were observed
+        # past 9,000 tokens in one turn — and kagent-controller 0.9.12 cuts the
+        # A2A stream at a hardcoded 180 s, which renders as an error card in
+        # the Console. Capping each turn bounds the run instead.
+        options:
+          num_ctx: "16384"
+          num_predict: "1200"
 
   # k8s-agent is the only built-in agent enabled — everything below is
   # disabled to keep the offline image list and runtime RAM footprint minimal
