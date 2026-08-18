@@ -23,9 +23,15 @@ done
 [ -n "$FAULT_DIR" ] || { echo "ERROR: no fault $NN"; usage; }
 
 # A fault namespace that already exists is almost certainly a RESTORED one, and
-# re-applying issue.yaml over it does not reliably re-break anything: some of the
-# fields these faults corrupt are immutable once created, so the apply is accepted
-# and changes nothing. You get a namespace with no fault in it — and verify.sh,
+# re-applying issue.yaml over it does not reliably re-break anything. Measured,
+# per fault, rather than assumed:
+#   01  the Deployment has ONE replica and maxUnavailable: 25%, which rounds down
+#       to 0 — so the rolling update never tears the healthy old pod down and the
+#       Deployment stays Available with the broken spec sitting behind it.
+#   02  the bad storageClassName lands on a Cluster whose PVC is already Bound,
+#       and CNPG does not re-provision storage for an existing cluster.
+# The apply is accepted and nothing breaks. You get a namespace with no fault in
+# it — and verify.sh,
 # which looks for the symptom, then reports the fault "fixed". Silently handing an
 # attendee a confident wrong answer is precisely what this module is about, so it
 # is not something to leave in the module's own tooling.

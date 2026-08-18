@@ -152,7 +152,7 @@ info "1 controlplane (${TALOS_MEMORY_CONTROLPLANE} MB) + 1 worker (${TALOS_MEMOR
 # end state (21 apps, ~125 containers). Scale with the daemon's CPU count and
 # floor at talosctl's own default, so the published MIN_CPUS=4 machine gets
 # exactly what it got before and a bigger laptop actually gets used.
-# See TALOS_CPU_SHARE_* in versions.env and docs/HAZARDS.md.
+# See TALOS_CPU_FLOOR in versions.env and docs/HAZARDS.md.
 host_cpus="$(docker info -f '{{.NCPU}}' 2>/dev/null || echo 0)"
 # Give BOTH containers the whole host and let the kernel share it. Deliberately
 # oversubscribed: a --cpus value equal to the host count is not a meaningful
