@@ -15,7 +15,7 @@ metadata:
   name: my-app
 spec:
   # x-release-please-start-version
-  image: ghcr.io/randax/cloudbox-uploader:v0.2.1
+  image: ghcr.io/randax/cloudbox-uploader:v0.2.2
   # x-release-please-end-version
   replicas:
     min: 0        # scale-to-zero

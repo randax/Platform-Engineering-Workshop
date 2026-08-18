@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/randax/Platform-Engineering-Workshop/compare/apps-v0.2.1...apps-v0.2.2) (2026-08-18)
+
+
+### Bug Fixes
+
+* **console:** a full ready count is not evidence that the release was good ([024421e](https://github.com/randax/Platform-Engineering-Workshop/commit/024421e83442d557b55d8aa461329510b4222471))
+
 ## [0.2.1](https://github.com/randax/Platform-Engineering-Workshop/compare/apps-v0.2.0...apps-v0.2.1) (2026-08-17)
 
 

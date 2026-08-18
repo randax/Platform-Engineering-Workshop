@@ -60,7 +60,7 @@ spec:
         # pre-pull list (scripts/images.txt). The tag is rewritten by
         # release-please in the release PR — keep the annotations.
         # x-release-please-start-version
-        - image: ghcr.io/randax/cloudbox-uploader:v0.2.1
+        - image: ghcr.io/randax/cloudbox-uploader:v0.2.2
         # x-release-please-end-version
           env:
             # WORKSHOP-GRADE CREDENTIALS, committed on purpose (ephemeral
@@ -102,7 +102,7 @@ spec:
         # pre-pull list (scripts/images.txt). The tag is rewritten by
         # release-please in the release PR — keep the annotations.
         # x-release-please-start-version
-        - image: ghcr.io/randax/cloudbox-resizer:v0.2.1
+        - image: ghcr.io/randax/cloudbox-resizer:v0.2.2
         # x-release-please-end-version
           env:
             - name: S3_ENDPOINT
