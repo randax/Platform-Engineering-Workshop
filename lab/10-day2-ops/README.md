@@ -375,9 +375,15 @@ ollama list | grep qwen3     # ~1.4 GB; ollama pull qwen3:1.7b if it is missing
 ### Beat 1: watch the local model flail — and write down how
 
 Pick any scenario above and inject it (or reuse one you already have live). In the
-Console, open **Components → demo** — the detail page whose Diagnostics panel is
-already showing your broken `demo-web` — and click **Open investigation**. Watch the
+Console, open **Components → demo** and click **Open investigation**. Watch the
 tool-call log stream.
+
+Worth noticing before you click: for the first two minutes the component reads
+**Rolling out**, not Degraded, and there is no Diagnostics panel yet. That is
+correct — a Deployment surges, so the previous version is still serving and the
+ready count still looks full. The console waits for the rollout to stop *making
+progress* before calling it degraded, rather than guessing from a count that
+cannot see the problem. It is the same trap the agent is about to fall into.
 
 Don't grade it on whether it gets the right answer — it mostly won't. A local ≤4B model
 is fine at *issuing* tool calls and falls off a cliff the moment an investigation has to
