@@ -213,6 +213,12 @@ curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 \
 step "Copying cluster images into the mirror (crane, ${NODE_PLATFORM} + pinned indexes)"
 CRANE_LOG="$(mktemp)"
 trap 'rm -f "${CRANE_LOG}"' EXIT
+# The redirects belong on the COMMAND, not on the retry() wrapper: retry() reports
+# each failed attempt with warn(), which writes to stdout, so wrapping the whole
+# call in `>/dev/null` sent the "retrying in 5s" line to /dev/null too. The run
+# then just appeared to freeze for 15 s on one image — on 63 of the 66 refs, i.e.
+# on every path where the retry actually matters.
+crane_copy() { crane copy "$@" >/dev/null 2>"${CRANE_LOG}"; }
 i=0
 failed=()
 for image in "${mirror_images[@]}"; do
@@ -229,13 +235,11 @@ for image in "${mirror_images[@]}"; do
     echo "  [${i}/${#mirror_images[@]}] ${image}"
   fi
 
-  if retry 3 "crane copy" -- crane copy "${copy_args[@]}" "${image}" "${dest}" \
-       >/dev/null 2>"${CRANE_LOG}"; then
+  if retry 3 "crane copy" -- crane_copy "${copy_args[@]}" "${image}" "${dest}"; then
     continue
   fi
   if [[ ${#copy_args[@]} -gt 1 ]] \
-     && retry 3 "crane copy (all arch)" -- crane copy --insecure "${image}" "${dest}" \
-          >/dev/null 2>"${CRANE_LOG}"; then
+     && retry 3 "crane copy (all arch)" -- crane_copy --insecure "${image}" "${dest}"; then
     warn "      no ${NODE_PLATFORM} manifest — copied every architecture instead"
     continue
   fi
