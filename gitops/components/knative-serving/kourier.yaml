@@ -663,10 +663,10 @@ spec:
   ports:
     # Workshop curation: NodePort instead of LoadBalancer (no LB implementation
     # in the Talos-in-Docker cluster). Knative Services answer on
-    # http://localhost:31080 with a Host header, e.g.
-    #   curl -H 'Host: hello.demo.kn.cloudbox.k8s.test' http://localhost:31080
-    # The Host must match config-domain (serving-core.yaml) — the ingress at
-    # ingress.yaml serves the same name without the header or the port.
+    # http://hello.demo.kn.cloudbox.k8s.test/, e.g.
+    #   curl http://hello.demo.kn.cloudbox.k8s.test/
+    # The host matches config-domain (serving-core.yaml) and the ingress at
+    # ingress.yaml serves it without a Host header or a port.
     - name: http2
       port: 80
       protocol: TCP

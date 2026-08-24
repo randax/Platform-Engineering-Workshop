@@ -2,7 +2,7 @@
 # Imperative leftovers of module 08 — all inherited from earlier modules:
 # the app-assets bucket (module 03) and the in-cluster hello-site build
 # (module 07; this module's apps/ still enables hello-site.yaml, whose image
-# localhost:30500/hello-site:v1 only exists after that build). Module 08's
+# node-side pull image localhost:30500/hello-site:v1 only exists after that build). Module 08's
 # own star task (console-db) is deliberately NOT here — it's created through
 # the console, outside git, and that gap is the module's explain-back.
 # Run by catch-up.sh after ArgoCD converges. Idempotent.

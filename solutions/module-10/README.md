@@ -16,7 +16,7 @@ so like every solutions tree it must carry everything earlier modules may have
 enabled, or catching up would prune capabilities out from under an attendee who
 had them running. That is why `post.sh` chains module-09's (and thereby
 module-07's) idempotent post-steps: the cumulative tree enables `hello-site`,
-whose `localhost:30500` image exists only after the in-cluster build, and the
+whose node-side `localhost:30500` image exists only after the in-cluster build, and the
 ArgoCD convergence gate would otherwise never go green. Expect `catch-up.sh 10`
 on a fresh cluster to take as long as catching up to module 09 plus the kagent
 install — it provisions the whole platform, not just this module's slice.

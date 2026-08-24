@@ -463,10 +463,11 @@ fi
 #
 # Allowlisted exceptions, each for a reason a rewrite would break:
 #   * scripts/substrate/docker.sh — the docker backend's own port publishing.
-#   * localhost:30500 — Zot's NodePort as the NODE sees it. Node-side image
-#     pulls and Knative's registries-skipping-tag-resolving must use it: with
-#     kube-proxy replacement it answers on every node on both substrates, and a
-#     tbx VM cannot resolve zot.cloudbox.k8s.test.
+#   * localhost:30500 — Zot's NodePort as the NODE sees it. Only node-side
+#     image references, Knative's registries-skipping-tag-resolving setting,
+#     portal pull-host code/tests, and comments that explain that distinction
+#     may use it. With kube-proxy replacement it answers on every node on both
+#     substrates, and a tbx VM cannot resolve zot.cloudbox.k8s.test.
 #   * the Slidev development server in slides/README.md, not a NodePort.
 #   * .github/workflows/bootstrap-test.yaml — Docker-only integration fixtures
 #     deliberately exercise published NodePorts, rather than attendee URLs.
@@ -477,10 +478,9 @@ stale="$(grep -rnE 'localhost:3[0-9]{4}' \
   --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.go' \
   lab solutions gitops scripts slides apps .devcontainer .github README.md PLAN.md 2>/dev/null \
   | grep -v '^scripts/substrate/docker.sh:' \
-  | grep -v 'localhost:30500' \
+  | grep -Eiv 'image(Name)?:.*localhost:30500|registries-skipping-tag-resolving|fnPullHost|_test\.go:|node.*localhost:30500|localhost:30500.*node' \
   | grep -v '^slides/README.md:.*localhost:30[3]0' \
   | grep -v '^\.github/workflows/bootstrap-test.yaml:' \
-  | grep -v '^gitops/components/knative-serving/kourier.yaml:' \
   | grep -v '^docs/' || true)"
 if [[ -n "${stale}" ]]; then
   bad "browser-facing localhost:3xxxx literals remain — they only work on the docker substrate:"

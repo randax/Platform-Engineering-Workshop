@@ -199,7 +199,7 @@ if have kubectl && kubectl get application platform -n argocd >/dev/null 2>&1; t
   #
   # `demo` is deliberately NOT in that gate. It carries the attendee's own
   # workloads, and from module 07 on those include hello-site, whose image
-  # (localhost:30500/hello-site:v1) does not exist until post.sh runs the
+  # node-side pull image (localhost:30500/hello-site:v1) does not exist until post.sh runs the
   # in-cluster build — so gating post.sh on demo's health is a deadlock: demo
   # sits ImagePullBackOff → Degraded, the gate dies at 10 minutes, and post.sh,
   # the thing that would have fixed it, never runs. Wait for demo AFTER the

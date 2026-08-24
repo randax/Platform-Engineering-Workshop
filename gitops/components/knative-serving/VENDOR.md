@@ -29,7 +29,7 @@ either a new upstream change or a curation someone forgot to write down.
    `NNNm`/`NNNMi` quantities. Resulting requests: activator 150m/30Mi,
    autoscaler + controller 50m/50Mi, webhook 50m/50Mi.
 2. **`config-deployment`**: `registries-skipping-tag-resolving:
-   "zot.zot.svc.cluster.local:5000,localhost:30500,127.0.0.1:30500,ghcr.io"`
+   "zot.zot.svc.cluster.local:5000,localhost:30500,127.0.0.1:30500,ghcr.io"` — node-side
    — the controller must not try to digest-resolve images in the in-cluster
    registry / its NodePort aliases. `ghcr.io` is on the list because tag
    resolution runs from the controller pod, bypassing the node registry
@@ -92,9 +92,8 @@ either a new upstream change or a curation someone forgot to write down.
 8. **Service `kourier` (kourier-system)**: `type: LoadBalancer` → `NodePort`
    with `nodePort: 31080` on the `http2` port (no LB implementation in
    Talos-in-Docker). The `https` port gets no nodePort. A comment at the
-   change site shows the `curl -H 'Host: <name>.<ns>.kn.cloudbox.k8s.test'
-   http://localhost/` form — the Host-header fallback for when the
-   ingress hostname does not resolve.
+   change site shows `curl http://hello.demo.kn.cloudbox.k8s.test/` — the
+   ingress hostname attendees use on both substrates.
 
 9. ~~**Envoy `stats_listener` bound back to IPv4-any.**~~ **RETIRED
    2026-08-17 — there is nothing to re-apply, and re-applying it would be
@@ -163,7 +162,7 @@ allow  serving-core.yaml  32736b89  curation 1 — halved activator requests 300
 allow  serving-core.yaml  02de06f1  curation 1 — halved requests 100m/100Mi → 50m/50Mi (autoscaler, controller, webhook)
 allow  kourier.yaml  3d26dade  curation 6 — halved requests 200m/200Mi → 100m/100Mi (net-kourier-controller, 3scale-kourier-gateway)
 allow  kourier.yaml  aff418f9  curation 7 — Envoy pinned: v1.37-latest (floating!) → v1.37.5
-allow  kourier.yaml  03c599a3  curation 8 — the comment showing the curl -H 'Host: <name>.<ns>.kn.cloudbox.k8s.test' :31080 fallback form
+allow  kourier.yaml  481cf2ba  curation 8 — the comment showing the ingress-hostname curl form
 allow  kourier.yaml  ea492933  curation 8 — nodePort 31080 on the http2 port
 allow  kourier.yaml  4cb63f9a  curation 8 — Service kourier type LoadBalancer → NodePort (no LB in Talos-in-Docker)
 ```

@@ -264,7 +264,7 @@ git instead?
   Go service that uses its composed Postgres (a live visit counter) and S3 bucket, so the page
   proves the wiring rather than ignoring it. Its Dockerfile builds `FROM` a golang base in Zot,
   so seed that base once first (same move as module 07's busybox):
-  `crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine localhost:30500/library/golang:1.25-alpine`.
+  `crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine zot.cloudbox.k8s.test/library/golang:1.25-alpine`.
   ⚠️ **This one step needs internet** — unlike module 07's busybox, the golang base is
   deliberately *not* on the pre-pull list (`scripts/images.txt`), because it costs every
   attendee a download for a going-deeper path most won't take. Everything else in the
