@@ -23,6 +23,10 @@
 #   8. every scripts/ and solutions/ script that uses kubectl CALLS
 #      require_workshop_context, with a short self-policing allowlist for the
 #      pre-cluster ones (and lib.sh still only defines the guard, never calls it)
+#   9. the workshop kubeconfig path agrees between mise.toml and
+#      scripts/context-guard.sh
+#  10. the tbx pin agrees between versions.env and mise.toml, and the tbx
+#      cluster yaml is generated from the pins rather than checked in
 #
 # Offline and fast — the upstream comparison itself lives in the maintainer-only
 # ./scripts/check-upstream.sh, which needs internet.
@@ -390,6 +394,37 @@ elif [[ "$(kc_normalize "${mise_kc}")" != "${guard_kc}" ]]; then
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "workshop kubeconfig path agrees in mise.toml and scripts/context-guard.sh (${guard_kc})"
+
+# --- 10. the tbx pin agrees between versions.env and mise.toml ----------------
+# Same rule as check 3, for the substrate that is not Docker. dev-setup.sh
+# installs only what mise.toml lists, so a drifted pin means an attendee runs a
+# tbx whose cluster-yaml schema or `tbx manifests` sections we never tested.
+before_fail=${FAILURES}
+tbx_mise="$(mise_pin 'ubi:randax/talos-box')"
+if [[ -z "${tbx_mise}" ]]; then
+  # Fallback pin form: tbx has no published mise backend yet (upstream #95/#96/
+  # #101), so mise.toml may carry it as a commented pin next to the install note.
+  tbx_mise="$(sed -nE 's|^#[[:space:]]*tbx[[:space:]]*=[[:space:]]*"([^"]+)".*|\1|p' mise.toml | head -1)"
+fi
+if [[ -z "${tbx_mise}" ]]; then
+  bad "mise.toml records no tbx pin (neither a [tools] entry nor the commented fallback) — TBX_VERSION would be the only copy and dev-setup could install anything"
+elif [[ "v${tbx_mise}" != "${TBX_VERSION}" ]]; then
+  bad "tbx pin drift: versions.env ${TBX_VERSION} vs mise.toml ${tbx_mise}"
+fi
+# The cluster yaml must stay a PROJECTION of the pins, never a second source.
+if [[ -f scripts/substrate/cloudbox.tbx.yaml ]]; then
+  bad "scripts/substrate/cloudbox.tbx.yaml is checked in — the tbx cluster yaml is GENERATED from versions.env into \${TBX_CLUSTER_FILE}; only the .tmpl belongs in git"
+fi
+for token in __TALOS_VERSION__ __CLUSTER_NAME__ __CLOUDBOX_DOMAIN__ \
+             __TBX_CP_MEMORY__ __TBX_CP_CPUS__ __TBX_WORKER_MEMORY__ \
+             __TBX_WORKER_CPUS__ __TBX_DISK_SIZE__; do
+  grep -q -- "${token}" scripts/substrate/cloudbox.tbx.yaml.tmpl \
+    || bad "scripts/substrate/cloudbox.tbx.yaml.tmpl no longer contains ${token} — a sizing value was hardcoded into the template instead of pinned in versions.env"
+done
+grep -qE '^[[:space:]]+cni:' scripts/substrate/cloudbox.tbx.yaml.tmpl \
+  && bad "scripts/substrate/cloudbox.tbx.yaml.tmpl declares a curated 'cni:' — that hands the cluster talos-box's Cilium 1.19.6 and its own machine config; this workshop installs Cilium ${CILIUM_VERSION} itself on BOTH substrates"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "tbx pin agrees (${TBX_VERSION}) and the cluster yaml is generated from versions.env"
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then
