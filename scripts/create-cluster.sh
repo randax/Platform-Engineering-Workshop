@@ -12,7 +12,15 @@
 #   4. Waits for both nodes to become Ready and prints next steps
 #
 # Usage:
-#   ./scripts/create-cluster.sh
+#   ./scripts/create-cluster.sh                 # everything, including Cilium
+#   ./scripts/create-cluster.sh --skip-cilium   # stop after step 2: the lab-01
+#                                               # path — nodes stay NotReady
+#                                               # until YOU install the CNI
+#
+# --skip-cilium exists for teaching, not convenience: lab 01 asks attendees to
+# install Cilium themselves and watch NotReady become Ready. Everything
+# automated (CI, catch-up.sh, solve.sh) calls this script bare and gets the
+# full behavior — do not make the flag the default.
 #
 # Environment overrides:
 #   CLOUDBOX_MIRROR_HOST  address where node containers reach the mirror
@@ -23,6 +31,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
+
+SKIP_CILIUM="false"
+[[ "${1:-}" == "--skip-cilium" ]] && SKIP_CILIUM="true"
 
 need talosctl
 need kubectl
@@ -251,6 +262,19 @@ kubectl --request-timeout=5s get nodes >/dev/null 2>&1 \
 ok "API server is answering (nodes are NotReady until Cilium arrives — expected)"
 
 # --- 3. Cilium ------------------------------------------------------------------------
+if [[ "${SKIP_CILIUM}" == "true" ]]; then
+  echo
+  ok "Cluster '${CLUSTER_NAME}' is up — and deliberately incomplete."
+  info "The nodes are NotReady and will stay that way: this cluster has no CNI."
+  info "That's your job now (lab/01-cluster/README.md, task 2). When Cilium is"
+  info "in, watch it happen:"
+  echo "   kubectl get nodes -w"
+  echo
+  info "The vendored chart is at scripts/manifests/cilium-${CILIUM_VERSION}.tgz —"
+  info "the exact values live in this script and in the lab's hints."
+  exit 0
+fi
+
 step "Installing Cilium ${CILIUM_VERSION} (CNI + kube-proxy replacement)"
 # Chart is vendored into scripts/manifests/ (re-vendor from CILIUM_HELM_REPO
 # when bumping) so this needs no internet at the venue — principle 2.
