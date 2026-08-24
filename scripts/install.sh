@@ -45,7 +45,7 @@ case "${1:-}" in
       echo "# ^ paste into ${CLOUDBOX_HOSTS_FILE} (or let ./scripts/create-cluster.sh do it)."
       echo "# WSL2: these lines belong in BOTH the WSL2 /etc/hosts and the Windows"
       printf '%s\n' '#       C:\Windows\System32\drivers\etc\hosts (edit as Administrator) —'
-      echo "#       the Windows browser resolves names itself. See lab/00-setup."
+      echo "#       the Windows browser resolves names itself, and only reads that file."
       echo "# tbx substrate: not needed — talos-box's resolver answers ${CLOUDBOX_DOMAIN}."
     } >&2
     exit 0 ;;
