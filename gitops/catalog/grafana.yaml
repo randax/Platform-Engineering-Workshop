@@ -2,7 +2,7 @@
 # issue #57). Datasources pre-provisioned: VictoriaMetrics and VictoriaLogs via
 # their native plugins, baked into the image (#65); VictoriaTraces via the
 # built-in Jaeger type. Anonymous read (Viewer). Browser: http://grafana.cloudbox.k8s.test
-# (the canonical observability port was freed when otel-lgtm was
+# (Grafana's canonical observability port was freed when otel-lgtm was
 # retired in the #57 rework). On-demand: enabled with the rest of the Victoria
 # observability capability, not wave-0.
 #

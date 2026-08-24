@@ -318,7 +318,7 @@ CLOUDBOX_HOSTS_FILE="${CLOUDBOX_HOSTS_FILE:-/etc/hosts}"
 # /etc/hosts has no wildcards, so the `*.<ns>.kn.` rules in
 # gitops/components/knative-serving/ingress.yaml cannot be expressed. Anything
 # else an attendee creates needs a manual line — lab/06 says so, and its
-# verify.sh accepts the Host-header form for exactly that reason.
+# verifier reads the Knative Service's published .status.url.
 cloudbox_hostnames() {
   local url host
   for url in "${GITEA_HOST_URL}" "${ARGOCD_HOST_URL}" "${PORTAL_HOST_URL}" \

@@ -50,7 +50,7 @@ runs on your laptop, readable end to end.
 3. **Find the results.** Both views of the same bucket:
    - the Gallery (refresh) shows the thumbnail + its metadata (dimensions, dominant color);
    - raw S3: `originals/`, `thumbs/`, and `meta/<key>.json` under bucket `images`
-     (`s5cmd ls` against :30900 — module 03 muscle memory; hint 3 has the exact lines).
+     (`s5cmd ls` against `http://s3.cloudbox.k8s.test` — module 03 muscle memory; hint 3 has the exact lines).
 4. **Inspect the plumbing.** `kubectl -n pipeline get broker,trigger` — find what the
    Trigger filters on. Then read the resizer's logs and find the `ce-type`, `ce-source`,
    `ce-id` headers: a CloudEvent is just an HTTP POST with five headers. Where did your

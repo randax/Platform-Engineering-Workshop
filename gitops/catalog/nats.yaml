@@ -1,5 +1,6 @@
 # NATS 2.14.5 + JetStream — durable messaging (PRD-0001). Single-node broker
-# with persistent JetStream: monitoring http://nats.cloudbox.k8s.test.
+# with persistent JetStream: client: NodePort 30422 on the docker substrate, or
+# `kubectl -n nats port-forward svc/nats 4222`; monitoring http://nats.cloudbox.k8s.test.
 # The durable counterpart to Knative's in-memory broker, and the queue backing
 # the golden-path Application XR (PRD-0003, spec.queue).
 #

@@ -22,7 +22,7 @@ Presenter-demo-first module: rootless BuildKit on Talos is pioneer territory (no
 flowchart LR
   gitea["Gitea<br>app source"] --> wf["Argo Workflow"]
   wf --> bk["BuildKit<br>rootless pod"]
-  bk --> zot["Zot registry<br>:30500"]
+  bk --> zot["Zot registry<br>NodePort 30500 (node-side)"]
   zot --> deploy["Deployment<br>runs your image"]
 ```
 

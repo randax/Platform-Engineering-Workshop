@@ -125,8 +125,9 @@ kubectl -n demo get configmap welcome -o yaml
 ./verify.sh
 ```
 
-It checks: Gitea answers on :30300 and hosts `cloudbox/platform`; ArgoCD answers on
-:30080; the root `platform` app points at your in-cluster Gitea (not GitHub) and is
+It checks: Gitea answers at `http://gitea.cloudbox.k8s.test` and hosts
+`cloudbox/platform`; ArgoCD answers at `http://argocd.cloudbox.k8s.test`; the root
+`platform` app points at your in-cluster Gitea (not GitHub) and is
 Healthy (Synced is the happy path; sync is advisory); the wave-0 app (storage) is
 healthy; and your `demo`
 app delivered the `welcome` ConfigMap with a real name in it.

@@ -471,15 +471,14 @@ fi
 #   * the Slidev development server in slides/README.md, not a NodePort.
 #   * .github/workflows/bootstrap-test.yaml — Docker-only integration fixtures
 #     deliberately exercise published NodePorts, rather than attendee URLs.
-#   * kourier.yaml and serving-core.yaml historical comments — curation records,
-#     not attendee instructions; changing rendered source requires re-vendoring.
+#   * serving-core.yaml historical comments — curation records, not attendee
+#     instructions; changing rendered source requires re-vendoring.
 before_fail=${FAILURES}
 stale="$(grep -rnE 'localhost:3[0-9]{4}' \
   --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.go' \
   lab solutions gitops scripts slides apps .devcontainer .github README.md PLAN.md 2>/dev/null \
   | grep -v '^scripts/substrate/docker.sh:' \
-  | grep -Eiv 'image(Name)?:.*localhost:30500|registries-skipping-tag-resolving|fnPullHost|_test\.go:|node.*localhost:30500|localhost:30500.*node' \
-  | grep -v '^slides/README.md:.*localhost:30[3]0' \
+  | grep -Eiv 'image(Name)?:.*localhost:30500|registries-skipping-tag-resolving|fnPullHost|_test\.go:.*30500|node.*localhost:30500|^[^:]+:[0-9]+:[[:space:]]*(#|//).*localhost:30500.*(node|kubelet)' \
   | grep -v '^\.github/workflows/bootstrap-test.yaml:' \
   | grep -v '^docs/' || true)"
 if [[ -n "${stale}" ]]; then
@@ -498,6 +497,22 @@ if [[ -n "${stale_sslip}" ]]; then
   printf '   %s\n' "${stale_sslip}" | head -30
 else
   ok "no sslip.io references outside docs/"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
+# --- 12b. no bare NodePort prose in attendee-facing lab material -------------
+# Browser URLs must name the shared hostname. A NodePort is only meaningful
+# here when its line explicitly identifies the Docker substrate or node-side
+# use, so the narrow exemptions below preserve those infrastructure notes.
+before_fail=${FAILURES}
+bare_nodeport="$(grep -rnE '(^|[^0-9.]):30[0-9]{3}([^0-9]|$)' \
+  lab/*/README.md lab/*/verify.sh lab/*/solve.sh slides/pages 2>/dev/null \
+  | grep -Eiv 'docker substrate|docker-only|NodePort|node[^[:alnum:]]*(pulls|side)|node.s[[:space:]]+kubelet|kubelet' || true)"
+if [[ -n "${bare_nodeport}" ]]; then
+  bad "bare :30xxx NodePort prose remains — use the shared hostname, or explicitly label Docker-substrate/node-side use:"
+  printf '   %s\n' "${bare_nodeport}" | head -30
+else
+  ok "no bare :30xxx NodePort prose in attendee-facing lab material"
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] || true
 

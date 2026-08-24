@@ -61,9 +61,9 @@ fi
 # --- The UI answers ------------------------------------------------------------
 HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${PORTAL_HOST_URL}/" 2>/dev/null || echo 000)"
 if [ "$HTTP_CODE" = "200" ]; then
-  ok "Cloudbox Console answers on :30600"
+  ok "Cloudbox Console answers at ${PORTAL_HOST_URL}"
 else
-  fail "no console on :30600 (HTTP $HTTP_CODE) — kubectl -n portal get svc portal; kubectl -n portal logs deploy/portal --tail=20"
+  fail "no console at ${PORTAL_HOST_URL} (HTTP $HTTP_CODE) — kubectl -n portal get svc,ingress; kubectl -n portal logs deploy/portal --tail=20"
 fi
 
 # --- The star task: the form-created database, if you've made it ----------------

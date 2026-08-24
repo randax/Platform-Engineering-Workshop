@@ -28,10 +28,9 @@ either a new upstream change or a curation someone forgot to write down.
    ~0.6 GiB. Script used (state-machine over `requests:` blocks): halve
    `NNNm`/`NNNMi` quantities. Resulting requests: activator 150m/30Mi,
    autoscaler + controller 50m/50Mi, webhook 50m/50Mi.
-2. **`config-deployment`**: `registries-skipping-tag-resolving:
-   "zot.zot.svc.cluster.local:5000,localhost:30500,127.0.0.1:30500,ghcr.io"` — node-side
-   — the controller must not try to digest-resolve images in the in-cluster
-   registry / its NodePort aliases. `ghcr.io` is on the list because tag
+2. **`config-deployment`**: `registries-skipping-tag-resolving` includes the
+   in-cluster Zot registry, its node-side NodePort 30500 aliases, and `ghcr.io` —
+   the controller must not try to digest-resolve those images. `ghcr.io` is on the list because tag
    resolution runs from the controller pod, bypassing the node registry
    mirror (offline-breaking at the venue); drop it once the first-party
    images are published and digest-pinned (issue #7).

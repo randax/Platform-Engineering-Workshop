@@ -122,8 +122,9 @@ typically a team that owns it. A portal is a *product decision*, not a default.
 >
 > *Presenter notes:* pre-enable `backstage.yaml` before the module (first boot is slow,
 > ~2 GB image + CNPG database — it's why this is a demo, not the lab). Show: guest
-> sign-in at :30700, catalog entities fed from Gitea, run the template, then chase it
-> through Gitea (:30300) and ArgoCD (:30080). `backstage.yaml` stays in the catalog —
+> sign-in at `http://backstage.cloudbox.k8s.test`, catalog entities fed from Gitea, run
+> the template, then chase it through Gitea (`http://gitea.cloudbox.k8s.test`) and
+> ArgoCD (`http://argocd.cloudbox.k8s.test`). `backstage.yaml` stays in the catalog —
 > attendees with RAM to spare can run the same loop at home.
 
 ## Hints
@@ -204,8 +205,8 @@ cd "$WORKSHOP/lab/08-portal" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: the portal app is Synced/Healthy; the deployment is ready; the UI answers on
-:30600; the `portal` ServiceAccount exists (that token is the portal's only credential);
+It checks: the portal app is Synced/Healthy; the deployment is ready; the UI answers at
+`http://portal.cloudbox.k8s.test`; the `portal` ServiceAccount exists (that token is the portal's only credential);
 and — once you've created it — that `console-db` is a real, Ready `WorkshopDatabase`
 with a healthy CNPG cluster behind it.
 

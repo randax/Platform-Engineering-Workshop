@@ -89,7 +89,8 @@ Zot also has a small web UI at `http://zot.cloudbox.k8s.test`.
 <summary>Hint 3: The deployment can't pull the image?</summary>
 
 Mind the two vantage points: the *build* pushed to `zot.zot.svc.cluster.local:5000`
-(cluster DNS — pods can resolve that), but the *node* pulls via `localhost:30500`,
+(cluster DNS — pods can resolve that), but the *node* pulls via NodePort 30500
+(node-side),
 where cluster DNS doesn't exist. *You* reach Zot at `http://zot.cloudbox.k8s.test`.
 If the pull fails: first confirm the image exists in Zot
 (hint 2), then `kubectl -n demo describe pod` and read the exact pull error.
@@ -132,7 +133,7 @@ cd "$WORKSHOP/lab/07-ci" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is advisory); Zot's API answering on :30500;
+It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is advisory); Zot's API answering at `http://zot.cloudbox.k8s.test`;
 at least one `build-hello-site-*` workflow **Succeeded**; the `hello-site` image present
 in Zot's catalog; and the hello-site Deployment Available and serving the page.
 
@@ -150,7 +151,7 @@ That's the sovereignty argument in one answer.
 - Inspect the build pod's securityContext while a build runs. What does
   `--oci-worker-no-process-sandbox` trade away, and why did the `builds` namespace need
   the PSA `privileged` label on a Talos cluster?
-- Point the module-06 ksvc at `localhost:30500/hello-site:v1` — the *node* pulls via
-  that NodePort; *you* reach Zot at `http://zot.cloudbox.k8s.test` (the cluster's Knative
+- Point the module-06 ksvc at the node-side NodePort 30500 image-pull address — the
+  *node* pulls via that NodePort; *you* reach Zot at `http://zot.cloudbox.k8s.test` (the cluster's Knative
   config already skips tag-resolution for the Zot registry names; find that setting in
   `config-deployment`).

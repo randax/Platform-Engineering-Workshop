@@ -22,7 +22,7 @@ gitops_push "$CLONE" "module 08: enable the cloudbox console + grant it demo acc
 wait_app portal
 wait_app demo
 
-# Wait until the UI actually answers on the NodePort.
+# Wait until the UI actually answers at its shared hostname.
 WAITED=0
 until curl -fsS --max-time 5 -o /dev/null "${PORTAL_HOST_URL}/" 2>/dev/null; do
   [ "$WAITED" -ge 300 ] && { echo "timed out waiting for the console UI" >&2; exit 1; }
