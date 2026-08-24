@@ -27,6 +27,8 @@
 #      scripts/context-guard.sh
 #  10. the tbx pin agrees between versions.env and mise.toml, and the tbx
 #      cluster yaml is generated from the pins rather than checked in
+#  11. the cni:none machine-config patch is byte-identical in both substrate
+#      backends, so both substrates produce the same cluster
 #
 # Offline and fast — the upstream comparison itself lives in the maintainer-only
 # ./scripts/check-upstream.sh, which needs internet.
@@ -432,6 +434,25 @@ grep -qE '^[[:space:]]+cni:' scripts/substrate/cloudbox.tbx.yaml.tmpl \
   && bad "scripts/substrate/cloudbox.tbx.yaml.tmpl declares a curated 'cni:' — that hands the cluster talos-box's Cilium 1.19.6 and its own machine config; this workshop installs Cilium ${CILIUM_VERSION} itself on BOTH substrates"
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "tbx pin agrees (${TBX_VERSION}) and the cluster yaml is generated from versions.env"
+
+# --- 11. the two substrate backends carry the same machine-config patch -------
+# The cni:none / proxy:disabled / node-label / local-path-mount patch is
+# duplicated in both backends so each reads standalone. Duplication is fine;
+# DRIFT is not — a node label that exists on one substrate and not the other
+# makes lab/01 pass on one laptop and fail on the next.
+before_fail=${FAILURES}
+# The patch is the body of the single-quoted heredoc that starts at the
+# 'cluster:' line; sed drops the closing EOF terminator awk's range included.
+patch_of() { awk '/^cluster:$/,/^EOF$/' "$1" | sed '$d'; }
+# Extracting nothing from both files would "agree" while asserting nothing —
+# that is how a renamed heredoc marker turns this check into decoration.
+if [[ -z "$(patch_of scripts/substrate/docker.sh)" || -z "$(patch_of scripts/substrate/tbx.sh)" ]]; then
+  bad "check 11 found no 'cluster:' ... EOF machine-config patch in one of the substrate backends — the heredoc moved or was renamed; fix patch_of() in this script, do not delete the check"
+elif ! diff -q <(patch_of scripts/substrate/docker.sh) <(patch_of scripts/substrate/tbx.sh) >/dev/null; then
+  bad "the cni:none machine-config patch has drifted between scripts/substrate/docker.sh and scripts/substrate/tbx.sh — both substrates must produce the same cluster (diff them)"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "both substrate backends carry the same cni:none machine-config patch"
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then

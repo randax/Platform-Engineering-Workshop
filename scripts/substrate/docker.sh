@@ -147,7 +147,6 @@ EOF
   step "Creating Talos cluster '${CLUSTER_NAME}' (Talos ${TALOS_VERSION}, Kubernetes ${KUBERNETES_VERSION})"
   info "1 controlplane (${TALOS_MEMORY_CONTROLPLANE} MB) + 1 worker (${TALOS_MEMORY_WORKER} MB)"
 
-  # NodePorts are published on the controlplane container; Cilium's
   # CPU caps: talosctl defaults both to 2.0, which caps the whole cluster at 4
   # cores regardless of the host — enough for modules 00-05, not for the module 10
   # end state (21 apps, ~125 containers). Scale with the daemon's CPU count and
@@ -164,7 +163,17 @@ EOF
   CPUS_WORKER="${NODE_CPUS}"
   info "Node CPUs: ${NODE_CPUS} each, uncapped by design (host has ${host_cpus})"
 
-  # kube-proxy replacement makes every NodePort answer on every node.
+  # NodePorts are published on the controlplane container; Cilium's kube-proxy
+  # replacement makes every NodePort answer on every node, so publishing them
+  # from the controlplane alone reaches pods on the worker too.
+  #
+  # The last entry is the odd one out: host port 80 -> NODEPORT_INGRESS, the
+  # nodePort Cilium's shared ingress Service is pinned to. That is what makes
+  # http://<anything>.${CLOUDBOX_DOMAIN}/ work port-free on docker, the way it
+  # does on tbx via a LoadBalancer VIP. The nine NodePorts above stay published
+  # on purpose: lab 07 and the portal pull images through localhost:${NODEPORT_ZOT}
+  # from the NODE side, and keeping the rest means a broken /etc/hosts block
+  # degrades to "use the port URL", not "nothing works".
   talosctl cluster create docker \
     --name "${CLUSTER_NAME}" \
     --image "${TALOS_IMAGE}" \
@@ -175,7 +184,7 @@ EOF
     --cpus-controlplanes "${CPUS_CONTROLPLANE}" \
     --cpus-workers "${CPUS_WORKER}" \
     --subnet "${TALOS_SUBNET}" \
-    --exposed-ports "${NODEPORT_GITEA}:${NODEPORT_GITEA}/tcp,${NODEPORT_ARGOCD}:${NODEPORT_ARGOCD}/tcp,${NODEPORT_ZOT}:${NODEPORT_ZOT}/tcp,${NODEPORT_PORTAL}:${NODEPORT_PORTAL}/tcp,${NODEPORT_BACKSTAGE}:${NODEPORT_BACKSTAGE}/tcp,${NODEPORT_RUSTFS_S3}:${NODEPORT_RUSTFS_S3}/tcp,${NODEPORT_GRAFANA}:${NODEPORT_GRAFANA}/tcp,${NODEPORT_KOURIER}:${NODEPORT_KOURIER}/tcp,${NODEPORT_NATS}:${NODEPORT_NATS}/tcp" \
+    --exposed-ports "${NODEPORT_GITEA}:${NODEPORT_GITEA}/tcp,${NODEPORT_ARGOCD}:${NODEPORT_ARGOCD}/tcp,${NODEPORT_ZOT}:${NODEPORT_ZOT}/tcp,${NODEPORT_PORTAL}:${NODEPORT_PORTAL}/tcp,${NODEPORT_BACKSTAGE}:${NODEPORT_BACKSTAGE}/tcp,${NODEPORT_RUSTFS_S3}:${NODEPORT_RUSTFS_S3}/tcp,${NODEPORT_GRAFANA}:${NODEPORT_GRAFANA}/tcp,${NODEPORT_KOURIER}:${NODEPORT_KOURIER}/tcp,${NODEPORT_NATS}:${NODEPORT_NATS}/tcp,80:${NODEPORT_INGRESS}/tcp" \
     "${patches[@]}"
 
   # --- 2. kubeconfig ------------------------------------------------------------------
@@ -223,7 +232,17 @@ EOF
   # a stale export from a previous run would be handed back unchanged.
   unset CLOUDBOX_HOST_GATEWAY
   CLOUDBOX_HOST_GATEWAY="$(cloudbox_host_gateway)"; export CLOUDBOX_HOST_GATEWAY
-  export CLOUDBOX_API_ENDPOINT="https://127.0.0.1:${API_PORT}"
+  # Must match the server the kubeconfig above actually carries, in BOTH
+  # branches: when `docker port` gave us nothing, API_PORT is empty and
+  # "https://127.0.0.1:${API_PORT}" would export the scheme and host of a URL
+  # with no port at all — a string that looks like an endpoint and connects to
+  # nothing. That branch left the kubeconfig as talosctl wrote it, which is the
+  # node's in-network address, so say so.
+  if [[ -n "${API_PORT}" ]]; then
+    export CLOUDBOX_API_ENDPOINT="https://127.0.0.1:${API_PORT}"
+  else
+    export CLOUDBOX_API_ENDPOINT="https://${TALOS_CP_IP}:6443"
+  fi
 }
 
 substrate_destroy() {

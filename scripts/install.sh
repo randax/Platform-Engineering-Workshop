@@ -108,9 +108,19 @@ if have docker && [[ -n "$(docker ps -q --filter "label=talos.cluster.name=${CLU
 else
   # Every NODEPORT_* in versions.env, or preflight passes and the module that
   # needs the missed port fails at the venue instead.
-  for port in "${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
-              "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
-              "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}"; do
+  ports=("${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
+         "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
+         "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}")
+  # Port 80 only on docker, where the controlplane container publishes it to
+  # NODEPORT_INGRESS. On tbx the ingress lives on a LoadBalancer VIP inside the
+  # cluster network and the host's port 80 is nobody's business. Read-only:
+  # substrate_resolve() only reads the override, the persisted file and
+  # `tbx doctor` — it never writes, so --check stays a check.
+  substrate="$(substrate_resolve)"
+  if [[ "${substrate}" == "docker" ]]; then
+    ports+=(80)
+  fi
+  for port in "${ports[@]}"; do
     if (echo > "/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
       check_fail "Port ${port} is already in use — the cluster needs it; free it first (lsof -i :${port})"
     else

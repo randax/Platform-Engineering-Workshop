@@ -28,6 +28,15 @@ info "Substrate: ${SUBSTRATE}"
 if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then
   info "  (tbx not used: $(substrate_doctor_reason))"
 fi
+# Pin the answer for everything this process later calls. substrate_resolve()
+# takes CLOUDBOX_SUBSTRATE first, so exporting it here makes every later resolve
+# — cloudbox_host_gateway() inside substrate_create(), and any helper the
+# backend shells out to — a variable read instead of another `tbx doctor` run
+# against a cluster that is halfway through being created. Must come AFTER the
+# "why not tbx" line above, which reads this variable to tell an explicit
+# override from a detection result. substrate_persist() below still writes the
+# file: the export dies with this process, the file is what the next script reads.
+export CLOUDBOX_SUBSTRATE="${SUBSTRATE}"
 # shellcheck source=substrate/docker.sh
 source "${SCRIPT_DIR}/substrate/${SUBSTRATE}.sh"
 
@@ -57,10 +66,10 @@ kubectl --request-timeout=5s get nodes >/dev/null 2>&1 \
 ok "API server is answering (nodes are NotReady until Cilium arrives — expected)"
 
 # --- 3. Cilium ------------------------------------------------------------------------
-step "Installing Cilium ${CILIUM_VERSION} (CNI + kube-proxy replacement)"
+step "Installing Cilium ${CILIUM_VERSION} (CNI + kube-proxy replacement + ingress)"
 # Chart is vendored into scripts/manifests/ (re-vendor from CILIUM_HELM_REPO
 # when bumping) so this needs no internet at the venue — principle 2.
-# Values from the official Talos Cilium guide:
+# Base values from the official Talos Cilium guide:
 # https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium
 # k8sServiceHost=localhost:7445 is KubePrism, Talos' local API server balancer.
 # --server-side=false pins helm 3's client-side apply. helm 4 defaults this to
@@ -69,18 +78,51 @@ step "Installing Cilium ${CILIUM_VERSION} (CNI + kube-proxy replacement)"
 # cannot exercise. Nothing here needs server-side; keeping the proven path
 # makes this a same-behaviour-newer-binary bump. Drop the flag once a full
 # bootstrap-test has been green with it removed.
+cilium_values=(
+  --set ipam.mode=kubernetes
+  --set kubeProxyReplacement=true
+  --set k8sServiceHost=localhost
+  --set k8sServicePort=7445
+  --set cgroup.autoMount.enabled=false
+  --set cgroup.hostRoot=/sys/fs/cgroup
+  --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}"
+  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+  # One ingress endpoint for the whole platform. `shared` means every Ingress
+  # object lands on ONE Service (cilium-ingress in kube-system) instead of one
+  # LoadBalancer per Ingress — which on tbx would burn a VIP per hostname and on
+  # docker would need a published port per hostname. Both substrates get the
+  # same values so `ingressClassName: cilium` means the same thing in both.
+  --set ingressController.enabled=true
+  --set ingressController.loadbalancerMode=shared
+  # L2 announcements are what make a LoadBalancer VIP answer ARP on the shared
+  # L2 segment. Enabled on BOTH substrates deliberately: on docker there is no
+  # LB-IPAM pool so nothing is announced, and keeping the flag identical means
+  # `cilium config view` reads the same in the room whichever laptop asks.
+  --set l2announcements.enabled=true
+  # Cilium's own L2 docs: the announcement leases are renewed every 5s, so a
+  # 40-address pool is ~8 QPS against the API server. The chart's 1.20.0
+  # defaults are lower than that on some paths; raise them explicitly. Same
+  # numbers talos-box uses (internal/manifests/manifests.go:41-43).
+  --set k8sClientRateLimit.qps=10
+  --set k8sClientRateLimit.burst=20
+)
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
+  # Real VIP, handed out by the CiliumLoadBalancerIPPool the shared-ingress step
+  # applies — .200 by talos-box convention, which tbx's resolver already answers
+  # for every *.${CLOUDBOX_DOMAIN} name. Until that pool exists the Service sits
+  # in <pending>, which is the correct state for a cluster with no LB-IPAM.
+  cilium_values+=(--set ingressController.service.type=LoadBalancer)
+else
+  # No LB implementation in a docker cluster. The controlplane container
+  # publishes host 80 -> this NodePort, so the hostnames work port-free there too.
+  cilium_values+=(--set ingressController.service.type=NodePort)
+  cilium_values+=(--set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}")
+fi
 helm upgrade --install cilium \
   --server-side=false \
   "${SCRIPT_DIR}/manifests/cilium-${CILIUM_VERSION}.tgz" \
   --namespace kube-system \
-  --set ipam.mode=kubernetes \
-  --set kubeProxyReplacement=true \
-  --set k8sServiceHost=localhost \
-  --set k8sServicePort=7445 \
-  --set cgroup.autoMount.enabled=false \
-  --set cgroup.hostRoot=/sys/fs/cgroup \
-  --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
-  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+  "${cilium_values[@]}"
 
 # --- 4. Wait for Ready -------------------------------------------------------------------
 step "Waiting for nodes to become Ready (Cilium rollout)"
