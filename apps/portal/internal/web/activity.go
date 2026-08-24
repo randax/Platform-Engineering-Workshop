@@ -1,13 +1,9 @@
 package web
 
-// The Activity page is CloudTrail-lite: the cluster already keeps an
-// activity log — Kubernetes Events — so "what just happened on my platform"
-// is one GET on /api/v1/events, filtered to our namespaces. No audit
-// pipeline, no log shipper; the API server had the data all along.
-
 import (
 	"context"
 	"net/http"
+	"sort"
 
 	"cloudbox.io/portal/internal/kube"
 )
@@ -20,13 +16,11 @@ func init() {
 		Path:       "/activity",
 		Handler:    handleActivity,
 		Extra: []Route{
-			{"GET /activity/list", handleActivityList}, // polled by htmx
+			{"GET /activity/list", handleActivityList},
 		},
 	})
 }
 
-// platformNamespaces is derived from the component catalog — the same "one
-// namespace per component" convention the Components page leans on.
 func platformNamespaces() map[string]bool {
 	ns := make(map[string]bool, len(componentCatalog))
 	for _, c := range componentCatalog {
@@ -35,9 +29,7 @@ func platformNamespaces() map[string]bool {
 	return ns
 }
 
-// recentActivity: one cluster-wide list, filtered client-side to the
-// platform's namespaces and capped for the page.
-func recentActivity(ctx context.Context, s *Server) ([]kube.Event, error) {
+func recentActivity(ctx context.Context, s *Server, filterNS, filterType string) ([]kube.Event, error) {
 	all, err := s.Kube.ListEvents(ctx, "/api/v1/events", "")
 	if err != nil {
 		return nil, err
@@ -46,6 +38,12 @@ func recentActivity(ctx context.Context, s *Server) ([]kube.Event, error) {
 	events := make([]kube.Event, 0, 50)
 	for _, e := range all {
 		if !ours[e.Metadata.Namespace] {
+			continue
+		}
+		if filterNS != "" && e.Metadata.Namespace != filterNS {
+			continue
+		}
+		if filterType != "" && e.Type != filterType {
 			continue
 		}
 		events = append(events, e)
@@ -57,25 +55,48 @@ func recentActivity(ctx context.Context, s *Server) ([]kube.Event, error) {
 }
 
 type activityData struct {
-	Events []kube.Event
-	Flash  flash
+	Events     []kube.Event
+	Namespaces []string
+	FilterNS   string
+	FilterType string
+	Flash      flash
+}
+
+func getActivityData(ctx context.Context, s *Server, r *http.Request) (activityData, error) {
+	fns := r.URL.Query().Get("ns")
+	ftype := r.URL.Query().Get("type")
+	events, err := recentActivity(ctx, s, fns, ftype)
+	if err != nil {
+		return activityData{}, err
+	}
+	var nss []string
+	ours := platformNamespaces()
+	for n := range ours {
+		nss = append(nss, n)
+	}
+	sort.Strings(nss)
+	return activityData{
+		Events:     events,
+		Namespaces: nss,
+		FilterNS:   fns,
+		FilterType: ftype,
+	}, nil
 }
 
 func handleActivity(s *Server, w http.ResponseWriter, r *http.Request) {
-	events, err := recentActivity(r.Context(), s)
+	data, err := getActivityData(r.Context(), s, r)
 	if err != nil {
 		s.renderError(w, err)
 		return
 	}
-	s.render(w, "activity", activityData{Events: events})
+	s.render(w, "activity", data)
 }
 
-// handleActivityList: the 10s-polled fragment, self-healing like the others.
 func handleActivityList(s *Server, w http.ResponseWriter, r *http.Request) {
-	events, err := recentActivity(r.Context(), s)
+	data, err := getActivityData(r.Context(), s, r)
 	if err != nil {
 		s.render(w, "activity-list", activityData{Flash: errorFlash("API error: " + err.Error())})
 		return
 	}
-	s.render(w, "activity-list", activityData{Events: events})
+	s.render(w, "activity-list", data)
 }

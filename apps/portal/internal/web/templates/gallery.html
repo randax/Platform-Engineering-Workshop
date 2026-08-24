@@ -5,6 +5,48 @@
 portal forwards it to the <b>uploader</b> → the uploader stores it in RustFS and emits a
 CloudEvent → the broker wakes the <b>resizer</b> from zero → thumbnail and analysis appear.
 Image links are presigned S3 URLs, valid 15 minutes.</p>
+<div class="pipeline-diagram" style="display: flex; flex-wrap: nowrap; align-items: center; gap: 0.5rem; padding: 1.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); margin-bottom: 2rem; overflow-x: auto; font: 0.8rem/1.3 ui-monospace, monospace; text-align: center;">
+  
+  <div style="padding: 0.5rem; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface-2); flex-shrink: 0;">
+    <b>Portal</b><br><small>(You)</small>
+  </div>
+  
+  <div style="color: var(--muted); flex-shrink: 0;">→<br><small>HTTP</small></div>
+  
+  <div style="padding: 0.5rem; border: 2px solid var(--accent); border-radius: var(--r-sm); flex-shrink: 0;">
+    <b>Uploader</b><br><small>Knative Service</small>
+  </div>
+  
+  <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; flex-shrink: 0; color: var(--muted);">
+    <div style="display: flex; align-items: center; gap: 0.25rem;">→ <small>S3 put <i>(original)</i></small> →</div>
+    <div style="display: flex; align-items: center; gap: 0.25rem; color: var(--accent);">→ <small>CloudEvent</small> →</div>
+  </div>
+  
+  <div style="display: flex; flex-direction: column; gap: 0.5rem; flex-shrink: 0;">
+    <div style="padding: 0.5rem; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface-2);">
+      <b>RustFS</b><br><small>images bucket</small>
+    </div>
+    <div style="padding: 0.5rem; border: 1px dashed var(--accent); border-radius: var(--r-sm); background: var(--surface-2);">
+      <b>Event Broker</b><br><small>Knative</small>
+    </div>
+  </div>
+  
+  <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; flex-shrink: 0; color: var(--muted);">
+    <div style="display: flex; align-items: center; gap: 0.25rem;">← <small>S3 get <i>(original)</i></small> ←</div>
+    <div style="display: flex; align-items: center; gap: 0.25rem; color: var(--accent);">→ <small>Trigger</small> →</div>
+  </div>
+  
+  <div style="padding: 0.5rem; border: 2px solid var(--accent); border-radius: var(--r-sm); flex-shrink: 0;">
+    <b>Resizer</b><br><small>Knative Service</small>
+  </div>
+  
+  <div style="color: var(--muted); flex-shrink: 0;">→<br><small>S3 put<br><i>(thumb+meta)</i></small></div>
+  
+  <div style="padding: 0.5rem; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface-2); flex-shrink: 0;">
+    <b>RustFS</b><br><small>images bucket</small>
+  </div>
+  
+</div>
 
 <form hx-post="/gallery/upload" hx-encoding="multipart/form-data"
       hx-target="#gallery" hx-swap="outerHTML">
