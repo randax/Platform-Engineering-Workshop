@@ -101,7 +101,7 @@ just the bucket) — this needs nothing installed on your laptop and no internet
 kubectl -n demo run s3 --rm -i --restart=Never \
   --image=docker.io/peakcom/s5cmd:v2.3.0 \
   --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
-  --env AWS_REGION=us-east-1 \
+  --env AWS_REGION=eu-north-1 \
   --command -- /bin/sh -c '
     set -e
     EP=http://rustfs-svc.rustfs.svc.cluster.local:9000
@@ -118,7 +118,7 @@ Got `s5cmd` on your laptop already (`brew install s5cmd`), or the AWS CLI, or `r
 Point any of them at the NodePort instead — that is the whole lesson:
 
 ```bash
-export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1
 s5cmd --endpoint-url http://localhost:30900 mb s3://app-assets
 echo "hello from my own cloud" > hello.txt
 s5cmd --endpoint-url http://localhost:30900 cp hello.txt s3://app-assets/
@@ -143,7 +143,7 @@ kubectl -n demo get cluster app-db -w        # until 'Cluster in healthy state'
 kubectl -n demo exec -it app-db-1 -- psql -U postgres -d app -c 'SELECT 1;'
 
 # any S3 client works; hint 4 has the in-cluster form if you have none installed
-export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1
 s5cmd --endpoint-url http://localhost:30900 mb s3://app-assets
 echo "hello from my own cloud" > /tmp/hello.txt
 s5cmd --endpoint-url http://localhost:30900 cp /tmp/hello.txt s3://app-assets/

@@ -106,7 +106,7 @@ Follow the event, hop by hop:
 <summary>Hint 3: The S3 view of what happened</summary>
 
 ```bash
-export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1
 s5cmd --endpoint-url http://localhost:30900 ls s3://images/originals/
 s5cmd --endpoint-url http://localhost:30900 ls s3://images/thumbs/
 s5cmd --endpoint-url http://localhost:30900 cat s3://images/meta/<key>.json
@@ -175,7 +175,7 @@ kubectl -n pipeline get pods -w &                    # the watcher
 # → http://localhost:30600/gallery — upload a photo, watch 0 → 1 → 0 twice
 kill %1
 
-export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1
 s5cmd --endpoint-url http://localhost:30900 ls --show-fullpath "s3://images/*"   # originals/ thumbs/ meta/
 
 kubectl -n pipeline logs -l serving.knative.dev/service=resizer -c user-container --tail=20   # ce-* headers
