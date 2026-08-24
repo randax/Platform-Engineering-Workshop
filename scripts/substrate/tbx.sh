@@ -8,6 +8,7 @@
 # `tbx up -f` reads. Source me from create-cluster.sh / destroy-cluster.sh;
 # do not run me.
 # =============================================================================
+set -euo pipefail
 
 # render_tbx_cluster_file() — write ${TBX_CLUSTER_FILE} from
 # scripts/substrate/cloudbox.tbx.yaml.tmpl, substituting the __TOKEN__
