@@ -113,8 +113,38 @@ jobs:
             exit 1
           fi
 
-      - name: Create cluster (Talos + Cilium, wired to the mirror)
-        run: ./scripts/create-cluster.sh
+      - name: Create cluster (Talos, no CNI — the lab-01 attendee path)
+        # --skip-cilium + the manual helm install below IS module 01 as
+        # attendees now do it. The full rehearsal deliberately walks the
+        # attendee path, not the automated one: the flag branch and the lab's
+        # hint-3 helm command get CI coverage nowhere else. The recovery-path
+        # job below still calls create-cluster.sh bare, so both halves of the
+        # script stay exercised every run.
+        run: ./scripts/create-cluster.sh --skip-cilium
+
+      - name: Install Cilium by hand (lab 01, task 3 — the hint-3 command)
+        # Keep this verbatim-equivalent to lab/01-cluster/README.md hint 3 and
+        # create-cluster.sh step 3. If a Cilium value changes in the script,
+        # this step is the tripwire that the lab text rotted.
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          kubectl get nodes | grep -q NotReady \
+            || { echo "ERROR: nodes Ready before Cilium — --skip-cilium did not skip"; exit 1; }
+          helm upgrade --install cilium \
+            --server-side=false \
+            "scripts/manifests/cilium-${CILIUM_VERSION}.tgz" \
+            --namespace kube-system \
+            --set ipam.mode=kubernetes \
+            --set kubeProxyReplacement=true \
+            --set k8sServiceHost=localhost \
+            --set k8sServicePort=7445 \
+            --set cgroup.autoMount.enabled=false \
+            --set cgroup.hostRoot=/sys/fs/cgroup \
+            --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
+            --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+          kubectl -n kube-system rollout status ds/cilium --timeout=300s
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
       - name: Bootstrap GitOps (Gitea + ArgoCD)
         run: ./scripts/bootstrap-gitops.sh
