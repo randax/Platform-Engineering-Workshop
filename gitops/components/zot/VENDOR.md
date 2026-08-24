@@ -24,7 +24,7 @@ Config rationale:
 - **Anonymous read/write on every repository** — workshop-grade; BuildKit
   pushes and kubelets pull without credentials.
 - search + ui extensions enabled (the combined image ships them) → visible
-  win at http://localhost:30500.
+  win at http://zot.cloudbox.k8s.test.
 - Renders a StatefulSet with a 5Gi volumeClaimTemplate on `local-path`.
 - Reachable as `zot.zot.svc.cluster.local:5000` in-cluster (BuildKit pushes
   with `registry.insecure=true`; Talos machine config must mirror/allow this

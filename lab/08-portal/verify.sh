@@ -59,7 +59,7 @@ else
 fi
 
 # --- The UI answers ------------------------------------------------------------
-HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:30600/ 2>/dev/null || echo 000)"
+HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${PORTAL_HOST_URL}/" 2>/dev/null || echo 000)"
 if [ "$HTTP_CODE" = "200" ]; then
   ok "Cloudbox Console answers on :30600"
 else
@@ -70,7 +70,7 @@ fi
 WDB_READY="$(kubectl -n demo get workshopdatabase console-db \
   -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
 if [ -z "$WDB_READY" ]; then
-  echo "○ star task not done yet: create 'console-db' via the console's New database form (http://localhost:30600/databases) — verify passes without it, but the module's trophy is missing"
+  echo "○ star task not done yet: create 'console-db' via the console's New database form (${PORTAL_HOST_URL}/databases) — verify passes without it, but the module's trophy is missing"
 else
   if [ "$WDB_READY" = "True" ]; then
     ok "WorkshopDatabase console-db exists and is Ready (created via the console!)"

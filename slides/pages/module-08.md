@@ -218,7 +218,7 @@ backstage.yaml stays in the catalog — anyone with RAM to spare can run this ex
 **Outcome:** a database created from a form — provably real.
 
 ```bash
-# enable portal.yaml → open http://localhost:30600
+# enable portal.yaml → open http://portal.cloudbox.k8s.test
 cd lab/08-portal && ./verify.sh
 ```
 

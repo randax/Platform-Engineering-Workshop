@@ -1,7 +1,6 @@
 # One Ingress in front of Knative. Knative programs every ksvc's host as
 # <name>.<ns>.kn.cloudbox.k8s.test (config-domain in serving-core.yaml, set to
-# KNATIVE_DOMAIN — scripts/versions.env:178 — by Task 11; until that edit lands
-# config-domain still says 127.0.0.1.sslip.io and these rules match nothing).
+# KNATIVE_DOMAIN in scripts/versions.env).
 # Kourier routes on the Host header, so the rules below cover every function
 # anyone creates in those namespaces for the rest of the workshop.
 #

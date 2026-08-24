@@ -17,14 +17,12 @@ magic-looking cloud product there is.
 ## The task
 
 1. Enable `knative-serving.yaml` from the catalog (installs Knative Serving + the Kourier
-   ingress, reachable on NodePort **31080**).
+   gateway behind the Cilium ingress).
 2. Deploy [`hello-ksvc.yaml`](hello-ksvc.yaml) from this lab dir the GitOps way (you know
    where it goes by now). Wait until the ksvc reports `READY True` and note its URL.
 3. **The moment.** Arrange two terminals:
    - one watching pods: `kubectl -n demo get pods -w`
-   - one to curl through Kourier. Traffic is routed by the `Host` header — figure out
-     what host your ksvc got (hint 2), then:
-     `curl -H "Host: <that-host>" http://localhost:31080/`
+   - one to curl the ksvc URL: `curl "$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')/"`
 
    Watch the first request *create* a pod (cold start — how long did it take?), repeat
    requests hit it warm, and ~60–90s of silence make it disappear.
@@ -48,21 +46,21 @@ Knative's webhooks take a minute to come up; the demo app retries. Watch:
 </details>
 
 <details>
-<summary>Hint 2: The Host header dance</summary>
+<summary>Hint 2: Find the ksvc URL</summary>
 
 ```bash
-kubectl -n demo get ksvc hello -o jsonpath='{.status.url}'    # e.g. http://hello.demo.example.com
+kubectl -n demo get ksvc hello -o jsonpath='{.status.url}'
 ```
 
-`example.com` obviously doesn't resolve to your laptop — that's fine. HTTP routing only
-needs the header to match:
+The URL is in the `kn.cloudbox.k8s.test` domain and routes through the Cilium ingress:
 
 ```bash
-curl -H "Host: hello.demo.example.com" http://localhost:31080/
+curl "$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')/"
 ```
 
-(`example.com` is Knative's default domain; a real install would set a real one +
-wildcard DNS. Same mechanics.)
+On the docker substrate `/etc/hosts` cannot hold a wildcard, so only the ksvc names
+`install.sh --print-hosts` lists resolve. For a ksvc you invent yourself, either add a
+line for it or use the Host-header form: `curl -H "Host: <the ksvc host>" http://localhost/`.
 </details>
 
 <details>
@@ -86,10 +84,10 @@ cp "$WORKSHOP/lab/06-serverless/hello-ksvc.yaml" gitops/components/demo/
 git add . && git commit -m "module 06: knative + hello ksvc" && git push
 
 kubectl -n demo get ksvc hello -w      # until READY True
-HOST="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' | sed 's|http://||')"
+URL="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')"
 
 kubectl -n demo get pods -w &          # watcher
-curl -H "Host: $HOST" http://localhost:31080/    # cold start!
+curl "${URL}/"                         # cold start!
 sleep 90                                # silence...
 kubectl -n demo get pods                # gone again
 kill %1
@@ -105,13 +103,13 @@ cd "$WORKSHOP/lab/06-serverless" && ./verify.sh
 ```
 
 It checks: the knative-serving app is Healthy (Synced is the happy path; sync is advisory) and its deployments are up; ksvc
-`hello` is Ready; a curl through Kourier (:31080, correct Host header) returns 200 with
+`hello` is Ready; a curl through the Cilium ingress returns 200 with
 the expected body; and — after a quiet period — that the revision has scaled to zero pods
 (this check waits up to ~2 minutes, be patient).
 
 ## Explain-back
 
-Tell your neighbor: between your `curl` hitting :31080 and a `Hello ...!` coming back
+Tell your neighbor: between your `curl` hitting the ksvc URL and a `Hello ...!` coming back
 from a pod that didn't exist — what had to happen, in order? (Ingress → ? → pod; who
 buffered your request while the pod started?)
 
@@ -119,7 +117,7 @@ buffered your request while the pod started?)
 
 - Deploy a change (edit `TARGET` via git). Knative keeps both revisions — find them
   (`kubectl -n demo get revisions`) and split traffic 50/50 between them in the ksvc spec.
-- Load it: `for i in $(seq 1 200); do curl -s -H "Host: $HOST" http://localhost:31080/ & done; wait`
+- Load it: `for i in $(seq 1 200); do curl -s "${URL}/" & done; wait`
   — watch the autoscaler add pods. What controls the max?
 - Set `autoscaling.knative.dev/min-scale: "1"` and explain when you'd pay that cost on
   purpose (hint: what did your first curl's latency look like?).

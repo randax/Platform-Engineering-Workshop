@@ -29,6 +29,8 @@
 #      cluster yaml is generated from the pins rather than checked in
 #  11. the cni:none machine-config patch is byte-identical in both substrate
 #      backends, so both substrates produce the same cluster
+#  12. browser-facing URLs use the shared hostname scheme, not Docker-only
+#      localhost NodePorts or the former sslip.io Knative domain
 #
 # Offline and fast — the upstream comparison itself lives in the maintainer-only
 # ./scripts/check-upstream.sh, which needs internet.
@@ -453,6 +455,51 @@ elif ! diff -q <(patch_of scripts/substrate/docker.sh) <(patch_of scripts/substr
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "both substrate backends carry the same cni:none machine-config patch"
+
+# --- 12. no browser-facing localhost:3xxxx literals --------------------------
+# The workshop serves one hostname scheme on both substrates. A leftover
+# localhost:30xxx URL works on exactly one of them, so it reads as a working
+# instruction and fails on half the room — the worst kind of stale text.
+#
+# Allowlisted exceptions, each for a reason a rewrite would break:
+#   * scripts/substrate/docker.sh — the docker backend's own port publishing.
+#   * localhost:30500 — Zot's NodePort as the NODE sees it. Node-side image
+#     pulls and Knative's registries-skipping-tag-resolving must use it: with
+#     kube-proxy replacement it answers on every node on both substrates, and a
+#     tbx VM cannot resolve zot.cloudbox.k8s.test.
+#   * the Slidev development server in slides/README.md, not a NodePort.
+#   * .github/workflows/bootstrap-test.yaml — Docker-only integration fixtures
+#     deliberately exercise published NodePorts, rather than attendee URLs.
+#   * kourier.yaml and serving-core.yaml historical comments — curation records,
+#     not attendee instructions; changing rendered source requires re-vendoring.
+before_fail=${FAILURES}
+stale="$(grep -rnE 'localhost:3[0-9]{4}' \
+  --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.go' \
+  lab solutions gitops scripts slides apps .devcontainer .github README.md PLAN.md 2>/dev/null \
+  | grep -v '^scripts/substrate/docker.sh:' \
+  | grep -v 'localhost:30500' \
+  | grep -v '^slides/README.md:.*localhost:30[3]0' \
+  | grep -v '^\.github/workflows/bootstrap-test.yaml:' \
+  | grep -v '^gitops/components/knative-serving/kourier.yaml:' \
+  | grep -v '^docs/' || true)"
+if [[ -n "${stale}" ]]; then
+  bad "browser-facing localhost:3xxxx literals remain — they only work on the docker substrate:"
+  printf '   %s\n' "${stale}" | head -30
+else
+  ok "no stale localhost:3xxxx literals (the hostname scheme is the only browser URL)"
+fi
+stale_sslip="$(grep -rn 'sslip\.io' \
+  --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.go' \
+  lab solutions gitops scripts slides apps 2>/dev/null \
+  | grep -v '^scripts/check-consistency.sh:' \
+  | grep -v '^gitops/components/knative-serving/serving-core.yaml:' || true)"
+if [[ -n "${stale_sslip}" ]]; then
+  bad "127.0.0.1.sslip.io references remain — Knative's config-domain is now ${CLOUDBOX_DOMAIN}-based:"
+  printf '   %s\n' "${stale_sslip}" | head -30
+else
+  ok "no sslip.io references outside docs/"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then

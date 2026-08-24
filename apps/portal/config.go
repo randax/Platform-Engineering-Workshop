@@ -28,6 +28,7 @@ type config struct {
 	PromURL        string // VictoriaMetrics Prometheus API for the sparklines
 	VLogsURL       string // VictoriaLogs query API for the per-component log tail
 	GrafanaURL     string // browser-facing Grafana for deep links
+	KnativeDomain  string // browser-facing domain for composed Knative Services
 	NATSMonitorURL string // NATS monitoring endpoint for the JetStream browser
 	ZotURL         string // cluster-internal Zot registry, read by the Builds page
 	KagentURL      string // Kagent controller (REST + A2A on :8083), the Case file agent
@@ -50,6 +51,7 @@ func loadConfig() config {
 		PromURL:          envOr("PROM_URL", "http://victoria-metrics.observability.svc.cluster.local:8428"),
 		VLogsURL:         envOr("VLOGS_URL", "http://victoria-logs.observability.svc.cluster.local:9428"),
 		GrafanaURL:       envOr("GRAFANA_URL", "http://grafana.cloudbox.k8s.test"),
+		KnativeDomain:    envOr("KNATIVE_DOMAIN", "kn.cloudbox.k8s.test"),
 		NATSMonitorURL:   envOr("NATS_MONITOR_URL", "http://nats.nats.svc.cluster.local:8222"),
 		ZotURL:           envOr("ZOT_URL", "http://zot.zot.svc.cluster.local:5000"),
 		KagentURL:        envOr("KAGENT_URL", "http://kagent-controller.kagent.svc.cluster.local:8083"),

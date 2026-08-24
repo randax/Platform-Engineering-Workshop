@@ -94,7 +94,7 @@ The goal was never "typed the commands yourself". It's a running platform PLUS y
 - Cloudbox Console → **Workshop** page
 - One row per module, inferred from cluster
 - It reads live state — no self-reporting
-- `http://localhost:30600/workshop` (after module 02)
+- `http://portal.cloudbox.k8s.test/workshop` (after module 02)
 
 <!--
 Once the platform's portal is running (it arrives via the catalog; you'll meet it properly in module 08), its Workshop page shows a checklist of all ten modules — each row inferred from your live cluster state: nodes ready, kube-proxy absent, Gitea healthy, a CNPG cluster in demo, WorkshopDatabases present, thumbnails in the images bucket, and so on.

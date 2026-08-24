@@ -3,12 +3,12 @@
 # Copy to gitops/components/demo/my-application.yaml and push.
 #
 # Crossplane v2: a namespaced XR created directly — not a Claim. Composes a
-# Knative Service (scale-to-zero, a *.sslip.io URL), a WorkshopDatabase
+# Knative Service (scale-to-zero, a *.kn.cloudbox.k8s.test URL), a WorkshopDatabase
 # (composition-of-compositions → CNPG cluster), and an S3 bucket, then injects
 # DATABASE_URL + S3_* into the workload so it boots already connected.
 #
 # Reach it at (once Ready):
-#   http://my-app.<namespace>.127.0.0.1.sslip.io:31080
+#   http://my-app.<namespace>.kn.cloudbox.k8s.test
 apiVersion: platform.cloudbox.io/v1alpha1
 kind: Application
 metadata:

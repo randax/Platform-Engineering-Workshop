@@ -218,7 +218,7 @@ echo "  ArgoCD:  ${ARGOCD_HOST_URL}  (user: admin)"
 echo
 # The hosts-file advice is docker-only: on tbx the names come from talos-box's
 # resolver and the NodePorts are inside the VM, not on this host — telling a tbx
-# attendee to try http://localhost:30300 sends them chasing a dead port.
+# attendee to try the Docker-only Gitea NodePort sends them chasing a dead port.
 BOOTSTRAP_SUBSTRATE="$(substrate_resolve)"
 if [[ "${BOOTSTRAP_SUBSTRATE}" == "docker" ]]; then
   info "Name not resolving? On the docker substrate these need the ${CLOUDBOX_HOSTS_FILE} block:"

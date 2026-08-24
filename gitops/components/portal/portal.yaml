@@ -109,6 +109,10 @@ spec:
             # cilium ingress) — used for the portal's observability deep-links.
             - name: GRAFANA_URL
               value: http://grafana.cloudbox.k8s.test
+            # Browser-facing domain for composed Knative Services. The portal
+            # builds <name>.<namespace>.<domain> links for Application XRs.
+            - name: KNATIVE_DOMAIN
+              value: kn.cloudbox.k8s.test
             # Gitea credentials for the scaffold bridge (PRD-0012): the console
             # calls Gitea's generate API to create a tenant repo from a template.
             # The lab's fixed gitea_admin (versions.env) — committed on purpose,

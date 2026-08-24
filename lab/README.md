@@ -6,7 +6,7 @@ a self-service platform API, and (if you're fast) serverless, in-cluster CI, a d
 portal, and an event-driven picture pipeline that ties it all together. Everything keeps
 working when you leave the building — that's the point. (From module 08 on, your platform
 even shows its own progress: the Cloudbox Console's **Workshop** page at
-http://localhost:30600/workshop is a live dashboard of which modules your cluster has
+http://portal.cloudbox.k8s.test/workshop is a live dashboard of which modules your cluster has
 reached.)
 
 ## Module overview

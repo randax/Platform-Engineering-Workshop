@@ -74,11 +74,11 @@ fi
 URL="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' 2>/dev/null || true)"
 HOST="${URL#http://}"; HOST="${HOST#https://}"
 if [ -n "$HOST" ]; then
-  BODY="$(curl -fsS --max-time 30 -H "Host: $HOST" http://localhost:31080/ 2>/dev/null || true)"
+  BODY="$(curl -fsS --max-time 30 "${URL}/" 2>/dev/null || true)"
   if echo "$BODY" | grep -qi hello; then
-    ok "curl via Kourier (:31080, Host: $HOST) answered: $(echo "$BODY" | head -1)"
+    ok "curl via the Cilium ingress (${URL}) answered: $(echo "$BODY" | head -1)"
   else
-    fail "no answer through Kourier — is 31080 up? kubectl get svc -A | grep 31080; try: curl -v -H 'Host: $HOST' http://localhost:31080/"
+    fail "no answer through the Cilium ingress — kubectl get ingress -A; try: curl -v ${URL}/"
   fi
 else
   fail "cannot determine ksvc URL — fix the ksvc checks above first"

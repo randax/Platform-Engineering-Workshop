@@ -132,7 +132,7 @@ a different module, see the "Prerequisites" section above):
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].env}'
 kubectl -n demo rollout history deploy/demo-web
-git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -196,7 +196,7 @@ Git-managed Deployment:
 kubectl -n demo describe pod <new-pod>
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].resources}'
-git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -256,7 +256,7 @@ image that fast. Which of the things you built in module 00 and 01 could have an
 ```bash
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].image}'
-git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -310,7 +310,7 @@ If you haven't already, turn the capability on the same way as every other one i
 workshop — copy the catalog entry into `gitops/apps/` and push:
 
 ```bash
-git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 cp gitops/catalog/kagent.yaml gitops/apps/
 git add gitops/apps/kagent.yaml
 git commit -m "enable kagent"

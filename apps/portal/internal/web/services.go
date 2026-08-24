@@ -236,7 +236,7 @@ var invokeClient = &http.Client{Timeout: 35 * time.Second}
 // functionClusterURL is the in-cluster address of a Knative Service. Knative
 // programs the cluster-local gateway to route this host to the revision, waking
 // it from zero — so a GET here is the canonical way to invoke a ksvc from
-// inside the cluster (no ingress, no sslip.io, works headless in CI).
+// inside the cluster (no ingress, works headless in CI).
 func functionClusterURL(namespace, name string) string {
 	return fmt.Sprintf("http://%s.%s.svc.cluster.local", name, namespace)
 }

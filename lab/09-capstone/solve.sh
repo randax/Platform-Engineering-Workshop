@@ -48,8 +48,8 @@ kubectl -n pipeline wait --for=condition=Complete job/create-images-bucket --tim
 
 # Wait for the portal UI (the upload path goes browser → portal → uploader).
 WAITED=0
-until curl -fsS --max-time 5 -o /dev/null http://localhost:30600/healthz 2>/dev/null; do
-  [ "$WAITED" -ge 300 ] && { echo "timed out waiting for the portal on :30600" >&2; exit 1; }
+until curl -fsS --max-time 5 -o /dev/null "${PORTAL_HOST_URL}/healthz" 2>/dev/null; do
+  [ "$WAITED" -ge 300 ] && { echo "timed out waiting for the portal at ${PORTAL_HOST_URL}" >&2; exit 1; }
   sleep 10; WAITED=$((WAITED + 10))
 done
 
@@ -62,14 +62,14 @@ echo "$PNG_B64" | base64 -d > "$TMP_PNG" 2>/dev/null || echo "$PNG_B64" | base64
 echo "uploading test image through the portal (cold-starts the uploader)..."
 curl -fsS --max-time 120 -o /dev/null \
   -F "file=@${TMP_PNG};type=image/png;filename=solve-test.png" \
-  http://localhost:30600/gallery/upload
+  "${PORTAL_HOST_URL}/gallery/upload"
 rm -f "$TMP_PNG"
 
 # The resizer scales from zero to process the event — poll S3 for its output.
 s3() {
   if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1 \
-      s5cmd --endpoint-url http://localhost:30900 "$@" 2>/dev/null
+      s5cmd --endpoint-url "${RUSTFS_S3_HOST_URL}" "$@" 2>/dev/null
   else
     kubectl -n pipeline run "solve-s3-$$-${RANDOM}" --rm -i --restart=Never --quiet \
       --image=docker.io/peakcom/s5cmd:v2.3.0 \
@@ -95,4 +95,4 @@ until thumb_landed; do
   [ "$WAITED" -ge 240 ] && { echo "no thumbnail after ${WAITED}s — check: kubectl -n pipeline logs -l serving.knative.dev/service=resizer -c user-container" >&2; exit 1; }
   sleep 10; WAITED=$((WAITED + 10))
 done
-echo "thumbnail produced after ~${WAITED}s — see http://localhost:30600/gallery"
+echo "thumbnail produced after ~${WAITED}s — see ${PORTAL_HOST_URL}/gallery"

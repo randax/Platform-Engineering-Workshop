@@ -17,7 +17,7 @@ Crossplane v2 pipeline + `function-patch-and-transform` — no new components.
 ## What one `Application` composes (in the XR's own namespace)
 
 1. **workload** — a Knative `Service` named after the XR. Free scale-to-zero and
-   a `http://<name>.<namespace>.127.0.0.1.sslip.io:31080` URL via Kourier — no
+   a `http://<name>.<namespace>.kn.cloudbox.k8s.test` URL via Kourier — no
    separate ingress component. `spec.image` → the container; `spec.replicas`
    `{min,max}` → the `autoscaling.knative.dev/minScale` and
    `autoscaling.knative.dev/maxScale` annotations. **`spec.env` is
@@ -139,7 +139,7 @@ fails with a plain "forbidden" until its group is aggregated in.
   to install + mirror). Because the DB is always created, `DATABASE_URL` always
   resolves — the composition is internally consistent as-is.
 - **NATS queue (`spec.queue`) and explicit `spec.ingress` host** from the PRD are
-  **out of scope for v1** (queue depends on PRD-0001; the sslip.io URL already
+  **out of scope for v1** (queue depends on PRD-0001; the Knative URL already
   covers ingress for the golden path).
 - **Redundant bucket when a DB exists.** The `WorkshopDatabase` also creates a
   bucket (`<name>-assets`, Job `<name>-bucket`). The app's own bucket is

@@ -80,10 +80,10 @@ a stale mirror can never break the cluster, it just costs bandwidth.
 
 | What | URL | Credentials |
 |---|---|---|
-| Gitea | http://localhost:30300 | `gitea_admin` / `cloudbox123` |
-| ArgoCD | http://localhost:30080 | `admin` / see `bootstrap-gitops.sh` output |
-| Zot registry | http://localhost:30500 | (enabled in module S2) |
-| Kourier (Knative) | http://localhost:31080 | (enabled in module S1) |
+| Gitea | http://gitea.cloudbox.k8s.test | `gitea_admin` / `cloudbox123` |
+| ArgoCD | http://argocd.cloudbox.k8s.test | `admin` / see `bootstrap-gitops.sh` output |
+| Zot registry | http://zot.cloudbox.k8s.test | (enabled in module S2) |
+| Knative | `http://<name>.<namespace>.kn.cloudbox.k8s.test` | (enabled in module S1) |
 
 ## Conventions
 

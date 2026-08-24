@@ -3,7 +3,8 @@
 # 04) — no new function to install. In ONE reconcile it emits, into the XR's
 # own namespace:
 #
-#   1. workload  — a Knative Service (free scale-to-zero + a *.sslip.io URL via
+#   1. workload  — a Knative Service (free scale-to-zero + a
+#                  *.kn.cloudbox.k8s.test URL via
 #                  Kourier; no separate ingress component needed).
 #   2. database  — a WorkshopDatabase XR. THIS is the make-or-break
 #                  composition-of-compositions: an Application XR that composes
@@ -47,7 +48,7 @@ spec:
         resources:
           # ---------------------------------------------------- the workload
           # A Knative Service. Named after the XR, so the developer gets a
-          # predictable URL: http://<name>.<namespace>.127.0.0.1.sslip.io:31080
+          # predictable URL: http://<name>.<namespace>.kn.cloudbox.k8s.test
           - name: workload
             base:
               apiVersion: serving.knative.dev/v1

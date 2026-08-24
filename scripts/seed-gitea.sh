@@ -4,7 +4,7 @@
 #
 # Pushes the local checkout to the in-cluster Gitea using push-to-create:
 #
-#   local checkout  --push-->  http://localhost:30300/cloudbox/platform.git
+#   local checkout  --push-->  http://gitea.cloudbox.k8s.test/cloudbox/platform.git
 #
 # The 'cloudbox' org and 'platform' repo are created by the push itself
 # (ENABLE_PUSH_CREATE_ORG). ArgoCD then reaches the same repo cluster-
@@ -41,7 +41,7 @@ need kubectl
 require_workshop_context
 
 # Credentials are supplied via GIT_ASKPASS (git_as_gitea_admin), not the URL.
-PUSH_URL="http://localhost:${NODEPORT_GITEA}/${PLATFORM_REPO_PATH}.git"
+PUSH_URL="${GITEA_HOST_URL}/${PLATFORM_REPO_PATH}.git"
 
 # --- 1. Wait for Gitea ---------------------------------------------------------
 step "Checking Gitea at ${GITEA_HOST_URL}"
@@ -97,7 +97,7 @@ curl -fsS -X PATCH \
 # cloudbox/demo-app (push-to-create in the same org), public, and marked a Gitea
 # TEMPLATE so the console can later scaffold new app repos from it.
 DEMO_REPO="${ORG}/demo-app"
-DEMO_PUSH_URL="http://localhost:${NODEPORT_GITEA}/${DEMO_REPO}.git"
+DEMO_PUSH_URL="${GITEA_HOST_URL}/${DEMO_REPO}.git"
 if [[ -d "${REPO_ROOT}/apps/demo-app" ]]; then
   step "Seeding the demo app as ${DEMO_REPO} (a standalone repo to deploy-from-source)"
   DEMO_TMP="$(mktemp -d)"

@@ -47,7 +47,7 @@ either a new upstream change or a curation someone forgot to write down.
    Ingress in `ingress.yaml` routes to the Kourier gateway — browsable with no
    `Host` header and no port on both substrates (`:31080` with a `Host` header
    stays as the fallback). The domain key was found
-   by rehearsal-in-CI, commit `a0687a2` (as `127.0.0.1.sslip.io`, which only
+   by rehearsal-in-CI, commit `a0687a2` (with the former local sslip domain, which only
    ever worked where the laptop's loopback WAS the cluster — the docker
    substrate). The annotation deletion arrived in
    that same commit; it is inert (the checksum only guards `_example`, which
@@ -93,7 +93,7 @@ either a new upstream change or a curation someone forgot to write down.
    with `nodePort: 31080` on the `http2` port (no LB implementation in
    Talos-in-Docker). The `https` port gets no nodePort. A comment at the
    change site shows the `curl -H 'Host: <name>.<ns>.kn.cloudbox.k8s.test'
-   http://localhost:31080` form — the port-and-header fallback for when the
+   http://localhost/` form — the Host-header fallback for when the
    ingress hostname does not resolve.
 
 9. ~~**Envoy `stats_listener` bound back to IPv4-any.**~~ **RETIRED
@@ -119,8 +119,8 @@ either a new upstream change or a curation someone forgot to write down.
    had made unprovable. The IPv4 dynamic listeners (`:8080`, `:8081`, `:8090`)
    and the `127.0.0.1:9901` admin are unchanged, the OTel Collector's
    `GET /stats/prometheus` still answers **200** over IPv4 (v4-mapped through
-   `ipv4_compat`), and `curl -H 'Host: hello.demo.127.0.0.1.sslip.io'
-   http://localhost:31080` still returned `Hello your own cloud!` (that was
+   `ipv4_compat`), and the former Host-header curl still returned
+   `Hello your own cloud!` (that was
    the config-domain value on the day of the evidence; it is
    `hello.demo.kn.cloudbox.k8s.test` now — re-run it with the new Host).
    Full evidence in `docs/HAZARDS.md`.

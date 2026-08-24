@@ -40,7 +40,7 @@ runs on your laptop, readable end to end.
    in ns `pipeline`: with no traffic, both ksvcs sit at **zero**.
 2. **The moment.** Two terminals:
    - `kubectl -n pipeline get pods -w`
-   - open **http://localhost:30600/gallery** and upload any JPEG/PNG.
+   - open **http://portal.cloudbox.k8s.test/gallery** and upload any JPEG/PNG.
 
    Watch the uploader pod cold-start to receive the file, then the *resizer* appear from
    nowhere to handle the event. Nothing called it. The first upload is the slow one: both
@@ -57,7 +57,7 @@ runs on your laptop, readable end to end.
    image bytes go, and what actually traveled through the Broker?
 5. **The flourish.** Observability is an on-demand capability — enable the Victoria stack +
    OTel Collector from the catalog first (hint 5 has the files), then find the upload's trace
-   in Grafana at **http://localhost:30030** → Explore → **VictoriaTraces** and see the chain —
+   in Grafana at **http://grafana.cloudbox.k8s.test** → Explore → **VictoriaTraces** and see the chain —
    portal → uploader → broker → resizer — as one waterfall. Hint 5 if the Jaeger trace view is
    new to you.
 6. Run `./verify.sh`.
@@ -107,9 +107,9 @@ Follow the event, hop by hop:
 
 ```bash
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
-s5cmd --endpoint-url http://localhost:30900 ls s3://images/originals/
-s5cmd --endpoint-url http://localhost:30900 ls s3://images/thumbs/
-s5cmd --endpoint-url http://localhost:30900 cat s3://images/meta/<key>.json
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test ls s3://images/originals/
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test ls s3://images/thumbs/
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test cat s3://images/meta/<key>.json
 ```
 
 The metadata JSON (dimensions, dominant color) is the resizer's proof of work — the
@@ -151,7 +151,7 @@ git add . && git commit -m "module 09: enable observability" && git push
 kubectl -n observability get pods   # victoria-metrics/-logs/-traces, grafana, otel-collector (agents + gateway)
 ```
 
-Then open Grafana at **http://localhost:30030** (NodePort — no port-forward needed) →
+Then open Grafana at **http://grafana.cloudbox.k8s.test** →
 Explore → data source **VictoriaTraces** (the Jaeger datasource) → Search. Upload a fresh
 image (traces are easiest to find seconds after you make them), then look for the
 uploader/resizer service names and open the newest trace: one waterfall, portal to
@@ -172,11 +172,11 @@ git add . && git commit -m "module 09: eventing + picture pipeline" && git push
 kubectl -n pipeline get broker,trigger,ksvc          # wait for Ready True across the board
 
 kubectl -n pipeline get pods -w &                    # the watcher
-# → http://localhost:30600/gallery — upload a photo, watch 0 → 1 → 0 twice
+# → http://portal.cloudbox.k8s.test/gallery — upload a photo, watch 0 → 1 → 0 twice
 kill %1
 
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
-s5cmd --endpoint-url http://localhost:30900 ls --show-fullpath "s3://images/*"   # originals/ thumbs/ meta/
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test ls --show-fullpath "s3://images/*"   # originals/ thumbs/ meta/
 
 kubectl -n pipeline logs -l serving.knative.dev/service=resizer -c user-container --tail=20   # ce-* headers
 

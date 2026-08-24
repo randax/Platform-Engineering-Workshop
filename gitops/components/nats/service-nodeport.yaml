@@ -1,6 +1,6 @@
 # Workshop addition (not upstream): expose the NATS client port on a stable
 # NodePort so the `nats` CLI and apps on the laptop can connect without a
-# port-forward: nats://localhost:30422
+# port-forward; `NODEPORT_NATS` in scripts/versions.env pins the host-side port.
 apiVersion: v1
 kind: Service
 metadata:

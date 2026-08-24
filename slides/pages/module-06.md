@@ -50,7 +50,7 @@ cd lab/06-serverless && ./verify.sh
 The task: enable knative-serving.yaml from the catalog (Serving + Kourier, NodePort 31080), deliver hello-ksvc.yaml the GitOps way — by now nobody should need telling where it goes — wait for READY True, then stage the moment:
 
 - Terminal 1: kubectl -n demo get pods -w
-- Terminal 2: curl -H "Host: <the ksvc's host>" http://localhost:31080/
+- Terminal 2: curl "$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')/"
 
 Watch the first request CREATE a pod (ask them to time the cold start), repeated requests hit it warm, and silence make it vanish.
 

@@ -37,7 +37,7 @@ check_app() { # <name>
     fi
     sleep 5
   done
-  fail "ArgoCD app '$1' is '$st' — check http://localhost:30080 and the module hints"
+  fail "ArgoCD app '$1' is '$st' — check ${ARGOCD_HOST_URL} and the module hints"
 }
 
 # --- Crossplane installed ----------------------------------------------------
@@ -111,7 +111,7 @@ fi
 s3ls() {
   if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1 \
-      s5cmd --endpoint-url http://localhost:30900 ls s3://my-db-assets 2>/dev/null
+      s5cmd --endpoint-url "${RUSTFS_S3_HOST_URL}" ls s3://my-db-assets 2>/dev/null
   else
     kubectl -n demo run "verify-s3-$$" --rm -i --restart=Never --quiet \
       --image=docker.io/peakcom/s5cmd:v2.3.0 \

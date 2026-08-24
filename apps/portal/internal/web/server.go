@@ -24,18 +24,19 @@ import (
 )
 
 type Server struct {
-	Kube        *kube.Client
-	Store       *store.Client
-	Prom        *metrics.Client
-	Logs        *logs.Client
-	Streams     *nats.Client
-	Registry    *reg.Client    // Zot OCI registry, read by the Builds page
-	Kagent      *kagent.Client // Kagent controller (A2A), the Case file investigation (module 10)
-	Tmpl        *template.Template
-	UploaderURL string              // cluster-internal URL of the uploader Knative Service
-	GrafanaURL  string              // browser-facing Grafana base for deep links
-	HTTPClient  *http.Client        // traced client for forwarding uploads
-	Pages       metric.Int64Counter // OTLP: cloudbox.pages.rendered → prom cloudbox_pages_rendered_total
+	Kube          *kube.Client
+	Store         *store.Client
+	Prom          *metrics.Client
+	Logs          *logs.Client
+	Streams       *nats.Client
+	Registry      *reg.Client    // Zot OCI registry, read by the Builds page
+	Kagent        *kagent.Client // Kagent controller (A2A), the Case file investigation (module 10)
+	Tmpl          *template.Template
+	UploaderURL   string              // cluster-internal URL of the uploader Knative Service
+	GrafanaURL    string              // browser-facing Grafana base for deep links
+	KnativeDomain string              // browser-facing domain for composed Knative Services
+	HTTPClient    *http.Client        // traced client for forwarding uploads
+	Pages         metric.Int64Counter // OTLP: cloudbox.pages.rendered → prom cloudbox_pages_rendered_total
 
 	// Unlock-state cache. The sidebar is rebuilt on every request (see the
 	// nav closure in ParseTemplates), and every gated handler re-checks its

@@ -1,6 +1,6 @@
 # Workshop addition (not part of the upstream chart): expose the S3 endpoint
 # on a stable NodePort so attendees can use presigned URLs and S3 clients from
-# the laptop without a port-forward: http://localhost:30900
+# the laptop without a port-forward: http://s3.cloudbox.k8s.test
 apiVersion: v1
 kind: Service
 metadata:

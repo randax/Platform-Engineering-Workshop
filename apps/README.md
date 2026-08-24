@@ -76,8 +76,8 @@ cd portal && LAB_MODE=1 KUBE_API_URL=http://127.0.0.1:8001 go run .
 # open http://localhost:8080
 
 # Uploader / resizer — need an S3 endpoint:
-cd uploader && S3_ENDPOINT=localhost:30900 go run .
-cd resizer  && S3_ENDPOINT=localhost:30900 go run .
+cd uploader && S3_ENDPOINT=s3.cloudbox.k8s.test go run .
+cd resizer  && S3_ENDPOINT=s3.cloudbox.k8s.test go run .
 ```
 
 ### Environment variables
@@ -98,10 +98,10 @@ Portal only:
 
 | Var | Default | |
 |---|---|---|
-| `S3_PUBLIC_ENDPOINT` | `localhost:30900` | endpoint presigned URLs are signed for — must be the address **your browser** can reach (the RustFS NodePort) |
+| `S3_PUBLIC_ENDPOINT` | `s3.cloudbox.k8s.test` | endpoint presigned URLs are signed for — must be the address **your browser** can reach |
 | `PROM_URL` | `http://victoria-metrics.observability.svc.cluster.local:8428` | VictoriaMetrics (Prometheus query API) for the sparklines |
 | `VLOGS_URL` | `http://victoria-logs.observability.svc.cluster.local:9428` | VictoriaLogs query API for the per-component log tail |
-| `GRAFANA_URL` | `http://localhost:30030` | browser-facing Victoria-stack Grafana for the deep links (NodePort) |
+| `GRAFANA_URL` | `http://grafana.cloudbox.k8s.test` | browser-facing Victoria-stack Grafana for the deep links |
 | `NATS_MONITOR_URL` | `http://nats.nats.svc.cluster.local:8222` | NATS monitoring endpoint for the JetStream/Streams browser |
 | `ZOT_URL` | `http://zot.zot.svc.cluster.local:5000` | cluster-internal Zot registry, read by the Builds page |
 | `UPLOADER_URL` | `http://uploader.pipeline.svc.cluster.local` | where upload POSTs are forwarded |
@@ -123,7 +123,7 @@ to VictoriaTraces and metrics to VictoriaMetrics — and they propagate W3C
 `traceparent` headers on every hop, including through the CloudEvent POST, which
 Knative's broker forwards to the resizer. The payoff: once the on-demand Victoria
 observability stack is enabled (module 09), one upload from the portal shows up
-in Grafana at **http://localhost:30030** → Explore → **VictoriaTraces** (the
+in Grafana at **http://grafana.cloudbox.k8s.test** → Explore → **VictoriaTraces** (the
 Jaeger datasource) as a **single distributed trace**,
 `cloudbox-portal → cloudbox-uploader → cloudbox-resizer`, with the S3 calls
 and the resize step as child spans.

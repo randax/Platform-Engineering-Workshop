@@ -3,7 +3,7 @@
 ## The goal
 
 At the end of this module your platform has a front door: the **Cloudbox Console** at
-http://localhost:30600, showing — live — the ArgoCD apps, Postgres clusters, and Knative
+http://portal.cloudbox.k8s.test, showing — live — the ArgoCD apps, Postgres clusters, and Knative
 services *you built today*. The trophy: you create a database through its "New database"
 form and prove with `kubectl` that a real `WorkshopDatabase` XR and a real CNPG cluster
 appeared. Then you read the portal's entire source code, because it's small enough that
@@ -45,7 +45,7 @@ most portals.
 
 1. Enable `portal.yaml` from the catalog. It lands in ns `portal` and takes seconds — it's
    one small Go binary (compare that to what module 08 used to be…).
-2. Open **http://localhost:30600** and explore. The nav groups the pages into **Platform**
+2. Open **http://portal.cloudbox.k8s.test** and explore. The nav groups the pages into **Platform**
    (Overview, Components, Access, Workshop, Activity, Billing), **Services** (Applications,
    Databases, Buckets, Functions, Streams, Builds — Applications, Databases and Functions
    each have a detail page, and Buckets uses an in-page object browser), and **Capstone** (Gallery) — and none of them is a mock: every row is a live read
@@ -139,7 +139,7 @@ git add . && git commit -m "enable the cloudbox console" && git push
 kubectl -n portal get pods -w    # one small pod
 ```
 
-It's up when `curl -s http://localhost:30600/healthz` answers `ok`. Note the portal needs
+It's up when `curl -s http://portal.cloudbox.k8s.test/healthz` answers `ok`. Note the portal needs
 the `demo` namespace and the module-04 platform API to exist — it *is* the UI for them.
 </details>
 
@@ -184,7 +184,7 @@ cp "$WORKSHOP/lab/08-portal/portal-access.yaml" gitops/components/demo/
 git add . && git commit -m "module 08: enable the cloudbox console + grant it demo access" && git push
 
 kubectl -n portal rollout status deploy/portal --timeout=300s
-open http://localhost:30600            # explore, then: Databases → New database
+open http://portal.cloudbox.k8s.test   # explore, then: Databases → New database
                                        # name: console-db, size: small → Create
 
 kubectl -n demo get workshopdatabase console-db -w    # until SYNCED + READY
@@ -248,7 +248,7 @@ git instead?
   cp "$WORKSHOP/lab/08-portal/portal-applications-access.yaml" gitops/components/demo/
   git add . && git commit -m "grant portal: create Applications" && git push
   ```
-  Deploy `my-app`, watch it turn Ready, and open its `*.sslip.io` URL — the apex of the
+  Deploy `my-app`, watch it turn Ready, and open its `*.kn.cloudbox.k8s.test` URL — the apex of the
   self-service arc, from a form.
 - **Read _why_ something is broken (Diagnostics, DR-0005).** When an Application or Function
   isn't Ready, open its **detail page**: instead of a bare red dot, the console shows the

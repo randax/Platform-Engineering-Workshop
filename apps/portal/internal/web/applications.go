@@ -43,8 +43,8 @@ func init() {
 }
 
 // appRow decorates an Application XR with the URL its composed Knative Service
-// answers on (Knative programs <name>.<ns>.sslip.io, reachable via Kourier's
-// NodePort 31080) — shown once the app is Ready.
+// answers on (Knative programs <name>.<ns>.kn.cloudbox.k8s.test through the
+// Cilium ingress) — shown once the app is Ready.
 type appRow struct {
 	kube.Application
 	URL         string
@@ -67,12 +67,18 @@ func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (app
 		_, _, _, sourceBuilt := a.Source()
 		row := appRow{Application: a, SourceBuilt: sourceBuilt}
 		if a.Readiness().Class == "ok" {
-			// The sslip.io URL the composed ksvc serves on, via Kourier's NodePort.
-			row.URL = fmt.Sprintf("http://%s.%s.127.0.0.1.sslip.io:31080", a.Metadata.Name, a.Metadata.Namespace)
+			row.URL = fmt.Sprintf("http://%s.%s.%s", a.Metadata.Name, a.Metadata.Namespace, s.knativeDomain())
 		}
 		rows = append(rows, row)
 	}
 	return applicationsData{Apps: rows, Flash: fl, ScaffoldEnabled: kube.GiteaConfigured()}, nil
+}
+
+func (s *Server) knativeDomain() string {
+	if s.KnativeDomain != "" {
+		return s.KnativeDomain
+	}
+	return "kn.cloudbox.k8s.test"
 }
 
 func handleApplications(s *Server, w http.ResponseWriter, r *http.Request) {

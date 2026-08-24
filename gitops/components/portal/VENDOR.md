@@ -59,7 +59,7 @@ extra-file — its version is prose, kept honest by review.
   (`networking.knative.dev/visibility: cluster-local` gives a ksvc the URL
   `http://<name>.<namespace>.svc.cluster.local`, routed via
   kourier-internal; port 80 implied).
-- **Service NodePort 30600** (`http://localhost:30600`), published at
+- **Service NodePort 30600**, published at
   http://portal.cloudbox.k8s.test (ingress.yaml), container port
   8080, `/healthz` readiness+liveness — port and health path are the
   contract with `apps/portal` (Knative-style `$PORT=8080` default).
@@ -75,6 +75,9 @@ extra-file — its version is prose, kept honest by review.
   `GRAFANA_HOST_URL` and the `grafana` component's Ingress. Source of the
   console's Explore deep-links (which also depend on the datasource uids —
   see `../grafana/VENDOR.md`).
+- **`KNATIVE_DOMAIN=kn.cloudbox.k8s.test`** — browser-facing domain for
+  composed Application XR workloads; the portal constructs
+  `<name>.<namespace>.<domain>` links from it.
 - **`GITEA_USER=gitea_admin` / `GITEA_PASSWORD=cloudbox123`** — the scaffold
   bridge (PRD-0012): the console calls Gitea's *generate* API to create a
   tenant repo from a template. Workshop-grade and committed like the S3 creds;
