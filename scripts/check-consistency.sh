@@ -354,6 +354,20 @@ fi
 # guard would tell people to export a path nothing uses — the exact class of
 # confident-wrong-answer this repo keeps finding. Two places, one truth.
 before_fail=${FAILURES}
+# mise templating -> shell templating, via variables rather than a backslash-
+# escaped inline replacement. `${v//\{\{env.HOME\}\}/\$\{HOME\}}` is not portable:
+# bash 5 eats the backslashes and yields '${HOME}', bash 3.2 keeps them and
+# yields '$\{HOME\}', so the comparison below could never match and this check
+# reported drift that did not exist — on macOS only, where /bin/bash IS 3.2.
+# CI runs bash 5 and stayed green, so the failure looked like a real one to the
+# only people who would ever run this locally. A check that cries wolf on the
+# maintainer's own laptop is worse than no check.
+kc_normalize() { # $1 = a mise [env] path -> the same path in shell templating
+  # shellcheck disable=SC2016  # deliberate: the LITERAL text '${HOME}' is the
+  # replacement, not this shell's home directory — expanding it is the bug.
+  local mise_tmpl='{{env.HOME}}' shell_tmpl='${HOME}'
+  printf '%s\n' "${1//${mise_tmpl}/${shell_tmpl}}"
+}
 # Section-aware: a KUBECONFIG line outside [env] pins nothing.
 mise_kc="$(awk -F= '
   /^\[/            { in_env = ($0 ~ /^\[env\]/) ; next }
@@ -367,7 +381,7 @@ elif [[ -z "${guard_kc}" ]]; then
   bad "scripts/context-guard.sh no longer defines CLOUDBOX_KUBECONFIG — the guard cannot tell someone their cluster is in another kubeconfig"
 elif [[ "${mise_kc}" == /Users/* || "${mise_kc}" == /home/* ]]; then
   bad "mise.toml pins KUBECONFIG to a hardcoded home directory ('${mise_kc}') — this file ships to 80 laptops; use mise templating ({{env.HOME}})"
-elif [[ "${mise_kc//\{\{env.HOME\}\}/\$\{HOME\}}" != "${guard_kc}" ]]; then
+elif [[ "$(kc_normalize "${mise_kc}")" != "${guard_kc}" ]]; then
   bad "the workshop kubeconfig path has drifted: mise.toml says '${mise_kc}', scripts/context-guard.sh says '${guard_kc}'"
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
