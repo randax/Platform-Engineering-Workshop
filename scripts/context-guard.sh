@@ -148,20 +148,30 @@ workshop_cluster_is_elsewhere() {
 
 # workshop_api_server <server-url> — true for an API server address that a
 # CloudBox cluster on this machine can legitimately have:
-#   https://127.0.0.1:<port>  create-cluster.sh repoints the kubeconfig at the
-#                             controlplane container's published port, and
-#                             kind-fallback.sh publishes its API the same way.
+#   https://127.0.0.1:<port>  the docker substrate: create-cluster.sh repoints
+#                             the kubeconfig at the controlplane container's
+#                             published port, and kind-fallback.sh does the same.
 #   https://localhost:<port>  the same address, spelled the other way.
-#   https://10.5.0.2:6443     create-cluster.sh's documented fallback for when
-#                             it cannot read the published port (fine on native
-#                             Linux): the controlplane's own address inside
-#                             TALOS_SUBNET, which is .2 — .1 is the gateway.
+#   https://10.5.0.2:6443     the docker substrate's documented fallback for
+#                             when it cannot read the published port (fine on
+#                             native Linux): the controlplane's own address
+#                             inside TALOS_SUBNET, which is .2 — .1 is gateway.
+#   https://172.30.<n>.<h>:6443
+#                             the tbx substrate: real VMs on talos-box's own
+#                             per-cluster /24 (docs/SPEC.md:186 — "cluster n ->
+#                             172.30.<n>.0/24", nodes in .2-.179). There is no
+#                             `docker port` rewrite there: the control plane IS
+#                             routable from the host, so the kubeconfig carries
+#                             the node address. 172.30.0.0/16 is RFC1918 and
+#                             talos-box-owned; a corporate cluster reachable at
+#                             one of these would need to be on the same laptop.
 workshop_api_server() { # <server-url>
   case "$1" in
     https://127.0.0.1:[0-9]*|https://localhost:[0-9]*) return 0 ;;
     "https://${TALOS_SUBNET_GATEWAY%.*}.2:6443")       return 0 ;;
-    *) return 1 ;;
   esac
+  # Pattern-matched rather than globbed: bash globs cannot express "1-3 digits".
+  [[ "$1" =~ ^https://172\.30\.[0-9]{1,3}\.[0-9]{1,3}:6443$ ]]
 }
 
 # require_workshop_context — exit non-zero unless kubectl's CURRENT context is
@@ -208,7 +218,7 @@ require_workshop_context() {
   current context : ${ctx:-<none>}
   API server      : ${server:-<none>}
   kubeconfig      : $(kubeconfig_in_use)
-  expected        : admin@${CLUSTER_NAME} (or kind-${CLUSTER_NAME}) on https://127.0.0.1:<port>
+  expected        : admin@${CLUSTER_NAME} (or kind-${CLUSTER_NAME}) on https://127.0.0.1:<port> (docker) or https://172.30.<n>.<h>:6443 (tbx)
 
 The workshop scripts create, patch and delete resources in whatever cluster
 kubectl points at, so this stops here instead of guessing.
