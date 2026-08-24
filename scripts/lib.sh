@@ -207,14 +207,25 @@ substrate_persist() {
   local value="$1"
   case "${value}" in tbx|docker) ;; *) die "substrate_persist: unknown substrate '${value}'" ;; esac
   mkdir -p "$(dirname "${CLOUDBOX_SUBSTRATE_FILE}")"
-  printf '%s\n' "${value}" > "${CLOUDBOX_SUBSTRATE_FILE}"
+  printf '%s\n' "${value}" > "${CLOUDBOX_SUBSTRATE_FILE}.tmp"
+  mv "${CLOUDBOX_SUBSTRATE_FILE}.tmp" "${CLOUDBOX_SUBSTRATE_FILE}"
 }
 
 # substrate_current — the persisted answer, or empty when no cluster has been
-# created on this machine yet. Never detects; never writes.
+# created on this machine yet (or the persisted file holds anything other than
+# tbx/docker — corruption is treated as "no answer", not as that literal
+# string). Never detects; never writes.
 substrate_current() {
   [[ -r "${CLOUDBOX_SUBSTRATE_FILE}" ]] || return 0
-  tr -d '[:space:]' < "${CLOUDBOX_SUBSTRATE_FILE}"
+  local value
+  value="$(tr -d '[:space:]' < "${CLOUDBOX_SUBSTRATE_FILE}")"
+  case "${value}" in
+    tbx|docker) echo "${value}" ;;
+    *)
+      warn "${CLOUDBOX_SUBSTRATE_FILE} contains '${value}', not 'tbx' or 'docker' — ignoring it" >&2
+      return 1
+      ;;
+  esac
 }
 
 # substrate_resolve — the substrate to USE right now, in precedence order:
@@ -223,6 +234,10 @@ substrate_current() {
 #   2. the persisted answer from a previous create
 #   3. detection, floored by CLOUDBOX_SUBSTRATE_DEFAULT: when the default is
 #      "docker" (the go-live gate having flipped it), detection never upgrades.
+# Callers: assign the result to a variable first (`local s; s="$(substrate_resolve)"`)
+# and check it there — never compare inside `[[ "$(substrate_resolve)" == ... ]]`,
+# since a `die` inside that command substitution only kills the subshell and the
+# comparison would silently see an empty string instead of aborting.
 substrate_resolve() {
   if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
     case "${CLOUDBOX_SUBSTRATE}" in
@@ -231,7 +246,7 @@ substrate_resolve() {
     esac
   fi
   local persisted
-  persisted="$(substrate_current)"
+  persisted="$(substrate_current || true)"
   if [[ -n "${persisted}" ]]; then echo "${persisted}"; return 0; fi
   if [[ "${CLOUDBOX_SUBSTRATE_DEFAULT}" == "docker" ]]; then echo "docker"; return 0; fi
   substrate_detect
@@ -248,9 +263,12 @@ substrate_resolve() {
 #           the same rule mirror_host_endpoint() uses, without scheme or port
 cloudbox_host_gateway() {
   if [[ -n "${CLOUDBOX_HOST_GATEWAY:-}" ]]; then echo "${CLOUDBOX_HOST_GATEWAY}"; return 0; fi
-  if [[ "$(substrate_resolve)" == "tbx" ]]; then
+  local substrate
+  substrate="$(substrate_resolve)"
+  if [[ "${substrate}" == "tbx" ]]; then
+    need jq
     local subnet
-    subnet="$(tbx status "${CLUSTER_NAME}" -o json 2>/dev/null | jq -r '.subnet // ""')"
+    subnet="$(tbx status "${CLUSTER_NAME}" -o json 2>/dev/null | jq -r '.subnet // empty' 2>/dev/null || true)"
     [[ -n "${subnet}" ]] \
       || die "cannot read the tbx cluster subnet — is '${CLUSTER_NAME}' up? (tbx status ${CLUSTER_NAME})"
     echo "${subnet%.*}.1"
