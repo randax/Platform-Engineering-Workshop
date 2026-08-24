@@ -8,12 +8,14 @@
 # Usage:
 #   ./scripts/install.sh --check    # run the pre-flight check
 #   ./scripts/install.sh            # same check + usage text
+#   ./scripts/install.sh --print-hosts   # the /etc/hosts lines the docker substrate needs
 #
 # Checked:
 #   * CPU architecture (amd64/arm64) and WSL2 hints
 #   * Docker daemon reachable; CPUs/RAM allocatable to Docker; free disk
 #   * Required CLI tools present at the pinned versions
 #   * Pre-pulled images from scripts/images.txt (host cache + mirror registry)
+#   * Which substrate will be used, and the workshop hostnames resolving
 #
 # Exit code: 0 = ready for the workshop, 1 = at least one check failed.
 # If a check fails, fix it and re-run. Failing machines can still join via
@@ -31,9 +33,25 @@ usage() {
 
 case "${1:-}" in
   --check) ;;
+  # Read-only, and the ONE thing a Windows attendee needs: these lines also have
+  # to go into C:\Windows\System32\drivers\etc\hosts for the Windows browser to
+  # reach a cluster running in WSL2 (lab/00-setup covers it). The block goes to
+  # stdout and the note to stderr, so `--print-hosts | sudo tee -a /etc/hosts`
+  # still writes exactly the block.
+  --print-hosts)
+    cloudbox_hosts_block
+    {
+      echo
+      echo "# ^ paste into ${CLOUDBOX_HOSTS_FILE} (or let ./scripts/create-cluster.sh do it)."
+      echo "# WSL2: these lines belong in BOTH the WSL2 /etc/hosts and the Windows"
+      printf '%s\n' '#       C:\Windows\System32\drivers\etc\hosts (edit as Administrator) —'
+      echo "#       the Windows browser resolves names itself. See lab/00-setup."
+      echo "# tbx substrate: not needed — talos-box's resolver answers ${CLOUDBOX_DOMAIN}."
+    } >&2
+    exit 0 ;;
   "") usage; echo ;;
   -h|--help) usage; exit 0 ;;
-  *) usage; die "Unknown argument: $1 (this script only checks; it installs nothing)" ;;
+  *) usage; die "Unknown argument: $1 (this script only checks and prints; it installs nothing)" ;;
 esac
 
 failures=0
@@ -59,6 +77,17 @@ elif [[ "${os}" == "Darwin" || "${os}" == "Linux" ]]; then
   ok "Platform: ${os}"
 else
   check_fail "Unsupported platform: ${os} (macOS, Linux or WSL2 required)"
+fi
+
+# Which substrate create-cluster.sh would pick, resolved ONCE and reused below.
+# Read-only: substrate_resolve() only reads the override, the persisted file and
+# `tbx doctor` — it never writes, so --check stays a check. Assigned before it is
+# compared (lib.sh:231-240): a die() inside the command substitution would only
+# kill the subshell if it were compared inline.
+SUBSTRATE="$(substrate_resolve)"
+info "Substrate: ${SUBSTRATE}"
+if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then
+  info "  (tbx not used: $(substrate_doctor_reason))"
 fi
 
 # --- Docker ---------------------------------------------------------------------
@@ -113,11 +142,9 @@ else
          "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}")
   # Port 80 only on docker, where the controlplane container publishes it to
   # NODEPORT_INGRESS. On tbx the ingress lives on a LoadBalancer VIP inside the
-  # cluster network and the host's port 80 is nobody's business. Read-only:
-  # substrate_resolve() only reads the override, the persisted file and
-  # `tbx doctor` — it never writes, so --check stays a check.
-  substrate="$(substrate_resolve)"
-  if [[ "${substrate}" == "docker" ]]; then
+  # cluster network and the host's port 80 is nobody's business. SUBSTRATE was
+  # resolved once in the platform section above.
+  if [[ "${SUBSTRATE}" == "docker" ]]; then
     ports+=(80)
   fi
   for port in "${ports[@]}"; do
@@ -127,6 +154,23 @@ else
       ok "Port ${port} is free"
     fi
   done
+fi
+
+# --- Hostname resolution --------------------------------------------------------
+# Verify only. The block is written on the create path (create-cluster.sh), which
+# is where the one sudo prompt of the workshop belongs; --check never mutates.
+step "Workshop hostnames (*.${CLOUDBOX_DOMAIN})"
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
+  ok "tbx substrate — talos-box's resolver answers *.${CLOUDBOX_DOMAIN}; no ${CLOUDBOX_HOSTS_FILE} entries needed"
+  info "  (verify after the cluster exists: tbx status ${CLUSTER_NAME})"
+elif hosts_block_present; then
+  ok "${CLOUDBOX_HOSTS_FILE} has the CloudBox block ($(cloudbox_hostnames | wc -l | tr -d ' ') names)"
+elif [[ -z "$(substrate_current)" ]]; then
+  info "No cluster yet — ./scripts/create-cluster.sh writes the ${CLOUDBOX_HOSTS_FILE} block (asks for sudo once)"
+  info "  Preview the lines: ./scripts/install.sh --print-hosts"
+else
+  check_fail "${CLOUDBOX_HOSTS_FILE} is missing $(hosts_missing_names | wc -l | tr -d ' ') CloudBox name(s): $(hosts_missing_names | tr '\n' ' ')"
+  echo "     Fix: ./scripts/install.sh --print-hosts   # then add them, or re-run create-cluster.sh"
 fi
 
 # --- Tools -----------------------------------------------------------------------

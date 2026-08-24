@@ -127,6 +127,12 @@ helm upgrade --install cilium \
 
 substrate_post_cni
 
+# docker has no resolver: the hostnames come from a marked /etc/hosts block.
+# This is the one sudo prompt in the whole workshop, and it is on the create
+# path only — install.sh --check verifies, never writes. On tbx the names are
+# answered by talos-box's resolver and nothing is written.
+[[ "${SUBSTRATE}" == "docker" ]] && write_hosts_block
+
 # --- 4. Wait for Ready -------------------------------------------------------------------
 step "Waiting for nodes to become Ready (Cilium rollout)"
 wait_rollout kube-system daemonset/cilium

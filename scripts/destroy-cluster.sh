@@ -8,7 +8,7 @@
 #
 # Usage:
 #   ./scripts/destroy-cluster.sh                 # destroy the cluster
-#   ./scripts/destroy-cluster.sh --purge-mirror  # also remove mirror + volume
+#   ./scripts/destroy-cluster.sh --purge-mirror  # also remove mirror + volume + the /etc/hosts block
 # =============================================================================
 set -euo pipefail
 
@@ -161,6 +161,10 @@ fi
 
 # --- Mirror ---------------------------------------------------------------------
 if [[ "${PURGE_MIRROR}" == "true" ]]; then
+  # Exactly reversible: only the lines between the two markers go, and the file
+  # is left byte-identical to what it was before create-cluster.sh wrote them.
+  # A no-op on tbx (nothing was ever written) and when the block is absent.
+  remove_hosts_block
   step "Purging the image mirror"
   docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
   docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true

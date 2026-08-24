@@ -198,7 +198,8 @@ kubectl -n argocd rollout restart deployment argocd-server argocd-repo-server >/
 info "Publishing Gitea and ArgoCD on ${GITEA_HOST_URL} / ${ARGOCD_HOST_URL}"
 # These two are installed imperatively, so nothing else will ever apply their
 # Ingress objects. The manifests live in gitops/components/{gitea,argocd}/ so
-# all ten ingresses read as one set; only these two are applied by hand.
+# all nine ingress files (eleven host rules — rustfs has two, knative-serving
+# two wildcards) read as one set; only these two are applied by hand.
 kubectl apply -f "${REPO_ROOT}/gitops/components/gitea/ingress.yaml"
 kubectl apply -f "${REPO_ROOT}/gitops/components/argocd/ingress.yaml"
 
@@ -215,9 +216,18 @@ echo
 echo "  Gitea:   ${GITEA_HOST_URL}  (${GITEA_ADMIN_USER} / ${GITEA_ADMIN_PASSWORD})"
 echo "  ArgoCD:  ${ARGOCD_HOST_URL}  (user: admin)"
 echo
-info "Name not resolving? On the docker substrate these need the /etc/hosts block:"
-echo "   ./scripts/install.sh --print-hosts        # shows the exact lines"
-echo "   The NodePort URLs still work: http://localhost:${NODEPORT_GITEA} and http://localhost:${NODEPORT_ARGOCD}"
+# The hosts-file advice is docker-only: on tbx the names come from talos-box's
+# resolver and the NodePorts are inside the VM, not on this host — telling a tbx
+# attendee to try http://localhost:30300 sends them chasing a dead port.
+BOOTSTRAP_SUBSTRATE="$(substrate_resolve)"
+if [[ "${BOOTSTRAP_SUBSTRATE}" == "docker" ]]; then
+  info "Name not resolving? On the docker substrate these need the ${CLOUDBOX_HOSTS_FILE} block:"
+  echo "   ./scripts/install.sh --print-hosts        # shows the exact lines"
+  echo "   The NodePort URLs still work: http://localhost:${NODEPORT_GITEA} and http://localhost:${NODEPORT_ARGOCD}"
+else
+  info "Name not resolving? talos-box's resolver answers *.${CLOUDBOX_DOMAIN}:"
+  echo "   tbx status ${CLUSTER_NAME}        # the cluster and its ingress VIP"
+fi
 echo
 info "ArgoCD admin password:"
 echo "   kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo"

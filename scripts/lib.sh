@@ -299,6 +299,113 @@ cloudbox_host_gateway() {
   fi
 }
 
+# --- The /etc/hosts block (docker substrate only) -------------------------------
+# On tbx, talos-box's own resolver answers *.${CLOUDBOX_DOMAIN} with the
+# cluster's ingress VIP and there is nothing to write. On docker there is no
+# resolver and no wildcard, so the hostnames are listed one by one, in a MARKED
+# block we own end-to-end: idempotent to write, exactly removable, and never
+# touching a line we did not put there.
+CLOUDBOX_HOSTS_BEGIN="# cloudbox-begin"
+CLOUDBOX_HOSTS_END="# cloudbox-end"
+CLOUDBOX_HOSTS_FILE="${CLOUDBOX_HOSTS_FILE:-/etc/hosts}"
+
+# cloudbox_hostnames — every name the workshop serves, one per line.
+# Derived from the *_HOST_URL pins in versions.env rather than re-typed here:
+# there is exactly one place a hostname is written down, and renaming a service
+# there moves the /etc/hosts line with it. The nine service names, plus the
+# three Knative names the labs create (lab/06-serverless -> hello.demo,
+# gitops/components/picture-pipeline -> uploader.pipeline, resizer.pipeline):
+# /etc/hosts has no wildcards, so the `*.<ns>.kn.` rules in
+# gitops/components/knative-serving/ingress.yaml cannot be expressed. Anything
+# else an attendee creates needs a manual line — lab/06 says so, and its
+# verify.sh accepts the Host-header form for exactly that reason.
+cloudbox_hostnames() {
+  local url host
+  for url in "${GITEA_HOST_URL}" "${ARGOCD_HOST_URL}" "${PORTAL_HOST_URL}" \
+             "${GRAFANA_HOST_URL}" "${RUSTFS_S3_HOST_URL}" "${RUSTFS_CONSOLE_HOST_URL}" \
+             "${BACKSTAGE_HOST_URL}" "${ZOT_HOST_URL}" "${NATS_HOST_URL}"; do
+    host="${url#*://}"        # drop the scheme
+    echo "${host%%[:/]*}"     # drop any :port or /path
+  done
+  local n
+  for n in hello.demo uploader.pipeline resizer.pipeline; do
+    echo "${n}.${KNATIVE_DOMAIN}"
+  done
+}
+
+cloudbox_hosts_block() {
+  echo "${CLOUDBOX_HOSTS_BEGIN}"
+  echo "# CloudBox workshop — the docker substrate has no resolver, so every"
+  echo "# hostname is listed here. Written by ./scripts/create-cluster.sh,"
+  echo "# removed by ./scripts/destroy-cluster.sh --purge-mirror. Safe to delete"
+  echo "# by hand: nothing outside these two markers is ever touched."
+  local n
+  while IFS= read -r n; do echo "127.0.0.1 ${n}"; done < <(cloudbox_hostnames)
+  echo "${CLOUDBOX_HOSTS_END}"
+}
+
+# hosts_block_present — 0 when the block exists AND lists every current name.
+# A block that is merely present is not enough: adding a hostname to
+# cloudbox_hostnames must make this fail so the block gets rewritten.
+hosts_block_present() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 1
+  grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || return 1
+  local n
+  while IFS= read -r n; do
+    grep -qE "^[[:space:]]*127\.0\.0\.1[[:space:]]+${n//./\\.}([[:space:]]|$)" \
+      "${CLOUDBOX_HOSTS_FILE}" || return 1
+  done < <(cloudbox_hostnames)
+  return 0
+}
+
+# hosts_missing_names — the names NOT currently resolvable from the file, so a
+# FAIL message can name them instead of saying "the block is wrong".
+hosts_missing_names() {
+  local n
+  while IFS= read -r n; do
+    grep -qE "^[[:space:]]*127\.0\.0\.1[[:space:]]+${n//./\\.}([[:space:]]|$)" \
+      "${CLOUDBOX_HOSTS_FILE}" 2>/dev/null || echo "${n}"
+  done < <(cloudbox_hostnames)
+}
+
+# write_hosts_block — replace the marked block (or append it). Needs sudo, once.
+# Written via a temp file and `sudo tee`, never an in-place sudo sed: a
+# half-written /etc/hosts breaks name resolution for the whole machine.
+write_hosts_block() {
+  hosts_block_present && { ok "${CLOUDBOX_HOSTS_FILE} block already correct"; return 0; }
+  local tmp; tmp="$(mktemp)"
+  if [[ -r "${CLOUDBOX_HOSTS_FILE}" ]]; then
+    awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
+      '$0 == b { skip = 1 } !skip { print } $0 == e { skip = 0 }' \
+      "${CLOUDBOX_HOSTS_FILE}" > "${tmp}"
+  fi
+  cloudbox_hosts_block >> "${tmp}"
+  warn "Adding the CloudBox hostnames to ${CLOUDBOX_HOSTS_FILE} — this needs sudo, once."
+  info "See exactly what goes in with: ./scripts/install.sh --print-hosts"
+  # shellcheck disable=SC2024  # deliberate: the INPUT redirect is our own
+  # mktemp file, readable without sudo; only the WRITE needs root, and tee does
+  # that. `sudo cat | tee` would be the wrong way round here.
+  sudo tee "${CLOUDBOX_HOSTS_FILE}" < "${tmp}" >/dev/null
+  rm -f "${tmp}"
+  hosts_block_present || die "Wrote ${CLOUDBOX_HOSTS_FILE} but the names still do not resolve — check it by hand"
+  ok "${CLOUDBOX_HOSTS_FILE} updated ($(cloudbox_hostnames | wc -l | tr -d ' ') names)"
+}
+
+remove_hosts_block() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
+  grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || return 0
+  local tmp; tmp="$(mktemp)"
+  awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
+    '$0 == b { skip = 1 } !skip { print } $0 == e { skip = 0 }' \
+    "${CLOUDBOX_HOSTS_FILE}" > "${tmp}"
+  warn "Removing the CloudBox block from ${CLOUDBOX_HOSTS_FILE} — this needs sudo."
+  # shellcheck disable=SC2024  # see write_hosts_block: the redirect reads our
+  # own temp file; sudo is only needed for the write tee performs.
+  sudo tee "${CLOUDBOX_HOSTS_FILE}" < "${tmp}" >/dev/null
+  rm -f "${tmp}"
+  ok "${CLOUDBOX_HOSTS_FILE} block removed"
+}
+
 # strip_registry <image-ref> — drop the registry host from an image reference,
 # leaving the repository path + tag/digest. This is the path a containerd
 # registry mirror is queried with. Examples:
