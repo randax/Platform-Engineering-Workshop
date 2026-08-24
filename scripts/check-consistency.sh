@@ -404,6 +404,10 @@ tbx_mise="$(mise_pin 'ubi:randax/talos-box')"
 if [[ -z "${tbx_mise}" ]]; then
   # Fallback pin form: tbx has no published mise backend yet (upstream #95/#96/
   # #101), so mise.toml may carry it as a commented pin next to the install note.
+  # In this form mise installs and enforces nothing — this check only keeps
+  # versions.env and the mise.toml comment line in agreement with each other;
+  # it cannot assert what binary is actually on PATH. That assertion is the
+  # tbx backend preflight's job (Task 5, substrate_preflight in tbx.sh).
   tbx_mise="$(sed -nE 's|^#[[:space:]]*tbx[[:space:]]*=[[:space:]]*"([^"]+)".*|\1|p' mise.toml | head -1)"
 fi
 if [[ -z "${tbx_mise}" ]]; then
