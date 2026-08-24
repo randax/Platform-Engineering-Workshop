@@ -289,6 +289,10 @@ GUARD_EXEMPT_SCRIPTS=(
   "scripts/lib.sh"                # defines it (never calls it — asserted above)
   "scripts/check-consistency.sh"  # this file: offline, greps for the string
   "scripts/destroy-cluster.sh"    # must work when the context is ALREADY wrong
+  "scripts/substrate/docker.sh"   # backend: it CREATES the workshop context, so
+                                  # there is nothing to assert while it runs;
+                                  # create-cluster.sh (checked, not exempt)
+                                  # calls the guard the moment it returns
   "scripts/dev-setup.sh"          # pre-cluster: kubectl version --client only
   "scripts/install.sh"            # pre-cluster preflight: likewise
 )

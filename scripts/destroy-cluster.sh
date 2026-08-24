@@ -19,7 +19,6 @@ PURGE_MIRROR="false"
 [[ "${1:-}" == "--purge-mirror" ]] && PURGE_MIRROR="true"
 
 need talosctl
-need docker
 
 # DELIBERATELY NOT guarded — the one script in scripts/ that must keep working
 # when kubectl points at the wrong cluster, because that is the state it exists
@@ -36,27 +35,21 @@ need docker
 # cluster's resources; the CI recovery-path job asserts exactly that by proving
 # an unrelated context survives a destroy.
 
-step "Destroying Talos cluster '${CLUSTER_NAME}'"
-# Talos labels every node container with talos.cluster.name=<cluster>
-if [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" ]]; then
-  talosctl cluster destroy --name "${CLUSTER_NAME}" --force
-  ok "Cluster destroyed"
-else
-  warn "No '${CLUSTER_NAME}' cluster found — nothing to destroy"
+# The substrate the cluster was CREATED on, not the one this machine would
+# detect today: a laptop that has lost `tbx doctor` since the create must still
+# be told to destroy VMs, not to look for docker containers that never existed.
+SUBSTRATE="$(substrate_resolve)"
+info "Substrate: ${SUBSTRATE} (from ${CLOUDBOX_SUBSTRATE_FILE})"
+# `need docker` only where the backend actually needs it — a tbx machine has no
+# reason to have the docker CLI. Written as an `if`, not `[[ … ]] && need docker`:
+# under `set -e` a failing test as a whole statement kills the script.
+if [[ "${SUBSTRATE}" == "docker" ]]; then
+  need docker
 fi
-
-# `talosctl cluster destroy` removes the provisioner state directory itself, so
-# this is a no-op on the happy path. It is NOT a no-op on the path that brings
-# people here: no node containers (deleted Docker VM, hand-pruned containers, a
-# create that died after PKI generation) means the branch above found nothing
-# to destroy, while the state directory still blocks the next
-# create-cluster.sh. Without this, the documented recovery command does not
-# recover. See talos_cluster_state_dir() in lib.sh.
-STATE_DIR="$(talos_cluster_state_dir)"
-if [[ -d "${STATE_DIR}" ]]; then
-  rm -rf "${STATE_DIR}"
-  ok "Talos cluster state directory removed (${STATE_DIR})"
-fi
+# shellcheck source=substrate/docker.sh
+source "${SCRIPT_DIR}/substrate/${SUBSTRATE}.sh"
+substrate_destroy
+rm -f "${CLOUDBOX_SUBSTRATE_FILE}"
 
 # --- Clean up kubeconfig / talosconfig contexts (best effort) -----------------
 # Cleaned in EVERY file the workshop could have written to, not just the one in
