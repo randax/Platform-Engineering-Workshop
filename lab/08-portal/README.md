@@ -263,13 +263,12 @@ git instead?
   path with a `Dockerfile`). A ready one is seeded for you: **`cloudbox/demo-app`** — a real
   Go service that uses its composed Postgres (a live visit counter) and S3 bucket, so the page
   proves the wiring rather than ignoring it. Its Dockerfile builds `FROM` a golang base in Zot,
-  so seed that base once first (same move as module 07's busybox):
-  `crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine localhost:30500/library/golang:1.25-alpine`.
-  ⚠️ **This one step needs internet** — unlike module 07's busybox, the golang base is
-  deliberately *not* on the pre-pull list (`scripts/images.txt`), because it costs every
-  attendee a download for a going-deeper path most won't take. Everything else in the
-  workshop runs offline; if you're at the venue on hostile WiFi, do this part at home or
-  skip it. See `docs/HAZARDS.md`.
+  so seed that base once first (same move as module 07's busybox — from your own mirror,
+  no internet needed):
+  `crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine localhost:30500/library/golang:1.25-alpine`.
+  (The golang base joined the pre-pull list with the adventure images — if your
+  `cloudbox-init.sh` run predates that, either re-run it or fall back to the online
+  source, `public.ecr.aws/docker/library/golang:1.25-alpine`.)
   The console runs the module-07 `build-and-push` Workflow (clone →
   BuildKit → Zot) **and** creates the Application at the built image — so `git push → build →
   deploy` is the app team's counterpart to the platform team's `git push → ArgoCD → converge`.

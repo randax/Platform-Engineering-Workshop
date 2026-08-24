@@ -6,12 +6,13 @@
 #
 # OFFLINE RULE: an in-cluster build pod can't reach the internet — only Zot
 # (in-cluster). So the builder base is pulled FROM your own Zot registry, seeded
-# the same way module 07 seeds busybox:
-#   crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine \
+# the same way module 07 seeds busybox — from the local mirror, offline:
+#   crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine \
 #     localhost:30500/library/golang:1.25-alpine
-# That seed step needs internet: this base is deliberately NOT on the pre-pull
-# list (scripts/images.txt) — it serves an optional going-deeper path, and the
-# download would be charged to every attendee. See docs/HAZARDS.md.
+# The base is on the pre-pull list (scripts/images.txt) since the adventure
+# refresh (issue #193): door 1 made in-cluster Go builds a first-class path, so
+# every attendee pays the ~59 MB once, at home. Pre-refresh pulls can still
+# seed from public.ecr.aws online.
 FROM zot.zot.svc.cluster.local:5000/library/golang:1.25-alpine AS build
 WORKDIR /src
 COPY . .
