@@ -1,0 +1,28 @@
+# NATS's HTTP monitoring endpoints at http://nats.cloudbox.k8s.test (/varz,
+# /jsz, /connz) — scripts/versions.env:168, NATS_HOST_URL, which carries the
+# same "monitoring only" caveat.
+#
+# The CLIENT protocol is not HTTP and cannot go through an Ingress: nats://
+# stays on NodePort 30422 (nats/service-nodeport.yaml) or a port-forward.
+#
+# Backend is the main `nats` Service's `monitor` port 8222 (nats.yaml:47-65).
+# The `nats-client-nodeport` Service is the WRONG backend — it carries only
+# `client`/4222.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nats
+  namespace: nats
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: nats.cloudbox.k8s.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nats
+                port:
+                  number: 8222

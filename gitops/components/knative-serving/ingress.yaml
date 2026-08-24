@@ -1,0 +1,53 @@
+# One Ingress in front of Knative. Knative programs every ksvc's host as
+# <name>.<ns>.kn.cloudbox.k8s.test (config-domain in serving-core.yaml, set to
+# KNATIVE_DOMAIN — scripts/versions.env:178 — by Task 11; until that edit lands
+# config-domain still says 127.0.0.1.sslip.io and these rules match nothing).
+# Kourier routes on the Host header, so the rules below cover every function
+# anyone creates in those namespaces for the rest of the workshop.
+#
+# WHY PER-NAMESPACE WILDCARDS AND NOT ONE "*.kn.cloudbox.k8s.test":
+# a Kubernetes Ingress wildcard host matches exactly ONE DNS label
+# (networking.k8s.io/v1 semantics). "*.kn.cloudbox.k8s.test" therefore matches
+# hello.kn.cloudbox.k8s.test but NOT hello.demo.kn.cloudbox.k8s.test — and
+# Knative's names are always two labels deep (<name>.<ns>). So we wildcard one
+# level down, per namespace: `demo` (lab/06-serverless -> ksvc hello) and
+# `pipeline` (gitops/components/picture-pipeline/picture-pipeline.yaml:49,91 ->
+# ksvcs uploader and resizer). A ksvc in a THIRD namespace — e.g. one a
+# Crossplane ApplicationXR lands elsewhere — needs another rule here.
+#
+# Backend is the EXTERNAL kourier gateway (kourier.yaml:653-679, port 80 ->
+# targetPort 8080), not kourier-internal (-> 8081), which is cluster-local.
+#
+# On tbx the names resolve through talos-box's own resolver to the .200 VIP; on
+# docker /etc/hosts has no wildcards, so create-cluster.sh's block lists the
+# three fixed ksvc names the labs create (hello.demo, uploader.pipeline,
+# resizer.pipeline). Anything else needs a manual hosts line or the Host-header
+# curl the lab still documents. NodePort 31080 stays as the fallback.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kourier
+  namespace: kourier-system
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: "*.demo.kn.cloudbox.k8s.test"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kourier
+                port:
+                  number: 80
+    - host: "*.pipeline.kn.cloudbox.k8s.test"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kourier
+                port:
+                  number: 80

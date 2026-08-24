@@ -1,0 +1,23 @@
+# Grafana at http://grafana.cloudbox.k8s.test (scripts/versions.env:165,
+# GRAFANA_HOST_URL — mirrored literally because YAML cannot expand it).
+# Backend is the chart's ClusterIP Service (grafana.yaml:62-77, port 3000), NOT
+# the workshop's grafana-nodeport addition (service-nodeport.yaml) — that one
+# keeps existing only for the http://localhost:30030 port-URL fallback.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: observability
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: grafana.cloudbox.k8s.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
