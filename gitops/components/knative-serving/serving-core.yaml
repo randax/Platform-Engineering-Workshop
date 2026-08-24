@@ -7796,13 +7796,15 @@ metadata:
     app.kubernetes.io/component: controller
     app.kubernetes.io/version: "1.23.0"
 data:
-  # Externally-routable default domain via sslip.io magic DNS (resolves to
-  # 127.0.0.1). WITHOUT this, config-domain has only _example → Knative
-  # defaults to svc.cluster.local, which is cluster-local-only and NOT served
-  # by the external Kourier NodePort → curl/browser get 404. ksvc URLs become
-  # http://<name>.<ns>.127.0.0.1.sslip.io, reachable at :31080 with a Host
-  # header AND directly in a browser. (Found by rehearsal-in-CI: module 06.)
-  127.0.0.1.sslip.io: ""
+  # Externally-routable default domain. Every ksvc becomes
+  # http://<name>.<ns>.kn.cloudbox.k8s.test, which the wildcard Ingress in
+  # ingress.yaml routes to the Kourier gateway — so a ksvc URL is browsable
+  # with no Host header and no port, on BOTH substrates. WITHOUT this key,
+  # config-domain holds only _example and Knative defaults to
+  # svc.cluster.local, which is cluster-local-only and 404s from outside.
+  # (The old value was 127.0.0.1.sslip.io, which only ever worked on a laptop
+  # whose loopback WAS the cluster — i.e. the docker substrate.)
+  kn.cloudbox.k8s.test: ""
   _example: |
     ################################
     #                              #

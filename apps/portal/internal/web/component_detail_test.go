@@ -52,7 +52,7 @@ func sampleDetail() componentDetailData {
 }
 
 func TestComponentDetailRender(t *testing.T) {
-	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestComponentDetailRender(t *testing.T) {
 // the Console. Same shared affordance as the Application detail: the live mount
 // when the agent is available, the locked hint (no mount) when it isn't.
 func TestComponentDetailCaseFile(t *testing.T) {
-	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestComponentDetailCaseFile(t *testing.T) {
 // entirely when it isn't. Cheap protection against a template typo that the
 // SCREENSHOTS-gated generator wouldn't catch in a normal CI run.
 func TestPanelMonitoringRender(t *testing.T) {
-	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestGenerateScreenshots(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read css: %v", err)
 	}
-	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

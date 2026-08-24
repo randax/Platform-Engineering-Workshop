@@ -36,9 +36,12 @@ diff against:
 ### app-config.yaml keys that are load-bearing
 
 - `app.baseUrl` / `backend.baseUrl` / `backend.cors.origin` are all
-  `http://localhost:30700` — the *browser's* view. They must move together with
-  `NODEPORT_BACKSTAGE`; a mismatch gives a UI that loads and then fails every
-  XHR on CORS.
+  `http://backstage.cloudbox.k8s.test` — the *browser's* view. They must move
+  together with `BACKSTAGE_HOST_URL`; a mismatch gives a UI that loads and then
+  fails every XHR on CORS.
+  They move with the hostname scheme
+  (docs/superpowers/plans/2026-08-24-talos-box-substrate.md); the NodePort 30700
+  Service stays for the port-URL fallback.
 - `backend.listen.port: 7007` — matches the container port, the Service
   `targetPort: http` and the probe.
 - `backend.csp.connect-src: ["'self'", 'http:', 'https:']` — the CNOE default;
@@ -117,7 +120,7 @@ diff against:
   bootstrap runs argocd-server with `server.insecure=true` (no TLS behind
   the Service). `NODE_TLS_REJECT_UNAUTHORIZED=0` is kept from CNOE but is
   no longer load-bearing.
-- **Service is NodePort 30700**; app/backend baseUrl `http://localhost:30700`.
+- **Service is NodePort 30700**; app/backend baseUrl `http://backstage.cloudbox.k8s.test`.
 - Workshop-grade credential Secrets `gitea-credentials` /
   `argocd-credentials` are committed in-line — they MUST match what the
   cluster bootstrap seeds. Gitea admin **`gitea_admin`/`cloudbox123`**

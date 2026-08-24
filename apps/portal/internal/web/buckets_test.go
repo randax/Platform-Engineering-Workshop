@@ -37,7 +37,7 @@ func (f fakeBucketStore) ListObjectsIn(_ context.Context, bucket string, max int
 
 func (f fakeBucketStore) PresignGet(_ context.Context, bucket, key string) (string, error) {
 	// Mirror the shape of a real presigned URL: browser-facing host + a signature.
-	return "http://localhost:30900/" + bucket + "/" + key + "?X-Amz-Signature=fake", nil
+	return "http://s3.cloudbox.k8s.test/" + bucket + "/" + key + "?X-Amz-Signature=fake", nil
 }
 
 // TestBucketsUnlock pins the gate: locked from a bare cluster, unlocked the
@@ -87,7 +87,7 @@ func TestBucketObjectsRender(t *testing.T) {
 	for _, want := range []string{
 		"originals/1-cat.png", // an object key
 		"245 KB",              // 250880 bytes, humanized
-		"http://localhost:30900/images/originals/1-cat.png?X-Amz-Signature=fake", // presigned link
+		"http://s3.cloudbox.k8s.test/images/originals/1-cat.png?X-Amz-Signature=fake", // presigned link
 		"Download ↗",                       // the download affordance
 		`hx-post="/buckets/images/upload"`, // the upload form
 		`hx-delete="/buckets/images/objects/originals/1-cat.png"`, // per-object delete (key with slash)

@@ -18,7 +18,7 @@ func TestTeapot(t *testing.T) {
 }
 
 func TestNotFoundStatus(t *testing.T) {
-	s := &Server{GrafanaURL: "http://localhost:30030"}
+	s := &Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"}
 	tmpl, err := ParseTemplates(s)
 	if err != nil {
 		t.Fatal(err)

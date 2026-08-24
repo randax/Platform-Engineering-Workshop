@@ -27,7 +27,7 @@ func TestTemplatesRender(t *testing.T) {
 	// Same constructor main uses (FuncMap!). A bare Server with just the
 	// Grafana URL is enough: with no Kube client currentSnapshot returns the
 	// zero snapshot, so the nav renders with every gated page simply locked.
-	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"})
 	if err != nil {
 		t.Fatalf("parsing templates: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestTemplatesRender(t *testing.T) {
 				Secret:     "my-db-pg-app",
 				Psql:       "kubectl -n demo exec -it my-db-pg-1 -- psql -U app app",
 				Events:     []kube.Event{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
-				GrafanaURL: "http://localhost:30030/explore?x",
+				GrafanaURL: "http://grafana.cloudbox.k8s.test/explore?x",
 				Telemetry:  true,
 				ConnSpark:  metrics.Sparkline([]float64{1, 3, 2, 4}, "connections"),
 				ConnNow:    "4",

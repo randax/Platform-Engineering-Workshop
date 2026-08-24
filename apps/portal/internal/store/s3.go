@@ -5,8 +5,8 @@ package store
 //
 // One subtlety worth understanding: presigned URLs embed the *host* they were
 // signed for. The portal talks to RustFS on its cluster-internal Service
-// address, but your browser can only reach RustFS through the NodePort
-// (localhost:30900). So we keep two minio clients with the same credentials —
+// address, but your browser can only reach RustFS through the ingress
+// (s3.cloudbox.k8s.test). So we keep two minio clients with the same credentials —
 // one for API calls from inside the cluster, one only used to sign URLs the
 // browser will follow.
 

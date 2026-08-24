@@ -12,7 +12,7 @@ import (
 // invoke, delete. Assert the merged markup renders — the build form, the
 // per-row invoke button, and Delete gated to demo-namespace functions.
 func TestFunctionsPageRender(t *testing.T) {
-	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
