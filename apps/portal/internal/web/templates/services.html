@@ -44,6 +44,25 @@ source in-cluster and deploys it.</p>
         <div class="env-row"><input name="env_name" placeholder="NAME" pattern="[A-Za-z_][A-Za-z0-9_]*"><input name="env_value" placeholder="value"></div>
       </fieldset>
       <label class="check"><input type="checkbox" name="keep_warm" value="1"> Keep one instance warm <small>— no cold start; disables scale-to-zero</small></label>
+      
+      <details class="yaml-toggle" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+        <summary style="cursor: pointer; color: var(--accent); font-weight: 500;">What is actually being created? (View YAML)</summary>
+        <div style="background: var(--surface); padding: 1rem; border: 1px solid var(--line); border-radius: var(--r-sm); margin-top: 0.5rem; max-height: 250px; overflow-y: auto;">
+          <p class="hint" style="margin-top: 0;">The portal submits two objects: an <code>Argo Workflow</code> to build the image, and a <code>Knative Service</code> to run it.</p>
+          <pre style="margin: 0; font-size: 0.85em;"><code>apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: &lt;name&gt;
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+      - image: zot.zot.svc.cluster.local:5000/cloudbox/&lt;name&gt;:latest
+        imagePullPolicy: Always</code></pre>
+        </div>
+      </details>
+
       <div class="modal-actions">
         <label for="fn-modal" class="btn ghost">Cancel</label>
         <button type="submit">Build &amp; deploy</button>
@@ -61,6 +80,8 @@ source in-cluster and deploys it.</p>
 {{define "svc-list"}}
 <div id="svc-list" hx-get="/services/list" hx-trigger="every 5s" hx-swap="outerHTML">
   {{template "flash" .Flash}}
+  <h2 style="margin-top: 1rem;">Functions <small>(all namespaces · auto-refreshes every 5 s)</small></h2>
+  <p class="hint" style="margin-top: -0.5rem; margin-bottom: 1rem;">CLI equivalent: <code>kubectl get ksvc -A</code></p>
   <table>
     <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th><th>Scale</th><th>Requests (30 min)</th><th>avg latency (30 min)</th><th></th></tr></thead>
     <tbody>
@@ -90,6 +111,23 @@ source in-cluster and deploys it.</p>
     {{end}}
     </tbody>
   </table>
+
+  {{if .Telemetry}}
+  <h2 style="margin-top: 2rem;">Monitoring <small>last 30 min · Project {{.Namespace}} pods</small></h2>
+  <div class="monitor">
+    <div class="metric">
+      <span class="metric-label">CPU <small>namespace {{.Namespace}}</small></span>
+      {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
+      {{else}}<span class="nodata">no data yet</span>{{end}}
+    </div>
+    <div class="metric">
+      <span class="metric-label">Memory <small>namespace {{.Namespace}}</small></span>
+      {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
+      {{else}}<span class="nodata">no data yet</span>{{end}}
+    </div>
+  </div>
+  <p class="hint"><small>This shows the aggregate resource usage of all pods in this project namespace (including your databases and applications).</small></p>
+  {{end}}
 </div>
 {{end}}
 

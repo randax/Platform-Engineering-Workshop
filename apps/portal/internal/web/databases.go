@@ -6,9 +6,12 @@ package web
 
 import (
 	"context"
+	"fmt"
+	"html/template"
 	"net/http"
 
 	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
 )
 
 func init() {
@@ -40,6 +43,11 @@ type databasesData struct {
 	Databases []kube.WorkshopDB
 	Namespace string
 	Flash     flash
+	Telemetry bool
+	CPUSpark  template.HTML
+	CPUNow    string
+	MemSpark  template.HTML
+	MemNow    string
 }
 
 func fetchDatabases(ctx context.Context, s *Server, ns string, fl flash) (databasesData, error) {
@@ -51,7 +59,20 @@ func fetchDatabases(ctx context.Context, s *Server, ns string, fl flash) (databa
 	if err != nil {
 		return databasesData{}, err
 	}
-	return databasesData{Clusters: clusters, Databases: dbs, Namespace: ns, Flash: fl}, nil
+	
+	data := databasesData{Clusters: clusters, Databases: dbs, Namespace: ns, Flash: fl}
+	if s.metricsEnabled() {
+		data.Telemetry = true
+		if vals, err := s.Prom.QueryRange(ctx, metrics.NamespaceCPUQuery(ns)); err == nil && len(vals) > 0 {
+			data.CPUSpark = metrics.Sparkline(vals, "cpu usage")
+			data.CPUNow = fmt.Sprintf("%.2f cores", vals[len(vals)-1])
+		}
+		if vals, err := s.Prom.QueryRange(ctx, metrics.NamespaceMemQuery(ns)); err == nil && len(vals) > 0 {
+			data.MemSpark = metrics.Sparkline(vals, "memory usage")
+			data.MemNow = humanBytes(int64(vals[len(vals)-1]))
+		}
+	}
+	return data, nil
 }
 
 func handleDatabases(s *Server, w http.ResponseWriter, r *http.Request) {

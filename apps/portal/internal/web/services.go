@@ -135,7 +135,22 @@ func fetchFunctions(s *Server, r *http.Request, fl flash) (functionsData, error)
 		}
 		rows = append(rows, row)
 	}
-	return functionsData{Rows: rows, Samples: fnSamples, Flash: fl}, nil
+
+	ns := s.activeProject(r)
+	data := functionsData{Rows: rows, Samples: fnSamples, Flash: fl, Namespace: ns}
+	if s.metricsEnabled() {
+		data.Telemetry = true
+		if vals, err := s.Prom.QueryRange(r.Context(), metrics.NamespaceCPUQuery(ns)); err == nil && len(vals) > 0 {
+			data.CPUSpark = metrics.Sparkline(vals, "cpu usage")
+			data.CPUNow = fmt.Sprintf("%.2f cores", vals[len(vals)-1])
+		}
+		if vals, err := s.Prom.QueryRange(r.Context(), metrics.NamespaceMemQuery(ns)); err == nil && len(vals) > 0 {
+			data.MemSpark = metrics.Sparkline(vals, "memory usage")
+			data.MemNow = humanBytes(int64(vals[len(vals)-1]))
+		}
+	}
+
+	return data, nil
 }
 
 func handleServices(s *Server, w http.ResponseWriter, r *http.Request) {
