@@ -234,6 +234,25 @@ fi
 # --- Pre-pulled images --------------------------------------------------------------
 step "Pre-pulled images (populated by ./scripts/cloudbox-init.sh)"
 
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
+  # The raw disk image every VM boots from. Nested by schematic/version/arch
+  # (upstream docs/SPEC.md:110-113), so match on the version directory rather
+  # than guessing the schematic id — ours is talos-box's own default.
+  # Checked BEFORE the docker gate below: it is a plain directory lookup, and on
+  # tbx the answer still matters on a laptop whose Docker is not up.
+  if find "${HOME}/.talosbox/cache" -type d -name "${TALOS_VERSION}" 2>/dev/null | grep -q .; then
+    ok "Talos ${TALOS_VERSION} disk image is cached for tbx"
+  else
+    check_fail "no Talos ${TALOS_VERSION} disk image in ~/.talosbox/cache — run ./scripts/cloudbox-init.sh (needs the Image Factory, so do it at home)"
+  fi
+  # What the container-image checks below can and cannot say on tbx: the crane
+  # mirror is a Docker container either way, so its content is verified the same
+  # — but the container-side probe proves reachability from a DOCKER container,
+  # not from the tbx VMs, which reach the same registry over the cluster gateway
+  # (create-cluster.sh patches that in; tbx doctor covers the host networking).
+  info "  (the container-image checks below speak for docker; the VMs reach the mirror via the cluster gateway)"
+fi
+
 if ! docker_running; then
   check_fail "Skipping image checks — Docker is not running"
 else

@@ -273,4 +273,49 @@ else
   fi
 fi
 
+# --- 5. Talos disk image for the tbx substrate ---------------------------------
+# The crane mirror above covers CONTAINER images. The tbx substrate also needs
+# the Talos RAW DISK IMAGE, which talos-box downloads from the Image Factory and
+# decompresses into ~/.talosbox/cache/ — 95 MB on arm64, 204 MB on amd64
+# (measured). That download is Factory-side and cannot go through our mirror, so
+# it must happen at home like everything else.
+#
+# --talos-version pins one ad-hoc combination (cmd/tbx/cache_pull.go:23,39-44):
+# naming it deliberately skips the file-driven mode that would ALSO warm tbx's
+# own registry mirror. Adopting that mirror is a spec non-goal — the crane
+# mirror on localhost:${MIRROR_PORT} stays the single container-image store.
+SUBSTRATE="$(substrate_resolve)"
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
+  if ! have tbx; then
+    # Only reachable via CLOUDBOX_SUBSTRATE=tbx on a machine without the binary:
+    # substrate_resolve's detection path requires `tbx doctor` to pass first.
+    warn "substrate is 'tbx' but the tbx binary is not installed — cannot pre-pull"
+    warn "the Talos disk image. Install tbx (see ./scripts/dev-setup.sh) and re-run."
+    tbx_cached="skipped"
+    tbx_doctor="skipped"
+  else
+    step "Pre-pulling the Talos ${TALOS_VERSION} disk image for tbx"
+    if tbx cache pull --talos-version "${TALOS_VERSION}"; then
+      ok "Talos disk image cached in ~/.talosbox/cache"
+      tbx_cached="yes"
+    else
+      warn "'tbx cache pull --talos-version ${TALOS_VERSION}' failed — the first"
+      warn "create will download it, which needs the Image Factory. Retry at home."
+      tbx_cached="no"
+    fi
+    step "Checking the tbx host setup"
+    if tbx doctor; then
+      ok "tbx doctor passes"
+      tbx_doctor="pass"
+    else
+      warn "tbx doctor reports problems (above). Fix them, or use the docker"
+      warn "substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
+      tbx_doctor="fail"
+    fi
+  fi
+  info "Prework summary: images=${total} mirrored · talos-disk=${tbx_cached} · tbx-doctor=${tbx_doctor}"
+else
+  info "Prework summary: images=${total} mirrored · substrate=docker (no Talos disk image needed)"
+fi
+
 info "Next: ./scripts/install.sh --check"
