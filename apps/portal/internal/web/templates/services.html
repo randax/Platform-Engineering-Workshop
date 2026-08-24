@@ -68,10 +68,10 @@ source in-cluster and deploys it.</p>
       <tr>
         <td><a href="/services/{{.Metadata.Namespace}}/{{.Metadata.Name}}">{{.Metadata.Name}}</a></td>
         <td>{{.Metadata.Namespace}}</td>
-        <td><code>{{.Status.URL}}</code></td>
+        <td><a href="{{.Status.URL}}" target="_blank" rel="noopener noreferrer">Open ↗</a></td>
         <td><span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></td>
         {{/* scale-from-zero: 0 pods when idle, N when serving — the serverless payoff */}}
-        <td>{{if .Scale}}<span class="metric-now">{{.Scale}}</span>{{else}}<span class="nodata">—</span>{{end}}</td>
+        <td>{{if .Scale}}<span>{{.Scale}}</span>{{else}}<span class="nodata">—</span>{{end}}</td>
         {{/* server-rendered SVG straight from a Prometheus range query */}}
         <td>{{if .Spark}}{{.Spark}}{{else}}<span class="nodata">— no metrics yet</span>{{end}}</td>
         <td>{{if .Latency}}{{.Latency}} <small>{{.LatencyNow}}</small>{{else}}<span class="nodata">—</span>{{end}}</td>
