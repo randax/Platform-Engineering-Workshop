@@ -236,14 +236,21 @@ step "Pre-pulled images (populated by ./scripts/cloudbox-init.sh)"
 
 if [[ "${SUBSTRATE}" == "tbx" ]]; then
   # The raw disk image every VM boots from. Nested by schematic/version/arch
-  # (upstream docs/SPEC.md:110-113), so match on the version directory rather
-  # than guessing the schematic id — ours is talos-box's own default.
-  # Checked BEFORE the docker gate below: it is a plain directory lookup, and on
-  # tbx the answer still matters on a laptop whose Docker is not up.
-  if find "${HOME}/.talosbox/cache" -type d -name "${TALOS_VERSION}" 2>/dev/null | grep -q .; then
+  # (upstream docs/SPEC.md:110-113), so match on the version DIRECTORY rather
+  # than guessing the schematic id — ours is talos-box's own default — but
+  # assert the FILE inside it: Cache.Ensure MkdirAll's that directory before it
+  # downloads anything (upstream internal/imagecache/cache.go:163-168), so an
+  # interrupted `tbx cache pull` leaves the directory there with no disk.raw
+  # (upstream calls that state Entry.Incomplete, cache.go:63-67) and a
+  # directory-only check would call it cached. disk.raw is published by
+  # temp-file-plus-rename (cache.go:393-417), so its presence means complete.
+  # The *disk.raw glob also covers the legacy <version>/disk.raw layout.
+  # Checked BEFORE the docker gate below: it is a plain filesystem lookup, and
+  # on tbx the answer still matters on a laptop whose Docker is not up.
+  if find "${HOME}/.talosbox/cache" -type f -path "*/${TALOS_VERSION}/*disk.raw" -size +0c 2>/dev/null | grep -q .; then
     ok "Talos ${TALOS_VERSION} disk image is cached for tbx"
   else
-    check_fail "no Talos ${TALOS_VERSION} disk image in ~/.talosbox/cache — run ./scripts/cloudbox-init.sh (needs the Image Factory, so do it at home)"
+    check_fail "no complete Talos ${TALOS_VERSION} disk.raw in ~/.talosbox/cache (an interrupted pull leaves the version directory behind, empty) — run ./scripts/cloudbox-init.sh (needs the Image Factory, so do it at home)"
   fi
   # What the container-image checks below can and cannot say on tbx: the crane
   # mirror is a Docker container either way, so its content is verified the same

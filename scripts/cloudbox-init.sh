@@ -284,6 +284,9 @@ fi
 # naming it deliberately skips the file-driven mode that would ALSO warm tbx's
 # own registry mirror. Adopting that mirror is a spec non-goal — the crane
 # mirror on localhost:${MIRROR_PORT} stays the single container-image store.
+# Note this is IN ADDITION to everything above: a tbx attendee still needs Docker
+# running for prework, because the crane mirror the VMs pull from is itself a
+# Docker container. tbx replaces the NODES, not the mirror.
 SUBSTRATE="$(substrate_resolve)"
 if [[ "${SUBSTRATE}" == "tbx" ]]; then
   if ! have tbx; then
