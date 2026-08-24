@@ -49,7 +49,24 @@ spec:
 <div id="db-list" hx-get="/databases/list" hx-trigger="every 5s" hx-swap="outerHTML">
   {{template "flash" .Flash}}
 
-  <h2>WorkshopDatabases <small>(namespace {{.Namespace}} · auto-refreshes every 5 s)</small></h2>
+  {{if .Telemetry}}
+  <h2 style="margin-top: 1rem;">Monitoring <small>last 30 min · Project {{.Namespace}} pods</small></h2>
+  <div class="monitor">
+    <div class="metric">
+      <span class="metric-label">CPU <small>namespace {{.Namespace}}</small></span>
+      {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
+      {{else}}<span class="nodata">no data yet</span>{{end}}
+    </div>
+    <div class="metric">
+      <span class="metric-label">Memory <small>namespace {{.Namespace}}</small></span>
+      {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
+      {{else}}<span class="nodata">no data yet</span>{{end}}
+    </div>
+  </div>
+  <p class="hint"><small>This shows the aggregate resource usage of all pods in this project namespace (including your databases and applications).</small></p>
+  {{end}}
+
+  <h2 style="margin-top: 1.5rem;">WorkshopDatabases <small>(namespace {{.Namespace}} · auto-refreshes every 5 s)</small></h2>
   <p class="hint" style="margin-top: -0.5rem; margin-bottom: 1rem;">CLI equivalent: <code>kubectl -n {{.Namespace}} get workshopdatabase</code></p>
   <table>
     <thead><tr><th>Name</th><th>Size</th><th>Status</th></tr></thead>
@@ -83,22 +100,5 @@ spec:
     {{end}}
     </tbody>
   </table>
-
-  {{if .Telemetry}}
-  <h2 style="margin-top: 2rem;">Monitoring <small>last 30 min · Project {{.Namespace}} pods</small></h2>
-  <div class="monitor">
-    <div class="metric">
-      <span class="metric-label">CPU <small>namespace {{.Namespace}}</small></span>
-      {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
-      {{else}}<span class="nodata">no data yet</span>{{end}}
-    </div>
-    <div class="metric">
-      <span class="metric-label">Memory <small>namespace {{.Namespace}}</small></span>
-      {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
-      {{else}}<span class="nodata">no data yet</span>{{end}}
-    </div>
-  </div>
-  <p class="hint"><small>This shows the aggregate resource usage of all pods in this project namespace (including your databases and applications).</small></p>
-  {{end}}
 </div>
 {{end}}

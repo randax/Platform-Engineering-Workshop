@@ -44,7 +44,7 @@ func init() {
 		// Mutating routes. No CSRF token — single-user disposable lab. These are
 		// pure S3 (minio-go → RustFS); no Kubernetes RBAC is involved.
 		Extra: []Route{
-			{"GET /buckets/objects", handleBucketObjects}, // htmx-loaded object list
+			{"GET /buckets/{name}", handleBucketDetail}, // htmx-loaded object list
 			{"POST /buckets", handleCreateBucket},
 			{"DELETE /buckets/{bucket}", handleDeleteBucket},
 			{"POST /buckets/{bucket}/upload", handleUploadObject},

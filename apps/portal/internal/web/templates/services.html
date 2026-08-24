@@ -10,7 +10,6 @@ source in-cluster and deploys it.</p>
 
 {{/* Server-side invoke lands here — a "Test" panel outside the polling list, so
      a cold-start result isn't wiped by the 5-second refresh. */}}
-<div id="invoke-result"></div>
 
 {{/* CSS-only modal (checkbox hack — no JS, same approach as the mobile nav): the
      "New function" button is a <label> that toggles the hidden checkbox; the
@@ -70,6 +69,18 @@ spec:
     </form>
   </div>
 </div>
+<h2>Actions</h2>
+<div class="fn-actions">
+  {{/* Invoke wakes a scaled-to-zero function server-side (GET its cluster-local URL). */}}
+  <button hx-post="/services/{{.Namespace}}/{{.Name}}/invoke" hx-target="#invoke-result" hx-swap="innerHTML">Invoke</button>
+  <a class="btn ghost" href="{{.TracesURL}}" target="_blank">View traces &amp; logs ↗</a>
+  {{if .Deletable}}<button class="danger" hx-delete="/services/{{.Namespace}}/{{.Name}}"
+    hx-swap="none"
+    hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Delete-Failed')){this.nextElementSibling.textContent='Delete failed — the function may still exist. Check the Functions list.'}else if(event.detail.successful){window.location='/services'}"
+    hx-confirm="Delete {{.Name}}? This removes the Knative Service.">Delete</button>
+  <span id="fn-detail-delete-flash" class="flash flash-error" role="alert"></span>{{end}}
+</div>
+<div id="invoke-result"></div>
 {{template "foot" .}}
 {{end}}
 
@@ -80,7 +91,25 @@ spec:
 {{define "svc-list"}}
 <div id="svc-list" hx-get="/services/list" hx-trigger="every 5s" hx-swap="outerHTML">
   {{template "flash" .Flash}}
-  <h2 style="margin-top: 1rem;">Functions <small>(all namespaces · auto-refreshes every 5 s)</small></h2>
+
+  {{if .Telemetry}}
+  <h2 style="margin-top: 1rem;">Monitoring <small>last 30 min · Project {{.Namespace}} pods</small></h2>
+  <div class="monitor">
+    <div class="metric">
+      <span class="metric-label">CPU <small>namespace {{.Namespace}}</small></span>
+      {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
+      {{else}}<span class="nodata">no data yet</span>{{end}}
+    </div>
+    <div class="metric">
+      <span class="metric-label">Memory <small>namespace {{.Namespace}}</small></span>
+      {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
+      {{else}}<span class="nodata">no data yet</span>{{end}}
+    </div>
+  </div>
+  <p class="hint"><small>This shows the aggregate resource usage of all pods in this project namespace (including your databases and applications).</small></p>
+  {{end}}
+
+  <h2 style="margin-top: 1.5rem;">Functions <small>(all namespaces · auto-refreshes every 5 s)</small></h2>
   <p class="hint" style="margin-top: -0.5rem; margin-bottom: 1rem;">CLI equivalent: <code>kubectl get ksvc -A</code></p>
   <table>
     <thead><tr><th>Name</th><th>Namespace</th><th>URL</th><th>Ready</th><th>Scale</th><th>Requests (30 min)</th><th>avg latency (30 min)</th><th></th></tr></thead>
@@ -111,23 +140,6 @@ spec:
     {{end}}
     </tbody>
   </table>
-
-  {{if .Telemetry}}
-  <h2 style="margin-top: 2rem;">Monitoring <small>last 30 min · Project {{.Namespace}} pods</small></h2>
-  <div class="monitor">
-    <div class="metric">
-      <span class="metric-label">CPU <small>namespace {{.Namespace}}</small></span>
-      {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
-      {{else}}<span class="nodata">no data yet</span>{{end}}
-    </div>
-    <div class="metric">
-      <span class="metric-label">Memory <small>namespace {{.Namespace}}</small></span>
-      {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
-      {{else}}<span class="nodata">no data yet</span>{{end}}
-    </div>
-  </div>
-  <p class="hint"><small>This shows the aggregate resource usage of all pods in this project namespace (including your databases and applications).</small></p>
-  {{end}}
 </div>
 {{end}}
 
@@ -154,18 +166,6 @@ spec:
 {{if not .Found}}
 <h1>{{.Name}}</h1>
 <p class="lede">No function named <code>{{.Name}}</code> in namespace <code>{{.Namespace}}</code> — it may have been deleted, or a different project is selected.</p>
-{{template "foot" .}}
-{{else}}
-<h1>{{.Name}} <span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></h1>
-<p class="lede">A Knative Service in <code>{{.Namespace}}</code> — scales to zero and back.{{if .URL}} Serving at <code>{{.URL}}</code>.{{end}}</p>
-
-{{if .ShowDiag}}
-<h2>Diagnostics <small>why this function isn't ready</small></h2>
-{{if .Why}}<p class="diag-why">{{.Why}}</p>{{end}}
-{{template "diagnostics" .Diag}}
-<p class="hint">The cause a <code>kubectl describe</code> would show — a failed revision usually means a bad image or a crash on boot. Rebuild from the Functions list, or delete and recreate.</p>
-{{end}}
-
 <h2>Actions</h2>
 <div class="fn-actions">
   {{/* Invoke wakes a scaled-to-zero function server-side (GET its cluster-local URL). */}}
@@ -178,6 +178,18 @@ spec:
   <span id="fn-detail-delete-flash" class="flash flash-error" role="alert"></span>{{end}}
 </div>
 <div id="invoke-result"></div>
+{{template "foot" .}}
+{{else}}
+<h1>{{.Name}} <span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span></h1>
+<p class="lede">A Knative Service in <code>{{.Namespace}}</code> — scales to zero and back.{{if .URL}} Serving at <code>{{.URL}}</code>.{{end}}</p>
+
+{{if .ShowDiag}}
+<h2>Diagnostics <small>why this function isn't ready</small></h2>
+{{if .Why}}<p class="diag-why">{{.Why}}</p>{{end}}
+{{template "diagnostics" .Diag}}
+<p class="hint">The cause a <code>kubectl describe</code> would show — a failed revision usually means a bad image or a crash on boot. Rebuild from the Functions list, or delete and recreate.</p>
+{{end}}
+
 
 <h2>Monitoring <small>last 30 min · scale-to-zero</small></h2>
 {{if .Telemetry}}
@@ -190,6 +202,18 @@ spec:
 {{else}}
 <p class="hint">{{icon "lock"}} Enable the observability stack to light up this function's metrics.</p>
 {{end}}
+<h2>Actions</h2>
+<div class="fn-actions">
+  {{/* Invoke wakes a scaled-to-zero function server-side (GET its cluster-local URL). */}}
+  <button hx-post="/services/{{.Namespace}}/{{.Name}}/invoke" hx-target="#invoke-result" hx-swap="innerHTML">Invoke</button>
+  <a class="btn ghost" href="{{.TracesURL}}" target="_blank">View traces &amp; logs ↗</a>
+  {{if .Deletable}}<button class="danger" hx-delete="/services/{{.Namespace}}/{{.Name}}"
+    hx-swap="none"
+    hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Delete-Failed')){this.nextElementSibling.textContent='Delete failed — the function may still exist. Check the Functions list.'}else if(event.detail.successful){window.location='/services'}"
+    hx-confirm="Delete {{.Name}}? This removes the Knative Service.">Delete</button>
+  <span id="fn-detail-delete-flash" class="flash flash-error" role="alert"></span>{{end}}
+</div>
+<div id="invoke-result"></div>
 {{template "foot" .}}
 {{end}}
 {{end}}

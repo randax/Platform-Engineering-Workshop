@@ -437,7 +437,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.82rem; padding: 2
 td.wrap { white-space: normal; word-break: break-word; max-width: 28rem; font-size: 0.9rem; }
 
 /* warning events: amber tint, red reason text */
-tr.evwarn td { background: var(--warn-bg); }
+tr.evwarn td { color: var(--warn); }
 tr.evwarn td:nth-child(3), tr.evwarn td:nth-child(4) { color: var(--bad); }
 
 pre.code {
@@ -580,3 +580,4 @@ pre.code {
 .cf-followup input:disabled { background: var(--surface-2); color: var(--muted); }
 .cf-you { color: var(--code-fg); font-weight: 600; margin-top: 0.4rem; }
 .flash:empty { display: none; }
+.yaml-toggle pre { overflow-x: auto; white-space: pre; }

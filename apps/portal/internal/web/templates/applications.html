@@ -162,31 +162,18 @@ spec:
   {{end}}
 </tbody></table>
 
-{{if .SourceBuilt}}
-<h2>Source <small>deploy-from-source</small></h2>
-<p>Built from <code>{{.Repo}}</code> <small>(branch {{.Branch}})</small>. Change the code, push, then roll it forward:</p>
-<button hx-post="/applications/{{.Name}}/redeploy" hx-target="#redeploy-flash" hx-swap="innerHTML"
-  hx-confirm="Rebuild {{.Name}} from its repo and roll it forward?">Redeploy</button>
-<div id="redeploy-flash"></div>
-{{end}}
-
-<h2>Monitoring <small>last 30 min · the workload</small></h2>
-{{if .Telemetry}}
-<div class="monitor">
-  <div class="metric"><span class="metric-label">Request rate</span>
-    {{if .ReqSpark}}<span class="metric-spark">{{.ReqSpark}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
-  <div class="metric"><span class="metric-label">Avg latency</span>
-    {{if .LatSpark}}<span class="metric-spark">{{.LatSpark}}</span><span class="metric-now">{{.LatNow}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
+<h2>Actions</h2>
+<div class="fn-actions">
+  {{if .SourceBuilt}}
+  <button hx-post="/applications/{{.Name}}/redeploy" hx-target="#redeploy-flash" hx-swap="innerHTML" hx-confirm="Rebuild {{.Name}} from its repo and roll it forward?">Redeploy</button>
+  {{end}}
+  {{if .Telemetry}}
+  <a class="btn ghost" href="{{.MetricsURL}}" target="_blank">View traces &amp; logs ↗</a>
+  {{end}}
+  <button class="danger" hx-delete="/applications/{{.Name}}" hx-on::after-request="if(event.detail.successful) window.location='/applications'" hx-confirm="Delete {{.Name}}? This removes the workload, its database and bucket.">Delete</button>
 </div>
-<p><a href="{{.MetricsURL}}" target="_blank">Explore traces in Grafana →</a></p>
-{{else}}
-<p class="hint">{{icon "lock"}} Enable the observability stack to light up the workload's metrics.</p>
-{{end}}
+<div id="redeploy-flash"></div>
 
-<h2>Danger zone</h2>
-<button class="danger" hx-delete="/applications/{{.Name}}"
-  hx-on::after-request="if(event.detail.successful) window.location='/applications'"
-  hx-confirm="Delete {{.Name}}? This removes the workload, its database and bucket.">Delete application</button>
 {{template "foot" .}}
 {{end}}
 {{end}}

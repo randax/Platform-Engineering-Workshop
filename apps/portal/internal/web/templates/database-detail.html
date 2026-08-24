@@ -13,6 +13,30 @@ Crossplane into the CNPG cluster and bucket below (the size decides instances + 
 is an unmanaged CNPG cluster).</p>
 {{end}}
 
+{{if .Cluster}}
+<h2>Monitoring <small>last 30 min · from CloudNativePG's exporter</small></h2>
+{{if .Telemetry}}
+<div class="monitor">
+  <div class="metric">
+    <span class="metric-label">Connections</span>
+    {{if .ConnSpark}}<span class="metric-spark">{{.ConnSpark}}</span><span class="metric-now">{{.ConnNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Cache hit <small>ratio</small></span>
+    {{if .CacheSpark}}<span class="metric-spark">{{.CacheSpark}}</span><span class="metric-now">{{.CacheNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+  <div class="metric">
+    <span class="metric-label">Database size</span>
+    {{if .SizeNow}}<span class="metric-now">{{.SizeNow}}</span>
+    {{else}}<span class="nodata">no data yet</span>{{end}}
+  </div>
+</div>
+{{else}}
+<p class="hint">{{icon "lock"}} Enable the observability stack to see this database's live connections, transactions, and size.</p>
+{{end}}
+{{end}}
 {{if .ShowDiag}}
 <h2>Diagnostics <small>why this database isn't ready</small></h2>
 {{if .Why}}<p class="diag-why">{{.Why}}</p>{{end}}
@@ -53,8 +77,6 @@ phase: {{.Status.Phase}} · storage {{.Spec.Storage.Size}}</p>
 </table>
 {{end}}
 
-{{/* Only invite a connection once the backing cluster actually exists —
-     otherwise the psql one-liner points at a pod and Secret that aren't there. */}}
 {{if .Cluster}}
 <h2>Connect</h2>
 <p>CNPG puts the credentials in the Secret <code>{{.Secret}}</code> (namespace demo).
@@ -62,30 +84,24 @@ Ready to paste:</p>
 <pre class="code">{{.Psql}}</pre>
 {{end}}
 
-{{if .Cluster}}
-<h2>Monitoring <small>last 30 min · from CloudNativePG's exporter</small></h2>
-{{if .Telemetry}}
-<div class="monitor">
-  <div class="metric">
-    <span class="metric-label">Connections</span>
-    {{if .ConnSpark}}<span class="metric-spark">{{.ConnSpark}}</span><span class="metric-now">{{.ConnNow}}</span>
-    {{else}}<span class="nodata">no data yet</span>{{end}}
-  </div>
-  <div class="metric">
-    <span class="metric-label">Cache hit <small>ratio</small></span>
-    {{if .CacheSpark}}<span class="metric-spark">{{.CacheSpark}}</span><span class="metric-now">{{.CacheNow}}</span>
-    {{else}}<span class="nodata">no data yet</span>{{end}}
-  </div>
-  <div class="metric">
-    <span class="metric-label">Database size</span>
-    {{if .SizeNow}}<span class="metric-now">{{.SizeNow}}</span>
-    {{else}}<span class="nodata">no data yet</span>{{end}}
-  </div>
+{{if .DB}}
+<h2>Actions</h2>
+<div class="fn-actions">
+  <form hx-post="/databases/{{.Name}}/resize" hx-target="#resize-result" hx-confirm="Resize {{.Name}}? Crossplane will re-compose the database." style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0;">
+    <select name="size" style="margin: 0; min-width: 150px;">
+      <option value="small"{{if eq .DB.Spec.Size "small"}} selected{{end}}>small (1 inst, 1Gi)</option>
+      <option value="medium"{{if eq .DB.Spec.Size "medium"}} selected{{end}}>medium (2 inst, 5Gi)</option>
+      <option value="large"{{if eq .DB.Spec.Size "large"}} selected{{end}}>large HA (3 inst, 10Gi)</option>
+    </select>
+    <button type="submit">Resize</button>
+  </form>
+  {{if .Telemetry}}
+  <a class="btn ghost" href="{{.GrafanaURL}}" target="_blank">View metrics &amp; logs ↗</a>
+  {{end}}
+  <button class="danger" hx-delete="/databases/{{.Name}}" hx-target="#delete-result" hx-confirm="Delete database {{.Name}}? This removes the Postgres cluster and its data.">Delete</button>
 </div>
-<p><a href="{{.GrafanaURL}}" target="_blank">Explore in Grafana →</a></p>
-{{else}}
-<p class="hint">{{icon "lock"}} Enable the observability stack to see this database's live connections, transactions, and size.</p>
-{{end}}
+<div id="resize-result"></div>
+<div id="delete-result"></div>
 {{end}}
 
 <h2>Recent events</h2>
@@ -101,34 +117,5 @@ Ready to paste:</p>
   {{end}}
   </tbody>
 </table>
-
-{{if .DB}}
-<h2>Resize</h2>
-<p class="hint">Change the T-shirt size and Crossplane re-composes — storage, HA instances and memory
-all follow the size. <small>Growing is safe; shrinking storage isn't (CNPG won't shrink a PVC), so a
-smaller size keeps the existing disk.</small></p>
-<div id="resize-result"></div>
-<form hx-post="/databases/{{.Name}}/resize" hx-target="#resize-result"
-      hx-confirm="Resize {{.Name}}? Crossplane will re-compose the database.">
-  <label>Size
-    <select name="size">
-      <option value="small"{{if eq .DB.Spec.Size "small"}} selected{{end}}>small — 1 instance · 1Gi</option>
-      <option value="medium"{{if eq .DB.Spec.Size "medium"}} selected{{end}}>medium — 2 instances · 5Gi</option>
-      <option value="large"{{if eq .DB.Spec.Size "large"}} selected{{end}}>large — 3 instances (HA) · 10Gi</option>
-    </select>
-  </label>
-  <button type="submit">Apply size</button>
-</form>
-
-<h2>Danger zone</h2>
-<div id="delete-result"></div>
-<p>
-  {{/* destructive action on the detail page, real-console style */}}
-  <button class="danger" hx-delete="/databases/{{.Name}}" hx-target="#delete-result"
-          hx-confirm="Delete database {{.Name}}? This removes the Postgres cluster and its data.">
-    Delete this database
-  </button>
-</p>
-{{end}}
 {{template "foot" .}}
 {{end}}
