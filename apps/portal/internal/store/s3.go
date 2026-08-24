@@ -43,7 +43,7 @@ type Config struct {
 
 func New(cfg Config) (*Client, error) {
 	creds := credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, "")
-	opts := &minio.Options{Creds: creds, Secure: false, Region: "us-east-1"}
+	opts := &minio.Options{Creds: creds, Secure: false, Region: "eu-north-1"}
 	api, err := minio.New(trimScheme(cfg.Endpoint), opts)
 	if err != nil {
 		return nil, err
