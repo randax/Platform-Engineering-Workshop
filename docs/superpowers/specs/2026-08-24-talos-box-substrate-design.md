@@ -42,11 +42,13 @@ scripts/lib.sh                       substrate_detect(), substrate_host_gateway(
 - Cilium 1.20.0 from `scripts/manifests/cilium-1.20.0.tgz`, values in §2.
 - Exports for later scripts: `CLOUDBOX_HOST_GATEWAY` (host as seen from nodes), `CLOUDBOX_API_ENDPOINT`.
 
-**tbx backend.** Substrate-only path (`docs/SPEC.md:16-21` upstream): `tbx up cloudbox` from a checked-in
-`scripts/substrate/cloudbox.tbx.yaml` (Talos `v1.13.8`, no `cni`, sizes from §4); wait for both nodes in
-maintenance; `talosctl gen config` with our patches + `tbx manifests cloudbox mirrors` output merged;
+**tbx backend.** Substrate-only path (`docs/SPEC.md:16-21` upstream): `tbx up -f scripts/substrate/cloudbox.tbx.yaml` (generated from
+`versions.env` pins; `tbx up` is file-driven, upstream `cmd/tbx/updown.go:412-425`) (Talos `v1.13.8`, no `cni`, sizes from §4); wait for both nodes in
+maintenance; `talosctl gen config` with our patches + `tbx manifests cloudbox mirrors` output merged (it renders only Talos's catch-all `"*"` mirror with
+`skipFallback: true`; our eight explicit registries take precedence in containerd, so the crane mirror stays
+the single store);
 `apply-config`, `bootstrap`, `kubeconfig` — our sequence, not tbx's. API endpoint is the CP node IP
-(`172.30.<n>.2`); no `docker port` rewrite. Gateway is `172.30.<n>.1`. Destroy: `tbx down cloudbox --delete`.
+(`172.30.<n>.2`); no `docker port` rewrite. Gateway is `172.30.<n>.1`. Destroy: `tbx cluster destroy cloudbox --force` (`tbx down` only stops; upstream `cmd/tbx/main.go:461-469`).
 `tbx` version is pinned in `scripts/versions.env` (`TBX_VERSION`) and `mise.toml`; install via
 `brew install randax/tap/tbx` (mac) or the release tarball (Linux) — added to lab 00 prereqs and `dev-setup.sh`.
 
@@ -75,7 +77,7 @@ resolver already returns for every `*.cloudbox.k8s.test` name — no DNS work on
 
 **docker only:** `install.sh` (create step, not `--check`) maintains a marked block in `/etc/hosts`
 (`# cloudbox-begin` … `# cloudbox-end`) mapping each hostname below to `127.0.0.1`; idempotent, removed by
-`destroy-cluster.sh --purge`. Requires sudo once; `install.sh --check` verifies the block and fails with
+`destroy-cluster.sh --purge-mirror` (the repo's existing purge flag). Requires sudo once; `install.sh --check` verifies the block and fails with
 `FAIL:` naming the missing lines. Windows/WSL2: the block goes in WSL's `/etc/hosts`; the Windows browser
 needs `C:\Windows\System32\drivers\etc\hosts` too — documented in lab 00 with the exact lines printed by
 `install.sh --print-hosts`.
