@@ -27,16 +27,24 @@ wait_exists builds workflowtemplate/build-and-push 180
 #    an external registry. Host-side crane against Zot's NodePort (plain HTTP).
 #    SOURCE is the local cloudbox-mirror, not Docker Hub: busybox:1.37.0 is on
 #    the pre-pull list, so it is already there, and Docker Hub is rate-limited
-#    at the venue. Falls back to Docker Hub only if the mirror is absent.
+#    at the venue. Falls back to Docker Hub only if the mirror hasn't got it.
 MIRROR="localhost:5001"     # cloudbox-mirror; MIRROR_PORT in scripts/versions.env
-if curl -fsS "http://${MIRROR}/v2/" >/dev/null 2>&1; then
-  BUSYBOX_SRC="${MIRROR}/library/busybox:1.37.0"
+BUSYBOX="library/busybox:1.37.0"
+# Probe the MANIFEST, not `/v2/`. `/v2/` answers "some registry is listening on
+# :5001" and nothing about what is in it, so a mirror that is up but unfilled —
+# a bare `docker run registry`, a purged volume, a cloudbox-init.sh that never
+# finished — passed the old check, and crane was then pointed at a tag that is
+# not there: `MANIFEST_UNKNOWN: manifest unknown`. The Docker Hub fallback sat
+# right below, unused, because "reachable" had already been answered yes. That
+# is exactly how the nightly rehearsal failed module 07.
+if mise x crane@0.21.9 -- crane manifest --insecure "${MIRROR}/${BUSYBOX}" >/dev/null 2>&1; then
+  BUSYBOX_SRC="${MIRROR}/${BUSYBOX}"
 else
-  echo "⚠️  cloudbox-mirror not reachable — falling back to Docker Hub (needs internet)"
-  BUSYBOX_SRC="docker.io/library/busybox:1.37.0"
+  echo "⚠️  cloudbox-mirror hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)"
+  BUSYBOX_SRC="docker.io/${BUSYBOX}"
 fi
 mise x crane@0.21.9 -- crane copy --insecure \
-  "${BUSYBOX_SRC}" localhost:30500/library/busybox:1.37.0
+  "${BUSYBOX_SRC}" "localhost:30500/${BUSYBOX}"
 
 # 3. Build inside the cluster.
 WF_NAME="$(kubectl create -f "$LAB_DIR/workflow-run.yaml" -o jsonpath='{.metadata.name}')"

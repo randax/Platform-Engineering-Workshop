@@ -69,6 +69,16 @@ jobs:
             curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 && break
             sleep 1
           done
+          # busybox is on the attendee pre-pull list (scripts/images.txt), so on a
+          # laptop module 07 seeds Zot FROM THE MIRROR and never touches Docker
+          # Hub. Put it in the CI mirror too, or the rehearsal proves the Docker
+          # Hub fallback instead of the offline path attendees actually run — the
+          # runner has internet, so that substitution is invisible and stays
+          # green right up until the venue WiFi is the thing under test.
+          mise x crane@0.21.9 -- crane copy --insecure \
+            docker.io/library/busybox:1.37.0 \
+            "localhost:${MIRROR_PORT}/library/busybox:1.37.0"
+          echo "✅ seeded busybox into the mirror (the module-07 offline source)"
           # Build + push each app under the SAME repo path the gitops manifests
           # request (ghcr.io/randax/cloudbox-*), so the node's mirror lookup hits.
           # localhost push is insecure-by-default in Docker — no daemon config.

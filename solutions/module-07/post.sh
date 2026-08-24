@@ -32,16 +32,21 @@ fi
 #     filled with busybox:1.37.0 — catch-up.sh is the recovery path AT THE
 #     VENUE, so it must not reach for Docker Hub (rate-limited there, and
 #     unreachable if the WiFi has given up). Same logic as lab/07-ci/solve.sh
-#     and the module README; only fall back to Docker Hub if the mirror is gone.
+#     and the module README; fall back to Docker Hub only if the mirror lacks it.
 MIRROR="localhost:5001"     # MIRROR_PORT in scripts/versions.env
-if curl -fsS --max-time 5 "http://${MIRROR}/v2/" >/dev/null 2>&1; then
-  BUSYBOX_SRC="${MIRROR}/library/busybox:1.37.0"
+BUSYBOX="library/busybox:1.37.0"
+# Probe the MANIFEST, not `/v2/` — see the same block in lab/07-ci/solve.sh. A
+# reachable-but-unfilled mirror answered `/v2/` happily and then failed the copy
+# with MANIFEST_UNKNOWN, without ever trying the fallback below. This is the
+# recovery path, so a wrong answer here strands someone mid-workshop.
+if mise x crane@0.21.9 -- crane manifest --insecure "${MIRROR}/${BUSYBOX}" >/dev/null 2>&1; then
+  BUSYBOX_SRC="${MIRROR}/${BUSYBOX}"
 else
-  echo "⚠️  cloudbox-mirror not reachable — falling back to Docker Hub (needs internet)" >&2
-  BUSYBOX_SRC="docker.io/library/busybox:1.37.0"
+  echo "⚠️  cloudbox-mirror hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)" >&2
+  BUSYBOX_SRC="docker.io/${BUSYBOX}"
 fi
 mise x crane@0.21.9 -- crane copy --insecure \
-  "${BUSYBOX_SRC}" localhost:30500/library/busybox:1.37.0
+  "${BUSYBOX_SRC}" "localhost:30500/${BUSYBOX}"
 
 WF_NAME="$(kubectl create -f "$REPO_ROOT/lab/07-ci/workflow-run.yaml" -o jsonpath='{.metadata.name}')"
 echo "submitted build workflow: $WF_NAME"
