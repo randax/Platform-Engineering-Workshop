@@ -109,6 +109,7 @@ The sentence to land: "The complete outcome of today isn't 'you learned Kubernet
 - Everything is public, pinned, Apache-2.0
 - `catch-up.sh <module>` — resume from anywhere
 - Skipped the stretch? It's all still there
+- Your adventure briefing keeps going — `adventures/` was written for the couch
 - `git tag javazone-2026` = today, forever
 - Broken prereqs at home? Open an issue
 

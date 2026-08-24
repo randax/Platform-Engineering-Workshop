@@ -69,6 +69,10 @@ src: ./pages/what.md
 ---
 
 ---
+src: ./pages/platforms.md
+---
+
+---
 src: ./pages/stack.md
 ---
 
@@ -98,6 +102,10 @@ src: ./pages/module-04.md
 
 ---
 src: ./pages/module-05.md
+---
+
+---
+src: ./pages/adventures.md
 ---
 
 ---

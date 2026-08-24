@@ -62,3 +62,17 @@ The rules we hold ourselves to while building this workshop. Grounded in
 15. **Be accurate about the ecosystem.** This audience fact-checks. MinIO wasn't
     "relicensed" — its open-source edition was discontinued; RustFS is an independent
     reimplementation, not a successor. Say it right in README and slides.
+
+## The adventures exemption
+
+The `adventures/` briefings are **deliberately outside the lab contract**:
+no `verify.sh`, no `solve.sh`, no single canonical end state. Principles 4–6
+assume a lab converges on a verifiable outcome; the adventure block
+(see issue #193) exists to do the opposite — open-ended building for the last
+hour, scoped as "start here, finish at home". A verify script would imply one
+right answer and quietly turn a briefing back into a lab. Do not "fix" this by
+adding one. Everything else still applies — briefings state outcomes-shaped
+missions (P4), layer their guidance from mission → traps rather than steps
+(P7 in spirit), stay offline-first (P2), and stay honest about what is
+rehearsed and what isn't (P14, P15). Their starting states are ordinary
+modules, which the CI bootstrap test already covers.
