@@ -107,10 +107,11 @@ cilium_values=(
   --set k8sClientRateLimit.burst=20
 )
 if [[ "${SUBSTRATE}" == "tbx" ]]; then
-  # Real VIP, handed out by the CiliumLoadBalancerIPPool the shared-ingress step
-  # applies — .200 by talos-box convention, which tbx's resolver already answers
-  # for every *.${CLOUDBOX_DOMAIN} name. Until that pool exists the Service sits
-  # in <pending>, which is the correct state for a cluster with no LB-IPAM.
+  # Real VIP, handed out by the CiliumLoadBalancerIPPool substrate_post_cni()
+  # applies below — .200 by talos-box convention, which tbx's resolver already
+  # answers for every *.${CLOUDBOX_DOMAIN} name. Until that call runs the
+  # Service sits in <pending>, which is the correct state for a cluster with no
+  # LB-IPAM.
   cilium_values+=(--set ingressController.service.type=LoadBalancer)
 else
   # No LB implementation in a docker cluster. The controlplane container
@@ -123,6 +124,8 @@ helm upgrade --install cilium \
   "${SCRIPT_DIR}/manifests/cilium-${CILIUM_VERSION}.tgz" \
   --namespace kube-system \
   "${cilium_values[@]}"
+
+substrate_post_cni
 
 # --- 4. Wait for Ready -------------------------------------------------------------------
 step "Waiting for nodes to become Ready (Cilium rollout)"

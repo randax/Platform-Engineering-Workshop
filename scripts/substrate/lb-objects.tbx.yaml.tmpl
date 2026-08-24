@@ -1,0 +1,30 @@
+# GENERATED — do not edit. Rendered by substrate_post_cni() in
+# scripts/substrate/tbx.sh from the cluster's own subnet index.
+#
+# tbx SUBSTRATE ONLY. Shape and address range from talos-box's own renderers
+# (internal/manifests/manifests.go:61-89) so a cluster we bootstrap by hand gets
+# the same LB reachability a curated `--cni cilium` one would: .200-.239, with
+# .200 the ingress VIP by convention. Since our shared cilium-ingress Service is
+# the first LoadBalancer in the cluster, it takes .200 — which is exactly the
+# address talos-box's resolver already answers for every *.cloudbox.k8s.test
+# name (docs/SPEC.md:213-216). That is why this workshop needs no DNS work.
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: __CLUSTER_NAME__-pool
+spec:
+  blocks:
+    - start: 172.30.__SUBNET_INDEX__.200
+      stop: 172.30.__SUBNET_INDEX__.239
+---
+# The default (non-BGP) reachability mechanism: a node ARP-replies for the VIP.
+# nodeSelector {} = every node, so either node can hold it. macOS/vmnet failover
+# is slow (40-50s — docs/HAZARDS.md); on a 2-node lab cluster that only matters
+# if a node is stopped mid-workshop.
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: __CLUSTER_NAME__-l2
+spec:
+  loadBalancerIPs: true
+  nodeSelector: {}

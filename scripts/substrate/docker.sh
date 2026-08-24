@@ -8,7 +8,8 @@
 # comments in it record bugs that cost whole rehearsals.
 #
 # Source me from create-cluster.sh / destroy-cluster.sh; do not run me.
-# Provides: substrate_preflight, substrate_create, substrate_destroy.
+# Provides: substrate_preflight, substrate_create, substrate_post_cni,
+#           substrate_destroy.
 # =============================================================================
 
 substrate_preflight() {
@@ -244,6 +245,13 @@ EOF
     export CLOUDBOX_API_ENDPOINT="https://${TALOS_CP_IP}:6443"
   fi
 }
+
+# substrate_post_cni — nothing to do on docker. There is no L2 segment to
+# announce a VIP onto, so the shared ingress Service is a NodePort (see the
+# Cilium values in create-cluster.sh) and the hostnames arrive via the marked
+# /etc/hosts block install.sh maintains. Defined so the dispatcher can call it
+# unconditionally.
+substrate_post_cni() { :; }
 
 substrate_destroy() {
   step "Destroying Talos cluster '${CLUSTER_NAME}'"

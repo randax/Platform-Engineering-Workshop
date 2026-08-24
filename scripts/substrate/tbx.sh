@@ -9,9 +9,9 @@
 # both substrates.
 #
 # Source me from create-cluster.sh / destroy-cluster.sh; do not run me.
-# Provides: substrate_preflight, substrate_create, substrate_destroy,
-#           render_tbx_cluster_file, tbx_cluster_json, tbx_subnet_index,
-#           tbx_node_ip.
+# Provides: substrate_preflight, substrate_create, substrate_post_cni,
+#           substrate_destroy, render_tbx_cluster_file, tbx_cluster_json,
+#           tbx_subnet_index, tbx_node_ip.
 # =============================================================================
 set -euo pipefail
 
@@ -300,6 +300,38 @@ EOF
     export TALOSCONFIG="${orig_talosconfig}"
   fi
   rm -rf "${workdir}"
+}
+
+# substrate_post_cni — run after Cilium is installed and its CRDs are
+# Established. Applies the LB-IPAM pool and the L2 announcement policy, then
+# waits for the shared ingress Service to actually get its VIP: an ingress
+# Service stuck <pending> is the single failure that makes every hostname in
+# the workshop dead, so it is worth failing loudly here rather than in module 02.
+substrate_post_cni() {
+  step "Applying the LoadBalancer pool and L2 announcement policy"
+  kubectl wait --for=condition=Established --timeout=120s \
+    crd/ciliumloadbalancerippools.cilium.io \
+    crd/ciliuml2announcementpolicies.cilium.io
+  local idx="${CLOUDBOX_HOST_GATEWAY}"
+  idx="${idx#172.30.}"; idx="${idx%.1}"
+  sed -e "s|__CLUSTER_NAME__|${CLUSTER_NAME}|g" \
+      -e "s|__SUBNET_INDEX__|${idx}|g" \
+      "${SCRIPT_DIR}/substrate/lb-objects.tbx.yaml.tmpl" \
+    | kubectl apply -f -
+
+  step "Waiting for the shared ingress VIP"
+  local waited=0 vip=""
+  while [[ "${waited}" -lt 180 ]]; do
+    vip="$(kubectl -n kube-system get svc cilium-ingress \
+      -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+    [[ -n "${vip}" ]] && break
+    sleep 5; waited=$((waited + 5))
+  done
+  [[ -n "${vip}" ]] \
+    || die "cilium-ingress never got a LoadBalancer address after ${waited}s — kubectl -n kube-system describe svc cilium-ingress; kubectl get ciliumloadbalancerippools"
+  ok "Ingress VIP: ${vip} — every *.${CLOUDBOX_DOMAIN} name resolves here"
+  [[ "${vip}" == "172.30.${idx}.200" ]] \
+    || warn "VIP is ${vip}, not the conventional .200 — talos-box's resolver answers .200 for *.${CLOUDBOX_DOMAIN}, so the hostnames will NOT reach this Service. Delete the other LoadBalancer Service holding .200 and re-run."
 }
 
 substrate_destroy() {
