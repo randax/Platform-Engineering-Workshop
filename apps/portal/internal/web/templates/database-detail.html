@@ -88,12 +88,17 @@ Ready to paste:</p>
 <h2>Actions</h2>
 <div class="fn-actions">
   <form hx-post="/databases/{{.Name}}/resize" hx-target="#resize-result" hx-confirm="Resize {{.Name}}? Crossplane will re-compose the database." style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0;">
+    <select name="version" style="margin: 0; min-width: 80px;">
+      <option value="15"{{if eq .DB.Spec.Version "15"}} selected{{end}}>15</option>
+      <option value="16"{{if eq .DB.Spec.Version "16"}} selected{{end}}>16</option>
+      <option value="17"{{if eq .DB.Spec.Version "17"}} selected{{end}}>17</option>
+    </select>
     <select name="size" style="margin: 0; min-width: 150px;">
       <option value="small"{{if eq .DB.Spec.Size "small"}} selected{{end}}>small (1 inst, 1Gi)</option>
       <option value="medium"{{if eq .DB.Spec.Size "medium"}} selected{{end}}>medium (2 inst, 5Gi)</option>
       <option value="large"{{if eq .DB.Spec.Size "large"}} selected{{end}}>large HA (3 inst, 10Gi)</option>
     </select>
-    <button type="submit">Resize</button>
+    <button type="submit">Update</button>
   </form>
   {{if .Telemetry}}
   <a class="btn ghost" href="{{.GrafanaURL}}" target="_blank">View metrics &amp; logs ↗</a>

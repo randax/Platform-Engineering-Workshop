@@ -37,3 +37,10 @@ spec:
                     team owns what each size means, in the Composition.
                   enum: ["small", "medium", "large"]
                   default: small
+                version:
+                  type: string
+                  description: >-
+                    The PostgreSQL major version. The platform maps this to the
+                    specific approved and patched container image.
+                  enum: ["15", "16", "17"]
+                  default: "16"

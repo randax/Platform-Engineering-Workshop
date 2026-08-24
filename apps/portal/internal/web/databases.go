@@ -103,10 +103,11 @@ func handleDatabasesList(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleCreateDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	size := r.FormValue("size")
+	version := r.FormValue("version")
 	ns := s.activeProject(r)
 
 	fl := flash{Msg: "Created " + name + " — Crossplane is composing a Postgres cluster and a bucket. Watch it turn Ready below."}
-	if err := s.Kube.CreateWorkshopDatabase(r.Context(), ns, name, size); err != nil {
+	if err := s.Kube.CreateWorkshopDatabase(r.Context(), ns, name, size, version); err != nil {
 		fl = errorFlash("Create failed: " + err.Error())
 	}
 	// Always answer with the fragment htmx targeted — a full 500 error page
@@ -138,7 +139,8 @@ func handleDeleteDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleResizeDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	size := r.FormValue("size")
-	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), s.activeProject(r), name, size); err != nil {
+	version := r.FormValue("version")
+	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), s.activeProject(r), name, size, version); err != nil {
 		s.render(w, "flash", errorFlash("Resize failed: "+err.Error()))
 		return
 	}

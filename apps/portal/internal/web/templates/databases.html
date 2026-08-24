@@ -13,6 +13,13 @@ API from module 04 — a <code>WorkshopDatabase</code> composite resource. The f
 decides the rest.</p>
 <form hx-post="/databases" hx-target="#db-list" hx-swap="outerHTML">
   <label>Name <input name="name" id="db-name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-db" oninput="document.getElementById('db-yaml-name').innerText = this.value || 'my-db'"></label>
+  <label>Postgres Version
+    <select name="version" onchange="document.getElementById('db-yaml-version').innerText = this.value">
+      <option value="15">15</option>
+      <option value="16" selected>16 (default)</option>
+      <option value="17">17</option>
+    </select>
+  </label>
   <label>Size
     <select name="size" onchange="document.getElementById('db-yaml-size').innerText = this.value">
       <option value="small" selected>small — 1 instance · 1Gi</option>
@@ -33,7 +40,8 @@ metadata:
   name: <span id="db-yaml-name">my-db</span>
   namespace: {{.Namespace}}
 spec:
-  size: <span id="db-yaml-size">small</span></code></pre>
+  size: <span id="db-yaml-size">small</span>
+  version: <span id="db-yaml-version">16</span></code></pre>
     <p class="hint" style="margin-bottom: 0; margin-top: 1rem;">CLI equivalent: <br><code>cat &lt;&lt;EOF | kubectl apply -f -</code></p>
   </div>
 </details>
