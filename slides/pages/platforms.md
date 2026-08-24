@@ -15,13 +15,13 @@ The one-liner to plant: "A cloud gives you primitives. A platform gives you opin
 # Primitives vs. platform
 
 <div class="grid grid-cols-2 gap-6 mt-4">
-  <div class="story">
+  <div v-click class="story">
     <h3>A cloud</h3>
     Compute, storage, databases, queues — <strong>as APIs</strong>.<br><br>
     Every team assembles them differently. Every team carries the ops,
     the security, the upgrades. 50 teams → 50 snowflakes.
   </div>
-  <div class="story">
+  <div v-click class="story">
     <h3>A platform</h3>
     The same primitives, <strong>pre-composed into paths</strong>.<br><br>
     One way to deploy. Dependencies by declaration. Observability and
@@ -29,7 +29,7 @@ The one-liner to plant: "A cloud gives you primitives. A platform gives you opin
   </div>
 </div>
 
-<div class="mt-8 text-xl opacity-85 text-center">
+<div v-click class="mt-8 text-xl opacity-85 text-center">
 A platform is <strong>opinions about how primitives compose</strong> — and the discipline is making the right thing the easiest thing.
 </div>
 
@@ -51,9 +51,17 @@ Foreshadow: "You'll build both layers today. Modules 01–03 are the cloud. Modu
   <div class="story"><div class="text-3xl font-bold">1</div>manifest to production</div>
 </div>
 
-<div class="mt-6 text-lg opacity-85">
-A team writes one <code>nais.yaml</code> — app, database, bucket, queue, access policy — and the platform does the rest. Sound familiar? It's the shape you build in module 04.
+<div class="flex justify-center mt-4">
+
+```mermaid {scale: 0.8}
+flowchart LR
+  yaml["nais.yaml<br><i>one manifest</i>"] --> plat["the platform<br><i>reconciliation loops</i>"]
+  plat --> out["app + URL&nbsp;&nbsp;·&nbsp;&nbsp;database&nbsp;&nbsp;·&nbsp;&nbsp;bucket&nbsp;&nbsp;·&nbsp;&nbsp;queue&nbsp;&nbsp;·&nbsp;&nbsp;access policy"]
+```
+
 </div>
+
+<div v-click class="mt-2 text-lg opacity-85 text-center">Sound familiar? It's the shape you build in <strong>module 04</strong>.</div>
 
 <!--
 [TODO Hans: replace the three headline numbers with your current firsthand figures before the workshop — these are order-of-magnitude from public Nais talks.]
@@ -72,11 +80,11 @@ Key beats:
 # Five things Nav's platform got right
 
 <div class="grid grid-cols-1 gap-2 mt-2">
-  <div class="story"><span class="tag">GOLDEN PATH</span> &nbsp;One manifest declares the app <em>and</em> its dependencies → <strong>module 04's <code>Application</code> XR</strong> is you building exactly this</div>
-  <div class="story"><span class="tag">SELF-SERVICE</span> &nbsp;No tickets, no humans in the loop — ask in git, reconciliation makes it true → <strong>modules 02–04</strong></div>
-  <div class="story"><span class="tag">SECURE DEFAULTS</span> &nbsp;Zero-trust network policy is the <em>default</em>, teams declare exceptions → <strong>the security door, later today</strong></div>
-  <div class="story"><span class="tag">BATTERIES INCLUDED</span> &nbsp;Observability comes with the platform, not per-team → <strong>the Victoria + OTel catalog apps</strong></div>
-  <div class="story"><span class="tag">PLATFORM AS PRODUCT</span> &nbsp;Teams are customers who could go elsewhere — the platform earns adoption → <strong>the whole design of today</strong></div>
+  <div v-click class="story"><span class="tag">GOLDEN PATH</span> &nbsp;One manifest declares the app <em>and</em> its dependencies → <strong>module 04's <code>Application</code> XR</strong> is you building exactly this</div>
+  <div v-click class="story"><span class="tag">SELF-SERVICE</span> &nbsp;No tickets, no humans in the loop — ask in git, reconciliation makes it true → <strong>modules 02–04</strong></div>
+  <div v-click class="story"><span class="tag">SECURE DEFAULTS</span> &nbsp;Zero-trust network policy is the <em>default</em>, teams declare exceptions → <strong>the security door, later today</strong></div>
+  <div v-click class="story"><span class="tag">BATTERIES INCLUDED</span> &nbsp;Observability comes with the platform, not per-team → <strong>the Victoria + OTel catalog apps</strong></div>
+  <div v-click class="story"><span class="tag">PLATFORM AS PRODUCT</span> &nbsp;Teams are customers who could go elsewhere — the platform earns adoption → <strong>the whole design of today</strong></div>
 </div>
 
 <!--

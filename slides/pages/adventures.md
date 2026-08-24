@@ -19,15 +19,15 @@ Point at the helpers: each briefing has a "Known traps" section, and the helpers
 # Five doors
 
 <div class="grid grid-cols-1 gap-2 mt-2">
-  <div class="story"><span class="tag">0 · MARKED TRAIL</span> &nbsp;The guided finale: Knative → in-cluster CI → the Console → the Bruktby pipeline → day-2 ops. Rehearsed, hinted, verified.</div>
-  <div class="story"><span class="tag">1 · APP DEV</span> &nbsp;Be the product team: ship an app with one <code>Application</code> YAML, subscribe a second consumer to the event mesh, build it with your own CI.</div>
-  <div class="story"><span class="tag">2 · PLATFORM</span> &nbsp;Be the platform team: author a catalog capability yourself — cert-manager (16 GB) or Kafka via Strimzi (32 GB) — then make it self-service with an XR.</div>
-  <div class="story"><span class="tag">3 · SECURITY</span> &nbsp;Zero trust for real: default-deny the live pipeline, watch it break in Hubble, earn it back least-privilege — then sign your images.</div>
-  <div class="story"><span class="tag">4 · INFRA</span> &nbsp;The metal layer: Talos machine-config surgery, etcd snapshots, Gateway API on Cilium, rebuild with two workers.</div>
+  <div v-click class="story"><span class="tag">0 · MARKED TRAIL</span> &nbsp;<Logo name="knative" size="1.2rem"/> <Logo name="argo-workflows" size="1.2rem"/> <Logo name="cloudbox" size="1.2rem"/> <Logo name="grafana" size="1.2rem"/> &nbsp;The guided finale — rehearsed, hinted, verified.</div>
+  <div v-click class="story"><span class="tag">1 · APP DEV</span> &nbsp;<Logo name="crossplane" size="1.2rem"/> <Logo name="nats" size="1.2rem"/> <Logo name="buildkit" size="1.2rem"/> &nbsp;Be the product team: one-YAML deploys, event consumers, your own CI.</div>
+  <div v-click class="story"><span class="tag">2 · PLATFORM</span> &nbsp;<Logo name="cert-manager" size="1.2rem"/> <Logo name="strimzi" size="1.2rem"/> <Logo name="kafka" size="1.2rem"/> &nbsp;Be the platform team: author a capability — cert-manager (16 GB) or Kafka (32 GB) — then make it self-service.</div>
+  <div v-click class="story"><span class="tag">3 · SECURITY</span> &nbsp;<Logo name="cilium" size="1.2rem"/> <Logo name="zot" size="1.2rem"/> &nbsp;Zero trust for real: default-deny a live pipeline, earn it back, sign your images.</div>
+  <div v-click class="story"><span class="tag">4 · INFRA</span> &nbsp;<Logo name="talos" size="1.2rem"/> <Logo name="cilium" size="1.2rem"/> &nbsp;The metal layer: machine-config surgery, etcd snapshots, Gateway API, two workers.</div>
 </div>
 
-<div class="mt-4 text-lg opacity-85 text-center">
-<code>adventures/</code> in the repo · behind on modules? <code>./scripts/catch-up.sh &lt;module&gt;</code> teleports you
+<div v-click class="mt-4 text-lg opacity-85 text-center">
+<code>adventures/</code> in the repo · behind? <code>./scripts/catch-up.sh &lt;module&gt;</code> teleports you
 </div>
 
 <!--

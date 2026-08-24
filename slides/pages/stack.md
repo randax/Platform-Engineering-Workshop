@@ -28,15 +28,10 @@ Ground rule to state once, up front: nothing here is "best in class" in the abst
 
 </div>
 
-<div class="mt-5 text-sm opacity-80">
-
-- **The node is a declarative resource** — one `machineconfig`, no shell to drift into.
-- **There is no kube-proxy pod to find** — eBPF answers service traffic in-kernel.
-
-</div>
+<div v-click class="mt-6 text-lg opacity-85 text-center">The node is a <strong>document</strong> — and service traffic is answered <strong>in-kernel</strong>.</div>
 
 <!--
-Say the bullets, don't read them.
+The two lines the table earns: the node is a declarative resource — one machineconfig, no shell to drift into. And there is no kube-proxy pod to find — eBPF answers service traffic in-kernel.
 
 Talos: one machineconfig document over a gRPC API. kind stays in the repo as the
 strictly-more-robust fallback — a mutable node you can shell into, which is exactly
@@ -66,15 +61,10 @@ Cilium tradeoff to name honestly: eBPF wants a modern kernel — Docker Desktop 
 
 </div>
 
-<div class="mt-5 text-sm opacity-80">
-
-- **Gitea in the cluster, not GitHub** — the write path is yours, and offline.
-- **App-of-apps + sync waves** — restore the `Application` health check, or the waves don't gate.
-
-</div>
+<div v-click class="mt-6 text-lg opacity-85 text-center">Your cloud has its <strong>own git server</strong> — the write path never leaves the laptop.</div>
 
 <!--
-Say the bullets, don't read them.
+Off-slide but said aloud: Gitea in the cluster, not GitHub — the write path is yours, and offline. App-of-apps + sync waves — restore the Application health check in argocd-cm, or the waves don't gate.
 
 Gitea: attendees can't push to our GitHub, and ~50 clusters polling anonymously through one venue NAT hit GitHub's per-IP limits. Single-pod SQLite, push-to-create, seeded by a Job. ArgoCD points only here — edit → push → converge, never touching the internet.
 
@@ -96,22 +86,17 @@ ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; 
 <tbody>
 <tr><td>Managed Postgres</td><td><span class="we"><Logo name="cloudnativepg" size="1.3rem"/> <b>CloudNativePG 1.28.4</b></span></td><td>bitnami/stock PG · RDS</td><td>A real control loop (failover, backup) vs. a bare pod — costs CRDs</td></tr>
 <tr><td>Object storage (S3)</td><td><span class="we"><Logo name="rustfs" text="RustFS" size="1.3rem"/> <b>1.0.0-rc.2</b></span></td><td>MinIO</td><td>Apache-2.0, ~90 MB — but young; SeaweedFS is the rehearsed Plan B</td></tr>
-<tr><td>OCI registry</td><td><span class="we"><Logo name="zot" text="Zot" size="1.3rem"/> <b>v2.1.20</b></span></td><td>Harbor · registry:2</td><td>One CNCF binary + UI vs. a Postgres/Redis/Trivy fleet — fewer features</td></tr>
+<tr><td>OCI registry</td><td><span class="we"><Logo name="zot" size="1.3rem"/> <b>v2.1.20</b></span></td><td>Harbor · registry:2</td><td>One CNCF binary + UI vs. a Postgres/Redis/Trivy fleet — fewer features</td></tr>
 <tr><td>Storage class</td><td><span class="we"><Logo name="localpath" text="local-path" size="1.3rem"/> <b>v0.0.37</b></span></td><td>Longhorn · Ceph CSI</td><td>Node-local, no snapshots/replication — right for one node</td></tr>
 </tbody>
 </table>
 
 </div>
 
-<div class="mt-5 text-sm opacity-80">
-
-- **CNPG *is* the RDS control loop** — a `Cluster` CR, not a Postgres pod.
-- **RustFS, not MinIO** — MinIO's community edition was gutted for proprietary AIStor.
-
-</div>
+<div v-click class="mt-6 text-lg opacity-85 text-center">CNPG <strong>is</strong> the RDS control loop — and the RustFS row is the roadmap-risk story, lived.</div>
 
 <!--
-Say the bullets, don't read them.
+Say it, don't show it: CNPG is the RDS control loop — a Cluster CR, not a Postgres pod. And RustFS-not-MinIO: MinIO's community edition was gutted for proprietary AIStor.
 
 CNPG: a Cluster CR reconciles into primary + replica with backups and failover. Bitnami's chart is just a Postgres pod.
 
@@ -139,16 +124,10 @@ RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed clust
 
 </div>
 
-<div class="mt-5 text-sm opacity-80">
-
-- **Crossplane v2** — Claims are gone; a namespaced XR *is* the API.
-- **Knative** — scale-to-zero, which is what Cloud Run is built on.
-- **BuildKit** — rootless, in-cluster, pushes to your own Zot.
-
-</div>
+<div v-click class="mt-6 text-lg opacity-85 text-center">One YAML becomes a stack · zero becomes a pod · your cluster <strong>builds its own images</strong>.</div>
 
 <!--
-Say the bullets, don't read them.
+Spoken, not projected: Crossplane v2 — Claims are gone, a namespaced XR IS the API. Knative — scale-to-zero, which is what Cloud Run is built on. BuildKit — rootless, in-cluster, pushes to your own Zot.
 
 Crossplane v2: pipeline compositions emit arbitrary K8s resources — ours literally composes a CNPG Cluster.
 
@@ -177,16 +156,10 @@ Knative: Kourier ingress (not Gateway API — not in Cilium's conformance matrix
 
 </div>
 
-<div class="mt-5 text-sm opacity-80">
-
-- **NATS JetStream** — durable streams on a PVC, for a rounding error of Kafka's RAM.
-- **The whole Victoria stack fits in ~1 GiB** — LGTM wants several.
-- **Datasource plugins baked into the image** — nothing fetched at boot.
-
-</div>
+<div v-click class="mt-6 text-lg opacity-85 text-center">Durable messaging in <strong>~15 MB</strong> · full observability in <strong>~1 GiB</strong>.</div>
 
 <!--
-Say the bullets, don't read them.
+Spoken: NATS JetStream — durable streams on a PVC for a rounding error of Kafka's RAM. The whole Victoria stack fits in ~1 GiB where LGTM wants several. Datasource plugins are baked into the Grafana image — nothing fetched at boot.
 
 Observability is the sharpest tradeoff on this slide. OTel Collector (agent DaemonSet + gateway) feeds VictoriaMetrics (PromQL), VictoriaLogs (LogsQL) and VictoriaTraces (Jaeger API), fronted by Grafana.
 
@@ -202,22 +175,22 @@ The four things we rejected, precisely: kube-prometheus-stack (heavy, and no tra
 # The rule underneath every pick
 
 <div class="grid grid-cols-2 gap-4 mt-2">
-  <div class="practice">
+  <div v-click class="practice">
     <strong>Pinned by digest</strong><br>
     Every image is a <code>sha256:</code>, never <code>:latest</code> — a floating tag silently defeats a pre-pulled cache.
     <div class="mod">scripts/images.txt · check-consistency.sh enforces it</div>
   </div>
-  <div class="practice">
+  <div v-click class="practice">
     <strong>Pre-pulled &amp; offline</strong><br>
     Nothing is fetched at the venue — no CDN, no Grafana plugin download, no Docker Hub live pull.
     <div class="mod">cloudbox-init.sh → local mirror</div>
   </div>
-  <div class="practice">
+  <div v-click class="practice">
     <strong>Assembled, not a blob</strong><br>
     Hand-written minimal manifests where a Helm chart would drag in StatefulSets, sidecars, PDBs.
     <div class="mod">rustfs · nats · grafana · victoria-*</div>
   </div>
-  <div class="practice">
+  <div v-click class="practice">
     <strong>Fits a 16 GB laptop</strong><br>
     In-cluster total ≈ 7.5–8 GB; ≥10 GB to Docker. Every pick optimises for this ceiling.
     <div class="mod">the constraint that shaped the whole stack</div>
