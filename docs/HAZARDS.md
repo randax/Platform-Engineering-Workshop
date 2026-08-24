@@ -411,6 +411,111 @@ disk" — a runner is discarded, not reset. If you ever need to reproduce it by 
 `docker rm -f cloudbox-controlplane-1 cloudbox-worker-1` and then run
 `create-cluster.sh`.
 
+## RESOLVED — destroy-cluster died on the only context it exists to remove
+
+**Found by reading the nightly on 2026-08-24, fixed in `867aef5`.** A sibling of the
+state-directory bug above, in the same script, on the same recovery path — and the
+sibling's own fix comment (`3a7848f`) is what it hid behind.
+
+The block that switches away from the `cloudbox` talos context before removing it
+starts by finding another context to switch *to*:
+
+    other="$(talos_contexts | grep -vx "${CLUSTER_NAME}" | head -1)"
+
+When `cloudbox` is the **only** context, `grep -vx` matches nothing and exits 1. A
+bare assignment inherits its command substitution's status, so under `set -euo
+pipefail` the script died on that line — one line above the `else` branch written
+for precisely that case, which removes the talosconfig outright. `catch-up.sh
+--rebuild` had by then destroyed the cluster and removed the kubeconfig entries, and
+never got to recreate anything:
+
+    ✅ Cluster destroyed
+    ✅ kubeconfig entries removed (/home/runner/.kube/cloudbox.conf)
+    ##[error]Process completed with exit code 1        ← nothing recreates from here
+
+**One cluster and one talos context is the ordinary attendee state.** Anyone whose
+`~/.talos/config` held nothing else — i.e. everyone who has only ever run this
+workshop — had a documented recovery command that destroyed and then quit. The
+maintainers could not hit it: a laptop that has met any other Talos cluster has a
+second context, takes the working branch, and never sees it.
+
+**The job built to catch exactly this caught it on its first run.** The
+`recovery-path` job (`ae224f4`, added 2026-08-18, itself a rehearsal-2 lesson: *rehearse
+the second cluster*) is a fresh runner, so it is always the one-context case. It went
+red on the first nightly it ever ran — 2026-08-24 — which is the whole argument for
+that job existing: the bug was already on `main`, shipped, and invisible to every
+other check we have.
+
+**Fixed by matching contexts in pipe-free bash** (`has_talos_context`,
+`first_other_talos_context`) rather than piping into `grep`. That also retires a
+latent `pipefail`+`SIGPIPE` false negative in the neighbouring `grep -qx`, where
+`grep -q` exits at the first match and `awk` takes `EPIPE` — measured at ~5000
+contexts before it can fire, so nobody would have hit it, but it is the same class
+and would have been the next thing copied. Verified across all six permutations:
+sole `cloudbox`, `cloudbox` first / last / middle of several, no `cloudbox`, and an
+empty talosconfig.
+
+## RESOLVED — a reachable mirror is not a mirror that has the image
+
+**Found in the nightly rehearsal, fixed in `510cfb1`.** Module 07 seeds Zot with the
+base image its Dockerfile builds `FROM`, sourcing it from the local cloudbox-mirror
+so the venue's rate-limited Docker Hub is never touched. It decided the mirror was
+usable by asking it `/v2/`:
+
+    if curl -fsS "http://${MIRROR}/v2/" >/dev/null 2>&1; then
+
+`/v2/` answers **"some registry is listening on :5001"**. It says nothing about what
+is in it. A mirror that is up but unfilled — a bare `docker run registry`, a purged
+`cloudbox-mirror-data` volume, a `cloudbox-init.sh` that was interrupted — answers
+that question yes, and `crane` was then pointed at a tag that is not there:
+
+    Error: fetching "localhost:5001/library/busybox:1.37.0": MANIFEST_UNKNOWN:
+    manifest unknown; unknown tag=1.37.0
+
+with the Docker Hub fallback four lines below, unused, because *reachable* had
+already been answered. The wrong question, confidently answered — the same shape as
+the entries above, in the seeding path rather than the diagnosis path.
+
+**Fixed by probing the manifest itself** in both copies (`lab/07-ci/solve.sh` and the
+catch-up path in `solutions/module-07/post.sh`), so the question asked is the one
+that matters. Verified against real registries: tag present → 0, tag missing → 1,
+repo missing → 1, no registry at all → 1 and instant, so the probe cannot hang a lab.
+
+**The CI mirror was seeded with busybox in the same commit, and that is the more
+important half.** CI's mirror deliberately holds only the first-party images, so the
+probe fix alone would have turned the nightly green *through the Docker Hub
+fallback* — the runner has internet, so the substitution is invisible. That would
+have left the offline path attendees actually run untested until the venue WiFi was
+the thing under test. See the `bootstrap-test.yaml` trap above: this is that trap
+with a different noun.
+
+## RESOLVED — the drift gate cried wolf, on the only machines that run it
+
+**Found while verifying the two fixes above, fixed in `57d3f43`.** `check-consistency.sh`
+check 9 compares the workshop kubeconfig path in `mise.toml` against the one in
+`context-guard.sh`, normalising mise templating to shell templating inline:
+
+    "${mise_kc//\{\{env.HOME\}\}/\$\{HOME\}}"
+
+That replacement is **bash-version-dependent**. Bash 5 consumes the backslashes and
+yields `${HOME}`; bash 3.2 keeps them and yields `$\{HOME\}`, which can never equal
+the guard's value. So the check reported drift that did not exist:
+
+    ❌ FAIL: the workshop kubeconfig path has drifted: mise.toml says
+       '{{env.HOME}}/.kube/cloudbox.conf', context-guard.sh says '${HOME}/.kube/cloudbox.conf'
+
+Those two strings *are* the same path, which is the tell. **macOS `/bin/bash` is
+3.2** — this repo supports it deliberately (`check-upstream.sh` has a `no readarray`
+note) because attendees run it — so the false failure landed on maintainers running
+the gate locally, while CI's bash 5 stayed green and made it look real. A green CI
+plus a red laptop reads as "the laptop is out of date", so the honest response is to
+go hunting for drift that was never there.
+
+**Fixed by normalising through variables**, which behaves identically on both. Proven
+both directions on bash 3.2: clean on the current tree, and still failing when drift
+is injected (`mise.toml` pointed at a different filename → `❌ FAIL`) — a gate that
+stops crying wolf is only worth anything if it still barks.
+
 ## RESOLVED — the workshop scripts ran against whatever cluster `kubectl` pointed at
 
 **Found in rehearsal 3, closed in `2b8de71` (lab/) and `b4f5e2d` (scripts/ +
