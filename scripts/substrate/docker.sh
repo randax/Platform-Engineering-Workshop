@@ -9,7 +9,7 @@
 #
 # Source me from create-cluster.sh / destroy-cluster.sh; do not run me.
 # Provides: substrate_preflight, substrate_create, substrate_post_cni,
-#           substrate_destroy.
+#           substrate_post_ready, substrate_destroy.
 # =============================================================================
 
 substrate_preflight() {
@@ -246,12 +246,13 @@ EOF
   fi
 }
 
-# substrate_post_cni — nothing to do on docker. There is no L2 segment to
-# announce a VIP onto, so the shared ingress Service is a NodePort (see the
-# Cilium values in create-cluster.sh) and the hostnames arrive via the marked
-# /etc/hosts block install.sh maintains. Defined so the dispatcher can call it
-# unconditionally.
+# substrate_post_cni / substrate_post_ready — nothing to do on docker. There
+# is no L2 segment to announce a VIP onto, so the shared ingress Service is a
+# NodePort (see the Cilium values in create-cluster.sh) and the hostnames
+# arrive via the marked /etc/hosts block install.sh maintains. Defined so the
+# dispatcher can call both unconditionally.
 substrate_post_cni() { :; }
+substrate_post_ready() { :; }
 
 substrate_destroy() {
   step "Destroying Talos cluster '${CLUSTER_NAME}'"

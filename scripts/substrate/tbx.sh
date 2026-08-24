@@ -10,8 +10,8 @@
 #
 # Source me from create-cluster.sh / destroy-cluster.sh; do not run me.
 # Provides: substrate_preflight, substrate_create, substrate_post_cni,
-#           substrate_destroy, render_tbx_cluster_file, tbx_cluster_json,
-#           tbx_subnet_index, tbx_node_ip.
+#           substrate_post_ready, substrate_destroy, render_tbx_cluster_file,
+#           tbx_cluster_json, tbx_subnet_index, tbx_node_ip.
 # =============================================================================
 set -euo pipefail
 
@@ -302,24 +302,69 @@ EOF
   rm -rf "${workdir}"
 }
 
-# substrate_post_cni — run after Cilium is installed and its CRDs are
-# Established. Applies the LB-IPAM pool and the L2 announcement policy, then
-# waits for the shared ingress Service to actually get its VIP: an ingress
-# Service stuck <pending> is the single failure that makes every hostname in
-# the workshop dead, so it is worth failing loudly here rather than in module 02.
+# wait_crd_established <crd-name>... — the Cilium operator CREATES these CRDs
+# at runtime (the helm install above has no --wait), so `kubectl wait
+# --for=condition=Established` run against one that does not exist yet fails
+# IMMEDIATELY with "no matching resources found" — `wait` waits for a
+# condition, never for the object's creation. Poll each CRD into existence
+# first, then wait on the condition. Same two-phase pattern as
+# lab/common.sh's wait_for_cr() and lab/04-self-service/solve.sh:32-37
+# (recurring finding across modules 03/04/06 in rehearsal-in-CI); not reused
+# directly because lab/common.sh is lab-side (POSIX `[ ]`, sourced relative to
+# a lab dir) and this file is bash with `set -euo pipefail` under scripts/.
+wait_crd_established() {
+  local crd
+  for crd in "$@"; do
+    local waited=0 found=0
+    while [[ "${waited}" -lt 300 ]]; do
+      if kubectl get "crd/${crd}" >/dev/null 2>&1; then
+        found=1
+        break
+      fi
+      sleep 5; waited=$((waited + 5))
+    done
+    [[ "${found}" == "1" ]] \
+      || die "CRD ${crd} never appeared after ${waited}s — is the Cilium operator running? 'kubectl -n kube-system get pods -l app.kubernetes.io/name=cilium-operator'"
+    kubectl wait --for=condition=Established --timeout=120s "crd/${crd}"
+  done
+}
+
+# substrate_post_cni — run after Cilium is installed. Applies the LB-IPAM pool
+# and the L2 announcement policy once their CRDs exist and are Established.
+# Does NOT wait for the VIP here: that wait belongs in substrate_post_ready(),
+# called after the node-Ready wait in create-cluster.sh, so a slow node
+# rollout is never misreported as an ingress problem.
 substrate_post_cni() {
   step "Applying the LoadBalancer pool and L2 announcement policy"
-  kubectl wait --for=condition=Established --timeout=120s \
-    crd/ciliumloadbalancerippools.cilium.io \
-    crd/ciliuml2announcementpolicies.cilium.io
-  local idx="${CLOUDBOX_HOST_GATEWAY}"
-  idx="${idx#172.30.}"; idx="${idx%.1}"
+  wait_crd_established \
+    ciliumloadbalancerippools.cilium.io \
+    ciliuml2announcementpolicies.cilium.io
+  # tbx_subnet_index() reads the fact from `tbx status -o json` (the same
+  # source substrate_create() used to derive CLOUDBOX_HOST_GATEWAY) instead of
+  # re-deriving it by string surgery on the gateway — one source of truth, and
+  # this call also works if CLOUDBOX_HOST_GATEWAY were ever unset when this
+  # function runs standalone (e.g. re-run by hand after a partial create).
+  local idx
+  idx="$(tbx_subnet_index)"
+  [[ "${idx}" =~ ^[0-9]+$ ]] \
+    || die "Could not read the subnet index from 'tbx status ${CLUSTER_NAME} -o json' (got '${idx}')"
   sed -e "s|__CLUSTER_NAME__|${CLUSTER_NAME}|g" \
       -e "s|__SUBNET_INDEX__|${idx}|g" \
       "${SCRIPT_DIR}/substrate/lb-objects.tbx.yaml.tmpl" \
     | kubectl apply -f -
+}
 
+# substrate_post_ready — run after nodes are Ready (Cilium's DaemonSet rolled
+# out, L2 announcer running). Waits for the shared ingress Service to actually
+# get its VIP: an ingress Service stuck <pending> is the single failure that
+# makes every hostname in the workshop dead, so it is worth failing loudly
+# here rather than in module 02.
+substrate_post_ready() {
   step "Waiting for the shared ingress VIP"
+  local idx
+  idx="$(tbx_subnet_index)"
+  [[ "${idx}" =~ ^[0-9]+$ ]] \
+    || die "Could not read the subnet index from 'tbx status ${CLUSTER_NAME} -o json' (got '${idx}')"
   local waited=0 vip=""
   while [[ "${waited}" -lt 180 ]]; do
     vip="$(kubectl -n kube-system get svc cilium-ingress \

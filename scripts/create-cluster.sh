@@ -133,6 +133,12 @@ wait_rollout kube-system daemonset/cilium
 kubectl wait --for=condition=Ready nodes --all --timeout=300s
 kubectl get nodes -o wide
 
+# Ingress-VIP wait runs AFTER nodes are Ready (not folded into
+# substrate_post_cni above): the L2 announcer needs a running Cilium agent,
+# and waiting on the VIP before the rollout finishes would misreport a slow
+# node rollout as an ingress problem.
+substrate_post_ready
+
 echo
 ok "Cluster '${CLUSTER_NAME}' is up — you now own a cloud. ☁️"
 info "Next steps:"
