@@ -61,9 +61,15 @@ type serviceRow struct {
 // functionsData is the Functions page model: the live rows, the whitelisted
 // build sources for the create form, and a one-shot flash.
 type functionsData struct {
-	Rows    []serviceRow
-	Samples []fnSample
-	Flash   flash
+	Rows      []serviceRow
+	Samples   []fnSample
+	Flash     flash
+	Telemetry bool
+	CPUSpark  template.HTML
+	CPUNow    string
+	MemSpark  template.HTML
+	MemNow    string
+	Namespace string
 }
 
 // fnSample is one vetted, in-cluster source a function can be built from. The
@@ -138,7 +144,7 @@ func fetchFunctions(s *Server, r *http.Request, fl flash) (functionsData, error)
 
 	ns := s.activeProject(r)
 	data := functionsData{Rows: rows, Samples: fnSamples, Flash: fl, Namespace: ns}
-	if s.metricsEnabled() {
+	if health, err := s.Kube.NamespaceWorkloads(r.Context()); err == nil && health["observability"].Ready > 0 && s.Prom != nil {
 		data.Telemetry = true
 		if vals, err := s.Prom.QueryRange(r.Context(), metrics.NamespaceCPUQuery(ns)); err == nil && len(vals) > 0 {
 			data.CPUSpark = metrics.Sparkline(vals, "cpu usage")
@@ -146,7 +152,7 @@ func fetchFunctions(s *Server, r *http.Request, fl flash) (functionsData, error)
 		}
 		if vals, err := s.Prom.QueryRange(r.Context(), metrics.NamespaceMemQuery(ns)); err == nil && len(vals) > 0 {
 			data.MemSpark = metrics.Sparkline(vals, "memory usage")
-			data.MemNow = humanBytes(int64(vals[len(vals)-1]))
+			data.MemNow = humanBytes(vals[len(vals)-1])
 		}
 	}
 

@@ -61,7 +61,7 @@ func fetchDatabases(ctx context.Context, s *Server, ns string, fl flash) (databa
 	}
 	
 	data := databasesData{Clusters: clusters, Databases: dbs, Namespace: ns, Flash: fl}
-	if s.metricsEnabled() {
+	if health, err := s.Kube.NamespaceWorkloads(ctx); err == nil && health["observability"].Ready > 0 && s.Prom != nil {
 		data.Telemetry = true
 		if vals, err := s.Prom.QueryRange(ctx, metrics.NamespaceCPUQuery(ns)); err == nil && len(vals) > 0 {
 			data.CPUSpark = metrics.Sparkline(vals, "cpu usage")
@@ -69,7 +69,7 @@ func fetchDatabases(ctx context.Context, s *Server, ns string, fl flash) (databa
 		}
 		if vals, err := s.Prom.QueryRange(ctx, metrics.NamespaceMemQuery(ns)); err == nil && len(vals) > 0 {
 			data.MemSpark = metrics.Sparkline(vals, "memory usage")
-			data.MemNow = humanBytes(int64(vals[len(vals)-1]))
+			data.MemNow = humanBytes(vals[len(vals)-1])
 		}
 	}
 	return data, nil
