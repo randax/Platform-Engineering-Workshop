@@ -27,6 +27,10 @@ substrate_preflight() {
   # resolver, DNS wiring, forwarding, routes, host pressure, mirror health and
   # image access — all of which the workshop needs and none of which a bare
   # binary on PATH proves.
+  # Deliberately run VISIBLY here even though substrate_resolve() has usually
+  # already run it quietly during detection: detection only needs the exit code,
+  # while an attendee who has been sent down this path needs to READ the FAIL
+  # lines. The second run is the price of showing them, and doctor is read-only.
   if ! tbx doctor; then
     die "'tbx doctor' reports problems (above). Fix them, or run the fallback substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
   fi
@@ -96,6 +100,18 @@ tbx_subnet_index() {
 tbx_node_ip() { # <control-plane|worker>
   tbx_cluster_json \
     | jq -r --arg role "$1" '[.nodes[]? | select(.role == $role) | .ip] | first // ""' 2>/dev/null || true
+}
+
+# tbx_etcd_live <node-ip> — true when etcd is actually running on that node.
+# Used to decide the bootstrap loop below on FACT rather than on the wording of
+# a gRPC error: a bootstrap whose reply was lost to a client-side timeout still
+# bootstrapped etcd, and asking the node is the only way to know that. Needs a
+# TALOSCONFIG with credentials, so it is only meaningful after apply-config.
+# `etcd status` is the direct question; `service etcd` is the fallback for a
+# talosctl whose etcd subcommand set differs.
+tbx_etcd_live() {
+  talosctl --nodes "$1" etcd status >/dev/null 2>&1 && return 0
+  talosctl --nodes "$1" service etcd 2>/dev/null | grep -qE '^STATE[[:space:]]+Running'
 }
 
 substrate_create() {
@@ -233,17 +249,31 @@ EOF
   talosctl apply-config --insecure --nodes "${worker_ip}" --file "${workdir}/worker.yaml"
 
   step "Bootstrapping etcd"
+  # Remember what the caller had, exactly: "" and "unset" are different states,
+  # and ${VAR+1} is the only way to tell them apart. Restored after the merge
+  # below — create-cluster.sh's later steps, and anything that sources this,
+  # must not inherit our temporary TALOSCONFIG or our unset of theirs.
+  local orig_talosconfig="${TALOSCONFIG-}" orig_talosconfig_set="${TALOSCONFIG+1}"
   export TALOSCONFIG="${workdir}/talosconfig"
   talosctl config endpoint "${cp_ip}"
   talosctl config node "${cp_ip}"
   # The node reboots into the applied config first, so bootstrap is retried
   # until apid answers. A client-side timeout on a call the server DID run
   # leaves etcd bootstrapped and the next retry complaining about exactly that
-  # — which is success, not failure.
+  # — which is success, not failure. Talos words that complaint as
+  #   rpc error: code = AlreadyExists desc = etcd data directory is not empty
+  # so the glob has to be case-insensitive AND accept the "not empty" phrasing;
+  # `*already*` alone silently misses the real reply and this loop would run its
+  # full five minutes before failing a cluster that is already up.
+  #
+  # The string match is the fallback, not the test. tbx_etcd_live() asks the
+  # node whether etcd is actually running: liveness beats parsing an error
+  # message, and it is the one check that stays right when Talos rewords itself.
   local out bootstrapped=0
   for _ in $(seq 1 60); do
     if out="$(talosctl bootstrap 2>&1)"; then bootstrapped=1; break; fi
-    case "${out}" in *already*) bootstrapped=1; break ;; esac
+    if tbx_etcd_live "${cp_ip}"; then bootstrapped=1; break; fi
+    case "${out}" in *[Aa]lready*|*"not empty"*) bootstrapped=1; break ;; esac
     sleep 5
   done
   [[ "${bootstrapped}" == "1" ]] \
@@ -265,6 +295,10 @@ EOF
   # unset TALOSCONFIG first, or the merge target is the file being merged.
   unset TALOSCONFIG
   talosctl config merge "${workdir}/talosconfig"
+  # ...and put the caller's environment back the way we found it.
+  if [[ -n "${orig_talosconfig_set}" ]]; then
+    export TALOSCONFIG="${orig_talosconfig}"
+  fi
   rm -rf "${workdir}"
 }
 

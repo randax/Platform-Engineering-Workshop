@@ -261,12 +261,20 @@ substrate_resolve() {
 #   tbx     172.30.<n>.1  — the cluster gateway (upstream docs/SPEC.md:186-192)
 #   docker  host.docker.internal (macOS/WSL2) or TALOS_SUBNET_GATEWAY (Linux),
 #           the same rule mirror_host_endpoint() uses, without scheme or port
+# Callers must ASSIGN the result (`gw="$(cloudbox_host_gateway)"`), never compare
+# it inline: this function's failure is a non-zero status, which an assignment
+# propagates (and `set -e` acts on) and a `[[ "$(...)" == ... ]]` swallows.
 cloudbox_host_gateway() {
   if [[ -n "${CLOUDBOX_HOST_GATEWAY:-}" ]]; then echo "${CLOUDBOX_HOST_GATEWAY}"; return 0; fi
   local substrate
   substrate="$(substrate_resolve)"
   if [[ "${substrate}" == "tbx" ]]; then
-    need jq
+    # Every failure message in this function goes to STDERR, and the function
+    # returns instead of dying: die() prints through fail() on stdout, which in
+    # `gw="$(cloudbox_host_gateway)"` would hand the caller the ❌ line AS THE
+    # GATEWAY ADDRESS. On stderr the attendee still sees it, the assignment gets
+    # an empty string, and the non-zero return aborts under set -e.
+    need jq >&2
     local subnet
     # `tbx status <cluster> -o json` prints an ARRAY of ClusterStatus even for a
     # single named cluster (cmd/tbx/main.go:661-670), so `.subnet` alone makes
@@ -277,8 +285,10 @@ cloudbox_host_gateway() {
       | jq -r --arg c "${CLUSTER_NAME}" \
           'if type == "array" then ((map(select(.name == $c)) | first) // {}) else . end | .subnet // empty' \
           2>/dev/null || true)"
-    [[ -n "${subnet}" ]] \
-      || die "cannot read the tbx cluster subnet — is '${CLUSTER_NAME}' up? (tbx status ${CLUSTER_NAME})"
+    if [[ -z "${subnet}" ]]; then
+      fail "cannot read the tbx cluster subnet — is '${CLUSTER_NAME}' up? (tbx status ${CLUSTER_NAME})" >&2
+      return 1
+    fi
     echo "${subnet%.*}.1"
   elif [[ -n "${CLOUDBOX_MIRROR_HOST:-}" ]]; then
     echo "${CLOUDBOX_MIRROR_HOST}"
