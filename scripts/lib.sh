@@ -160,6 +160,109 @@ mirror_host_endpoint() {
   echo "http://${host}:${MIRROR_PORT}"
 }
 
+# --- Substrate ------------------------------------------------------------------
+# Which machine substrate this cluster runs on: real Talos VMs via talos-box
+# (`tbx`) or Talos-in-Docker containers. Both satisfy the same contract, which
+# lab/01-cluster/verify.sh asserts; the difference is where the API server and
+# the ingress endpoint live. See docs/superpowers/plans/2026-08-24-talos-box-substrate.md.
+CLOUDBOX_SUBSTRATE_FILE="${HOME}/.cloudbox/substrate"
+
+# substrate_doctor_reason — the first FAIL line `tbx doctor` printed, or a
+# one-liner saying why tbx was not even asked. Read-only; never runs a cluster
+# operation. Used by install.sh --check to explain a fallback instead of just
+# announcing one.
+substrate_doctor_reason() {
+  if ! have tbx; then
+    echo "tbx is not installed (brew install randax/tap/tbx, or the release tarball on Linux)"
+    return 0
+  fi
+  local out
+  out="$(tbx doctor 2>&1 || true)"
+  local line
+  line="$(printf '%s\n' "${out}" | grep -m1 '^FAIL ' || true)"
+  echo "${line:-tbx doctor did not report a FAIL line}"
+}
+
+# substrate_detect — the substrate this MACHINE can run, with no persisted
+# answer and no override. tbx needs its daemon+helper installed and healthy, so
+# `tbx doctor` (which exits non-zero on any FAIL — cmd/tbx/doctor.go:345-347) is
+# the gate, not the mere presence of the binary.
+substrate_detect() {
+  local os arch
+  os="$(uname -s)"; arch="$(uname -m)"
+  if have tbx; then
+    case "${os}:${arch}" in
+      Darwin:arm64|Linux:x86_64|Linux:aarch64|Linux:arm64|Linux:amd64)
+        if tbx doctor >/dev/null 2>&1; then echo "tbx"; return 0; fi ;;
+    esac
+  fi
+  echo "docker"
+}
+
+# substrate_persist <tbx|docker> — record the substrate the cluster was CREATED
+# on. Everything downstream reads this rather than re-detecting: a laptop that
+# loses `tbx doctor` mid-workshop must not make destroy-cluster.sh look for
+# docker containers that never existed.
+substrate_persist() {
+  local value="$1"
+  case "${value}" in tbx|docker) ;; *) die "substrate_persist: unknown substrate '${value}'" ;; esac
+  mkdir -p "$(dirname "${CLOUDBOX_SUBSTRATE_FILE}")"
+  printf '%s\n' "${value}" > "${CLOUDBOX_SUBSTRATE_FILE}"
+}
+
+# substrate_current — the persisted answer, or empty when no cluster has been
+# created on this machine yet. Never detects; never writes.
+substrate_current() {
+  [[ -r "${CLOUDBOX_SUBSTRATE_FILE}" ]] || return 0
+  tr -d '[:space:]' < "${CLOUDBOX_SUBSTRATE_FILE}"
+}
+
+# substrate_resolve — the substrate to USE right now, in precedence order:
+#   1. an explicit CLOUDBOX_SUBSTRATE in the environment (the documented escape
+#      hatch, e.g. CLOUDBOX_SUBSTRATE=tbx on a machine that failed detection)
+#   2. the persisted answer from a previous create
+#   3. detection, floored by CLOUDBOX_SUBSTRATE_DEFAULT: when the default is
+#      "docker" (the go-live gate having flipped it), detection never upgrades.
+substrate_resolve() {
+  if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
+    case "${CLOUDBOX_SUBSTRATE}" in
+      tbx|docker) echo "${CLOUDBOX_SUBSTRATE}"; return 0 ;;
+      *) die "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker'" ;;
+    esac
+  fi
+  local persisted
+  persisted="$(substrate_current)"
+  if [[ -n "${persisted}" ]]; then echo "${persisted}"; return 0; fi
+  if [[ "${CLOUDBOX_SUBSTRATE_DEFAULT}" == "docker" ]]; then echo "docker"; return 0; fi
+  substrate_detect
+}
+
+# cloudbox_host_gateway — the HOST as workloads INSIDE the cluster see it.
+# ONE definition, used by both backends and by bootstrap-gitops.sh (kagent's
+# Ollama endpoint), catch-up.sh and the labs — each of which runs in its own
+# shell long after create-cluster.sh exported CLOUDBOX_HOST_GATEWAY, so it is
+# re-derived rather than inherited. Honours an already-exported value first so
+# a backend that has just computed it does not pay for a second lookup.
+#   tbx     172.30.<n>.1  — the cluster gateway (upstream docs/SPEC.md:186-192)
+#   docker  host.docker.internal (macOS/WSL2) or TALOS_SUBNET_GATEWAY (Linux),
+#           the same rule mirror_host_endpoint() uses, without scheme or port
+cloudbox_host_gateway() {
+  if [[ -n "${CLOUDBOX_HOST_GATEWAY:-}" ]]; then echo "${CLOUDBOX_HOST_GATEWAY}"; return 0; fi
+  if [[ "$(substrate_resolve)" == "tbx" ]]; then
+    local subnet
+    subnet="$(tbx status "${CLUSTER_NAME}" -o json 2>/dev/null | jq -r '.subnet // ""')"
+    [[ -n "${subnet}" ]] \
+      || die "cannot read the tbx cluster subnet — is '${CLUSTER_NAME}' up? (tbx status ${CLUSTER_NAME})"
+    echo "${subnet%.*}.1"
+  elif [[ -n "${CLOUDBOX_MIRROR_HOST:-}" ]]; then
+    echo "${CLOUDBOX_MIRROR_HOST}"
+  elif [[ "$(uname -s)" == "Darwin" ]] || is_wsl2; then
+    echo "host.docker.internal"
+  else
+    echo "${TALOS_SUBNET_GATEWAY}"
+  fi
+}
+
 # strip_registry <image-ref> — drop the registry host from an image reference,
 # leaving the repository path + tag/digest. This is the path a containerd
 # registry mirror is queried with. Examples:
