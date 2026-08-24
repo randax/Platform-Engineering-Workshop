@@ -83,7 +83,8 @@ spec:
           # pre-pull list (scripts/images.txt). The tag is rewritten by
           # release-please in the release PR — keep the annotations.
           # x-release-please-start-version
-          image: ghcr.io/randax/cloudbox-portal:v0.2.2
+          image: localhost:30500/cloudbox-portal:dev
+          imagePullPolicy: Always
           # x-release-please-end-version
           env:
             # The uploader is a cluster-local Knative Service in the
