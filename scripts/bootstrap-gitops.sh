@@ -195,6 +195,13 @@ kubectl patch service argocd-server -n argocd \
 # Restart both: server picks up server.insecure, repo-server the size limit.
 kubectl -n argocd rollout restart deployment argocd-server argocd-repo-server >/dev/null
 
+info "Publishing Gitea and ArgoCD on ${GITEA_HOST_URL} / ${ARGOCD_HOST_URL}"
+# These two are installed imperatively, so nothing else will ever apply their
+# Ingress objects. The manifests live in gitops/components/{gitea,argocd}/ so
+# all ten ingresses read as one set; only these two are applied by hand.
+kubectl apply -f "${REPO_ROOT}/gitops/components/gitea/ingress.yaml"
+kubectl apply -f "${REPO_ROOT}/gitops/components/argocd/ingress.yaml"
+
 # --- 4. Wait for everything --------------------------------------------------------------
 step "Waiting for Gitea and ArgoCD to become ready"
 wait_rollout gitea deployment/gitea
@@ -207,6 +214,10 @@ ok "GitOps engine is running."
 echo
 echo "  Gitea:   ${GITEA_HOST_URL}  (${GITEA_ADMIN_USER} / ${GITEA_ADMIN_PASSWORD})"
 echo "  ArgoCD:  ${ARGOCD_HOST_URL}  (user: admin)"
+echo
+info "Name not resolving? On the docker substrate these need the /etc/hosts block:"
+echo "   ./scripts/install.sh --print-hosts        # shows the exact lines"
+echo "   The NodePort URLs still work: http://localhost:${NODEPORT_GITEA} and http://localhost:${NODEPORT_ARGOCD}"
 echo
 info "ArgoCD admin password:"
 echo "   kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo"
