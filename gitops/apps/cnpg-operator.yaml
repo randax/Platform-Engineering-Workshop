@@ -1,25 +1,24 @@
-# NATS 2.14.5 + JetStream — durable messaging (PRD-0001). Single-node broker
-# with persistent JetStream: client nats://localhost:30422, monitoring :8222.
-# The durable counterpart to Knative's in-memory broker, and the queue backing
-# the golden-path Application XR (PRD-0003, spec.queue).
+# CloudNativePG operator 1.28.4 (module 3: Postgres-as-a-service).
+# ServerSideApply: the CNPG CRDs exceed the 262KB annotation limit of
+# client-side apply.
 #
-# Enable with:  cp gitops/catalog/nats.yaml gitops/apps/ && git add . && git commit -m 'enable nats' && git push
+# Enable with:  cp gitops/catalog/cnpg-operator.yaml gitops/apps/ && git add . && git commit -m 'enable cnpg-operator' && git push
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: nats
+  name: cnpg-operator
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
     repoURL: http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/platform.git
     targetRevision: main
-    path: gitops/components/nats
+    path: gitops/components/cnpg-operator
   destination:
     server: https://kubernetes.default.svc
-    namespace: nats
+    namespace: cnpg-system
   syncPolicy:
     automated:
       prune: true
@@ -32,3 +31,4 @@ spec:
         maxDuration: 3m
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
