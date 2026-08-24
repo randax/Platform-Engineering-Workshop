@@ -110,8 +110,45 @@ fi
 talos_contexts() { # -> one context name per line, '*' marker stripped
   talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'
 }
-if talos_contexts | grep -qx "${CLUSTER_NAME}"; then
-  other="$(talos_contexts | grep -vx "${CLUSTER_NAME}" | head -1)"
+# Matched with pipe-free bash, NOT `talos_contexts | grep`. Under
+# `set -euo pipefail` the two greps this replaces were one live bug and one
+# latent one:
+#
+#   `other="$(talos_contexts | grep -vx "${CLUSTER_NAME}" | head -1)"` — when
+#   '${CLUSTER_NAME}' is the ONLY context, grep -vx matches nothing and exits 1.
+#   A bare assignment inherits its command substitution's status, so `set -e`
+#   killed the script HERE, before the single-context branch below — the branch
+#   that exists for precisely that case — could run. `catch-up.sh --rebuild`
+#   then died mid-destroy, having removed the kubeconfig entries but never
+#   recreating anything. One cluster and one context is the normal attendee
+#   state, so the documented recovery command was broken for everyone whose
+#   machine had nothing else in ~/.talos/config. Caught by the CI recovery-path
+#   job, which is a fresh runner and therefore always the one-context case.
+#
+#   `talos_contexts | grep -qx "${CLUSTER_NAME}"` — LATENT, not observed: grep
+#   -q exits at the first match, and if awk is still writing it takes EPIPE,
+#   which pipefail turns into a non-zero pipeline — i.e. a context that IS
+#   present reads as absent and the removal is skipped, silently. Measured, it
+#   needs ~5000 contexts before awk's output stops fitting in one pipe buffer,
+#   so nobody was ever going to hit it. Rewritten anyway: the fix for the live
+#   bug above is a pipe-free matcher, and leaving one grep behind would keep
+#   the class alive for the next person who copies the line.
+has_talos_context() { # $1 = context name
+  local c
+  while IFS= read -r c; do
+    [[ "${c}" == "$1" ]] && return 0
+  done <<<"$(talos_contexts)"
+  return 1
+}
+first_other_talos_context() { # $1 = context to exclude; prints nothing if none
+  local c
+  while IFS= read -r c; do
+    if [[ -n "${c}" && "${c}" != "$1" ]]; then printf '%s\n' "${c}"; return 0; fi
+  done <<<"$(talos_contexts)"
+  return 0   # no other context is a normal outcome, not a failure — see above
+}
+if has_talos_context "${CLUSTER_NAME}"; then
+  other="$(first_other_talos_context "${CLUSTER_NAME}")"
   if [[ -n "${other}" ]]; then
     talosctl config context "${other}" >/dev/null 2>&1 || true
     talosctl config remove "${CLUSTER_NAME}" --noconfirm >/dev/null 2>&1 || true
@@ -122,7 +159,7 @@ if talos_contexts | grep -qx "${CLUSTER_NAME}"; then
     rm -f "${TALOSCONFIG:-${HOME}/.talos/config}"
   fi
 fi
-if talos_contexts | grep -qx "${CLUSTER_NAME}"; then
+if has_talos_context "${CLUSTER_NAME}"; then
   warn "talosconfig still has a '${CLUSTER_NAME}' context — remove it before recreating:"
   warn "  talosctl config context <other> && talosctl config remove ${CLUSTER_NAME}"
 else
