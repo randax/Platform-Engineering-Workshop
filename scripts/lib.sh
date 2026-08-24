@@ -268,7 +268,15 @@ cloudbox_host_gateway() {
   if [[ "${substrate}" == "tbx" ]]; then
     need jq
     local subnet
-    subnet="$(tbx status "${CLUSTER_NAME}" -o json 2>/dev/null | jq -r '.subnet // empty' 2>/dev/null || true)"
+    # `tbx status <cluster> -o json` prints an ARRAY of ClusterStatus even for a
+    # single named cluster (cmd/tbx/main.go:661-670), so `.subnet` alone makes
+    # jq error out and this die fire on a perfectly healthy cluster. The array
+    # is normalised here; the object branch keeps a later tbx that unwraps it
+    # working. Same normaliser as tbx_cluster_json() in substrate/tbx.sh.
+    subnet="$(tbx status "${CLUSTER_NAME}" -o json 2>/dev/null \
+      | jq -r --arg c "${CLUSTER_NAME}" \
+          'if type == "array" then ((map(select(.name == $c)) | first) // {}) else . end | .subnet // empty' \
+          2>/dev/null || true)"
     [[ -n "${subnet}" ]] \
       || die "cannot read the tbx cluster subnet — is '${CLUSTER_NAME}' up? (tbx status ${CLUSTER_NAME})"
     echo "${subnet%.*}.1"

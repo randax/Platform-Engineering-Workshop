@@ -297,6 +297,9 @@ GUARD_EXEMPT_SCRIPTS=(
                                   # there is nothing to assert while it runs;
                                   # create-cluster.sh (checked, not exempt)
                                   # calls the guard the moment it returns
+  "scripts/substrate/tbx.sh"      # the other backend, same reason: it is what
+                                  # creates the workshop context (talosctl
+                                  # kubeconfig + kubectl config use-context)
   "scripts/dev-setup.sh"          # pre-cluster: kubectl version --client only
   "scripts/install.sh"            # pre-cluster preflight: likewise
 )
