@@ -170,7 +170,7 @@ spec:
 <div class="fn-actions">
   {{/* Invoke wakes a scaled-to-zero function server-side (GET its cluster-local URL). */}}
   <button hx-post="/services/{{.Namespace}}/{{.Name}}/invoke" hx-target="#invoke-result" hx-swap="innerHTML">Invoke</button>
-  <a class="btn ghost" href="{{.TracesURL}}" target="_blank">traces →</a>
+  <a class="btn ghost" href="{{.TracesURL}}" target="_blank">View traces &amp; logs ↗</a>
   {{if .Deletable}}<button class="danger" hx-delete="/services/{{.Namespace}}/{{.Name}}"
     hx-swap="none"
     hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Delete-Failed')){this.nextElementSibling.textContent='Delete failed — the function may still exist. Check the Functions list.'}else if(event.detail.successful){window.location='/services'}"
@@ -179,11 +179,9 @@ spec:
 </div>
 <div id="invoke-result"></div>
 
-<h2>Monitoring <small>last 30 min</small></h2>
+<h2>Monitoring <small>last 30 min · scale-to-zero</small></h2>
 {{if .Telemetry}}
 <div class="monitor">
-  <div class="metric"><span class="metric-label">Scale</span>
-    {{if .Scale}}<span class="metric-now">{{.Scale}}</span>{{else}}<span class="nodata">—</span>{{end}}</div>
   <div class="metric"><span class="metric-label">Request rate</span>
     {{if .ReqSpark}}<span class="metric-spark">{{.ReqSpark}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
   <div class="metric"><span class="metric-label">Avg latency</span>

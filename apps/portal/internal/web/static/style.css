@@ -356,6 +356,7 @@ td.actions a { margin-right: 0.5rem; }
 
 /* ---- flashes / hints / errors ---- */
 .flash {
+
   padding: 0.55rem 0.85rem;
   border-left: 3px solid var(--accent);
   background: var(--accent-soft);
@@ -578,3 +579,4 @@ pre.code {
 .cf-followup input:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
 .cf-followup input:disabled { background: var(--surface-2); color: var(--muted); }
 .cf-you { color: var(--code-fg); font-weight: 600; margin-top: 0.4rem; }
+.flash:empty { display: none; }
