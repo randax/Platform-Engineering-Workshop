@@ -50,7 +50,7 @@ maintenance; `talosctl gen config` with our patches + `tbx manifests cloudbox mi
 `tbx` version is pinned in `scripts/versions.env` (`TBX_VERSION`) and `mise.toml`; install via
 `brew install randax/tap/tbx` (mac) or the release tarball (Linux) — added to lab 00 prereqs and `dev-setup.sh`.
 
-**Docker backend.** Unchanged except: it also publishes `80:30080` (ingress, §2) and its published NodePorts
+**Docker backend.** Unchanged except: it also publishes `80:30880` (ingress, §2) and its published NodePorts
 are no longer referenced by lab text. Kubeconfig rewrite to `127.0.0.1:<port>` stays. Gateway stays
 `host.docker.internal` / `10.5.0.1`.
 
@@ -65,7 +65,7 @@ server string exactly) as a cloudbox endpoint.
 
 **Cilium values added on both substrates:** `ingressController.enabled=true`,
 `ingressController.loadbalancerMode=shared`, `l2announcements.enabled=true`,
-`ingressController.service.type=LoadBalancer` (tbx) / `NodePort` with `insecureNodePort=30080` (docker).
+`ingressController.service.type=LoadBalancer` (tbx) / `NodePort` with `insecureNodePort=30880 (30080 is ArgoCD's existing NodePort)` (docker).
 Cilium's `externalIPs`/`devices` left default; `k8sClientRateLimit` raised per Cilium's L2 docs.
 
 **tbx only** (applied by the backend after Cilium): `CiliumLoadBalancerIPPool` `cloudbox` with
