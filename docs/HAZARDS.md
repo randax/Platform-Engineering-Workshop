@@ -1196,14 +1196,30 @@ reason.
 **The lease moves, and that is normal.** A node's address is a vmnet DHCP lease
 keyed by MAC (which is why `tbx_node_ip` reads it and never computes it), so
 after `tbx cluster start` the control plane can come up somewhere else in the
-/24 — leaving the kubeconfig pointing at a dead address and the guard refusing
-an address it has no record of. One command repairs both:
+/24 — leaving the kubeconfig pointing at a dead address, the talosconfig context
+pointing at it too, and the guard refusing an address it has no record of. One
+command repairs the **client-side** files:
 
     ./scripts/create-cluster.sh --refresh-endpoint
 
-It re-reads `tbx status`, rewrites the kubeconfig's server and the endpoint
-file, and does nothing else — no create, no Helm, no `/etc/hosts`. It is tbx-only
-(on docker the API server is published on loopback and cannot move).
+It re-reads `tbx status` and rewrites three things: the kubeconfig's `server`,
+the `cloudbox` talosconfig context's `endpoints`/`nodes` (baked at create time by
+`talosctl config endpoint|node` — miss it and `talosctl --context cloudbox
+dashboard` keeps dialing the dead address long after kubectl is well), and, only
+after **both** clients have answered at the new address, `~/.cloudbox/api-endpoint`.
+Nothing else — no create, no Helm, no `/etc/hosts`. It is tbx-only (on docker the
+API server is published on loopback and cannot move), and it dies without writing
+anything when the kubeconfig in use has no `admin@cloudbox` context.
+
+**What it does not repair, and we have not proven we need to:** the machine
+config's own `cluster.controlPlane.endpoint`, baked by `talosctl gen config` at
+create time. A control plane that comes back on a new address still holds the old
+one in its config; kubelet/etcd on a single-CP cluster reach the API server
+locally, so nothing in three rehearsals has needed it — but no rehearsal has
+actually *moved* a lease either. Treat "one command repairs everything" as
+unproven until a real lease-move rehearsal says so; the honest claim today is
+"one command repairs the three client-side files, and both clients are verified
+before it says so".
 
 **The other half — "destroy first" for a cluster you want to keep.** The tbx
 preflight and `lab/01-cluster/verify.sh` both treated "a cloudbox cluster

@@ -30,8 +30,9 @@ case "${1:-}" in
   -h|--help)
     echo "Usage: $0 [--refresh-endpoint]"
     echo "  (no flags)          create the CloudBox cluster"
-    echo "  --refresh-endpoint  re-read the running cluster's API address and"
-    echo "                      point the kubeconfig and \${HOME}/.cloudbox/api-endpoint at it."
+    echo "  --refresh-endpoint  re-read the running cluster's API address, point the"
+    echo "                      kubeconfig and the talosconfig context at it, and — once"
+    echo "                      both clients answer there — \${HOME}/.cloudbox/api-endpoint."
     echo "                      Creates nothing. Run it after 'tbx cluster start' or a reboot,"
     echo "                      when the VM's DHCP lease has moved."
     exit 0 ;;
@@ -60,8 +61,15 @@ source "${SCRIPT_DIR}/substrate/${SUBSTRATE}.sh"
 # the control plane up on a different address than the one in the kubeconfig and
 # in ${CLOUDBOX_API_ENDPOINT_FILE}. Nothing else here can repair that: the
 # kubeconfig points at a dead address, and the context guard (correctly) refuses
-# an address it has no record of. This re-reads `tbx status`, rewrites both, and
-# does NOTHING else — no create, no helm, no /etc/hosts.
+# an address it has no record of. This re-reads `tbx status`, rewrites the
+# kubeconfig cluster entry, the talosconfig context and — only once BOTH clients
+# have answered at the new address — ${CLOUDBOX_API_ENDPOINT_FILE}. It does
+# NOTHING else: no create, no helm, no /etc/hosts.
+#
+# What it does NOT touch: the machine config's own `cluster.controlPlane.endpoint`
+# (baked at create time by `talosctl gen config`). Client-side files are what a
+# moved DHCP lease breaks first and what these three lines repair; a control
+# plane that has to be told its own new address is a re-create, not a refresh.
 if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
   step "Refreshing this cluster's API endpoint"
   if [[ "${SUBSTRATE}" != "tbx" ]]; then
@@ -75,11 +83,49 @@ if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
   # The kubeconfig's CLUSTER entry, read from the context rather than assumed:
   # talosctl names it after the cluster today, but the thing that must be
   # rewritten is whatever `admin@${CLUSTER_NAME}` actually points at.
+  #
+  # No fallback to "${CLUSTER_NAME}" when the lookup comes up empty: an absent
+  # `admin@${CLUSTER_NAME}` context means this kubeconfig is not the one this
+  # cluster wrote, and `kubectl config set-cluster` CREATES the entry it is given
+  # — a guessed name would silently add a cluster stanza nothing references and
+  # report success. Die before touching the file instead.
   cluster_key="$(kubectl config view \
     -o jsonpath="{.contexts[?(@.name=='admin@${CLUSTER_NAME}')].context.cluster}" 2>/dev/null || true)"
-  [[ -n "${cluster_key}" ]] || cluster_key="${CLUSTER_NAME}"
+  [[ -n "${cluster_key}" ]] \
+    || die "No 'admin@${CLUSTER_NAME}' context in $(kubeconfig_in_use) — nothing was changed. That file is not the one this cluster's kubeconfig was merged into: check KUBECONFIG (mise.toml pins it to ${CLOUDBOX_KUBECONFIG} for this repo), or re-create with ./scripts/create-cluster.sh if the cluster was never created on this machine."
   kubectl config set-cluster "${cluster_key}" --server="${endpoint}" >/dev/null \
     || die "Could not point the kubeconfig cluster '${cluster_key}' at ${endpoint} — is $(kubeconfig_in_use) the file with your workshop cluster in it?"
+
+  # The talosconfig context carries its OWN copy of the address: the create path
+  # bakes it in with `talosctl config endpoint/node` before merging, so a moved
+  # lease leaves `talosctl --context ${CLUSTER_NAME} dashboard|dmesg|health`
+  # dialing the dead one long after kubectl is well again. Same file every other
+  # context operation in this repo uses (talos_config_target), and --context
+  # edits the NAMED context without changing which one is selected.
+  talos_target="$(talos_config_target)"
+  if has_talos_context "${CLUSTER_NAME}"; then
+    talosctl --context "${CLUSTER_NAME}" config endpoint "${cp_ip}" \
+      || die "Could not point the talosconfig context '${CLUSTER_NAME}' (${talos_target}) at ${cp_ip}"
+    talosctl --context "${CLUSTER_NAME}" config node "${cp_ip}" \
+      || die "Could not set the talosconfig node for context '${CLUSTER_NAME}' (${talos_target}) to ${cp_ip}"
+    ok "talosconfig context '${CLUSTER_NAME}' now points at ${cp_ip} (${talos_target})"
+  else
+    warn "No talosconfig context '${CLUSTER_NAME}' in ${talos_target} — talosctl was not refreshed."
+    warn "  kubectl is fine; 'talosctl --context ${CLUSTER_NAME} …' will not work until the cluster is re-created."
+  fi
+
+  # Both clients have to answer at the new address BEFORE it is recorded. The
+  # endpoint file is what the context guard trusts; writing an address that
+  # nothing responds at converts "kubectl cannot reach the cluster" into
+  # "everything says it is fine and nothing works".
+  kubectl --request-timeout=10s get --raw /readyz >/dev/null 2>&1 \
+    || die "The kubeconfig now points at ${endpoint}, but the API server there did not answer /readyz. ${CLOUDBOX_API_ENDPOINT_FILE} was NOT updated. Is the cluster running ('tbx status ${CLUSTER_NAME}')? Start it with 'tbx cluster start ${CLUSTER_NAME}' and re-run this."
+  if has_talos_context "${CLUSTER_NAME}"; then
+    talosctl --context "${CLUSTER_NAME}" version --short >/dev/null 2>&1 \
+      || die "The talosconfig context '${CLUSTER_NAME}' now points at ${cp_ip}, but the Talos API there did not answer. ${CLOUDBOX_API_ENDPOINT_FILE} was NOT updated. Check 'tbx status ${CLUSTER_NAME}' and 'talosctl --context ${CLUSTER_NAME} version'."
+  fi
+  ok "kubectl and talosctl both answer at ${cp_ip}"
+
   api_endpoint_persist "${endpoint}"
   if [[ "${previous}" == "${endpoint}" ]]; then
     ok "API endpoint unchanged: ${endpoint}"
