@@ -1,4 +1,4 @@
-# Zot's UI and OCI API at http://zot.cloudbox.k8s.test (scripts/versions.env:167,
+# Zot's UI and OCI API at http://zot.cloudbox.k8s.test (scripts/versions.env,
 # ZOT_HOST_URL) — for the BROWSER and for host-side `crane`. Backend: Service
 # `zot`, port 5000 (zot.yaml:51-71), not the `zot-headless` Service above it.
 #

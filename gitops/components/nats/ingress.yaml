@@ -1,5 +1,5 @@
 # NATS's HTTP monitoring endpoints at http://nats.cloudbox.k8s.test (/varz,
-# /jsz, /connz) — scripts/versions.env:168, NATS_HOST_URL, which carries the
+# /jsz, /connz) — scripts/versions.env, NATS_HOST_URL, which carries the
 # same "monitoring only" caveat.
 #
 # The CLIENT protocol is not HTTP and cannot go through an Ingress: nats://

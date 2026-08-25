@@ -1,6 +1,6 @@
 # Gitea at http://gitea.cloudbox.k8s.test — the workshop's only git remote, so
 # this URL is what attendees clone and push through all day.
-# (scripts/versions.env:117, GITEA_HOST_URL. YAML is not shell, so the hostname
+# (scripts/versions.env, GITEA_HOST_URL. YAML is not shell, so the hostname
 # is written out literally here; keep the two in step.)
 #
 # NOT applied by ArgoCD: Gitea is installed imperatively by
@@ -13,7 +13,7 @@
 # gitea.service.http.name = "<fullname>-http" (templates/gitea/_services.tpl:5)
 # ⇒ Service `gitea-http`, port `http` 3000 (chart values.yaml:121, not
 # overridden by bootstrap-gitops.sh) — the same address as
-# scripts/versions.env:118 GITEA_CLUSTER_URL.
+# scripts/versions.env GITEA_CLUSTER_URL.
 # NodePort 30300 (NODEPORT_GITEA) stays published as the docker fallback.
 #
 # gitea.config.server.ROOT_URL deliberately stays the in-CLUSTER URL

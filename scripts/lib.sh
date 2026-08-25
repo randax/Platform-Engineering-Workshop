@@ -429,7 +429,8 @@ tbx_cluster_absent() {
 #
 # The three traces, all of which a tbx create writes before its VMs exist:
 #   ~/.cloudbox/substrate            — "tbx", written by substrate_persist()
-#   ${TBX_CLUSTER_FILE}              — the rendered cluster yaml (tbx.sh:120-152)
+#   ${TBX_CLUSTER_FILE}              — the rendered cluster yaml
+#                                      (render_tbx_cluster_file, tbx.sh:129-156)
 #   ~/.talosbox/clusters/<name>      — upstream's own state directory, one per
 #                                      cluster, holding cluster.json
 #                                      (internal/cluster/store.go:14-22, const

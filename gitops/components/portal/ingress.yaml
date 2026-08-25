@@ -1,8 +1,8 @@
 # The Cloudbox Console at http://portal.cloudbox.k8s.test — the same URL on both
-# substrates (scripts/versions.env:164, PORTAL_HOST_URL). YAML is not shell, so
+# substrates (scripts/versions.env, PORTAL_HOST_URL). YAML is not shell, so
 # the hostname is written out literally here; keep the two in step.
-# NodePort 30600 (portal.yaml:153) stays published as the fallback for when the
-# /etc/hosts block is missing on the docker substrate.
+# NodePort 30600 (portal.yaml:150-160, the portal Service) stays published as the
+# fallback for when the /etc/hosts block is missing on the docker substrate.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

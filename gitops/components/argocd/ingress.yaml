@@ -1,4 +1,4 @@
-# ArgoCD at http://argocd.cloudbox.k8s.test (scripts/versions.env:122,
+# ArgoCD at http://argocd.cloudbox.k8s.test (scripts/versions.env,
 # ARGOCD_HOST_URL — written out literally because YAML is not shell).
 #
 # Plain http on purpose: bootstrap-gitops.sh sets server.insecure=true in

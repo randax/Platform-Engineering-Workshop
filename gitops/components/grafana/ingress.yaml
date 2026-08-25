@@ -1,4 +1,4 @@
-# Grafana at http://grafana.cloudbox.k8s.test (scripts/versions.env:165,
+# Grafana at http://grafana.cloudbox.k8s.test (scripts/versions.env,
 # GRAFANA_HOST_URL — mirrored literally because YAML cannot expand it).
 # Backend is the chart's ClusterIP Service (grafana.yaml:62-77, port 3000), NOT
 # the workshop's grafana-nodeport addition (service-nodeport.yaml) — that one

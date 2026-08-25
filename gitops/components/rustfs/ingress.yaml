@@ -1,13 +1,13 @@
 # Two hostnames onto one Service (rustfs.yaml:78-99, Service `rustfs-svc`):
 #   s3.cloudbox.k8s.test      the S3 API (port `endpoint`, :9000). Mirrors
-#                             RUSTFS_S3_HOST at scripts/versions.env:174. The
+#                             RUSTFS_S3_HOST at scripts/versions.env. The
 #                             portal SIGNS presigned URLs for this host, so it
 #                             must stay plain http —
 #                             apps/portal/internal/store/s3.go builds its
 #                             signing client with Secure:false.
 #   rustfs.cloudbox.k8s.test  the RustFS console (port `console`, :9001).
 #                             Mirrors RUSTFS_CONSOLE_HOST_URL at
-#                             scripts/versions.env:170. The console had no host
+#                             scripts/versions.env. The console had no host
 #                             exposure at all before the ingress scheme.
 # NodePort 30900 (service-nodeport.yaml) stays as the S3 fallback.
 apiVersion: networking.k8s.io/v1

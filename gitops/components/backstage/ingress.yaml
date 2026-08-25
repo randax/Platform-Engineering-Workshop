@@ -1,4 +1,4 @@
-# Backstage at http://backstage.cloudbox.k8s.test (scripts/versions.env:166,
+# Backstage at http://backstage.cloudbox.k8s.test (scripts/versions.env,
 # BACKSTAGE_HOST_URL — literal here because YAML cannot expand a shell var).
 # app.baseUrl, backend.baseUrl and backend.cors.origin move with this host —
 # see backstage.yaml:125,129,135 — all three must agree with the host below,
