@@ -50,11 +50,30 @@ substrate_preflight() {
   #
   # `have tbx` first: a machine without talos-box cannot be in this state, and
   # this must not become a reason to require the binary on the docker path.
-  if have tbx && tbx status "${CLUSTER_NAME}" >/dev/null 2>&1; then
-    fail "A '${CLUSTER_NAME}' cluster already exists on the tbx substrate — its VMs are running."
-    warn "Creating a docker cluster of the same name would leave two, with one talosconfig"
-    warn "context between them and a destroy that can only find one."
-    die "Destroy it first: CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh"
+  #
+  # The question is asked three-way (tbx_cluster_absent in lib.sh), and only a
+  # PROVEN absence lets the create continue. The boolean version failed OPEN:
+  # `tbx status` also exits non-zero when tbxd is down, which is exactly the
+  # state a laptop is in after a reboot with the VMs still registered — so the
+  # check read "no tbx cluster" precisely when it could not tell, and the two
+  # clusters this exists to prevent got created anyway. CLOUDBOX_IGNORE_TBX=1 is
+  # the escape hatch for someone who knows their tbx install is broken and only
+  # wants a docker cluster.
+  if have tbx && [[ "${CLOUDBOX_IGNORE_TBX:-}" != "1" ]]; then
+    local absent=0
+    tbx_cluster_absent "${CLUSTER_NAME}" || absent=$?
+    if [[ "${absent}" -eq 1 ]]; then
+      fail "A '${CLUSTER_NAME}' cluster already exists on the tbx substrate — its VMs are running."
+      warn "Creating a docker cluster of the same name would leave two, with one talosconfig"
+      warn "context between them and a destroy that can only find one."
+      die "Destroy it first: CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh"
+    elif [[ "${absent}" -eq 2 ]]; then
+      fail "tbx is installed but cannot be inspected, so whether a '${CLUSTER_NAME}' cluster"
+      fail "already exists on the tbx substrate is unknown:"
+      printf '   %s\n' "${TBX_CLUSTER_ABSENT_REASON}"
+      warn "If its VMs are running, a docker cluster of the same name would leave two."
+      die "Fix tbx ('tbx doctor'), or set CLOUDBOX_IGNORE_TBX=1 to proceed anyway."
+    fi
   fi
 }
 

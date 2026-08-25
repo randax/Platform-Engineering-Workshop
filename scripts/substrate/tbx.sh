@@ -35,9 +35,17 @@ substrate_preflight() {
     die "'tbx doctor' reports problems (above). Fix them, or run the fallback substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
   fi
   tbx_version_check die
-  if tbx status "${CLUSTER_NAME}" >/dev/null 2>&1; then
-    die "A '${CLUSTER_NAME}' tbx cluster already exists. Run ./scripts/destroy-cluster.sh first."
-  fi
+  # Three-way, not two: "tbx cannot be inspected" is not "no cluster exists".
+  # See tbx_cluster_absent() in lib.sh for the two error shapes and why the
+  # narrow one is the only proof of absence.
+  local absent=0
+  tbx_cluster_absent "${CLUSTER_NAME}" || absent=$?
+  case "${absent}" in
+    1) die "A '${CLUSTER_NAME}' tbx cluster already exists. Run ./scripts/destroy-cluster.sh first." ;;
+    2) fail "Could not ask tbx whether a '${CLUSTER_NAME}' cluster already exists:"
+       printf '   %s\n' "${TBX_CLUSTER_ABSENT_REASON}"
+       die "Creating over an existing cluster is worse than not creating. Fix the above (is tbxd running? 'tbx doctor'), then re-run." ;;
+  esac
   # Leftover docker-substrate /etc/hosts entries are fatal HERE, before any VM
   # exists. They map *.${CLOUDBOX_DOMAIN} names to 127.0.0.1, and /etc/hosts is
   # consulted before talos-box's resolver — so the cluster would come up
