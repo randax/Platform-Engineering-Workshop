@@ -16,49 +16,32 @@ fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 # Talos-in-Docker. This MUST agree with substrate_resolve() (scripts/lib.sh),
 # which install.sh --check and create-cluster.sh use — a lab 00 that demanded
 # tbx while create-cluster.sh built docker would fail an attendee who is
-# perfectly ready. So the precedence below is theirs, in order:
-#   1. CLOUDBOX_SUBSTRATE in the environment (the documented escape hatch)
-#   2. the persisted answer from a previous create (~/.cloudbox/substrate)
-#   3. CLOUDBOX_SUBSTRATE_DEFAULT=docker — the go-live gate's kill switch:
-#      when the pin says docker, detection never upgrades to tbx
-#   4. detection: `tbx doctor`
-# Inlined rather than sourced, deliberately: scripts/lib.sh defines its own
-# non-counting ok()/fail() (which would silently clobber the counting ones
-# above — the trap lab/01-cluster/verify.sh records) and its need()/die() exit
-# the process, which a checklist that must run every check may never do.
-# Whenever substrate_resolve() changes, change this with it.
+# perfectly ready.
+#
+# So it is not decided here at all: scripts/substrate-decide.sh is the ONE
+# implementation of that precedence (override → persisted → the
+# CLOUDBOX_SUBSTRATE_DEFAULT floor → `tbx doctor` detection), and both this file
+# and lib.sh read it. It was inlined before, and the copy drifted exactly as
+# copies do — it cased on `uname -m` (wrong in a Rosetta shell, where the VMs
+# are still arm64) and applied no platform gate, so it graded a tbx laptop as
+# docker. Every function in that file is pure: it prints answers and never
+# narrates, so the COUNTING ok()/fail() above survive the source, which is what
+# lib.sh itself (non-counting ok/fail, exiting need/die) could not promise.
+# shellcheck source=../../scripts/substrate-decide.sh
+. "$REPO_ROOT/scripts/substrate-decide.sh"
 
-# `tbx doctor` is the slowest thing in this file (it probes the helper, DNS,
-# routes and the mirror), and both the detection above and the tbx branch below
-# want its answer — so run it at most once.
-TBX_DOCTOR_RC=""
-tbx_doctor_ok() {
-  if [ -z "$TBX_DOCTOR_RC" ]; then
-    if command -v tbx >/dev/null 2>&1 && tbx doctor >/dev/null 2>&1; then
-      TBX_DOCTOR_RC=0
-    else
-      TBX_DOCTOR_RC=1
-    fi
-  fi
-  return "$TBX_DOCTOR_RC"
-}
+# tbx_doctor_run is memoised in that file, so the tbx branch below reuses the
+# detection's answer instead of paying for a second probe of helper, DNS, routes
+# and mirror.
+tbx_doctor_ok() { command -v tbx >/dev/null 2>&1 && tbx_doctor_run; }
 
-SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
-if [ -z "$SUBSTRATE" ] && [ -r "$HOME/.cloudbox/substrate" ]; then
-  SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
+if ! substrate_decide_into SUBSTRATE; then
+  # The one case substrate_decide refuses to answer: a typo in the attendee's
+  # own override. lib.sh fails the same way; saying so here beats silently
+  # grading the machine as something create-cluster.sh will not build.
+  fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker' — unset it or fix the spelling; checking as docker meanwhile"
+  SUBSTRATE=docker
 fi
-case "$SUBSTRATE" in
-  tbx|docker) ;;
-  *)
-    if [ "${CLOUDBOX_SUBSTRATE_DEFAULT:-tbx}" = docker ]; then
-      SUBSTRATE=docker
-    elif tbx_doctor_ok; then
-      SUBSTRATE=tbx
-    else
-      SUBSTRATE=docker
-    fi
-    ;;
-esac
 ok "substrate: $SUBSTRATE"
 
 # --- Docker daemon ---------------------------------------------------------

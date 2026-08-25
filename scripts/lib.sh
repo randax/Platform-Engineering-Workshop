@@ -35,6 +35,17 @@ source "${LIB_DIR}/versions.env"
 # shellcheck source=context-guard.sh
 source "${LIB_DIR}/context-guard.sh"
 
+# Which substrate, and the architecture questions that decision is made of.
+# Split out of this file because lab/00-setup/verify.sh must ask the SAME
+# question and cannot source lib.sh (whose ok()/fail() would clobber the
+# counting ones that lab's checklist is built on, and whose need()/die() exit
+# the process). Two copies of a decision drift, and this one had: lab 00 cased
+# on `uname -m` and applied no platform gate. Everything in there is pure —
+# it prints answers, it does not narrate them; the diagnostics below are this
+# file's job.
+# shellcheck source=substrate-decide.sh
+source "${LIB_DIR}/substrate-decide.sh"
+
 # --- Logging -----------------------------------------------------------------
 if [[ -t 1 ]]; then
   C_RED=$'\033[0;31m'; C_GREEN=$'\033[0;32m'; C_YELLOW=$'\033[0;33m'
@@ -105,33 +116,9 @@ confirm() {
   [[ "${answer}" == "y" || "${answer}" == "Y" ]]
 }
 
-# detect_arch — prints amd64 or arm64, fails on anything else.
-detect_arch() {
-  case "$(uname -m)" in
-    x86_64|amd64)  echo "amd64" ;;
-    arm64|aarch64) echo "arm64" ;;
-    *) return 1 ;;
-  esac
-}
-
-# host_cpu_arch — the arch of the MACHINE, not of this shell. On macOS the two
-# differ inside Rosetta: a terminal launched with "Open using Rosetta" (or any
-# shell under an x86_64 parent — some IDEs, older brew installs) reports
-# `uname -m` = x86_64 on an Apple Silicon Mac. The tbx VMs are virtualised
-# natively by that hardware and are arm64 regardless, so asking uname there
-# mirrored the whole image set for the wrong architecture — offline, at the
-# venue, with "exec format error" as the only clue.
-#
-# `sysctl -n hw.optional.arm64` is not translated: it describes the CPU, and
-# answers 1 under Rosetta as well as outside it. Absent (or 0) means a real
-# Intel Mac, where uname is right. Everything non-Darwin falls through to
-# detect_arch — Linux has no equivalent translation layer here.
-host_cpu_arch() {
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    [[ "$(sysctl -n hw.optional.arm64 2>/dev/null || true)" == "1" ]] && { echo "arm64"; return 0; }
-  fi
-  detect_arch
-}
+# detect_arch and host_cpu_arch live in substrate-decide.sh (sourced above):
+# they are what the substrate decision is made of, and lab/00-setup/verify.sh
+# needs them without lib.sh. Nothing about them changed in the move.
 
 # docker_server_arch — the Docker DAEMON's architecture (amd64/arm64), which is
 # what the cluster node containers run. Can differ from uname -m: an x86_64
@@ -334,7 +321,10 @@ mirror_host_endpoint() {
 # (`tbx`) or Talos-in-Docker containers. Both satisfy the same contract, which
 # lab/01-cluster/verify.sh asserts; the difference is where the API server and
 # the ingress endpoint live. See docs/superpowers/plans/2026-08-24-talos-box-substrate.md.
-CLOUDBOX_SUBSTRATE_FILE="${HOME}/.cloudbox/substrate"
+# CLOUDBOX_SUBSTRATE_FILE, the decision itself (substrate_decide) and the
+# `tbx doctor` memo are defined in substrate-decide.sh, sourced at the top.
+# What lives here is everything that SPEAKS: the messages for an invalid
+# override, a corrupt state file and "why not tbx", plus the writer.
 
 # substrate_doctor_reason — the first FAIL line `tbx doctor` printed, or a
 # one-liner saying why tbx was not even asked. Read-only; never runs a cluster
@@ -345,67 +335,24 @@ substrate_doctor_reason() {
     echo "tbx is not installed (brew install randax/tap/tbx, or the release tarball on Linux)"
     return 0
   fi
-  # The platform gate substrate_detect_into applies, in words. Without it an
-  # Intel Mac with tbx installed was told "tbx doctor did not report a FAIL
-  # line" — a true sentence that explains nothing about why it is on docker.
-  local os arch; os="$(uname -s)"; arch="$(host_cpu_arch || true)"
-  case "${os}:${arch}" in
-    Darwin:arm64|Linux:x86_64|Linux:aarch64|Linux:arm64|Linux:amd64) ;;
-    *) echo "talos-box virtualises natively and this is ${os}/${arch:-unknown} — supported: arm64 macOS, or Linux"
-       return 0 ;;
-  esac
+  # The platform gate detection applies, in words — asked of the same predicate
+  # (substrate_platform_supported), never re-derived. Without it an Intel Mac
+  # with tbx installed was told "tbx doctor did not report a FAIL line" — a true
+  # sentence that explains nothing about why it is on docker.
+  if ! substrate_platform_supported; then
+    echo "talos-box virtualises natively and this is $(uname -s)/$(host_cpu_arch 2>/dev/null || echo unknown) — supported: arm64 macOS, or Linux"
+    return 0
+  fi
   tbx_doctor_run || true
   local line
   line="$(printf '%s\n' "${TBX_DOCTOR_OUT}" | grep -m1 '^FAIL ' || true)"
   echo "${line:-tbx doctor did not report a FAIL line}"
 }
 
-# tbx_doctor_run — `tbx doctor`, ONCE per process. Output in TBX_DOCTOR_OUT,
-# verdict in the return status. `tbx doctor` probes the helper, DNS, the routes
-# and the mirror; it is the slowest read-only thing this repo runs, and it was
-# being run three times over in a single `install.sh --check` — the detection
-# inside substrate_resolve, the visible run in the tbx section, and again by
-# substrate_doctor_reason to quote one FAIL line from output it had just thrown
-# away. Callers that want to SHOW it print TBX_DOCTOR_OUT.
-#
-# Memoised for the life of the process, which is the right scope: every caller
-# is within seconds of the others, and nothing here can change the verdict.
-TBX_DOCTOR_OUT=""
-TBX_DOCTOR_RC=""
-tbx_doctor_run() {
-  if [[ -z "${TBX_DOCTOR_RC}" ]]; then
-    if TBX_DOCTOR_OUT="$(tbx doctor 2>&1)"; then TBX_DOCTOR_RC=0; else TBX_DOCTOR_RC=1; fi
-  fi
-  [[ "${TBX_DOCTOR_RC}" == "0" ]]
-}
-
-# substrate_detect — the substrate this MACHINE can run, with no persisted
-# answer and no override. tbx needs its daemon+helper installed and healthy, so
-# `tbx doctor` (which exits non-zero on any FAIL — cmd/tbx/doctor.go:345-347) is
-# the gate, not the mere presence of the binary.
-#
-# The arch comes from host_cpu_arch(), NOT `uname -m`. A Rosetta shell on an
-# Apple Silicon Mac reports x86_64 (an IDE terminal, an older brew, "Open using
-# Rosetta"), which made this read `Darwin:x86_64` — not a supported pair — and
-# quietly select docker on a machine whose `tbx doctor` passes and whose VMs are
-# natively virtualised arm64. The attendee then ran the whole workshop on the
-# fallback substrate, with no message saying why, because the "why not tbx" line
-# only speaks for a doctor that failed. host_cpu_arch asks the CPU
-# (`sysctl -n hw.optional.arm64`, which Rosetta does not translate) and
-# normalises to amd64/arm64, so the Linux aliases below can no longer be
-# produced — they stay as a belt on a helper that could grow another caller.
-substrate_detect_into() { # <varname>
-  local os arch
-  os="$(uname -s)"; arch="$(host_cpu_arch || true)"
-  printf -v "$1" '%s' "docker"
-  if have tbx; then
-    case "${os}:${arch}" in
-      Darwin:arm64|Linux:x86_64|Linux:aarch64|Linux:arm64|Linux:amd64)
-        if tbx_doctor_run; then printf -v "$1" '%s' "tbx"; fi ;;
-    esac
-  fi
-  return 0
-}
+# tbx_doctor_run (the memoised `tbx doctor`, output in TBX_DOCTOR_OUT) and the
+# detection itself are in substrate-decide.sh. These two names are kept as the
+# in-tree spelling every caller already uses.
+substrate_detect_into() { substrate_decide_detect_into "$1"; } # <varname>
 substrate_detect() { local __s; substrate_detect_into __s; echo "${__s}"; }
 
 # substrate_persist <tbx|docker> — record the substrate the cluster was CREATED
@@ -414,7 +361,7 @@ substrate_detect() { local __s; substrate_detect_into __s; echo "${__s}"; }
 # docker containers that never existed.
 substrate_persist() {
   local value="$1"
-  case "${value}" in tbx|docker) ;; *) die "substrate_persist: unknown substrate '${value}'" ;; esac
+  substrate_valid "${value}" || die "substrate_persist: unknown substrate '${value}'"
   mkdir -p "$(dirname "${CLOUDBOX_SUBSTRATE_FILE}")"
   printf '%s\n' "${value}" > "${CLOUDBOX_SUBSTRATE_FILE}.tmp"
   mv "${CLOUDBOX_SUBSTRATE_FILE}.tmp" "${CLOUDBOX_SUBSTRATE_FILE}"
@@ -439,16 +386,15 @@ api_endpoint_forget() { rm -f "${CLOUDBOX_API_ENDPOINT_FILE}"; }
 # tbx/docker — corruption is treated as "no answer", not as that literal
 # string). Never detects; never writes.
 substrate_current() {
-  [[ -r "${CLOUDBOX_SUBSTRATE_FILE}" ]] || return 0
   local value
-  value="$(tr -d '[:space:]' < "${CLOUDBOX_SUBSTRATE_FILE}")"
-  case "${value}" in
-    tbx|docker) echo "${value}" ;;
-    *)
-      warn "${CLOUDBOX_SUBSTRATE_FILE} contains '${value}', not 'tbx' or 'docker' — ignoring it" >&2
-      return 1
-      ;;
-  esac
+  value="$(substrate_persisted_raw)"
+  [[ -n "${value}" ]] || return 0
+  if substrate_valid "${value}"; then
+    echo "${value}"
+    return 0
+  fi
+  warn "${CLOUDBOX_SUBSTRATE_FILE} contains '${value}', not 'tbx' or 'docker' — ignoring it" >&2
+  return 1
 }
 
 # substrate_resolve — the substrate to USE right now, in precedence order:
@@ -468,18 +414,20 @@ substrate_current() {
 # stdout message becomes the *value* of s, not a diagnostic anyone sees. On
 # stderr the attendee reads the real reason, the assignment gets an empty
 # string, and the non-zero status aborts the caller under `set -e`.
+#
+# The DECISION is substrate_decide_into (substrate-decide.sh) — one
+# implementation, shared with lab/00-setup/verify.sh. What this wrapper adds is
+# the speaking: an invalid override named on stderr, and the corrupt-state-file
+# warning (substrate_current is asked for its voice, not for its answer).
 substrate_resolve_into() { # <varname> — substrate_resolve without the subshell
-  local __var="$1" __persisted
+  local __var="$1"
   if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
-    case "${CLOUDBOX_SUBSTRATE}" in
-      tbx|docker) printf -v "${__var}" '%s' "${CLOUDBOX_SUBSTRATE}"; return 0 ;;
-      *) fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker'" >&2; return 1 ;;
-    esac
+    substrate_valid "${CLOUDBOX_SUBSTRATE}" \
+      || { fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker'" >&2; return 1; }
+  else
+    substrate_current >/dev/null || true
   fi
-  __persisted="$(substrate_current || true)"
-  if [[ -n "${__persisted}" ]]; then printf -v "${__var}" '%s' "${__persisted}"; return 0; fi
-  if [[ "${CLOUDBOX_SUBSTRATE_DEFAULT}" == "docker" ]]; then printf -v "${__var}" '%s' "docker"; return 0; fi
-  substrate_detect_into "${__var}"
+  substrate_decide_into "${__var}"
 }
 
 # The `$( )` form, for the places that read the answer inline. Prefer
