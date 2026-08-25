@@ -1454,6 +1454,7 @@ spec:
   provider: "Ollama"
   model: "qwen3:1.7b"
   ollama:
+    # Patched at bootstrap to cloudbox_host_gateway() — 172.30.<n>.1 on tbx, host.docker.internal or 10.5.0.1 on docker. See scripts/bootstrap-gitops.sh; the kagent Application ignoreDifferences this field.
     host: host.docker.internal:11434
     options:
       num_ctx: "16384"

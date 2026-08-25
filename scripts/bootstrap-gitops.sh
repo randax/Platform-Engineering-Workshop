@@ -203,6 +203,36 @@ info "Publishing Gitea and ArgoCD on ${GITEA_HOST_URL} / ${ARGOCD_HOST_URL}"
 kubectl apply -f "${REPO_ROOT}/gitops/components/gitea/ingress.yaml"
 kubectl apply -f "${REPO_ROOT}/gitops/components/argocd/ingress.yaml"
 
+# --- Kagent's host-side Ollama ---------------------------------------------------
+# kagent's default ModelConfig points at a host-side Ollama (module 10). The
+# address of "the host" is substrate- and OS-specific, and it used to be
+# hardcoded to host.docker.internal — which native-Linux attendees had to
+# hand-edit (lab/10-day2-ops/README.md) and which no tbx VM can resolve at all.
+# Record the right answer once, here, where the substrate is known. The
+# ModelConfig may not exist yet (kagent is a stretch catalog item enabled later),
+# so this writes a ConfigMap the module-10 lab reads and applies the patch
+# opportunistically — never failing the bootstrap over an optional component.
+# That last promise is why the lookup itself is guarded: on tbx
+# cloudbox_host_gateway() needs jq and a live `tbx status`, and a bootstrap must
+# not die because an optional day-2 capability could not be pre-addressed.
+if gateway="$(cloudbox_host_gateway)"; then
+  info "Host gateway for in-cluster workloads: ${gateway}"
+  kubectl create namespace kagent --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl -n kagent create configmap cloudbox-host \
+    --from-literal=gateway="${gateway}" \
+    --from-literal=ollama="${gateway}:11434" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  if kubectl -n kagent get modelconfig default-model-config >/dev/null 2>&1; then
+    kubectl -n kagent patch modelconfig default-model-config --type merge \
+      -p "{\"spec\":{\"ollama\":{\"host\":\"${gateway}:11434\"}}}"
+    ok "kagent ModelConfig points at ${gateway}:11434"
+  else
+    info "kagent is not enabled yet — its Ollama host (${gateway}:11434) is recorded in configmap kagent/cloudbox-host"
+  fi
+else
+  warn "could not determine the host gateway — kagent (module 10, optional) keeps the git default host.docker.internal:11434; lab/10-day2-ops/README.md says how to check it"
+fi
+
 # --- 4. Wait for everything --------------------------------------------------------------
 step "Waiting for Gitea and ArgoCD to become ready"
 wait_rollout gitea deployment/gitea

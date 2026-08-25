@@ -36,8 +36,15 @@ recipe, re-apply the curation below, then
   local models are not presented as hosted-model equivalents; a hosted
   provider is the upgrade path (see the module 10 PRD, issue #132:
   https://github.com/randax/Platform-Engineering-Workshop/issues/132).
-  Native Linux users must replace `host.docker.internal` with the Talos
-  bridge gateway.
+  The host's address is a MACHINE fact, not a git fact: `host.docker.internal`
+  (the value carried here) is right only on macOS/WSL2 docker — native Linux
+  docker needs `10.5.0.1` (`TALOS_SUBNET_GATEWAY`) and a tbx VM needs its
+  cluster gateway `172.30.<n>.1`. Nobody hand-edits it any more:
+  `scripts/bootstrap-gitops.sh` resolves `cloudbox_host_gateway()` once, records
+  it in configmap `kagent/cloudbox-host` and patches the `ModelConfig` if kagent
+  is already enabled; the kagent Application `ignoreDifferences` on
+  `/spec/ollama/host` (plus `RespectIgnoreDifferences=true`) keeps selfHeal from
+  reverting the patch.
 - **Bundled Postgres stays** — this slice keeps upstream's dev-mode database
   and workshop-grade database/user/password credentials
   `kagent`/`kagent`/`kagent`. It is intentionally not wired to the separately
@@ -161,11 +168,15 @@ values
       model: "qwen3:1.7b"
       # host.docker.internal:11434 is the chart's own default and matches this
       # repo's existing host-reachability convention for Docker Desktop/OrbStack
-      # on macOS + WSL2 (see mirror_host_endpoint() in scripts/lib.sh). Native
-      # Linux Docker has no host.docker.internal — those attendees must edit
-      # this ModelConfig after `cp` to point at the Talos bridge gateway
-      # (TALOS_SUBNET_GATEWAY in scripts/versions.env), same caveat as
-      # CLOUDBOX_MIRROR_HOST.
+      # on macOS + WSL2 (see mirror_host_endpoint() in scripts/lib.sh). It is
+      # only the DEFAULT: native Linux docker has no host.docker.internal
+      # (10.5.0.1 = TALOS_SUBNET_GATEWAY) and a tbx VM resolves neither (its
+      # cluster gateway is 172.30.<n>.1). scripts/bootstrap-gitops.sh decides
+      # which of the three applies from cloudbox_host_gateway(), writes it to
+      # configmap kagent/cloudbox-host and patches the ModelConfig; the kagent
+      # Application ignoreDifferences /spec/ollama/host so selfHeal leaves that
+      # patch alone. Nothing hand-edits this line — the rendered file carries a
+      # comment saying so (allow hunk c871d641 below).
       config:
         host: host.docker.internal:11434
         # Measured on 2026-08-18 against this cluster's module 10 end state.
@@ -224,6 +235,7 @@ values
 # --- accepted curation: one line per diff hunk (id, then why) ---
 allow  kagent-crds.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm (4.2.4)
 allow  kagent.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm (4.2.4)
+allow  kagent.yaml  c871d641  a post-render comment above `spec.ollama.host`, saying that bootstrap-gitops.sh patches that field from cloudbox_host_gateway() and that the kagent Application ignoreDifferences it — the one place a reader meets the hardcoded default is the one place that has to say it is not the whole story. Comment only; no manifest change
 allow  kagent.yaml  c0b80476  helm 4 keeps two whitespace-only lines in the config ConfigMap that helm 3 stripped — inert, same fix as above
 allow  kagent.yaml  277cc02f  helm 4 keeps a single-space line that helm 3 stripped — inert, same fix as above
 allow  kagent.yaml  0972f4d7  helm 4.2.4 (the "vanishing empty lines" fix) keeps TWO blank lines before one `---` — after the `kagent-tools` Service — where 4.2.3 kept one. Same helm-3-era artifact as `39cdd0de`, one hunk with its own content id; inert whitespace, no manifest changes

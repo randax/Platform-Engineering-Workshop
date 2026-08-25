@@ -6,9 +6,10 @@ Application in `gitops/apps/` for ArgoCD to install and resets
 bad-release scenario.
 
 `catch-up.sh` does **not** create any attendee-side secret or touch host-side Ollama
-state. Kagent's ModelConfig expects Ollama on the attendee's own machine at
-`host.docker.internal:11434`; that host service is outside catch-up's scope, just as it
-is outside the module's `inject.sh` scope.
+state. Kagent's ModelConfig expects Ollama on the attendee's own machine, at whichever
+address reaches the host from inside the cluster (`bootstrap-gitops.sh` resolved it and
+recorded it in configmap `kagent/cloudbox-host`); that host service is outside catch-up's
+scope, just as it is outside the module's `inject.sh` scope.
 
 **Catch-up is cumulative; the lab is not.** The lab's scenario path needs only
 module 02, but `catch-up.sh` force-push *replaces* `gitops/apps/` with this tree —

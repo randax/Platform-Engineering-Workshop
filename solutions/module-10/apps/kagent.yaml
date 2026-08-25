@@ -34,3 +34,17 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - SkipDryRunOnMissingResource=true
+      # Without this, selfHeal syncs ignore ignoreDifferences and put the git
+      # value back on every reconcile.
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    # The Ollama host is a MACHINE fact (which substrate, which OS), decided by
+    # bootstrap-gitops.sh from cloudbox_host_gateway(). Git carries a default
+    # that is right for exactly one of the three cases; letting selfHeal fight
+    # the patch would break kagent on the other two.
+    - group: kagent.dev
+      kind: ModelConfig
+      name: default-model-config
+      namespace: kagent
+      jsonPointers:
+        - /spec/ollama/host
