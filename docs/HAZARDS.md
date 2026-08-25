@@ -142,7 +142,7 @@ floor**, and deflating on release (upstream `docs/SPEC.md:319-328` and the close
 at `:595-600`; the Linux host-free sampler is not implemented yet, so the policy is
 presently inactive there). We opt into it deliberately — `substrate_create()` patches
 `machine.kernel.modules: [virtio_balloon]` into the guests
-(`scripts/substrate/tbx.sh:255-266`), because without the module loaded the balloon device
+(the `balloon_patch` in `substrate_create()`, `scripts/substrate/tbx.sh:286-297`), because without the module loaded the balloon device
 is inert and the overcommit story stops working.
 
 That makes the OOM hazard **worse on a busy laptop, not better**: a node can *lose* memory
@@ -169,7 +169,7 @@ nothing about what the balloon will do at the venue.
 ## LIVE — L2 failover on macOS takes 40-50 s
 
 Cilium announces the ingress VIP over L2 (`scripts/substrate/lb-objects.tbx.yaml.tmpl`,
-applied by `substrate_post_cni()` in `scripts/substrate/tbx.sh:456-474`). When the node
+applied by `substrate_post_cni()` in `scripts/substrate/tbx.sh:502-520`). When the node
 holding the VIP goes away, the new announcer sends a gratuitous ARP — and **macOS ignores
 it through vmnet**, converging only when its own ARP cache revalidates. talos-box's own
 spec says so: "the slow-L2 failover caveat is macOS/vmnet-specific" (upstream
@@ -201,7 +201,7 @@ split-exclude the VPN/ZTNA client that captured `172.30.0.0/16`, then restart th
 cluster"). The trap is *when* we ask:
 
 - **Detection runs doctor before any cluster exists.** `substrate_detect()`
-  (`scripts/lib.sh:190-200`) uses `tbx doctor`'s exit code to choose the substrate, and at
+  (`substrate_detect_into()` / `substrate_detect()`, `scripts/lib.sh:227-239`) uses `tbx doctor`'s exit code to choose the substrate, and at
   that moment `routes` is a `SKIP` — "no clusters exist" (`cmd/tbx/doctor.go:270-277`), as
   it also is for a cluster that exists but is stopped (`:293-300`). So a VPN'd laptop
   passes detection cleanly and gets sent down the tbx path.
@@ -327,7 +327,7 @@ connection is refused. A name that resolves reads as "the service is there and b
 when the truth is that it does not exist yet.
 
 **Why the scripts are shaped the way they are.** `substrate_post_ready()`
-(`scripts/substrate/tbx.sh:481-515`) waits up to 180 s for `cilium-ingress` to actually
+(`substrate_post_ready()`, `scripts/substrate/tbx.sh:527-561`) waits up to 180 s for `cilium-ingress` to actually
 carry a LoadBalancer address, and fails loudly there rather than letting module 02 discover
 it; it also **dies** if the VIP is not `.200` — the resolver answers `.200` unconditionally,
 without consulting who holds it, so an ingress anywhere else in the pool means every
