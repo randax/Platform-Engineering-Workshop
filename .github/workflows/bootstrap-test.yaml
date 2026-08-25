@@ -33,6 +33,11 @@ jobs:
     name: full rehearsal — all labs (01-09)
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      # GitHub runners have no nested-virt: the tbx substrate is impossible here.
+      # This is also the point — the docker substrate is the CI-PROVEN fallback,
+      # and it must be exercised on every weekly run, not just when tbx fails.
+      CLOUDBOX_SUBSTRATE: docker
     steps:
       - uses: actions/checkout@v7
         with:
@@ -116,6 +121,13 @@ jobs:
       - name: Create cluster (Talos + Cilium, wired to the mirror)
         run: ./scripts/create-cluster.sh
 
+      - name: Show the /etc/hosts block create-cluster.sh wrote
+        run: |
+          set -euo pipefail
+          ./scripts/install.sh --print-hosts
+          getent hosts gitea.cloudbox.k8s.test
+          getent hosts hello.demo.kn.cloudbox.k8s.test
+
       - name: Bootstrap GitOps (Gitea + ArgoCD)
         run: ./scripts/bootstrap-gitops.sh
 
@@ -126,8 +138,9 @@ jobs:
         run: |
           set -euo pipefail
           kubectl get nodes -o wide
-          curl -fsS http://localhost:30300/api/healthz
-          curl -fsS -o /dev/null http://localhost:30080
+          kubectl -n kube-system get svc cilium-ingress -o wide
+          curl -fsS http://gitea.cloudbox.k8s.test/api/healthz
+          curl -fsS -o /dev/null http://argocd.cloudbox.k8s.test
           kubectl get application platform -n argocd -o wide
 
       - name: Run ALL labs (01-09) — solve + verify, with a results table
@@ -1166,6 +1179,11 @@ jobs:
     name: recovery path — second cluster + catch-up 07
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      # GitHub runners have no nested-virt: the tbx substrate is impossible here.
+      # This is also the point — the docker substrate is the CI-PROVEN fallback,
+      # and it must be exercised on every weekly run, not just when tbx fails.
+      CLOUDBOX_SUBSTRATE: docker
     steps:
       - uses: actions/checkout@v7
         with:

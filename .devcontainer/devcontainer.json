@@ -21,6 +21,14 @@
     "storage": "32gb"
   },
 
+  // Codespaces and dev containers are Docker-in-Docker: there is no hypervisor
+  // and no KVM, so the tbx substrate cannot run here. Pinning it explicitly
+  // means the dispatcher never even probes for tbx — and the lifeboat behaves
+  // identically to every CI run, which is what makes it a tested path.
+  "containerEnv": {
+    "CLOUDBOX_SUBSTRATE": "docker"
+  },
+
   // Install mise, hook it into the shell, then install the pinned toolchain.
   //
   // The `mise activate` line is not a nicety: mise.run only PRINTS the activation
@@ -35,11 +43,14 @@
   // once inside the container, before the workshop:
   //   ./scripts/cloudbox-init.sh && ./scripts/install.sh --check
   // MISE_VERSION pin: keep in sync with scripts/versions.env
+  // The /etc/hosts block create-cluster.sh writes lands inside the container, which
+  // is where the browser preview resolves from — nothing to do on the Codespaces host.
   "postCreateCommand": "curl -fsSL https://mise.run | MISE_VERSION=v2026.8.6 sh && export PATH=\"$HOME/.local/bin:$PATH\" && printf '\\n# mise (CloudBox workshop tools + KUBECONFIG)\\neval \"$($HOME/.local/bin/mise activate bash)\"\\n' >> \"$HOME/.bashrc\" && ./scripts/dev-setup.sh",
 
   // NodePorts exposed by the in-cluster platform.
-  "forwardPorts": [30300, 30080, 30500, 30600, 30700, 30900, 30030, 31080, 30422],
+  "forwardPorts": [80, 30300, 30080, 30500, 30600, 30700, 30900, 30030, 31080, 30422],
   "portsAttributes": {
+    "80": { "label": "Platform ingress (*.cloudbox.k8s.test)" },
     "30030": { "label": "Grafana" },
     "30300": { "label": "Gitea (in-cluster git)" },
     "30080": { "label": "ArgoCD" },
