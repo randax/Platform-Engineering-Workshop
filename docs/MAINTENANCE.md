@@ -163,6 +163,25 @@ correct or current. The script prints both caveats on every run.
 Bumps that touch the cluster shape (Talos, Kubernetes, Cilium) deserve their own
 PR and their own rehearsal run. Batch the boring ones.
 
+### The Cilium bump has two operator surfaces to re-read
+
+Re-vendoring the chart `.tgz` is not the whole job. `create-cluster.sh` passes
+`--set "operator.extraArgs[0]=--ingress-default-request-timeout=24h"` and four
+of our ingresses carry `ingress.cilium.io/request-timeout: "0s"`. Both are
+**operator** surfaces, and both are load-bearing: without them Envoy's 15 s
+default route timeout applies to every hostname in the workshop (`git push`,
+the Console's SSE stream, ArgoCD's watches). On a bump, confirm
+
+* the flag still exists and still means what it means —
+  `operator/pkg/ingress/cell.go`, and note that
+  `operator/pkg/model/ingestion/ingress.go` SKIPS the flag when it is zero, so
+  "0" is not "no timeout" there;
+* the annotation is still parsed — `operator/pkg/ingress/annotations/annotations.go`;
+* the flag still renders:
+  `helm template cilium scripts/manifests/cilium-<v>.tgz --set ingressController.enabled=true --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" | grep ingress-default-request-timeout`.
+
+`docs/HAZARDS.md` carries the full reasoning.
+
 ### The `tbx` pin is a special case
 
 `TBX_VERSION` in `scripts/versions.env` pins the talos-box binary — the primary

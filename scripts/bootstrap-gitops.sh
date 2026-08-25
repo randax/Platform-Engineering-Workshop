@@ -198,8 +198,8 @@ kubectl -n argocd rollout restart deployment argocd-server argocd-repo-server >/
 info "Publishing Gitea and ArgoCD on ${GITEA_HOST_URL} / ${ARGOCD_HOST_URL}"
 # These two are installed imperatively, so nothing else will ever apply their
 # Ingress objects. The manifests live in gitops/components/{gitea,argocd}/ so
-# all nine ingress files (eleven host rules — rustfs has two, knative-serving
-# two wildcards) read as one set; only these two are applied by hand.
+# all nine ingress files (ten host rules — rustfs has two, knative-serving one
+# wildcard) read as one set; only these two are applied by hand.
 # Recount both numbers with:
 #   find gitops -name ingress.yaml | wc -l
 #   grep -rhcE '^\s*- host:' gitops --include=ingress.yaml | paste -sd+ - | bc

@@ -507,14 +507,18 @@ fi
 # here when its line explicitly identifies the Docker substrate or node-side
 # use, so the narrow exemptions below preserve those infrastructure notes.
 before_fail=${FAILURES}
-bare_nodeport="$(grep -rnE '(^|[^0-9.]):30[0-9]{3}([^0-9]|$)' \
+# The range is 3[01]xxx, not 30xxx: NODEPORT_KOURIER is 31080 — the port every
+# app an attendee deploys is reached on, and the one most likely to be written
+# down bare. A 30000-only pattern was blind to exactly the busiest NodePort in
+# the workshop.
+bare_nodeport="$(grep -rnE '(^|[^0-9.]):3[01][0-9]{3}([^0-9]|$)' \
   lab/*/README.md lab/*/verify.sh lab/*/solve.sh slides/pages 2>/dev/null \
   | grep -Eiv 'docker substrate|docker-only|NodePort|node[^[:alnum:]]*(pulls|side)|node.s[[:space:]]+kubelet|kubelet' || true)"
 if [[ -n "${bare_nodeport}" ]]; then
-  bad "bare :30xxx NodePort prose remains — use the shared hostname, or explicitly label Docker-substrate/node-side use:"
+  bad "bare :3[01]xxx NodePort prose remains — use the shared hostname, or explicitly label Docker-substrate/node-side use:"
   printf '   %s\n' "${bare_nodeport}" | head -30
 else
-  ok "no bare :30xxx NodePort prose in attendee-facing lab material"
+  ok "no bare :3[01]xxx NodePort prose in attendee-facing lab material"
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] || true
 

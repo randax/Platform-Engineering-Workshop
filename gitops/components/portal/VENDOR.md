@@ -63,6 +63,11 @@ extra-file — its version is prose, kept honest by review.
   http://portal.cloudbox.k8s.test (ingress.yaml), container port
   8080, `/healthz` readiness+liveness — port and health path are the
   contract with `apps/portal` (Knative-style `$PORT=8080` default).
+- **`ingress.cilium.io/request-timeout: "0s"`** on that Ingress = **no**
+  timeout. The Console's agent-ask answer is an SSE stream that runs for as
+  long as the model takes, and a Cilium Ingress is an Envoy route whose default
+  timeout is 15 s — long enough to make module 10 look broken. See
+  `docs/HAZARDS.md`, "NodePorts had no proxy in the path".
 - **Two S3 endpoints, and they are not interchangeable.**
   `S3_ENDPOINT=http://rustfs-svc.rustfs.svc.cluster.local:9000` is what the
   *pod* talks to; `S3_PUBLIC_ENDPOINT=s3.cloudbox.k8s.test` is the host the

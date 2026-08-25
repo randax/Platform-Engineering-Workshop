@@ -69,7 +69,7 @@ else
   # context at whatever the substrate actually publishes — the controlplane
   # container's port on docker, the control-plane VM's own address on tbx —
   # so re-running it is the fix on both.
-  fail "kubectl cannot reach the cluster — did create-cluster.sh finish? Re-run ./scripts/create-cluster.sh (it points the kubeconfig at the API server your substrate publishes: https://127.0.0.1:\$(docker port cloudbox-controlplane-1 6443/tcp) on docker, the control-plane VM's own https://172.30.<n>.2:6443 on tbx)"
+  fail "kubectl cannot reach the cluster — did create-cluster.sh finish? Re-run ./scripts/create-cluster.sh (it points the kubeconfig at the API server your substrate publishes: https://127.0.0.1:\$(docker port cloudbox-controlplane-1 6443/tcp) on docker, the control-plane VM's own address on tbx, read from 'tbx status ${CLUSTER_NAME} -o json' — a vmnet DHCP lease, not a computable .2)"
   echo; echo "❌ Cannot check further without API access."; exit 1
 fi
 

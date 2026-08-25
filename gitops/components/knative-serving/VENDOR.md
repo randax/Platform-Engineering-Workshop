@@ -147,6 +147,15 @@ either a new upstream change or a curation someone forgot to write down.
    fix — but re-check `/proc/net/if_inet6` and `bindv6only` in the pod first,
    because the interesting question would be what removed IPv6 from the netns.
 
+### `ingress.yaml` (ours, not vendored)
+
+The single `*.kn.cloudbox.k8s.test` rule in front of the external Kourier
+gateway carries **`ingress.cilium.io/request-timeout: "0s"`** = **no** timeout.
+A Cilium Ingress is an Envoy route and Envoy's default is 15 s, which a
+scale-from-zero ksvc's first request can exceed — and this one rule fronts every
+function in the workshop, so a 504 here reads as "my function is broken". See
+`docs/HAZARDS.md`, "NodePorts had no proxy in the path".
+
 ### The same list, machine-readable
 
 `scripts/check-vendor-drift.sh` reproduces the pristine upstream artifact from
@@ -171,7 +180,7 @@ fetch  https://github.com/knative-extensions/net-kourier/releases/download/knati
 # --- accepted curation: one line per diff hunk (id, then why) ---
 allow  serving-core.yaml  fa38a31c  curation 2 — config-deployment registries-skipping-tag-resolving (Zot + its aliases + ghcr.io)
 allow  serving-core.yaml  797bdd28  curation 3 — config-domain's knative.dev/example-checksum annotation deleted (inert; kept as-is rather than re-litigated at each bump)
-allow  serving-core.yaml  672c43eb  curation 3 — config-domain gains kn.cloudbox.k8s.test; without it every ksvc URL 404s
+allow  serving-core.yaml  3ed31eed  curation 3 — config-domain gains kn.cloudbox.k8s.test; without it every ksvc URL 404s (was 672c43eb before the comment stopped describing the pre-domain-template dotted host)
 allow  serving-core.yaml  a8882498  curation 4 — config-network: ingress-class kourier.ingress.networking.knative.dev + the single-label domain-template (was 62912f67 before domain-template joined the same zero-context hunk)
 allow  serving-core.yaml  09d0bf54  curation 5 — the nine real config-observability keys (tracing + metrics + request-metrics) to the OTel Collector
 allow  serving-core.yaml  32736b89  curation 1 — halved activator requests 300m/60Mi → 150m/30Mi

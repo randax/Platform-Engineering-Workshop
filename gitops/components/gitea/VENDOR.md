@@ -21,6 +21,7 @@ the ArgoCD install, once the `gitea` namespace and Service exist.
 | host | `gitea.cloudbox.k8s.test`, literal (YAML is not shell); must equal `scripts/versions.env` `GITEA_HOST_URL` |
 | backend | Service `gitea-http`, port **3000**, namespace `gitea` |
 | path / pathType | `/` and `Prefix` — Gitea serves its UI, API and the git http protocol all under the root |
+| `ingress.cilium.io/request-timeout` | `0s` = **no** timeout. Cilium ingress is an Envoy route, and Envoy's default is 15 s; `seed-gitea.sh` pushes a ~40 MiB pack through here and attendees push through it all day. See `docs/HAZARDS.md`, "NodePorts had no proxy in the path". |
 
 The backend name is not a guess: release `gitea` + chart `gitea` makes
 `gitea.fullname` = `gitea` (chart `templates/_helpers.tpl`), and

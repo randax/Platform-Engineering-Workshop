@@ -7797,9 +7797,11 @@ metadata:
     app.kubernetes.io/version: "1.23.0"
 data:
   # Externally-routable default domain. Every ksvc becomes
-  # http://<name>.<ns>.kn.cloudbox.k8s.test, which the wildcard Ingress in
-  # ingress.yaml routes to the Kourier gateway — so a ksvc URL is browsable
-  # with no Host header and no port, on BOTH substrates. WITHOUT this key,
+  # http://<name>-<ns>.kn.cloudbox.k8s.test — a DASH, from the domain-template
+  # key in config-network below, which keeps the host to ONE DNS label so the
+  # single wildcard Ingress in ingress.yaml can route every namespace to the
+  # Kourier gateway. A ksvc URL is then browsable with no Host header and no
+  # port, on BOTH substrates. WITHOUT this key,
   # config-domain holds only _example and Knative defaults to
   # svc.cluster.local, which is cluster-local-only and 404s from outside.
   # (The old value was 127.0.0.1.sslip.io, which only ever worked on a laptop

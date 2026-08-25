@@ -22,6 +22,7 @@ every component's ingress reads as one set (`gitops/components/*/ingress.yaml`).
 | host | `argocd.cloudbox.k8s.test`, literal (YAML is not shell); must equal `scripts/versions.env` `ARGOCD_HOST_URL` |
 | backend | Service `argocd-server`, port **80** (name `http`, targetPort 8080), namespace `argocd` |
 | path / pathType | `/` and `Prefix` — the UI, the API and the gRPC-web endpoint all live under the root |
+| `ingress.cilium.io/request-timeout` | `0s` = **no** timeout. The UI holds gRPC-web watch streams open for as long as the tab is, and Envoy — which every hostname now goes through — defaults to 15 s. See `docs/HAZARDS.md`, "NodePorts had no proxy in the path". |
 
 The Service is the one the vendored install ships (`argocd-server`, ports
 `http` 80→8080 and `https` 443→8080). The `https` port is deliberately **not**

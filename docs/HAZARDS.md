@@ -674,6 +674,56 @@ Now uses the same vendored chart: **exit 0 in 49 s, both nodes Ready, offline.**
 are the least-tested code you ship, and the most expensive to get wrong.** Every
 blocker in five rehearsals came from recovery or setup, never from the platform.
 
+## TRAP — the lifeboat's browser is not on the lifeboat
+
+The hostname scheme assumes the browser and the cluster share a machine. In
+Codespaces they do not: the preview is
+`https://<codespace>-<port>.app.github.dev`, which sends GitHub's own `Host`
+header, and every rule in the platform's ingress matches on a
+`*.cloudbox.k8s.test` host. **Forwarded port 80 therefore 404s** — on a cluster
+where `curl http://gitea.cloudbox.k8s.test` from the codespace's own terminal
+works perfectly, because the `/etc/hosts` block create-cluster.sh writes is
+inside the container.
+
+The README and lab 00 both said the lifeboat runs "identical" content, and
+`devcontainer.json` carried a comment saying the hosts block is "where the
+browser preview resolves from — nothing to do on the Codespaces host", which is
+the opposite of true. Same class as the lifeboat-needed-the-internet finding
+above: nobody opens a browser on the path that only gets used when something
+else already went wrong.
+
+**What handles it.** Documentation, not code — the NodePorts are already
+forwarded (`.devcontainer/devcontainer.json` `forwardPorts`), and each Ports-tab
+entry reaches its service directly with no `Host` header involved. README's
+Plan B section carries the table, lab 00 points at it, the `devcontainer.json`
+comment is corrected, and port 80's label now says it needs a `Host` header.
+Everything that runs *inside* the container — `curl`, `kubectl`, every
+`verify.sh` — is unaffected, which is why CI never saw this.
+
+**Retired by:** nothing available to us. Host-based routing plus a browser on
+another machine is the shape of the problem; the fix would be a per-service
+path prefix, which no other substrate needs.
+
+## TRAP — an optional golden path needs the internet, deliberately
+
+`lab/08-portal`'s deploy-from-source walkthrough (and `apps/demo-app`'s own
+README) tells the attendee to `crane copy
+public.ecr.aws/docker/library/golang:1.25-alpine` into Zot at run time. That
+image is **not** on `scripts/images.txt`, so `cloudbox-init.sh` never pre-pulls
+it and the step needs working WiFi at the moment it runs.
+
+This is a choice, not an oversight, and it predates the substrate split (it is on
+`main`: `git show main:lab/08-portal/README.md:267`): the base image costs every
+attendee a download for a going-deeper path most will not take. The lab says so
+in bold, and says to do it at home if the venue's WiFi is hostile.
+
+**What to keep true.** Everything on the core path stays offline (principle 2).
+If this ever moves onto `images.txt`, it moves *with a digest*, and the mirror
+grows by the size of a golang base for every attendee — measure that before
+deciding. CI (`bootstrap-test.yaml`) runs the same `crane copy` on a runner that
+does have the internet, which is why the deploy-from-source job proves the
+pipeline but not the offline story.
+
 ## TRAP — recovery tooling that lies is worse than recovery tooling that breaks
 
 The first four rehearsals found recovery paths that **broke**. The recovery pass
