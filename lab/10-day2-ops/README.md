@@ -331,8 +331,9 @@ failures self-heal in a way *configuration* failures never do. If it is still re
 after ~3 minutes, then read the logs.
 
 **"The host" is not one address, and you do not hand-edit it.** It is
-`host.docker.internal` on macOS/WSL2 Docker, `10.5.0.1` (`TALOS_SUBNET_GATEWAY`) on native
-Linux Docker, and the cluster gateway `172.30.<n>.1` inside a talos-box VM — the same
+`host.docker.internal` on the macOS/WSL2 docker substrate, `10.5.0.1`
+(`TALOS_SUBNET_GATEWAY`) on the native-Linux docker substrate, and the cluster gateway
+`172.30.<n>.1` inside a talos-box VM — the same
 host-vs-container addressing problem `cloudbox-mirror` solved for you in module 00 (see
 `mirror_host_endpoint()` and `cloudbox_host_gateway()` in `scripts/lib.sh`), showing up a
 second time for a second reason. It is already handled, in two halves:
@@ -441,7 +442,7 @@ calls, then evidence that goes unread — is the point.
 > ```bash
 > kubectl -n kagent logs deploy/k8s-agent -f
 > # POST http://<your host>:11434/api/chat    →  your host model answered
-> #   (host.docker.internal on macOS/WSL2 docker, 10.5.0.1 on native Linux,
+> #   (docker-only: host.docker.internal on macOS/WSL2, 10.5.0.1 on native Linux;
 > #    172.30.<n>.1 on talos-box — whatever the ModelConfig says)
 > # POST http://kagent-tools.kagent:8084/mcp  →  a tool call actually happened
 > ```

@@ -49,7 +49,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
 | `install.sh --write-hosts` | Docker only, mutating: (re)write the marked `/etc/hosts` block from the pins + `~/.cloudbox/extra-hosts`. The recovery path after a declined `sudo`, and the refresh path after WSL2 regenerates the file |
 | `create-cluster.sh` | Substrate **dispatcher**: resolves tbx-or-docker, sources the backend, then runs the shared path — Talos config gen/apply/bootstrap (1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm. Persists the choice in `~/.cloudbox/substrate` |
-| `create-cluster.sh --refresh-endpoint` | tbx only, creates nothing: re-reads `tbx status`, points the kubeconfig and `~/.cloudbox/api-endpoint` at the control plane's current address. The one command for "the cluster is running again after `tbx cluster start`, and its vmnet DHCP lease moved" |
+| `create-cluster.sh --refresh-endpoint` | tbx only, creates nothing: re-reads `tbx status`, points the kubeconfig **and** the `cloudbox` talosconfig context at the control plane's current address, verifies both clients answer there, and only then records it in `~/.cloudbox/api-endpoint`. Does not touch the machine config's own `controlPlane.endpoint`. The one command for "the cluster is running again after `tbx cluster start`, and its vmnet DHCP lease moved" |
 | `substrate/docker.sh` | The **Docker backend**: `talosctl cluster create docker` (raised memory/CPU, published ports) and the marked `/etc/hosts` block that gives the hostname scheme somewhere to resolve |
 | `substrate/tbx.sh` | The **talos-box backend**: `tbx up -f ~/.cloudbox/cloudbox.tbx.yaml` (rendered from `substrate/cloudbox.tbx.yaml.tmpl` + the `TBX_*` pins), then *our* Talos config — same patches as docker — plus the Cilium `LoadBalancerIPPool`/L2 policy and the wait for the ingress VIP |
 | `destroy-cluster.sh` | `talosctl cluster destroy` + kubeconfig cleanup (this workshop's named entries, in both the pinned kubeconfig and `~/.kube/config`); `--purge-mirror` also removes the image mirror |
@@ -68,8 +68,9 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 
 ## Why a local registry mirror?
 
-The Talos "nodes" are Docker containers with their **own containerd inside** —
-the host Docker image cache is invisible to them. `cloudbox-init.sh` therefore
+The Talos nodes run their **own containerd**, whichever substrate you are on — a VM's
+on talos-box, the container's on docker — so the host's Docker image cache is invisible
+to them either way. `cloudbox-init.sh` therefore
 runs a plain OCI registry (`cloudbox-mirror`, data in a Docker volume, so it
 survives cluster rebuilds) and copies every cluster image into it with crane,
 preserving repository paths and digests. Tag-only images are mirrored for your

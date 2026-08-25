@@ -72,8 +72,9 @@ if kubectl version >/dev/null 2>&1; then
   ok "kubectl reaches the API server"
 else
   # Do NOT suggest `talosctl kubeconfig` here. It writes the server address from
-  # the machine config's cluster.controlPlane.endpoint (https://10.5.0.2:6443),
-  # which only routes on native Linux — on macOS/Windows it replaces a working
+  # the machine config's cluster.controlPlane.endpoint — on the docker substrate
+  # that is the node's in-network https://10.5.0.2:6443 (docker-only), which
+  # only routes on native Linux. On macOS/Windows it replaces a working
   # kubeconfig with one that hangs on TCP connect. create-cluster.sh repoints the
   # context at whatever the substrate actually publishes — the controlplane
   # container's port on docker, the control-plane VM's own address on tbx —

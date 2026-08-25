@@ -565,6 +565,32 @@ else
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] || true
 
+# --- 12d. no docker-substrate node facts as universal truth ------------------
+# The docker backend's node addresses (10.5.0.x — talosctl's default subnet,
+# TALOS_SUBNET) and its container names (cloudbox-controlplane-1 /
+# cloudbox-worker-1) do not exist on tbx, where nodes are VMs on a vmnet DHCP
+# lease in 172.30.<n>.0/24. Module 01's README used to hand the room
+# `talosctl -n 10.5.0.2 …` and `docker pause cloudbox-worker-1` as THE way to do
+# it, which on half the machines is a command that cannot work.
+#
+# A line stays legal when it names its substrate — the same rule as 12b:
+# "docker substrate" / "docker-only" for a docker fact, "tbx "/"talos-box" for a
+# tbx one, and a line that names both is a comparison (lab 10's host-address
+# paragraph) rather than a claim. The search set is attendee-facing material
+# only; scripts/substrate/docker.sh, scripts/context-guard.sh and docs/ are
+# where these addresses legitimately live in full.
+before_fail=${FAILURES}
+docker_only_nodes="$(grep -rnE '10\.5\.0\.|cloudbox-(controlplane|worker)-1' \
+  lab/*/README.md lab/*/verify.sh lab/*/solve.sh slides/pages 2>/dev/null \
+  | grep -Eiv 'docker substrate|docker-only|talos-box|tbx ' || true)"
+if [[ -n "${docker_only_nodes}" ]]; then
+  bad "docker-substrate node facts (10.5.0.x, cloudbox-*-1 container names) in attendee-facing material without naming the substrate — on tbx the nodes are VMs with DHCP addresses and these commands cannot work:"
+  printf '   %s\n' "${docker_only_nodes}" | head -30
+else
+  ok "no unlabelled docker-substrate node addresses/container names in lab or slides"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
 # --- 13. CI project fixtures obey the console's own project-name rule --------
 # The console refuses a project name containing '-' (kube.ValidProjectName /
 # CheckProjectName: the Knative host is "<app>-<project>" in ONE DNS label, so a

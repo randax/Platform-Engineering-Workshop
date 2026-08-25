@@ -8,7 +8,7 @@ layout: section
 
 <div class="modlogos"><Logo name="talos" label size="2.6rem"/> <Logo name="cilium" label size="2.6rem"/></div>
 
-<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their new datacenter is just Docker on this laptop — an immutable OS with no server to SSH into and pet.</div>
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their new datacenter is two VMs on this laptop — an immutable OS with no server to SSH into and pet.</div>
 
 <!--
 The first real module, and the biggest identity shift of the day: every cloud provider runs an operating system under your Kubernetes that you never get to see. For the next 35 minutes, attendees take ownership of that layer.
@@ -35,7 +35,7 @@ flowchart LR
 <!--
 Talos in one breath: an operating system built solely to run Kubernetes. There is no shell to SSH into, no package manager to drift, no /etc to hand-edit. The ENTIRE machine is one declarative config document — the machineconfig — and the only way to manage the node is talosctl talking to a gRPC API. The OS is managed exactly like a Kubernetes resource: declare, apply, reconcile.
 
-Why this matters: the attack surface and the snowflake surface both collapse. This is what production-grade looks like in 2026 — and it runs happily as Docker containers on a laptop.
+Why this matters: the attack surface and the snowflake surface both collapse. This is what production-grade looks like in 2026 — and it runs happily on a laptop: real Talos VMs via talos-box where that works (macOS/Linux), Talos-in-Docker containers everywhere else. create-cluster.sh picks; every module after this is identical on both.
 
 Cilium: does the pod networking in eBPF programs in the kernel, and also REPLACES kube-proxy entirely. In the lab they'll verify there is no kube-proxy pod anywhere — and figure out who answers Service traffic instead (eBPF programs attached in-kernel).
 
@@ -64,6 +64,7 @@ Explain-back at the end: "tell your neighbor what is MISSING from these nodes, a
 
 Presenter/helper notes:
 - Talos v1.13 pinned (never 1.12.x — known-bad in Docker); node memory limits are raised in the script.
-- If Talos-in-Docker won't cooperate on someone's machine (rare, usually exotic firewall/nftables setups on Linux), don't debug past ~10 minutes: kind-fallback.sh gives them kind+Cilium and they rejoin from module 02 with everything else identical.
+- Expect a mixed room: `cat ~/.cloudbox/substrate` says which one a machine got. The lab's "break a node" bonus is branched per substrate (`tbx node stop|start`, or `docker pause|unpause`); everything else is plain kubectl/talosctl and identical.
+- If the substrate won't cooperate on someone's machine (rare), don't debug past ~10 minutes: `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh` is the first fallback, and kind-fallback.sh gives them kind+Cilium as the last one — they rejoin from module 02 with everything else identical.
 - Walk the solution on screen at ~30 min to re-sync the room.
 -->
