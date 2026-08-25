@@ -31,7 +31,11 @@ From the repository root:
    `tbx doctor` is unhappy with — runs the identical workshop on Talos-in-Docker. The
    scripts decide for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you
    want to. Docker is required either way: the image mirror is a container on both
-   substrates.
+   substrates. **On tbx, also let Ollama listen on more than loopback** if you plan to
+   run module 10: the cluster reaches your laptop at `172.30.<n>.1`, and Ollama's default
+   `127.0.0.1:11434` bind refuses that. `launchctl setenv OLLAMA_HOST 0.0.0.0` (then quit
+   and reopen Ollama.app), or `OLLAMA_HOST=0.0.0.0 ollama serve`. `cloudbox-init.sh` warns
+   you if it is still loopback-only.
 1. Install the tool chain: `./scripts/dev-setup.sh` (uses [mise](https://mise.jdx.dev/) with
    pinned versions — nothing floats). It ends by offering to hook mise into your shell —
    **say yes**: that is what puts the tools on your PATH *and* points `KUBECONFIG` at a

@@ -166,7 +166,7 @@ that matters, and it is worth saying so from the front of the room.
 
 The docker substrate has no resolver of its own, so the same hostname scheme both
 substrates serve has to come from somewhere: `create-cluster.sh:130-134` calls
-`write_hosts_block` (`scripts/lib.sh:302-392`), which replaces a block marked
+`write_hosts_block` (`scripts/lib.sh:302-430`), which replaces a block marked
 `# cloudbox-begin` / `# cloudbox-end` in `/etc/hosts` via a temp file and `sudo tee` —
 never an in-place `sudo sed`, because a half-written `/etc/hosts` breaks name resolution
 for the whole machine. Twelve names go in: the nine services plus `hello.demo.kn`,
@@ -176,14 +176,17 @@ so this prompt appears on exactly half the room's laptops.
 
 **How you would notice** if the attendee declines the password (or has no sudo at all):
 every hostname fails while the cluster is perfectly healthy, which is the same symptom as
-the VPN trap above and reads like a broken ingress.
+the VPN trap above and reads like a broken ingress. A declined `sudo tee` is now handled
+rather than left to `set -e`: `write_hosts_block` deletes its temp copy of `/etc/hosts`
+(it would otherwise sit in `$TMPDIR` forever) and dies naming
+`./scripts/install.sh --print-hosts`.
 
 **What handles it.** `install.sh --check` names the missing lines and how many
-(`scripts/install.sh:166-173`); `./scripts/install.sh --print-hosts` prints the block for
+(`scripts/install.sh:167-183`); `./scripts/install.sh --print-hosts` prints the block for
 hand-application, and on WSL2 also prints the note that the same lines belong in
 `C:\Windows\System32\drivers\etc\hosts`, edited as Administrator, for the Windows browser
 to resolve them (`scripts/install.sh:41-51`). `destroy-cluster.sh --purge-mirror` removes
-the block again (`scripts/destroy-cluster.sh:167`).
+the block again (`scripts/destroy-cluster.sh:195`).
 
 **Retired by:** nothing — it is the price of one hostname scheme on a substrate with no
 resolver. Say it out loud before `create-cluster.sh` runs so nobody is surprised by a
@@ -207,6 +210,151 @@ carry a LoadBalancer address, and fails loudly there rather than letting module 
 it; it also warns if the VIP is *not* `.200`, because the resolver would then be pointing
 every hostname at whichever other Service took the address first. Delete that Service and
 re-run; do not repoint the resolver.
+
+## TRAP — the pinned portal image predates `KNATIVE_DOMAIN`
+
+The Console builds the URL of every function it lists from a domain it now reads
+out of the environment: `KNATIVE_DOMAIN`, defaulted in `apps/portal/config.go:54`
+and used in `apps/portal/internal/web/applications.go:78-79`.
+`gitops/components/portal/portal.yaml:114` sets it. That code landed on the
+substrate branch; **the image it runs does not have it yet.**
+
+`ghcr.io/randax/cloudbox-portal:v0.2.2` — pinned in exactly two places,
+`scripts/images.txt:169` and `gitops/components/portal/portal.yaml:83` — was
+built before that commit, and its binary hardcodes `127.0.0.1.sslip.io:31080`.
+So until the next release is published, module 08's Console shows function URLs
+that are wrong **on both substrates**: they are not the `*.demo.kn.cloudbox.k8s.test`
+names Knative actually programs (`gitops/components/knative-serving/ingress.yaml`),
+and `127.0.0.1.sslip.io:31080` reaches nothing on tbx at all.
+
+**Do not fix this by editing the tag.** Pins are not hand-edited in this repo:
+`release-please` rewrites all of them from `extra-files` in the release PR
+(`release-please-config.json`, `.github/workflows/build-images.yaml:20-21`). A
+hand-bumped tag points at an image that does not exist yet — which is the
+publish-window trap below.
+
+**Why the release will be cut.** `release-please` in manifest mode assigns
+commits to the `apps` package by the **files they touch**, not by the
+conventional-commit scope: the branch's `feat(labs): sweep every browser-facing
+URL…` (`e9585df`) touches `apps/portal/*.go`, as do `ee8837e` and `a6f03fd`. Two
+`feat`s under `apps/` means the release PR bumps `0.2.2` → `0.3.0` and
+`build-images` publishes `cloudbox-portal:v0.3.0`.
+
+**Retired by, in order:** merge to `main` → `release-please` opens the release PR
+(pins rewritten in it) → merge that → `build-images` publishes the images →
+verify every ref resolves (the `crane manifest` loop in the publish-window entry
+below) → `./scripts/cloudbox-init.sh` re-mirrors. **Step 0 of rehearsal 5**
+(`docs/REHEARSALS.md`) — nothing else in that rehearsal proves the Console's
+function URLs until it is done.
+
+## LIVE — Ollama binds to loopback, and on tbx the cluster is not on loopback
+
+kagent's ModelConfig points at `<host-gateway>:11434`, written by
+`bootstrap-gitops.sh` from `cloudbox_host_gateway()`. The gateway differs by
+substrate, and so does whether Ollama's default bind can serve it:
+
+- **docker/macOS** → `host.docker.internal`, which Docker Desktop maps onto the
+  host's loopback. A `127.0.0.1:11434` Ollama answers. This has worked for four
+  rehearsals, which is why nobody has hit it.
+- **tbx** → `172.30.<n>.1`, a real vmnet address on the host. Ollama's default
+  bind is `127.0.0.1:11434`, so that connection is **refused**.
+
+**How you would notice.** Module 10's agent never answers. kagent is up, the
+ModelConfig holds the right host, the model is pulled — and every inference call
+fails at connect. It reads like a broken agent; it is a bind address.
+
+**What handles it.** `cloudbox-init.sh` probes this during prework, on tbx only:
+it confirms Ollama answers on `127.0.0.1:11434`, then reads the LISTEN address
+(`lsof -nP -iTCP:11434 -sTCP:LISTEN` on macOS, `ss -ltn` on Linux) and **warns**
+— never dies, the model is optional and this runs inside the image pre-pull
+everyone needs — naming the fix:
+
+    launchctl setenv OLLAMA_HOST 0.0.0.0    # macOS, then quit and reopen Ollama.app
+    OLLAMA_HOST=0.0.0.0 ollama serve        # if you run it in a terminal
+
+`lab/00-setup/README.md` says the same in the tbx prerequisites.
+
+**Retired by:** a rehearsal-5 module 10 on tbx that reaches the model (step 9).
+Nothing about this is provable on the docker substrate.
+
+## LIVE — host port 80 is the only privileged port the workshop binds
+
+On docker, `substrate/docker.sh` publishes `80:${NODEPORT_INGRESS}` from the
+controlplane container. That single entry is what makes
+`http://<name>.cloudbox.k8s.test` work without a port, the way the LoadBalancer
+VIP does on tbx — and it is the one port the workshop cannot pick differently.
+
+Everything that collides with it is ordinary: a local dev web server, another
+kind/Talos cluster, a system Apache/nginx, and on Colima/Lima the VM's own
+privileged-port forwarding (which needs to be enabled and can fail on its own
+terms). `install.sh --check` tests port 80, but **only before a cluster exists** —
+a listener started between the preflight and the create is invisible to it.
+
+**How you would notice.** `talosctl cluster create` dies with a docker port
+binding error that names the port and not the owner.
+
+**What handles it.** The create call is wrapped: on failure it says port 80 is
+the likely culprit and prints who holds it (`lsof -nP -iTCP:80 -sTCP:LISTEN`, or
+`ss -ltn`), and points at the substrate that needs no host port at all —
+`CLOUDBOX_SUBSTRATE=tbx ./scripts/create-cluster.sh`. On macOS the holder can be
+inside the Docker/Colima VM, where the host's `lsof` cannot see it; the message
+says to check `docker ps --filter publish=80` too.
+
+**Retired by:** nothing — a port-free hostname scheme on a substrate with no
+LoadBalancer costs exactly one privileged port. Rehearsal 5 step 13 runs the
+docker path on the same Mac and, if Colima is available, under Colima.
+
+## WATCH — `bootstrap-gitops.sh` creates namespace `kagent` before ArgoCD owns it
+
+`bootstrap-gitops.sh:227` creates the `kagent` namespace imperatively
+(`kubectl create namespace … --dry-run=client | kubectl apply -f -`) so it has
+somewhere to put the `cloudbox-host` ConfigMap that records the substrate's
+gateway. Module 10 then enables kagent, whose Application declares
+`CreateNamespace=true` **and** ships `gitops/components/kagent/namespace.yaml`.
+
+So ArgoCD meets a namespace that already exists, created client-side, and has to
+adopt it. **This is expected to hold** — the imperative create sets no labels and
+the manifest only adds `app.kubernetes.io/name: kagent`, so there is no field
+whose ownership is contested — but it has never been run.
+
+**Checked, not assumed:** the two definitions do not disagree. The manifest sets
+no PodSecurity labels (kagent needs nothing beyond Talos's `baseline` default),
+and the imperative create sets none either.
+
+**How you would notice.** The `kagent` Application sits `OutOfSync` on the
+Namespace resource after the first sync, or the sync reports a server-side-apply
+field-manager conflict on `metadata`.
+
+**Retired by:** rehearsal 5 step 9 — enable kagent and confirm the Application
+reaches Synced+Healthy with the Namespace among its resources.
+
+## WATCH — three settings have to agree for the Ollama host to survive selfHeal
+
+The Ollama host is a MACHINE fact, so git carries a default that is right for
+exactly one of the three cases (docker/macOS, docker/Linux, tbx) and the real
+value is written at runtime. Three separate mechanisms keep it there, and all
+three have to hold at once:
+
+1. `ignoreDifferences` on `ModelConfig/default-model-config`,
+   `/spec/ollama/host` (`gitops/catalog/kagent.yaml`) — so the diff is ignored;
+2. `RespectIgnoreDifferences=true` — without it a **selfHeal** sync ignores
+   `ignoreDifferences` and puts the git value back on every reconcile;
+3. `ServerSideApply=true` — which means the patch's field manager matters:
+   `bootstrap-gitops.sh:233` and the PostSync hook both use
+   `kubectl patch --type merge`, whose manager (`kubectl-patch`) is not
+   ArgoCD's, so `/spec/ollama/host` ends up owned by a manager ArgoCD does not
+   speak for.
+
+Expected to hold — `ignoreDifferences` is evaluated on the diff, before any
+apply, so ArgoCD should never send that field. Unproven: nobody has watched an
+SSA sync of this app after the patch landed.
+
+**How you would notice.** Module 10's agent works once, then stops after ArgoCD's
+next reconcile, with `.spec.ollama.host` back to `host.docker.internal:11434`.
+
+**Retired by:** rehearsal 5 step 9 — `argocd app sync kagent`, then re-read
+`kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.ollama.host}'`
+and confirm it still names the substrate's gateway.
 
 ## RESOLVED — node containers were capped at 2.0 CPUs, whatever the laptop had
 
