@@ -1,0 +1,31 @@
+{{define "query-result"}}
+{{if .Error}}
+<div class="alert danger" style="margin-top: 1rem;">
+  <strong>Error:</strong> {{.Error}}
+</div>
+{{else}}
+<div style="overflow-x: auto; margin-top: 1rem;">
+  <table class="grid" style="width: 100%; white-space: nowrap;">
+    <thead>
+      <tr>
+        {{range .Columns}}
+        <th>{{.}}</th>
+        {{end}}
+      </tr>
+    </thead>
+    <tbody>
+      {{if not .Rows}}
+      <tr><td colspan="{{len .Columns}}"><em>0 rows</em></td></tr>
+      {{end}}
+      {{range .Rows}}
+      <tr>
+        {{range .}}
+        <td>{{.}}</td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{end}}

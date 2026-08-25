@@ -82,6 +82,14 @@ phase: {{.Status.Phase}} · storage {{.Spec.Storage.Size}}</p>
 <p>CNPG puts the credentials in the Secret <code>{{.Secret}}</code> (namespace demo).
 Ready to paste:</p>
 <pre class="code">{{.Psql}}</pre>
+
+<h3>Interactive Query</h3>
+<form hx-post="/databases/{{.Name}}/query" hx-target="#query-result" style="margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+  <textarea name="query" rows="3" placeholder="SELECT * FROM pg_stat_activity;" style="font-family: monospace; resize: vertical; width: 100%;"></textarea>
+  <button type="submit" style="align-self: flex-start;">Run Query</button>
+</form>
+<div id="query-result"></div>
+
 {{end}}
 
 {{if .DB}}

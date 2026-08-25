@@ -41,7 +41,7 @@ rules:
     resources: [services]
     verbs: [get, list, watch]
   - apiGroups: [""]
-    resources: [pods, namespaces, nodes, events]
+    resources: [pods, namespaces, nodes, events, secrets]
     verbs: [get, list, watch]
   # Workload readiness for the /components status page and /workshop checklist.
   - apiGroups: [apps]

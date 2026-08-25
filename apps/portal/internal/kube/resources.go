@@ -433,3 +433,14 @@ func (k *Client) SelfRules(ctx context.Context, ns string) (SelfRules, error) {
 		Incomplete:    out.Status.Incomplete,
 	}, nil
 }
+
+type Secret struct {
+	Metadata ObjMeta           `json:"metadata"`
+	Data     map[string][]byte `json:"data"` // base64 encoded!
+}
+
+func (k *Client) GetSecret(ctx context.Context, ns, name string) (Secret, error) {
+	var s Secret
+	err := k.get(ctx, "/api/v1/namespaces/"+ns+"/secrets/"+name, &s)
+	return s, err
+}

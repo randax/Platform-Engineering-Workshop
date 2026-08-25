@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"database/sql"
+	_ "github.com/lib/pq"
 
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/metrics"
@@ -147,4 +149,86 @@ func handleResizeDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	// Reload the detail page: Crossplane is re-composing, and the page's live
 	// conditions + size now reflect the new T-shirt.
 	w.Header().Set("HX-Redirect", "/databases/"+name)
+}
+
+func handleDatabaseQuery(s *Server, w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	query := r.FormValue("query")
+	ns := s.activeProject(r)
+
+	if query == "" {
+		s.render(w, "query-result", map[string]any{"Error": "Query is empty"})
+		return
+	}
+
+	cluster, clusterName, err := s.Kube.GetCNPGCluster(r.Context(), ns, name)
+	if err != nil || cluster == nil || clusterName == "" {
+		s.render(w, "query-result", map[string]any{"Error": "Database not found or not composed yet"})
+		return
+	}
+
+	sec, err := s.Kube.GetSecret(r.Context(), ns, clusterName+"-app")
+	if err != nil {
+		s.render(w, "query-result", map[string]any{"Error": "Failed to read credentials: " + err.Error()})
+		return
+	}
+
+	user := string(sec.Data["user"])
+	pass := string(sec.Data["password"])
+	dbname := string(sec.Data["dbname"])
+	host := clusterName + "-rw." + ns + ".svc.cluster.local"
+
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=require", user, pass, host, dbname)
+	
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		s.render(w, "query-result", map[string]any{"Error": "Failed to open connection: " + err.Error()})
+		return
+	}
+	defer db.Close()
+
+	rows, err := db.QueryContext(r.Context(), query)
+	if err != nil {
+		s.render(w, "query-result", map[string]any{"Error": "Query error: " + err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		s.render(w, "query-result", map[string]any{"Error": "Failed to read columns: " + err.Error()})
+		return
+	}
+
+	var results [][]string
+	for rows.Next() {
+		columns := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i := range columns {
+			columnPointers[i] = &columns[i]
+		}
+
+		if err := rows.Scan(columnPointers...); err != nil {
+			continue
+		}
+
+		rowStrs := make([]string, len(cols))
+		for i, val := range columns {
+			if val == nil {
+				rowStrs[i] = "NULL"
+			} else {
+				if b, ok := val.([]byte); ok {
+					rowStrs[i] = string(b)
+				} else {
+					rowStrs[i] = fmt.Sprintf("%v", val)
+				}
+			}
+		}
+		results = append(results, rowStrs)
+	}
+
+	s.render(w, "query-result", map[string]any{
+		"Columns": cols,
+		"Rows":    results,
+	})
 }
