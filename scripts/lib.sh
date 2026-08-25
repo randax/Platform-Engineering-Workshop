@@ -958,6 +958,21 @@ hosts_marker_lines() {
   hosts_file_lf | sed 's/[[:blank:]]*$//'
 }
 
+# hosts_indented_markers — marker text that is in the file but NOT a marker,
+# because something indented it. `grep -n` output (line: text), empty when there
+# is none.
+#
+# Trailing blanks and CRs are normalised away (hosts_marker_lines); leading
+# whitespace deliberately is not, because indenting a line changes what it is
+# and an /etc/hosts comment may legitimately be indented. That makes "0 begin
+# markers" a sentence an attendee can read while looking straight at the marker,
+# and the count alone sent them hunting for a line they can already see.
+hosts_indented_markers() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
+  hosts_file_lf \
+    | grep -nE "^[[:blank:]]+(${CLOUDBOX_HOSTS_BEGIN}|${CLOUDBOX_HOSTS_END})[[:blank:]]*$" || true
+}
+
 hosts_markers_paired() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
   local begins ends b_line e_line
@@ -980,6 +995,19 @@ assert_hosts_block_wellformed() {
     fail "${CLOUDBOX_HOSTS_FILE} has ${begins} '${CLOUDBOX_HOSTS_BEGIN}' marker(s) and ${ends} '${CLOUDBOX_HOSTS_END}' marker(s) — expected one of each."
     warn "Refusing to rewrite it: with unpaired markers the rewrite would delete every line"
     warn "after the begin marker, including entries this workshop never wrote."
+    # A marker must be the WHOLE line. Trailing blanks and CRs are normalised
+    # away (hosts_marker_lines); LEADING whitespace is not, because indenting a
+    # line changes what it is, and /etc/hosts comments may legitimately be
+    # indented. So "0 begin markers" can be a lie an attendee is staring at: the
+    # marker is right there in the file, with two spaces in front of it. Say so
+    # — the count alone sent people looking for a line they can already see.
+    local indented
+    indented="$(hosts_indented_markers)"
+    if [[ -n "${indented}" ]]; then
+      warn "A marker IS in the file but starts with whitespace, which does not count — a marker"
+      warn "must be the whole line. Delete the leading spaces/tabs from these (line: text):"
+      printf '   %s\n' "${indented}"
+    fi
     warn "Fix it by hand (sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}): keep ONE ${CLOUDBOX_HOSTS_BEGIN} …"
     warn "${CLOUDBOX_HOSTS_END} pair, or delete both markers and the lines between them, then re-run."
     warn "The lines that belong inside: ./scripts/install.sh --print-hosts"
@@ -1185,7 +1213,46 @@ hosts_missing_names() {
 # no re-entrant writer at all: `--add-hosts` needs a name to add.
 # `install.sh --write-hosts` is that writer, and it is what every failure below
 # names. Callers that want a hard stop check the status themselves.
+# hosts_file_unreadable — the file is THERE and this process cannot read it.
+# The one state every helper in this section confused with "there is no file":
+# each of them opens with `[[ -r ... ]] || return 0`, which is right for a
+# machine that has no ${CLOUDBOX_HOSTS_FILE} at all and catastrophic for one
+# whose permissions (a hardened image, a bad chmod, a CLOUDBOX_HOSTS_FILE
+# pointed somewhere odd) hide it. write_hosts_block then skipped the awk that
+# copies the existing lines and `sudo tee`'d a file containing ONLY the CloudBox
+# block — no `127.0.0.1 localhost`, no anything else. That is not a workshop
+# problem, it is a machine that stops resolving its own name.
+hosts_file_unreadable() {
+  [[ -e "${CLOUDBOX_HOSTS_FILE}" && ! -r "${CLOUDBOX_HOSTS_FILE}" ]]
+}
+
 write_hosts_block() {
+  # Before every other question: a file we cannot READ is one we must not
+  # REWRITE. Everything below assumes "unreadable" and "absent" are the same
+  # thing, and for a whole-file rewrite they are opposites.
+  if hosts_file_unreadable; then
+    fail "${CLOUDBOX_HOSTS_FILE} exists but this process cannot read it — refusing to rewrite it."
+    warn "The rewrite copies the file's existing lines and appends the CloudBox block; unreadable,"
+    warn "it would write a file containing ONLY that block and drop 'localhost' with everything else."
+    warn "Check its permissions (ls -l ${CLOUDBOX_HOSTS_FILE}), then re-run:"
+    warn "  ./scripts/install.sh --write-hosts"
+    warn "Or add the lines by hand: ./scripts/install.sh --print-hosts"
+    return 1
+  fi
+  # Indented markers are invisible to every marker reader, and BOTH of them
+  # indented reads as "no block at all" — which is well-formed, so the assertion
+  # below passes and this appends a second block beside the one already there.
+  # Not fatal (the write that follows is correct and the names will resolve),
+  # but said out loud, because the leftover is the kind of thing that surfaces
+  # three commands later as a duplicate nobody can account for.
+  local indented_markers
+  indented_markers="$(hosts_indented_markers)"
+  if [[ -n "${indented_markers}" ]]; then
+    warn "${CLOUDBOX_HOSTS_FILE} contains CloudBox marker text that is indented, so it is not a"
+    warn "marker — the block below it is invisible to every script here (line: text):"
+    printf '   %s\n' "${indented_markers}"
+    warn "Delete the leading spaces/tabs (or that whole old block) by hand: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}"
+  fi
   # Pairing FIRST, before the "is it already correct?" shortcut: a file with a
   # begin marker and no end marker can still list every name, and taking the
   # shortcut there would report success on a file we have just refused to touch.
@@ -1247,6 +1314,16 @@ write_hosts_block() {
 # 0 when there is nothing to do or the block was removed, 1 when the file still
 # carries CloudBox lines and the caller should say so.
 remove_hosts_block() {
+  # Same distinction the writer makes, and here it is about honesty rather than
+  # damage: an unreadable file cannot be searched for markers, so "nothing of
+  # mine here" would be a guess reported as a fact — and destroy-cluster.sh
+  # would end with a clean bill of health on a machine whose /etc/hosts may
+  # still send every workshop name to 127.0.0.1.
+  if hosts_file_unreadable; then
+    fail "${CLOUDBOX_HOSTS_FILE} exists but this process cannot read it — cannot tell whether the CloudBox block is still in it."
+    warn "Check it by hand: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # delete the marked block if it is there"
+    return 1
+  fi
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
   # EITHER marker, not just the begin one. An end-only file is precisely the
   # state the assertion below exists for — a truncated block, a half-finished

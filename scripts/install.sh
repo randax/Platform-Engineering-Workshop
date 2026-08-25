@@ -407,7 +407,14 @@ fi
 # Verify only. The block is written on the create path (create-cluster.sh) or by
 # `--write-hosts`, which is where the sudo prompt belongs; --check never mutates.
 step "Workshop hostnames (*.${CLOUDBOX_DOMAIN})"
-if [[ "${SUBSTRATE}" == "tbx" ]] && hosts_block_stale_for_tbx; then
+if hosts_file_unreadable; then
+  # Before every other question about this file, on every substrate: unreadable
+  # is not absent. Every predicate below opens with `[[ -r ]] || return 0` and
+  # would report a clean machine, while the writer refuses (rightly — it would
+  # otherwise replace the whole file with the block alone) and tbx cannot be
+  # told whether stale 127.0.0.1 lines are overriding its resolver.
+  check_fail "${CLOUDBOX_HOSTS_FILE} exists but cannot be read from here, so nothing can tell whether the workshop names resolve — check its permissions (ls -l ${CLOUDBOX_HOSTS_FILE})"
+elif [[ "${SUBSTRATE}" == "tbx" ]] && hosts_block_stale_for_tbx; then
   # "No entries needed" is true and useless when docker-substrate lines are still
   # sitting there: /etc/hosts is consulted BEFORE talos-box's resolver, so those
   # 127.0.0.1 lines win and every workshop URL reaches the attendee's own

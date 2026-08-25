@@ -235,8 +235,32 @@ if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
     ok "API endpoint is now ${endpoint} (was ${previous:-unrecorded})"
   fi
   info "kubeconfig: $(kubeconfig_in_use)"
-  require_workshop_context
-  ok "The context guard accepts this cluster again."
+
+  # SELECT the context, then assert it. The guard asserts kubectl's CURRENT
+  # context and EXITS 1 when it is not this cluster's — which, run bare here,
+  # failed the repair after every one of its writes had already succeeded, on
+  # the ordinary case of an attendee who had switched context since the create.
+  # The three files were correct, the endpoint was recorded, and the command
+  # still ended in "❌ refusing to touch this cluster" and exit 1. This is the
+  # repair for a cluster that moved: leaving kubectl pointed at it is part of
+  # the repair, and it is what create-cluster.sh's own create path does.
+  #
+  # --kubeconfig is pinned to the file everything above was written into
+  # (kubeconfig_in_use resolves the mise shim's KUBECONFIG), so the selection
+  # lands where the guard will look.
+  if kubectl --kubeconfig "$(kubeconfig_in_use)" config use-context "admin@${CLUSTER_NAME}" >/dev/null 2>&1; then
+    ok "kubectl context selected: admin@${CLUSTER_NAME}"
+    require_workshop_context
+    ok "The context guard accepts this cluster again."
+  else
+    # Nothing above is undone by this: the kubeconfig, the talosconfig and
+    # ${CLOUDBOX_API_ENDPOINT_FILE} are written and proven. Only the selection
+    # failed, so this warns and names the command instead of exiting 1 on a
+    # repair that worked.
+    warn "Could not select 'admin@${CLUSTER_NAME}' in $(kubeconfig_in_use) — the repair itself is DONE"
+    warn "(kubeconfig, talosconfig and ${CLOUDBOX_API_ENDPOINT_FILE} all point at ${cp_ip})."
+    warn "Point kubectl at it yourself: kubectl config use-context admin@${CLUSTER_NAME}"
+  fi
   exit 0
 fi
 
