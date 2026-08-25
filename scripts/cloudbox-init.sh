@@ -335,37 +335,53 @@ fi
 # Note this is IN ADDITION to everything above: a tbx attendee still needs Docker
 # running for prework, because the crane mirror the VMs pull from is itself a
 # Docker container. tbx replaces the NODES, not the mirror.
-if [[ "${SUBSTRATE}" == "tbx" ]]; then
-  if ! have tbx; then
-    # Only reachable via CLOUDBOX_SUBSTRATE=tbx on a machine without the binary:
-    # substrate_resolve's detection path requires `tbx doctor` to pass first.
+# Gated on the BINARY, not on substrate_resolve()'s answer. Those differ in the
+# case that matters: `tbx doctor` fails at home (the helper is not installed
+# yet, the resolver is not wired up, a laptop is on battery-saver) so detection
+# says "docker", the warm is skipped — and then the attendee fixes tbx before
+# the venue, `tbx doctor` passes there, create-cluster.sh picks tbx, and the
+# create goes to the Image Factory over conference WiFi for a 95-204 MB disk
+# image. Prework is cheap and idempotent; a Factory download at the venue is
+# the thing principle 2 exists to prevent. So: warm it whenever tbx exists,
+# unless the attendee has explicitly said they are on docker.
+#
+# CLOUDBOX_SUBSTRATE (the explicit override), not SUBSTRATE (which is also
+# "docker" whenever detection merely failed) — that distinction is the whole
+# point of this gate.
+if [[ "${CLOUDBOX_SUBSTRATE:-}" == "docker" ]]; then
+  info "Prework summary: images=${total} mirrored · substrate=docker (CLOUDBOX_SUBSTRATE=docker — no Talos disk image needed)"
+elif ! have tbx; then
+  if [[ "${SUBSTRATE}" == "tbx" ]]; then
+    # Reachable via a persisted 'tbx' answer, or CLOUDBOX_SUBSTRATE=tbx, on a
+    # machine without the binary: detection itself requires `tbx doctor` first.
     warn "substrate is 'tbx' but the tbx binary is not installed — cannot pre-pull"
     warn "the Talos disk image. Install tbx (see ./scripts/dev-setup.sh) and re-run."
-    tbx_cached="skipped"
-    tbx_doctor="skipped"
+  fi
+  info "Prework summary: images=${total} mirrored · substrate=docker (tbx not installed — no Talos disk image needed)"
+else
+  step "Pre-pulling the Talos ${TALOS_VERSION} disk image for tbx"
+  if tbx cache pull --talos-version "${TALOS_VERSION}"; then
+    ok "Talos disk image cached in ~/.talosbox/cache"
+    tbx_cached="yes"
   else
-    step "Pre-pulling the Talos ${TALOS_VERSION} disk image for tbx"
-    if tbx cache pull --talos-version "${TALOS_VERSION}"; then
-      ok "Talos disk image cached in ~/.talosbox/cache"
-      tbx_cached="yes"
-    else
-      warn "'tbx cache pull --talos-version ${TALOS_VERSION}' failed — the first"
-      warn "create will download it, which needs the Image Factory. Retry at home."
-      tbx_cached="no"
-    fi
-    step "Checking the tbx host setup"
-    if tbx doctor; then
-      ok "tbx doctor passes"
-      tbx_doctor="pass"
-    else
-      warn "tbx doctor reports problems (above). Fix them, or use the docker"
-      warn "substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
-      tbx_doctor="fail"
-    fi
+    warn "'tbx cache pull --talos-version ${TALOS_VERSION}' failed — the first"
+    warn "create will download it, which needs the Image Factory. Retry at home."
+    tbx_cached="no"
+  fi
+  step "Checking the tbx host setup"
+  if tbx doctor; then
+    ok "tbx doctor passes"
+    tbx_doctor="pass"
+  else
+    # NOT fatal, and not a reason to skip the warm above — which is exactly why
+    # the warm runs first. A doctor that fails today may pass at the venue, and
+    # the cached disk image is what makes that recovery offline-safe.
+    warn "tbx doctor reports problems (above). The Talos disk image is cached either way."
+    warn "Fix them before the venue, or use the docker substrate:"
+    warn "  CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
+    tbx_doctor="fail"
   fi
   info "Prework summary: images=${total} mirrored · talos-disk=${tbx_cached} · tbx-doctor=${tbx_doctor}"
-else
-  info "Prework summary: images=${total} mirrored · substrate=docker (no Talos disk image needed)"
 fi
 
 info "Next: ./scripts/install.sh --check"
