@@ -58,29 +58,6 @@ substrate_preflight() {
 }
 
 
-# tbx_host_memory_mib — the host's physical RAM in MiB, or nothing when this
-# platform has no probe we trust. Deliberately the SAME sources tbxd reads, so
-# our arithmetic and its overcommit gate cannot disagree about the host:
-#   macOS  sysctl hw.memsize (bytes)   — internal/balloon/hostmem_darwin.go:17-23
-#   Linux  /proc/meminfo MemTotal (kB) — tbxd has no Linux probe at all
-#          (internal/balloon/hostmem_stub.go), so nothing to disagree with.
-# Prints nothing rather than dying: it runs inside $( ), and the caller treats
-# an unreadable host as "keep the pinned ceiling".
-tbx_host_memory_mib() {
-  local raw
-  case "$(uname -s)" in
-    Darwin)
-      raw="$(sysctl -n hw.memsize 2>/dev/null || true)"
-      [[ "${raw}" =~ ^[0-9]+$ ]] && echo $((raw / 1024 / 1024))
-      ;;
-    Linux)
-      raw="$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || true)"
-      [[ "${raw}" =~ ^[0-9]+$ ]] && echo $((raw / 1024))
-      ;;
-  esac
-  return 0
-}
-
 # tbx_worker_memory — the worker VM's memory as a GiB string for the cluster
 # yaml. See the TBX_HOST_RESERVE_GIB block in versions.env for why this is
 # derived and not simply the pin: `tbx up` ERRORS when planned VM memory
@@ -524,13 +501,36 @@ substrate_post_ready() {
 
 substrate_destroy() {
   step "Destroying Talos VMs for '${CLUSTER_NAME}'"
-  if tbx status "${CLUSTER_NAME}" >/dev/null 2>&1; then
+  need tbx "The cluster was created on the tbx substrate, so only tbx can remove its VMs. Install talos-box again, or remove them by hand before deleting ${CLOUDBOX_SUBSTRATE_FILE}."
+  # `tbx status <cluster>` exits non-zero for TWO very different reasons, and
+  # treating them the same is how a destroy erases the record of a cluster that
+  # is still there:
+  #   * the cluster does not exist — `cluster.Load` fails to read its state file
+  #     (upstream internal/cluster/store.go:63-71, the ONLY site that says
+  #     "read cluster state"), reached from the daemon's status op
+  #     (internal/daemon/operations.go:1446-1449);
+  #   * anything else — tbxd not running, the socket refusing, a protocol
+  #     mismatch, a permission problem. The VMs are alive and we simply cannot
+  #     see them.
+  # Only the first is "nothing to destroy". The second must NOT continue: the
+  # caller deletes ~/.cloudbox/substrate right after this returns, and a machine
+  # with live VMs and no persisted substrate destroys as docker forever after.
+  local out rc=0
+  out="$(tbx status "${CLUSTER_NAME}" 2>&1)" || rc=$?
+  if [[ "${rc}" -eq 0 ]]; then
     # `tbx down` only STOPS a cluster and has no --delete flag. Destroy is its
     # own verb, and --force is its confirmation.
     tbx cluster destroy "${CLUSTER_NAME}" --force
     ok "Cluster destroyed"
-  else
+  elif [[ "${out}" == *"read cluster state"* || "${out}" == *"no such file or directory"* ]]; then
     warn "No '${CLUSTER_NAME}' tbx cluster found — nothing to destroy"
+  else
+    fail "'tbx status ${CLUSTER_NAME}' failed for a reason that is NOT 'no such cluster':"
+    printf '   %s\n' "${out}"
+    warn "Nothing has been removed, and ${CLOUDBOX_SUBSTRATE_FILE} is left in place —"
+    warn "if the VMs are still running, this is the only record that they are tbx's."
+    die "Fix the above (is tbxd running? 'tbx doctor'), then re-run ./scripts/destroy-cluster.sh"
   fi
+  # Only after a successful destroy or a PROVEN absence.
   rm -f "${TBX_CLUSTER_FILE}"
 }

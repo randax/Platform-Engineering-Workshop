@@ -288,6 +288,33 @@ tbx_version_check() {
   "${report}" "tbx version drift: this machine has ${found:-an unreadable version}, the workshop is pinned to ${TBX_VERSION} (scripts/versions.env). Install the pin (brew install randax/tap/tbx, or the matching release tarball), set CLOUDBOX_ALLOW_TBX_DRIFT=1 to proceed unpinned, or use the docker substrate: CLOUDBOX_SUBSTRATE=docker"
 }
 
+# tbx_host_memory_mib — the host's physical RAM in MiB, or nothing when this
+# platform has no probe we trust. Deliberately the SAME sources tbxd reads, so
+# our arithmetic and its overcommit gate cannot disagree about the host:
+#   macOS  sysctl hw.memsize (bytes)   — internal/balloon/hostmem_darwin.go:17-23
+#   Linux  /proc/meminfo MemTotal (kB) — tbxd has no Linux probe at all
+#          (internal/balloon/hostmem_stub.go), so nothing to disagree with.
+# Prints nothing rather than dying: it runs inside $( ), and the caller treats
+# an unreadable host as "keep the pinned ceiling".
+# Lives in lib.sh, not in substrate/tbx.sh, for the same reason
+# tbx_version_check does: `install.sh --check` reports the host's RAM against
+# the published floor on the tbx substrate, and a preflight must not have to
+# source a create backend to ask a read-only question.
+tbx_host_memory_mib() {
+  local raw
+  case "$(uname -s)" in
+    Darwin)
+      raw="$(sysctl -n hw.memsize 2>/dev/null || true)"
+      [[ "${raw}" =~ ^[0-9]+$ ]] && echo $((raw / 1024 / 1024))
+      ;;
+    Linux)
+      raw="$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || true)"
+      [[ "${raw}" =~ ^[0-9]+$ ]] && echo $((raw / 1024))
+      ;;
+  esac
+  return 0
+}
+
 # cloudbox_host_gateway — the HOST as workloads INSIDE the cluster see it.
 # ONE definition, used by both backends and by bootstrap-gitops.sh (kagent's
 # Ollama endpoint), catch-up.sh and the labs — each of which runs in its own
@@ -415,6 +442,53 @@ CLOUDBOX_HOSTS_BEGIN="# cloudbox-begin"
 CLOUDBOX_HOSTS_END="# cloudbox-end"
 CLOUDBOX_HOSTS_FILE="${CLOUDBOX_HOSTS_FILE:-/etc/hosts}"
 
+# Extra short names an attendee asked for with `./scripts/install.sh
+# --add-hosts <name>…` — one per line, no domain, e.g. `my-app-demo`. See
+# cloudbox_extra_hostnames() below for why this file has to exist.
+CLOUDBOX_EXTRA_HOSTS_FILE="${HOME}/.cloudbox/extra-hosts"
+
+# cloudbox_extra_hostnames — the attendee's own Knative names, fully qualified.
+#
+# On tbx talos-box's resolver answers the whole `*.${KNATIVE_DOMAIN}` wildcard
+# and none of this is consulted. /etc/hosts has NO wildcards, so on docker only
+# the names we enumerate resolve — and the three the labs create are the only
+# ones we can know in advance. Everything the Console composes (module 08's
+# Application XR, into whichever project the attendee picked) and everything an
+# attendee writes by hand is unknowable at create time. Recording them here is
+# what makes `install.sh --add-hosts my-app-demo` re-derivable: the block is
+# rewritten from cloudbox_hostnames(), so a name that is not persisted is a name
+# the next rewrite silently drops.
+#
+# Anything that is not a bare DNS label is skipped WITH a warning rather than
+# written into /etc/hosts: this file is edited by hand as often as not.
+cloudbox_extra_hostnames() {
+  [[ -r "${CLOUDBOX_EXTRA_HOSTS_FILE}" ]] || return 0
+  local n
+  while IFS= read -r n; do
+    n="${n%%#*}"                       # allow trailing comments
+    n="${n//[[:space:]]/}"
+    [[ -z "${n}" ]] && continue
+    if [[ ! "${n}" =~ ^[a-z0-9-]+$ ]]; then
+      warn "${CLOUDBOX_EXTRA_HOSTS_FILE}: ignoring '${n}' — not a DNS label ([a-z0-9-])" >&2
+      continue
+    fi
+    echo "${n}.${KNATIVE_DOMAIN}"
+  done < "${CLOUDBOX_EXTRA_HOSTS_FILE}"
+}
+
+# cloudbox_add_extra_host <name> — persist one short name, idempotently.
+# Validates here rather than at the call site so every door into the file
+# (today: install.sh --add-hosts) enforces the same rule.
+cloudbox_add_extra_host() {
+  local name="$1"
+  [[ "${name}" =~ ^[a-z0-9-]+$ ]] \
+    || die "'${name}' is not a DNS label — Knative names are lowercase letters, digits and '-' (pass the FIRST label only, e.g. my-app-demo for my-app-demo.${KNATIVE_DOMAIN})"
+  mkdir -p "$(dirname "${CLOUDBOX_EXTRA_HOSTS_FILE}")"
+  touch "${CLOUDBOX_EXTRA_HOSTS_FILE}"
+  grep -qxF "${name}" "${CLOUDBOX_EXTRA_HOSTS_FILE}" && return 0
+  printf '%s\n' "${name}" >> "${CLOUDBOX_EXTRA_HOSTS_FILE}"
+}
+
 # cloudbox_hostnames — every name the workshop serves, one per line.
 # Derived from the *_HOST_URL pins in versions.env rather than re-typed here:
 # there is exactly one place a hostname is written down, and renaming a service
@@ -427,9 +501,10 @@ CLOUDBOX_HOSTS_FILE="${CLOUDBOX_HOSTS_FILE:-/etc/hosts}"
 # whole shape is covered by talos-box's wildcard resolver and this list is not
 # consulted at all; /etc/hosts has no wildcards, so on docker the three names
 # the labs create are enumerated and anything an attendee creates themselves
-# needs a manual line, a `curl -H Host:`, or NodePort 31080. lab/06 says so,
-# and its verifier reads the Knative Service's published .status.url rather
-# than assuming the shape.
+# needs `./scripts/install.sh --add-hosts <name>` (which persists it in
+# ${CLOUDBOX_EXTRA_HOSTS_FILE} and rewrites the block), a `curl -H Host:`, or
+# NodePort 31080. lab/06 and lab/08 say so, and their verifiers read the Knative
+# Service's published .status.url rather than assuming the shape.
 cloudbox_hostnames() {
   local url host
   for url in "${GITEA_HOST_URL}" "${ARGOCD_HOST_URL}" "${PORTAL_HOST_URL}" \
@@ -442,21 +517,27 @@ cloudbox_hostnames() {
   for n in hello-demo uploader-pipeline resizer-pipeline; do
     echo "${n}.${KNATIVE_DOMAIN}"
   done
+  # …plus whatever the attendee added with `install.sh --add-hosts`.
+  cloudbox_extra_hostnames
 }
 
 cloudbox_hosts_block() {
   echo "${CLOUDBOX_HOSTS_BEGIN}"
   echo "# CloudBox workshop — the docker substrate has no resolver, so every"
-  echo "# hostname is listed here. Written by ./scripts/create-cluster.sh,"
-  echo "# removed by ./scripts/destroy-cluster.sh --purge-mirror. Safe to delete"
-  echo "# by hand: nothing outside these two markers is ever touched."
+  echo "# hostname is listed here. Written by ./scripts/create-cluster.sh (and"
+  echo "# by ./scripts/install.sh --add-hosts), removed by"
+  echo "# ./scripts/destroy-cluster.sh. Safe to delete by hand: nothing outside"
+  echo "# these two markers is ever touched."
   local n
   while IFS= read -r n; do echo "127.0.0.1 ${n}"; done < <(cloudbox_hostnames)
   echo "${CLOUDBOX_HOSTS_END}"
 }
 
-# assert_hosts_block_wellformed — refuse to rewrite ${CLOUDBOX_HOSTS_FILE}
-# unless its markers form exactly one ordered pair (or none at all).
+# The marker-pairing rule, and the two functions that ask about it:
+# hosts_markers_paired (quiet predicate) and assert_hosts_block_wellformed
+# (same answer, plus the repair guidance). Nothing rewrites
+# ${CLOUDBOX_HOSTS_FILE} unless its markers form exactly one ordered pair — or
+# none at all.
 #
 # Both rewrites below are the same awk: "stop printing at the begin marker,
 # resume after the end marker". That awk is only exactly-reversible while the
@@ -468,12 +549,28 @@ cloudbox_hosts_block() {
 #
 # So this is a hard stop with manual-repair guidance, not a repair: we cannot
 # know where the missing marker belonged, and guessing writes /etc/hosts.
-assert_hosts_block_wellformed() {
+# hosts_markers_paired — the same question, WITHOUT printing anything: 0 when
+# the markers are one ordered pair or absent entirely, 1 when they are not.
+# Split out so predicates (hosts_block_present) can ask it without narrating,
+# while the paths that refuse to write still print the repair guidance below.
+hosts_markers_paired() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
-  local begins ends
+  local begins ends b_line e_line
   begins="$(grep -cxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || true)"
   ends="$(grep -cxF "${CLOUDBOX_HOSTS_END}" "${CLOUDBOX_HOSTS_FILE}" || true)"
   [[ "${begins}" == "0" && "${ends}" == "0" ]] && return 0
+  [[ "${begins}" == "1" && "${ends}" == "1" ]] || return 1
+  b_line="$(grep -nxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" | cut -d: -f1)"
+  e_line="$(grep -nxF "${CLOUDBOX_HOSTS_END}" "${CLOUDBOX_HOSTS_FILE}" | cut -d: -f1)"
+  [[ "${e_line}" -gt "${b_line}" ]]
+}
+
+assert_hosts_block_wellformed() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
+  hosts_markers_paired && return 0
+  local begins ends
+  begins="$(grep -cxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || true)"
+  ends="$(grep -cxF "${CLOUDBOX_HOSTS_END}" "${CLOUDBOX_HOSTS_FILE}" || true)"
   if [[ "${begins}" != "1" || "${ends}" != "1" ]]; then
     fail "${CLOUDBOX_HOSTS_FILE} has ${begins} '${CLOUDBOX_HOSTS_BEGIN}' marker(s) and ${ends} '${CLOUDBOX_HOSTS_END}' marker(s) — expected one of each."
     warn "Refusing to rewrite it: with unpaired markers the rewrite would delete every line"
@@ -496,12 +593,18 @@ assert_hosts_block_wellformed() {
   return 0
 }
 
-# hosts_block_present — 0 when the block exists AND lists every current name.
-# A block that is merely present is not enough: adding a hostname to
-# cloudbox_hostnames must make this fail so the block gets rewritten.
+# hosts_block_present — 0 when the block exists, its markers are a PAIR, and it
+# lists every current name. A block that is merely present is not enough:
+# adding a hostname to cloudbox_hostnames must make this fail so the block gets
+# rewritten — and so must a begin marker with no end marker. That last one is
+# why the pairing check is here and not only in the writers: write_hosts_block
+# asks this first, and an unpaired block that happens to list every name used to
+# answer "already correct", which skipped the assertion entirely and left the
+# broken file in place for the NEXT writer (or a hand edit) to truncate.
 hosts_block_present() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 1
   grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || return 1
+  hosts_markers_paired || return 1
   local n
   while IFS= read -r n; do
     grep -qE "^[[:space:]]*127\.0\.0\.1[[:space:]]+${n//./\\.}([[:space:]]|$)" \
@@ -524,9 +627,12 @@ hosts_missing_names() {
 # Written via a temp file and `sudo tee`, never an in-place sudo sed: a
 # half-written /etc/hosts breaks name resolution for the whole machine.
 write_hosts_block() {
-  hosts_block_present && { ok "${CLOUDBOX_HOSTS_FILE} block already correct"; return 0; }
+  # Pairing FIRST, before the "is it already correct?" shortcut: a file with a
+  # begin marker and no end marker can still list every name, and taking the
+  # shortcut there would report success on a file we have just refused to touch.
   assert_hosts_block_wellformed \
     || die "Not touching ${CLOUDBOX_HOSTS_FILE} (see above). The cluster is fine; only the hostnames are."
+  hosts_block_present && { ok "${CLOUDBOX_HOSTS_FILE} block already correct"; return 0; }
   local tmp; tmp="$(mktemp)"
   # Set AFTER mktemp so an early `return 0` above never runs it with tmp unset.
   # shellcheck disable=SC2064  # expand tmp NOW: at RETURN time the local is gone
@@ -553,6 +659,9 @@ write_hosts_block() {
     die "Could not write ${CLOUDBOX_HOSTS_FILE} (sudo declined or unavailable). Add the lines by hand: ./scripts/install.sh --print-hosts"
   fi
   rm -f "${tmp}"
+  # The temp file is gone; disarm the trap so the RETURN below is not a second
+  # `rm -f` against a path $TMPDIR may by then have handed to someone else.
+  trap - RETURN
   hosts_block_present || die "Wrote ${CLOUDBOX_HOSTS_FILE} but the names still do not resolve — check it by hand"
   ok "${CLOUDBOX_HOSTS_FILE} updated ($(cloudbox_hostnames | wc -l | tr -d ' ') names)"
 }
@@ -581,6 +690,7 @@ remove_hosts_block() {
     die "Could not rewrite ${CLOUDBOX_HOSTS_FILE} (sudo declined or unavailable). Delete the lines between ${CLOUDBOX_HOSTS_BEGIN} and ${CLOUDBOX_HOSTS_END} by hand."
   fi
   rm -f "${tmp}"
+  trap - RETURN   # see write_hosts_block
   ok "${CLOUDBOX_HOSTS_FILE} block removed"
 }
 

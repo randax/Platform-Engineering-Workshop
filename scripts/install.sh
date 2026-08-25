@@ -2,13 +2,17 @@
 # =============================================================================
 # install.sh — CloudBox pre-flight check (step 3, the go/no-go gate)
 #
-# Checks that this machine can run the workshop. It only READS state —
-# it never installs anything, never touches a cluster, never pulls images.
+# Checks that this machine can run the workshop. --check and --print-hosts only
+# READ state — they install nothing, touch no cluster, pull no images. The one
+# mutating mode is --add-hosts, which is opt-in and says what it is doing.
 #
 # Usage:
 #   ./scripts/install.sh --check    # run the pre-flight check
 #   ./scripts/install.sh            # same check + usage text
 #   ./scripts/install.sh --print-hosts   # the /etc/hosts lines the docker substrate needs
+#   ./scripts/install.sh --add-hosts <name>...   # docker only: resolve extra
+#                                   Knative names (e.g. my-app-demo) — WRITES
+#                                   /etc/hosts, asks for sudo
 #
 # Checked:
 #   * CPU architecture (amd64/arm64) and WSL2 hints
@@ -48,6 +52,31 @@ case "${1:-}" in
       echo "#       the Windows browser resolves names itself, and only reads that file."
       echo "# tbx substrate: not needed — talos-box's resolver answers ${CLOUDBOX_DOMAIN}."
     } >&2
+    exit 0 ;;
+  # The ONE mutating mode in this script, and the reason it lives here rather
+  # than in create-cluster.sh: /etc/hosts has no wildcards, so on the docker
+  # substrate only the names create-cluster.sh enumerated resolve. The three
+  # ksvcs the labs create are knowable in advance; a Console-composed
+  # Application (module 08) or anything an attendee names themselves is not.
+  # This persists the short name in ${CLOUDBOX_EXTRA_HOSTS_FILE} — so the NEXT
+  # rewrite of the block keeps it — and rewrites the block now.
+  #
+  # tbx needs none of this: talos-box's resolver answers the whole
+  # *.${KNATIVE_DOMAIN} wildcard, so the command refuses there rather than
+  # writing lines that would OVERRIDE that resolver with 127.0.0.1.
+  --add-hosts)
+    shift
+    [[ $# -gt 0 ]] || { usage; die "--add-hosts needs at least one name, e.g. --add-hosts my-app-demo"; }
+    add_substrate="$(substrate_resolve)"
+    if [[ "${add_substrate}" != "docker" ]]; then
+      die "--add-hosts is docker-substrate only. On tbx, talos-box's resolver already answers every *.${KNATIVE_DOMAIN} name — adding 127.0.0.1 lines would override it and send every URL to your own loopback."
+    fi
+    for name in "$@"; do
+      cloudbox_add_extra_host "${name}"
+      info "will resolve: ${name}.${KNATIVE_DOMAIN}"
+    done
+    write_hosts_block
+    info "Remove them again with: \$EDITOR ${CLOUDBOX_EXTRA_HOSTS_FILE}  # then re-run this"
     exit 0 ;;
   "") usage; echo ;;
   -h|--help) usage; exit 0 ;;
@@ -89,11 +118,48 @@ info "Substrate: ${SUBSTRATE}"
 if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then
   info "  (tbx not used: $(substrate_doctor_reason))"
 fi
-# The pin this laptop will actually run. check-consistency.sh check 10 only
-# proves versions.env and mise.toml agree with each other — mise has no tbx
-# backend to install from, so the binary on PATH is unasserted until here.
-if [[ "${SUBSTRATE}" == "tbx" ]] && have tbx; then
-  tbx_version_check check_fail
+# Everything tbx-specific, in one place, and NONE of it silently skipped.
+#
+# The previous shape was `if [[ tbx ]] && have tbx` — which turned the one state
+# that cannot work (tbx resolved, binary gone: an explicit CLOUDBOX_SUBSTRATE=tbx,
+# or a persisted answer whose brew formula has since been uninstalled) into a
+# preflight that passes. A machine that cannot create a cluster read as ready.
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
+  if ! have tbx; then
+    check_fail "substrate is tbx but the 'tbx' binary is not on PATH — install talos-box (brew install randax/tap/tbx && sudo tbx system install), or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
+  else
+    # The pin this laptop will actually run. check-consistency.sh check 10 only
+    # proves versions.env and mise.toml agree with each other — mise has no tbx
+    # backend to install from, so the binary on PATH is unasserted until here.
+    tbx_version_check check_fail
+    # `tbx doctor` is the tbx substrate's real preflight: helper, resolver, DNS
+    # wiring, forwarding, routes, host pressure, mirror health, image access.
+    # substrate_preflight runs it on the create path and dies; running it HERE
+    # is the point of a go/no-go gate — an attendee finds out at home, not at
+    # the venue. Read-only, so it belongs in --check. Output is shown: the FAIL
+    # lines are the actionable part, and summarising them would lose them.
+    if ! tbx doctor; then
+      check_fail "'tbx doctor' reports problems (above) — fix them, or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
+    else
+      ok "tbx doctor is clean"
+    fi
+  fi
+  # The memory budget that actually applies on this substrate. The VMs are sized
+  # from the HOST's RAM (tbx_worker_memory()), and `tbx up` REFUSES to start a
+  # cluster whose planned VM memory exceeds host RAM minus tbxd's 6 GiB balloon
+  # reserve — so the number to publish and check here is the host's, not
+  # Docker's slice. Same probe tbxd uses (lib.sh, tbx_host_memory_mib).
+  host_mib="$(tbx_host_memory_mib)"
+  if [[ "${host_mib}" =~ ^[0-9]+$ ]]; then
+    host_gb=$(( host_mib / 1024 ))
+    if [[ "${host_gb}" -ge "${MIN_HOST_MEMORY_GB}" ]]; then
+      ok "Host memory: ${host_gb} GB (need >= ${MIN_HOST_MEMORY_GB} GB)"
+    else
+      check_fail "Host memory: ${host_gb} GB — the published minimum is ${MIN_HOST_MEMORY_GB} GB. On tbx the VMs are sized from host RAM, so this is the budget that matters; 'tbx up' refuses a plan that does not fit."
+    fi
+  else
+    warn "Could not read this host's RAM — the tbx VM sizing falls back to the pinned ceiling"
+  fi
 fi
 
 # --- Docker ---------------------------------------------------------------------
@@ -109,22 +175,33 @@ elif ! docker_running; then
 else
   ok "Docker daemon reachable ($(docker info -f '{{.OperatingSystem}}' 2>/dev/null))"
 
-  # CPUs available to Docker
-  ncpu="$(docker info -f '{{.NCPU}}' 2>/dev/null || echo 0)"
-  if [[ "${ncpu}" -ge "${MIN_CPUS}" ]]; then
-    ok "Docker CPUs: ${ncpu} (need >= ${MIN_CPUS})"
-  else
-    check_fail "Docker CPUs: ${ncpu} — need >= ${MIN_CPUS}. Raise it in Docker settings."
-  fi
+  # The CPU/RAM budget below is the NODE budget, and on tbx the nodes are not
+  # containers: they are VMs sized from the HOST's RAM (tbx_worker_memory() in
+  # substrate/tbx.sh), and Docker's slice is irrelevant to them. Docker is still
+  # required on tbx — the offline image mirror is a Docker container — but a
+  # mirror is a registry serving blobs, which needs neither 4 CPUs nor 10 GB.
+  # Failing a perfectly good tbx laptop over a small Docker VM would send an
+  # attendee to raise a limit that changes nothing they will use.
+  if [[ "${SUBSTRATE}" == "docker" ]]; then
+    # CPUs available to Docker
+    ncpu="$(docker info -f '{{.NCPU}}' 2>/dev/null || echo 0)"
+    if [[ "${ncpu}" -ge "${MIN_CPUS}" ]]; then
+      ok "Docker CPUs: ${ncpu} (need >= ${MIN_CPUS})"
+    else
+      check_fail "Docker CPUs: ${ncpu} — need >= ${MIN_CPUS}. Raise it in Docker settings."
+    fi
 
-  # Memory allocatable to Docker (on Linux this is host RAM; on macOS/WSL2 the VM)
-  mem_bytes="$(docker info -f '{{.MemTotal}}' 2>/dev/null || echo 0)"
-  mem_gb=$(( mem_bytes / 1024 / 1024 / 1024 ))
-  if [[ "${mem_gb}" -ge "${MIN_DOCKER_MEMORY_GB}" ]]; then
-    ok "Memory allocatable to Docker: ${mem_gb} GB (need >= ${MIN_DOCKER_MEMORY_GB} GB)"
+    # Memory allocatable to Docker (on Linux this is host RAM; on macOS/WSL2 the VM)
+    mem_bytes="$(docker info -f '{{.MemTotal}}' 2>/dev/null || echo 0)"
+    mem_gb=$(( mem_bytes / 1024 / 1024 / 1024 ))
+    if [[ "${mem_gb}" -ge "${MIN_DOCKER_MEMORY_GB}" ]]; then
+      ok "Memory allocatable to Docker: ${mem_gb} GB (need >= ${MIN_DOCKER_MEMORY_GB} GB)"
+    else
+      check_fail "Memory allocatable to Docker: ${mem_gb} GB — need >= ${MIN_DOCKER_MEMORY_GB} GB"
+      info "  Docker Desktop: Settings -> Resources -> Memory. OrbStack: orb config set memory_mib."
+    fi
   else
-    check_fail "Memory allocatable to Docker: ${mem_gb} GB — need >= ${MIN_DOCKER_MEMORY_GB} GB"
-    info "  Docker Desktop: Settings -> Resources -> Memory. OrbStack: orb config set memory_mib."
+    info "Docker's CPU/RAM budget not checked — on tbx it only has to run the image mirror."
   fi
 
   # Free disk where Docker stores images. On macOS/WSL2 the Docker root dir
@@ -176,9 +253,30 @@ fi
 # Verify only. The block is written on the create path (create-cluster.sh), which
 # is where the one sudo prompt of the workshop belongs; --check never mutates.
 step "Workshop hostnames (*.${CLOUDBOX_DOMAIN})"
-if [[ "${SUBSTRATE}" == "tbx" ]]; then
+if [[ "${SUBSTRATE}" == "tbx" ]] \
+   && [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] \
+   && grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}"; then
+  # "No entries needed" is true and useless when a docker-substrate block is
+  # still sitting there: /etc/hosts is consulted BEFORE talos-box's resolver, so
+  # those 127.0.0.1 lines win and every workshop URL reaches the attendee's own
+  # loopback on a perfectly healthy cluster. substrate_preflight in
+  # substrate/tbx.sh dies on exactly this predicate — a go/no-go gate that says
+  # "ready" and then a create that dies is the gate failing at its one job.
+  check_fail "${CLOUDBOX_HOSTS_FILE} still carries the docker-substrate CloudBox block, and on tbx those 127.0.0.1 lines OVERRIDE talos-box's resolver"
+  echo "     See the lines: ./scripts/install.sh --print-hosts"
+  echo "     Remove them:   ./scripts/destroy-cluster.sh   # if the docker cluster is still around"
+  echo "                    sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # otherwise: delete ${CLOUDBOX_HOSTS_BEGIN} … ${CLOUDBOX_HOSTS_END}"
+elif [[ "${SUBSTRATE}" == "tbx" ]]; then
   ok "tbx substrate — talos-box's resolver answers *.${CLOUDBOX_DOMAIN}; no ${CLOUDBOX_HOSTS_FILE} entries needed"
   info "  (verify after the cluster exists: tbx status ${CLUSTER_NAME})"
+elif ! hosts_markers_paired; then
+  # Before anything reads the names: an unpaired block is a file no script may
+  # rewrite (lib.sh, assert_hosts_block_wellformed), so create-cluster.sh will
+  # refuse to touch it. Reporting "the block is correct" — which a begin-only
+  # block listing every name used to do — hides the one thing to fix.
+  check_fail "${CLOUDBOX_HOSTS_FILE} has an unpaired CloudBox marker — the block must be exactly one '${CLOUDBOX_HOSTS_BEGIN}' … '${CLOUDBOX_HOSTS_END}' pair, in that order"
+  echo "     Nothing will rewrite it in that state (the rewrite would delete every line after the begin marker)."
+  echo "     Fix by hand: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # then: ./scripts/install.sh --print-hosts"
 elif hosts_block_present; then
   ok "${CLOUDBOX_HOSTS_FILE} has the CloudBox block ($(cloudbox_hostnames | wc -l | tr -d ' ') names)"
 elif [[ -z "$(substrate_current)" ]]; then
