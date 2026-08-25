@@ -157,7 +157,7 @@ means a hungry browser can shrink your cluster mid-module. Close the zoo anyway.
 | Platform | Substrate | Support |
 |---|---|---|
 | macOS, Apple Silicon | tbx (Docker if `tbx doctor` fails) | fully supported |
-| Linux, amd64/arm64 with KVM | tbx (Docker otherwise) | fully supported |
+| Linux, amd64/arm64 with KVM | tbx (Docker otherwise) | fully supported on Docker; **tbx is best-effort at the pinned v0.1.1** |
 | macOS, Intel | Docker | fully supported |
 | Windows via WSL2 | Docker | best-effort — pair up if it fights you |
 | GitHub Codespaces / devcontainer | Docker | the lifeboat, tested weekly in CI |
@@ -166,6 +166,22 @@ Both substrates run **the same labs, the same `verify.sh` scripts and the same U
 scripts pick for you and remember the choice in `~/.cloudbox/substrate`; override with
 `CLOUDBOX_SUBSTRATE=docker` or `=tbx`. On Linux, watch out for firewalld/nftables
 interference on either substrate.
+
+**Linux + tbx, the fine print.** Detection gates on `tbx doctor`, and at the pinned
+v0.1.1 one of its Linux checks turns a *permission* problem into a verdict: with
+`br_netfilter` active it runs `iptables -S FORWARD`, and an unprivileged shell's exit 4
+becomes `FAIL inspect FORWARD policy` rather than "could not tell". On such a host
+detection quietly falls back to Docker — which works, and is why this is best-effort
+rather than broken. If you want the VMs anyway and you have checked the FORWARD policy
+yourself, run `sudo iptables -S FORWARD` once to see the real answer and then force the
+substrate: `CLOUDBOX_SUBSTRATE=tbx ./scripts/create-cluster.sh` (add
+`CLOUDBOX_ALLOW_TBX_DRIFT=1` if you are on a newer tbx than the pin). Upstream fixed it
+in `053aecb` — WARN with a sudo remediation — so this note retires with the first tbx
+release that contains it.
+
+**One catalog extra is amd64-only:** Backstage's CNOE image has no arm64 build, and a tbx
+VM emulates nothing, so on Apple Silicon that stretch item needs the Docker substrate.
+`install.sh --check` warns. Nothing on the core path is affected.
 
 ## At the venue
 

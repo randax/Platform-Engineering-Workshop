@@ -58,10 +58,53 @@ person needs the history ·
 
 ---
 
-The five entries below arrived with the **talos-box substrate** on 2026-08-24
+The seven entries below arrived with the **talos-box substrate** on 2026-08-24/25
 (`docs/talos-box-vs-docker.md`) and share one property: **no rehearsal has run on
 that substrate yet.** Everything above and below them was learned on
 Talos-in-Docker, which is still what CI and the lifeboat run.
+
+## TRAP — Backstage is amd64-only, and a tbx VM emulates nothing
+
+`ghcr.io/cnoe-io/backstage-app` is published as a bare `linux/amd64` manifest. The
+exemption that lets it past the mirror's architecture check
+(`MIRROR_ARCH_EXEMPT`, `scripts/versions.env`) was written with Docker-only
+evidence — "Apple Silicon runs it emulated" — which is true of Docker
+Desktop/OrbStack and **not** of the tbx substrate: those nodes are natively
+virtualised arm64 VMs with no emulation layer, so the pod crashloops with
+`exec format error`.
+
+**Checked before keeping the pin:** every one of the 43 tags in that repository
+was a single amd64 manifest on 2026-08-25 (`crane manifest` + `crane config` over
+the full `crane ls` output — no manifest list, no arm64 image anywhere). There is
+nothing to re-pin to, so the pin stays and the limitation is stated instead:
+`install.sh --check` warns on tbx+arm64, `gitops/catalog/backstage.yaml`'s header
+says it, lab 00 and lab 08's presenter note say it, and the README's matrix says
+it. Backstage is a stretch catalog item and a presenter demo; no core module
+touches it, and on the docker substrate it behaves exactly as before.
+
+**Retired by:** a multi-arch CNOE image (re-check with the same `crane` sweep at
+pin-bump time), or dropping the component.
+
+## TRAP — on Linux, `tbx doctor` at v0.1.1 can call a permission problem a FAIL
+
+Detection gates on `tbx doctor`'s exit code (`substrate_detect`, `scripts/lib.sh`),
+which is the right gate — but at the **pinned v0.1.1** one Linux check answers the
+wrong question. `linuxBridgeNetfilterFinding` (`cmd/tbx/doctor_platform_linux.go`
+at the tag) runs `iptables -S FORWARD` when `br_netfilter` is active, and turns
+*any* error from it into `FAIL inspect FORWARD policy: exit status 4` — exit 4
+being what an unprivileged `iptables` returns when it cannot talk to the kernel.
+"I could not look" is reported as "I looked and it is broken".
+
+The blast radius is small and self-healing: the FAIL makes detection fall back to
+the docker substrate, which runs the identical workshop. That is why the README's
+matrix now calls Linux+tbx **best-effort at v0.1.1** rather than fully supported.
+The workaround, for someone who has checked their FORWARD policy themselves
+(`sudo iptables -S FORWARD`): force the substrate with `CLOUDBOX_SUBSTRATE=tbx`
+(plus `CLOUDBOX_ALLOW_TBX_DRIFT=1` if their tbx is newer than the pin).
+
+**Retired by:** a tbx release containing upstream `053aecb`, which makes that
+check WARN with a sudo remediation instead of FAIL. `docs/MAINTENANCE.md`'s tbx
+pin section says to re-pin when one exists.
 
 ## LIVE — tbx VM memory is a moving ceiling, and it is unrehearsed
 

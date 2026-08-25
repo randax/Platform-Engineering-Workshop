@@ -120,7 +120,9 @@ typically a team that owns it. A portal is a *product decision*, not a default.
 > → new Gitea repo → ArgoCD app → pods. Watch for what the template wires together —
 > that integration glue is the real work of running Backstage.
 >
-> *Presenter notes:* pre-enable `backstage.yaml` before the module (first boot is slow,
+> *Presenter notes:* the CNOE image is **amd64-only** — on an Apple Silicon laptop the
+> demo cluster has to be the docker substrate (`CLOUDBOX_SUBSTRATE=docker`), because tbx
+> VMs are native arm64 with no emulation. Pre-enable `backstage.yaml` before the module (first boot is slow,
 > ~2 GB image + CNPG database — it's why this is a demo, not the lab). Show: guest
 > sign-in at `http://backstage.cloudbox.k8s.test`, catalog entities fed from Gitea, run
 > the template, then chase it through Gitea (`http://gitea.cloudbox.k8s.test`) and

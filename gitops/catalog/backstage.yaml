@@ -4,6 +4,12 @@
 # Requires cnpg-operator to be enabled first (its database is a CNPG
 # Cluster — hence SkipDryRunOnMissingResource).
 #
+# AMD64 ONLY. The CNOE image has no arm64 build (no tag in
+# ghcr.io/cnoe-io/backstage-app has one), so on the tbx substrate on an Apple
+# Silicon Mac — native arm64 VMs, no emulation — this pod crashloops with
+# "exec format error". The docker substrate emulates amd64 and runs it. Every
+# other component in this workshop is multi-arch; see docs/HAZARDS.md.
+#
 # Enable with:  cp gitops/catalog/backstage.yaml gitops/apps/ && git add . && git commit -m 'enable backstage' && git push
 apiVersion: argoproj.io/v1alpha1
 kind: Application

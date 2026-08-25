@@ -179,8 +179,18 @@ ghcr.io/randax/cloudbox-grafana:v0.2.2
 # x-release-please-end-version
 
 # --- Wave 3: Backstage (CNOE prebuilt image, tag pinned by gitops/catalog)
-# linux/amd64 only — Apple Silicon runs it emulated, and install.sh --check
-# skips the mirror arch check for it (MIRROR_ARCH_EXEMPT in versions.env).
+# linux/amd64 only, and it has no multi-arch sibling: on 2026-08-25 every one of
+# the 43 tags in ghcr.io/cnoe-io/backstage-app was a bare amd64 manifest (crane
+# manifest + crane config over the full tag list) — there is nothing to re-pin to.
+# What that means depends on the substrate, which is why the exemption below is
+# not the whole story:
+#   docker on Apple Silicon — Docker Desktop/OrbStack emulate amd64, so it runs.
+#   tbx on Apple Silicon    — the nodes are arm64 VMs with NO emulation layer;
+#                             the pod crashloops with "exec format error".
+# Backstage is a stretch catalog item and a presenter demo, so the pin stays and
+# install.sh --check warns on tbx+arm64 (see docs/HAZARDS.md). The mirror arch
+# check skips it either way (MIRROR_ARCH_EXEMPT in versions.env): a single-arch
+# copy is indistinguishable from a wrong-arch one.
 # Its database is a CNPG
 # cluster using the postgresql image pinned above. Presenter demo in
 # module 08; stays pre-pulled so attendees can run it at home.

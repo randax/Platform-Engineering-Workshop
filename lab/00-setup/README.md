@@ -35,7 +35,10 @@ From the repository root:
    run module 10: the cluster reaches your laptop at `172.30.<n>.1`, and Ollama's default
    `127.0.0.1:11434` bind refuses that. `launchctl setenv OLLAMA_HOST 0.0.0.0` (then quit
    and reopen Ollama.app), or `OLLAMA_HOST=0.0.0.0 ollama serve`. `cloudbox-init.sh` warns
-   you if it is still loopback-only.
+   you if it is still loopback-only. **One catalog extra does not run on tbx+arm64:**
+   Backstage's CNOE image is amd64-only and a tbx VM emulates nothing, so that stretch
+   item needs `CLOUDBOX_SUBSTRATE=docker`; `install.sh --check` says so. Nothing on the
+   core path is affected.
 1. Install the tool chain: `./scripts/dev-setup.sh` (uses [mise](https://mise.jdx.dev/) with
    pinned versions — nothing floats). It ends by offering to hook mise into your shell —
    **say yes**: that is what puts the tools on your PATH *and* points `KUBECONFIG` at a
