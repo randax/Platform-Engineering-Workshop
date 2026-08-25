@@ -36,6 +36,10 @@
 #
 # No state file (a machine that took the lifeboat before this existed)? Say so
 # for the session: CLOUDBOX_SUBSTRATE=kind ./scripts/install.sh --check
+# The same override works for `--delete`, but there it is honoured only against
+# PROOF — kind must list the cluster, or the marked /etc/hosts block must be
+# present. An environment variable is a claim, and this script will not delete
+# an /etc/hosts block it cannot show is its own.
 # =============================================================================
 set -euo pipefail
 
@@ -66,12 +70,45 @@ if [[ "${DELETE}" == "true" ]]; then
   # Read the identity BEFORE deleting anything: it decides whether the
   # /etc/hosts block is ours to remove.
   identity="$(substrate_current || true)"
+  # No record at all, but the session was told CLOUDBOX_SUBSTRATE=kind — the
+  # documented "lost state" recipe. An override is a claim, not a record, so it
+  # is honoured only against PROOF that a lifeboat is what this machine has:
+  # kind itself lists the cluster, or the marked ${CLOUDBOX_HOSTS_FILE} block is
+  # sitting there. Without either, taking the claim at face value would remove a
+  # /etc/hosts block on the say-so of an environment variable — the same
+  # unowned-block deletion this branch was built to stop. Asked BEFORE the
+  # delete below, because `kind get clusters` is one of the two proofs.
+  if [[ -z "${identity}" && "${CLOUDBOX_SUBSTRATE:-}" == "kind" ]]; then
+    kind_proof=""
+    if kind_cluster_exists; then
+      kind_proof="kind lists a '${CLUSTER_NAME}' cluster"
+    elif [[ -n "$(hosts_marked_block)" ]]; then
+      kind_proof="the marked CloudBox block is in ${CLOUDBOX_HOSTS_FILE}"
+    fi
+    if [[ -n "${kind_proof}" ]]; then
+      identity="kind"
+      info "No identity recorded, but CLOUDBOX_SUBSTRATE=kind and ${kind_proof} — treating this as the lifeboat."
+    else
+      warn "CLOUDBOX_SUBSTRATE=kind, but nothing on this machine proves it: kind lists no"
+      warn "'${CLUSTER_NAME}' cluster and there is no marked block in ${CLOUDBOX_HOSTS_FILE}."
+      warn "The override is not taken as ownership — nothing here will be removed."
+    fi
+  fi
   step "Deleting the kind fallback cluster '${CLUSTER_NAME}'"
+  # Whether the cluster is GONE when this is over, which is half of what clearing
+  # the identity requires below. A delete that fails leaves a cluster whose only
+  # cleanup command needs the identity to know the block is its own.
+  cluster_gone="false"
   if kind_cluster_exists; then
-    kind delete cluster --name "${CLUSTER_NAME}"
-    ok "kind cluster '${CLUSTER_NAME}' deleted"
+    if kind delete cluster --name "${CLUSTER_NAME}"; then
+      ok "kind cluster '${CLUSTER_NAME}' deleted"
+      cluster_gone="true"
+    else
+      fail "'kind delete cluster --name ${CLUSTER_NAME}' failed (above)."
+    fi
   else
     info "No kind cluster '${CLUSTER_NAME}' — nothing to delete."
+    cluster_gone="true"
   fi
 
   # The block is removed ONLY when this machine's recorded identity is 'kind'.
@@ -85,6 +122,9 @@ if [[ "${DELETE}" == "true" ]]; then
       # Same block, same remover as the docker substrate's destroy. Never fatal:
       # the cluster is already gone, and a declined sudo is a name-resolution
       # problem, not a teardown failure.
+      # 0 from remove_hosts_block means "removed, or proven not there"; 1 means
+      # "still there, or cannot tell" (a declined sudo, an unpaired block, an
+      # unreadable file). That distinction is what decides the identity below.
       remove_hosts_block || hosts_left="true"
       if [[ "${hosts_left}" == "true" ]]; then
         warn "Remove the remaining CloudBox lines from ${CLOUDBOX_HOSTS_FILE} by hand (see above)."
@@ -97,13 +137,28 @@ if [[ "${DELETE}" == "true" ]]; then
         # OVERRIDES talos-box's resolver on a perfectly healthy machine.
         hosts_stray="$(hosts_loopback_lines)"
       fi
-      rm -f "${CLOUDBOX_SUBSTRATE_FILE}"
-      ok "Identity cleared (${CLOUDBOX_SUBSTRATE_FILE})"
+      # The identity goes ONLY when there is nothing left that needs it. It is
+      # the single thing that lets a RETRY prove the /etc/hosts block is the
+      # lifeboat's — clear it while the block (or the cluster) is still there and
+      # the next `--delete` falls into the "no identity recorded" arm and leaves
+      # the block alone forever, with no command left that will touch it.
+      # A declined sudo password is the ordinary way this happens.
+      if [[ "${cluster_gone}" == "true" && "${hosts_left}" != "true" ]]; then
+        rm -f "${CLOUDBOX_SUBSTRATE_FILE}"
+        ok "Identity cleared (${CLOUDBOX_SUBSTRATE_FILE})"
+      else
+        warn "KEEPING the recorded identity in ${CLOUDBOX_SUBSTRATE_FILE} — the teardown is not"
+        warn "finished, and that file is what proves the ${CLOUDBOX_HOSTS_FILE} block is this"
+        warn "cluster's to remove. Fix what failed above and re-run: ./scripts/kind-fallback.sh --delete"
+      fi
       ;;
     "")
       warn "No identity recorded in ${CLOUDBOX_SUBSTRATE_FILE}, so the ${CLOUDBOX_HOSTS_FILE} block"
       warn "was left alone — this script only removes a block it can prove is the lifeboat's."
-      warn "If those names were this cluster's: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # delete the marked block"
+      warn "If this machine took the lifeboat before the identity file existed, say so and"
+      warn "re-run — the claim is honoured once kind lists the cluster, or the marked block is there:"
+      warn "  CLOUDBOX_SUBSTRATE=kind ./scripts/kind-fallback.sh --delete"
+      warn "Otherwise, by hand: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # delete the marked block"
       ;;
     *)
       warn "${CLOUDBOX_SUBSTRATE_FILE} says '${identity}', not 'kind' — the ${CLOUDBOX_HOSTS_FILE} block"
@@ -124,6 +179,17 @@ fi
 need helm
 need docker
 docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
+
+# BEFORE anything is created or written: this machine must not already BE
+# something else. The preflight below asks docker and tbx what is running, which
+# is the right question for a live cluster and the wrong one for a machine whose
+# tbx binary has since been uninstalled, or whose docker daemon has been swapped
+# — in both cases the record is the only thing that still knows, and persisting
+# `kind` over it is unrecoverable. require_identity_match (lib.sh) dies here with
+# the teardown recipe for whatever is recorded. CLOUDBOX_IGNORE_TBX does NOT
+# relax it: that flag is about not being able to INSPECT tbx, and this is a fact
+# this repo wrote down itself.
+require_identity_match kind
 
 if kind_cluster_exists; then
   die "A kind cluster '${CLUSTER_NAME}' already exists. Delete it first: ./scripts/kind-fallback.sh --delete"
@@ -165,31 +231,15 @@ if have tbx && [[ "${CLOUDBOX_IGNORE_TBX:-}" != "1" ]]; then
     die "Fix tbx ('tbx doctor'), or set CLOUDBOX_IGNORE_TBX=1 to proceed anyway."
   fi
 fi
-# The ports this script is about to publish. Same list and same probe as
-# install.sh --check, including port 80 — the privileged one that makes the
-# hostnames work without a port, and the one whose holder is most often
-# something else entirely. `kind create cluster` fails on a bound port AFTER
-# creating containers, which is the wreck this refusal exists to avoid.
-kind_ports=("${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
-            "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
-            "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}" 80)
-ports_taken=()
-for kind_port in "${kind_ports[@]}"; do
-  port_in_use "${kind_port}" && ports_taken+=("${kind_port}")
-done
-if [[ "${#ports_taken[@]}" -gt 0 ]]; then
-  fail "These host ports are already in use: ${ports_taken[*]}"
-  for kind_port in "${ports_taken[@]}"; do
-    if [[ "${kind_port}" == "80" ]]; then
-      warn "  port 80 (the ingress; every *.${CLOUDBOX_DOMAIN} URL needs it):"
-      port80_listeners
-    else
-      holder="$(port_listeners "${kind_port}")"
-      [[ -n "${holder}" ]] && printf '   %s\n' "${holder}"
-    fi
-  done
-  die "Free them and re-run — kind would create the cluster and then fail to publish them."
-fi
+# The ports this script is about to publish. Same list, same probe and now the
+# same helper as install.sh --check and the docker substrate's preflight
+# (assert_host_ports_free / cloudbox_host_ports in lib.sh) — including port 80,
+# the privileged one that makes the hostnames work without a port and the one
+# whose holder is most often something else entirely. `kind create cluster`
+# fails on a bound port AFTER creating containers, which is the wreck this
+# refusal exists to avoid.
+assert_host_ports_free \
+  || die "Free them and re-run — kind would create the cluster and then fail to publish them."
 
 # --- 1. Create the kind cluster -------------------------------------------------
 step "Creating kind cluster '${CLUSTER_NAME}' (Kubernetes from ${KIND_NODE_IMAGE%%@*})"

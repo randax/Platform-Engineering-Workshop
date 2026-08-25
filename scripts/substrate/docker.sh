@@ -22,6 +22,19 @@ substrate_preflight() {
   if [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" ]]; then
     die "A '${CLUSTER_NAME}' cluster already exists. Run ./scripts/destroy-cluster.sh first."
   fi
+  # …and the THIRD thing that can hold this name on this very daemon: the kind
+  # lifeboat. Its containers carry kind's own label, not Talos's, so the filter
+  # above steps straight over them — and kind-fallback.sh has refused over
+  # Talos containers since round 8 while this direction stayed open. A machine
+  # whose identity record was lost (or never written, pre-round-8) then created
+  # a Talos cluster on top of a running lifeboat: same name, same host ports,
+  # same /etc/hosts block, two clusters. `-aq` for the same reason as above —
+  # stopped kind nodes still own the ports and the name.
+  if [[ -n "$(docker ps -aq --filter "label=io.x-k8s.kind.cluster=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
+    fail "A kind lifeboat cluster '${CLUSTER_NAME}' exists on this Docker daemon (running or stopped)."
+    warn "It holds the same name, the same host ports and the same ${CLOUDBOX_HOSTS_FILE} block."
+    die "Tear it down first: ./scripts/kind-fallback.sh --delete"
+  fi
   # The MIRROR image of the tbx preflight's /etc/hosts guard: a '${CLUSTER_NAME}'
   # that already exists on the OTHER substrate is just as fatal, and much
   # quieter. The tbx VMs are alive, they hold the cluster name, the talosconfig
@@ -79,6 +92,15 @@ substrate_preflight() {
       fi
     fi
   fi
+  # The ten host ports this substrate publishes, before `talosctl cluster create`
+  # binds a single one. It publishes them AFTER creating the containers, so a
+  # port held by anything else — another project's compose stack, a local nginx
+  # on 80, a leftover mirror — fails the create with "bind: address already in
+  # use" and leaves node containers, a state directory and a talosconfig context
+  # behind for the next run to trip over. kind-fallback.sh has refused here since
+  # round 8; the substrate that binds the same ports did not.
+  assert_host_ports_free \
+    || die "Free them and re-run — 'talosctl cluster create' publishes these AFTER creating the node containers, so it would leave a half-made cluster behind."
 }
 
 substrate_create() {

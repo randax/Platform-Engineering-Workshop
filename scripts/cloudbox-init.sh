@@ -295,7 +295,13 @@ ok "All ${total} images pre-pulled. The mirror survives reboots and cluster rebu
 # needs. Probing 127.0.0.1 says whether Ollama is up at all; the LISTEN address
 # says whether anything other than this host can reach it.
 ollama_bind_check() {
-  if [[ "${SUBSTRATE}" == "docker" ]]; then return 0; fi
+  # kind is a docker machine for this question and every other one in this
+  # file: the lifeboat's nodes are containers on this host's Docker engine, and
+  # cloudbox_host_gateway() answers host.docker.internal there (lib.sh,
+  # kind_network_gateway) — not a vmnet address. Warning a lifeboat attendee
+  # that their 127.0.0.1-bound Ollama is unreachable from the VMs describes a
+  # machine that has no VMs.
+  if [[ "${SUBSTRATE}" == "docker" || "${SUBSTRATE}" == "kind" ]]; then return 0; fi
   have curl || return 0
   if ! curl -fsS --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1; then
     info "Ollama is not serving on 127.0.0.1:11434 right now — start it before module 10."
@@ -371,7 +377,18 @@ fi
 # CLOUDBOX_SUBSTRATE (the explicit override), not SUBSTRATE (which is also
 # "docker" whenever detection merely failed) — that distinction is the whole
 # point of this gate.
-if [[ "${CLOUDBOX_SUBSTRATE:-}" == "docker" ]]; then
+if [[ "${SUBSTRATE}" == "kind" ]]; then
+  # The lifeboat, first — and keyed on the RESOLVED identity, not on the
+  # override, because `kind` is never an override in practice: it is written
+  # into ${CLOUDBOX_SUBSTRATE_FILE} by kind-fallback.sh. A machine that has
+  # taken the lifeboat and still has tbx installed (the ordinary case — that is
+  # usually WHY it took the lifeboat) fell into the tbx arm below and spent the
+  # prework downloading a 95-204 MB Talos disk image for a substrate it will
+  # never create on, then ran `tbx doctor` and printed its FAIL lines as if they
+  # were this attendee's problem.
+  info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=kind (the lifeboat runs on Docker — no Talos disk image needed)"
+  info "Next: ./scripts/kind-fallback.sh   # this machine records the kind lifeboat"
+elif [[ "${CLOUDBOX_SUBSTRATE:-}" == "docker" ]]; then
   info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=docker (CLOUDBOX_SUBSTRATE=docker — no Talos disk image needed)"
 elif ! have tbx; then
   if [[ "${SUBSTRATE}" == "tbx" ]]; then

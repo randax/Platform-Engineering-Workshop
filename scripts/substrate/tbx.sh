@@ -74,6 +74,22 @@ substrate_preflight() {
   # that change existed — and, since the predicate is entries-or-markers rather
   # than the begin marker alone, also the file whose markers were deleted by
   # hand and whose 127.0.0.1 lines were left behind.
+  # The kind lifeboat, before any VM is asked for. It is a docker cluster, so
+  # `tbx status` is blind to it — but it holds the ${CLOUDBOX_DOMAIN} names in
+  # /etc/hosts (which is consulted BEFORE talos-box's resolver), binds host
+  # port 80, and answers `kubectl` on the same workshop context. The hosts-file
+  # guard below catches its block, but only while the block is still there: a
+  # lifeboat whose write_hosts_block was declined is invisible to it, and the
+  # attendee ends up with a Knative-less kind cluster and a Talos cluster
+  # fighting over one kubeconfig context. Asked of docker directly rather than
+  # of `kind` — the binary may be gone; the containers are the fact.
+  if have docker && docker_running \
+     && [[ -n "$(docker ps -aq --filter "label=io.x-k8s.kind.cluster=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
+    fail "A kind lifeboat cluster '${CLUSTER_NAME}' exists on this machine's Docker daemon (running or stopped)."
+    warn "It holds the ${CLOUDBOX_DOMAIN} names in ${CLOUDBOX_HOSTS_FILE}, which override talos-box's"
+    warn "resolver, and it answers on the same kubectl context this create is about to write."
+    die "Tear it down first: ./scripts/kind-fallback.sh --delete"
+  fi
   if hosts_block_stale_for_tbx; then
     fail "${CLOUDBOX_HOSTS_FILE} still points CloudBox names at 127.0.0.1."
     warn "On tbx those lines OVERRIDE talos-box's resolver, so every"

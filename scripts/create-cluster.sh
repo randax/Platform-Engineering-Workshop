@@ -49,6 +49,15 @@ esac
 SUBSTRATE=""
 substrate_resolve_into SUBSTRATE
 info "Substrate: ${SUBSTRATE}"
+# BEFORE anything else: is the substrate we are about to act on the one this
+# machine has RECORDED? CLOUDBOX_SUBSTRATE overrides the decision, and used to
+# override the record too — so `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh`
+# on a machine running the kind lifeboat (or holding tbx VMs) walked straight
+# past the refusal below, persisted `docker` over the real identity, and left the
+# running cluster with no script able to name it. require_identity_match (lib.sh)
+# dies here, before any backend is sourced and before any state is touched, with
+# the two-step recipe. Silent on a clean machine — which is what CI is.
+require_identity_match "${SUBSTRATE}"
 # The lifeboat is not one of the two backends this script can build, and there
 # is no scripts/substrate/kind.sh for `source` to find. Refuse in words rather
 # than on a missing file: this machine is running kind-fallback.sh's cluster
@@ -56,6 +65,18 @@ info "Substrate: ${SUBSTRATE}"
 # second cluster over it would take the same ports, the same hostnames and the
 # same /etc/hosts block.
 if [[ "${SUBSTRATE}" == "kind" ]]; then
+  # With the `kind` binary gone there is no ./scripts/kind-fallback.sh --delete to
+  # send anyone to — it opens with `need kind` — so the refusal has to name the
+  # hand fix, or an attendee who uninstalled kind is told to run a command that
+  # cannot run and has no other way out of this state.
+  if ! have kind; then
+    fail "This machine records the kind lifeboat (${CLOUDBOX_SUBSTRATE_FILE}), but the 'kind' binary is gone."
+    warn "./scripts/kind-fallback.sh --delete needs it, so it cannot clean up here."
+    warn "Either reinstall kind (./scripts/dev-setup.sh pins it) and run that, or — if the"
+    warn "lifeboat cluster is already gone — drop the record by hand:"
+    warn "  rm ${CLOUDBOX_SUBSTRATE_FILE}   # then re-run this script"
+    die "Refusing to create over a recorded lifeboat."
+  fi
   die "this machine runs the kind lifeboat — use ./scripts/kind-fallback.sh [--delete]"
 fi
 if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then

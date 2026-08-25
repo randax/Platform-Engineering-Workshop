@@ -4,18 +4,19 @@
 #
 # Checks that this machine can run the workshop. --check and --print-hosts only
 # READ state — they install nothing, touch no cluster, pull no images. The two
-# mutating modes are --write-hosts and --add-hosts; both are opt-in, docker-only
+# mutating modes are --write-hosts and --add-hosts; both are opt-in and run only
+# on the docker and kind identities
 # and say what they are doing.
 #
 # Usage:
 #   ./scripts/install.sh --check    # run the pre-flight check
 #   ./scripts/install.sh            # same check + usage text
 #   ./scripts/install.sh --print-hosts   # the /etc/hosts lines the docker substrate needs
-#   ./scripts/install.sh --write-hosts   # docker only: (re)write that block —
+#   ./scripts/install.sh --write-hosts   # docker/kind only: (re)write that block —
 #                                   the recovery path when create-cluster.sh's
 #                                   sudo was declined, and the refresh path
 #                                   after WSL2 regenerates /etc/hosts
-#   ./scripts/install.sh --add-hosts <name>...   # docker only: resolve extra
+#   ./scripts/install.sh --add-hosts <name>...   # docker/kind only: resolve extra
 #                                   Knative names (e.g. my-app-demo) — WRITES
 #                                   /etc/hosts, asks for sudo
 #
@@ -84,8 +85,14 @@ case "${1:-}" in
     # "the names stopped resolving" — with no command on the machine that needs
     # it most.
     if [[ "${write_substrate}" != "docker" && "${write_substrate}" != "kind" ]]; then
-      die "--write-hosts is docker-substrate only. On tbx, talos-box's resolver answers every *.${CLOUDBOX_DOMAIN} name — 127.0.0.1 lines would override it and send every URL to your own loopback."
+      die "--write-hosts works on the docker and kind identities only. On tbx, talos-box's resolver answers every *.${CLOUDBOX_DOMAIN} name — 127.0.0.1 lines would override it and send every URL to your own loopback."
     fi
+    # …and only when that is also what this machine has RECORDED. This writes to
+    # /etc/hosts with sudo, and `CLOUDBOX_SUBSTRATE=docker ./scripts/install.sh
+    # --write-hosts` on a tbx machine wrote exactly the block substrate_preflight
+    # dies on — the one that overrides talos-box's resolver and sends every
+    # workshop URL to the attendee's own loopback, on a healthy cluster.
+    require_identity_match "${write_substrate}"
     write_hosts_block
     exit 0 ;;
   # /etc/hosts has no wildcards, so on the docker substrate only the names
@@ -106,8 +113,11 @@ case "${1:-}" in
     # has no wildcards on either, and module 08's Knative names are exactly as
     # unresolvable on the lifeboat as they are on the docker substrate.
     if [[ "${add_substrate}" != "docker" && "${add_substrate}" != "kind" ]]; then
-      die "--add-hosts is docker-substrate only. On tbx, talos-box's resolver already answers every *.${KNATIVE_DOMAIN} name — adding 127.0.0.1 lines would override it and send every URL to your own loopback."
+      die "--add-hosts works on the docker and kind identities only. On tbx, talos-box's resolver already answers every *.${KNATIVE_DOMAIN} name — adding 127.0.0.1 lines would override it and send every URL to your own loopback."
     fi
+    # Same guard, same reason as --write-hosts: this ends in the same privileged
+    # rewrite of the same block.
+    require_identity_match "${add_substrate}"
     # ALL of them validated before ANY of them is persisted. Persisting as we go
     # made `--add-hosts good-name Bad_Name` write half the request and then die:
     # the extras file kept the first name, /etc/hosts was never rewritten, and
@@ -354,9 +364,16 @@ elif [[ "${SUBSTRATE}" == "kind" ]]; then
     check_fail "${CLOUDBOX_SUBSTRATE_FILE} says 'kind' but the 'kind' binary is not on PATH — run ./scripts/dev-setup.sh (mise pins it), or remove that file if you are done with the lifeboat"
   elif kind_cluster_exists; then
     if kind_nodes_running; then
-      ok "kind lifeboat '${CLUSTER_NAME}' is running — its ports are expected to be bound"
+      ok "kind lifeboat '${CLUSTER_NAME}' is running (both nodes) — its ports are expected to be bound"
     else
-      check_fail "the kind lifeboat '${CLUSTER_NAME}' exists but its node containers are STOPPED"
+      # BOTH nodes, named. Every host port the lifeboat publishes is mapped from
+      # the WORKER container (kind-fallback.sh's extraPortMappings sit under
+      # `role: worker`), so "the control plane is up" was the wrong question:
+      # with the worker stopped this said "running — ports expected to be bound"
+      # about a cluster that answers no workshop URL at all.
+      check_fail "the kind lifeboat '${CLUSTER_NAME}' is not running both nodes — stopped: $(kind_nodes_missing)"
+      echo "     (host port 80 and every NodePort are published from ${CLUSTER_NAME}-worker, so a"
+      echo "      stopped worker means no *.${CLOUDBOX_DOMAIN} URL resolves to anything.)"
       echo "     Bring it back:  docker start ${CLUSTER_NAME}-control-plane ${CLUSTER_NAME}-worker"
       echo "     Or start over:  ./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh"
     fi
@@ -382,9 +399,8 @@ else
   # needs the missed port fails at the venue instead. Plus port 80, which the
   # controlplane container publishes to NODEPORT_INGRESS — the only privileged
   # port the workshop binds, and what makes the hostnames work port-free here.
-  ports=("${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
-         "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
-         "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}" 80)
+  ports=()
+  while IFS= read -r port; do ports+=("${port}"); done < <(cloudbox_host_ports)
   # port_in_use (lib.sh), not a bare connect to 127.0.0.1. The cluster publishes
   # these on 0.0.0.0, and the connect probe only ever saw loopback: a listener
   # bound to this machine's LAN address alone answered nothing at 127.0.0.1, so

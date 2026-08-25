@@ -69,6 +69,15 @@ else
     warn "If this machine ran the cluster on tbx: CLOUDBOX_SUBSTRATE=tbx $0 ${1:-}"
   fi
 fi
+# The recorded identity decides what may be torn down, not the override. The
+# env var still names the DESIRED substrate above (it has to: with no record at
+# all it is the only way to say "the leftovers are tbx VMs"), but where a record
+# exists and disagrees, this is a destroy aimed at the wrong cluster — and the
+# damage is not hypothetical: `CLOUDBOX_SUBSTRATE=docker` on a tbx machine ran
+# the docker teardown, found nothing, then deleted ${CLOUDBOX_SUBSTRATE_FILE} —
+# the only record that those VMs exist — and rewrote /etc/hosts. Placed BEFORE
+# `need docker`, before the backend is sourced and before any removal.
+require_identity_match "${SUBSTRATE}"
 # The lifeboat, before anything is removed. `kind` is a persisted identity, not
 # a substrate: there is no scripts/substrate/kind.sh, the cluster is not made of
 # Talos containers or VMs, and — this is the part that mattered — the
