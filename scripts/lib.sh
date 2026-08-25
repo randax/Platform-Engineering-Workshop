@@ -129,6 +129,25 @@ docker_server_arch() {
   esac
 }
 
+# node_arch — the CPU architecture the CLUSTER NODES will run, which is a
+# different question per substrate and is what every image decision (the
+# mirror!) depends on:
+#   docker — the nodes ARE containers on this host's Docker engine, so the
+#            daemon's arch is theirs; on an amd64 Colima VM on an arm64 Mac
+#            that is amd64, and uname -m would be wrong.
+#   tbx    — the nodes are VMs virtualised natively (vz/hvf on macOS, KVM on
+#            Linux); nothing is emulated, so they are the HOST's arch, and the
+#            Docker daemon — which here only ever runs the mirror — may not be
+#            the same one at all.
+# Callers that already know the substrate pass it in $1; otherwise this
+# resolves it (which can run `tbx doctor`).
+node_arch() { # [substrate]
+  local s="${1:-}"
+  [[ -n "${s}" ]] || substrate_resolve_into s || return 1
+  if [[ "${s}" == "tbx" ]]; then detect_arch; return; fi
+  docker_server_arch
+}
+
 # is_wsl2 — true when running inside Windows Subsystem for Linux.
 is_wsl2() {
   [[ -f /proc/version ]] && grep -qi microsoft /proc/version
@@ -205,17 +224,19 @@ tbx_doctor_run() {
 # answer and no override. tbx needs its daemon+helper installed and healthy, so
 # `tbx doctor` (which exits non-zero on any FAIL — cmd/tbx/doctor.go:345-347) is
 # the gate, not the mere presence of the binary.
-substrate_detect() {
+substrate_detect_into() { # <varname>
   local os arch
   os="$(uname -s)"; arch="$(uname -m)"
+  printf -v "$1" '%s' "docker"
   if have tbx; then
     case "${os}:${arch}" in
       Darwin:arm64|Linux:x86_64|Linux:aarch64|Linux:arm64|Linux:amd64)
-        if tbx_doctor_run; then echo "tbx"; return 0; fi ;;
+        if tbx_doctor_run; then printf -v "$1" '%s' "tbx"; fi ;;
     esac
   fi
-  echo "docker"
+  return 0
 }
+substrate_detect() { local __s; substrate_detect_into __s; echo "${__s}"; }
 
 # substrate_persist <tbx|docker> — record the substrate the cluster was CREATED
 # on. Everything downstream reads this rather than re-detecting: a laptop that
@@ -277,18 +298,31 @@ substrate_current() {
 # stdout message becomes the *value* of s, not a diagnostic anyone sees. On
 # stderr the attendee reads the real reason, the assignment gets an empty
 # string, and the non-zero status aborts the caller under `set -e`.
-substrate_resolve() {
+substrate_resolve_into() { # <varname> — substrate_resolve without the subshell
+  local __var="$1" __persisted
   if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
     case "${CLOUDBOX_SUBSTRATE}" in
-      tbx|docker) echo "${CLOUDBOX_SUBSTRATE}"; return 0 ;;
+      tbx|docker) printf -v "${__var}" '%s' "${CLOUDBOX_SUBSTRATE}"; return 0 ;;
       *) fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker'" >&2; return 1 ;;
     esac
   fi
-  local persisted
-  persisted="$(substrate_current || true)"
-  if [[ -n "${persisted}" ]]; then echo "${persisted}"; return 0; fi
-  if [[ "${CLOUDBOX_SUBSTRATE_DEFAULT}" == "docker" ]]; then echo "docker"; return 0; fi
-  substrate_detect
+  __persisted="$(substrate_current || true)"
+  if [[ -n "${__persisted}" ]]; then printf -v "${__var}" '%s' "${__persisted}"; return 0; fi
+  if [[ "${CLOUDBOX_SUBSTRATE_DEFAULT}" == "docker" ]]; then printf -v "${__var}" '%s' "docker"; return 0; fi
+  substrate_detect_into "${__var}"
+}
+
+# The `$( )` form, for the places that read the answer inline. Prefer
+# substrate_resolve_into in a script that will ask anything else about tbx: a
+# command substitution is a SUBSHELL, so the `tbx doctor` memo that detection
+# fills in (TBX_DOCTOR_RC) dies with it, and the next caller —
+# substrate_preflight, substrate_doctor_reason, install.sh's visible run — pays
+# for a second full probe of the helper, DNS, routes and mirror. Seconds, twice,
+# on a path the attendee is already waiting on.
+substrate_resolve() {
+  local __s
+  substrate_resolve_into __s || return 1
+  echo "${__s}"
 }
 
 # tbx_version_check <reporter> — assert the tbx on PATH is the PINNED one,

@@ -54,17 +54,23 @@ need docker "Install Docker Desktop / OrbStack / docker-ce first."
 docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
 need crane
 
-# The platform the cluster nodes actually run. The Talos "nodes" are containers
-# on THIS host's Docker engine, so their CPU architecture is the DAEMON's — and
-# that is what this must read, not uname -m: an x86_64 Rosetta shell on Apple
-# Silicon (or a context pointing at a remote daemon) would otherwise mirror
-# amd64 images for arm64 node containers, and install.sh --check — which
-# compares the mirror against the same daemon arch — would flag the mirror this
-# script had just built. Nothing here may be hard-coded (CI runs amd64, most
-# laptops in the room are arm64).
-node_arch="$(docker_server_arch)" \
-  || die "Docker reports an unsupported architecture '$(docker version -f '{{.Server.Arch}}' 2>/dev/null)' — the workshop needs amd64 or arm64."
+# The platform the cluster NODES actually run — asked of the substrate, because
+# the two answer differently and getting it wrong fills the mirror with images
+# no node can execute:
+#   docker — the nodes are containers on THIS host's Docker engine, so their
+#            arch is the DAEMON's, not uname -m (an x86_64 Rosetta shell on
+#            Apple Silicon, or a context pointing at a remote daemon).
+#   tbx    — the nodes are natively virtualised VMs, so their arch is the
+#            HOST's. Docker here only runs the mirror container, and on an
+#            amd64 Colima VM on an arm64 Mac the daemon's answer is the wrong
+#            one by a whole architecture: every mirrored image would be amd64
+#            for arm64 VMs, and the venue is where you would find out.
+# Nothing may be hard-coded (CI runs amd64, most laptops in the room are arm64).
+substrate_resolve_into INIT_SUBSTRATE
+node_arch="$(node_arch "${INIT_SUBSTRATE}")" \
+  || die "Could not determine the architecture your ${INIT_SUBSTRATE} nodes will run (docker reports '$(docker version -f '{{.Server.Arch}}' 2>/dev/null)', uname -m says '$(uname -m)') — the workshop needs amd64 or arm64."
 NODE_PLATFORM="linux/${node_arch}"
+info "Cluster nodes will run ${NODE_PLATFORM} (substrate: ${INIT_SUBSTRATE})"
 
 IMAGES_FILE="${SCRIPT_DIR}/images.txt"
 [[ -f "${IMAGES_FILE}" ]] || die "Missing ${IMAGES_FILE}"
@@ -298,11 +304,11 @@ ollama_bind_check() {
   warn "  either: OLLAMA_HOST=0.0.0.0 ollama serve       # if you run it in a terminal"
 }
 
-# The substrate this machine will use — resolved ONCE here because both section
-# 4 (Ollama's bind address is a tbx problem) and section 5 (the Talos disk cache
-# is a tbx-only artefact) need it. Assigned before it is compared: a die() inside
-# `[[ "$(substrate_resolve)" == … ]]` would only kill the subshell (lib.sh).
-SUBSTRATE="$(substrate_resolve)"
+# The substrate this machine will use — resolved ONCE, at the top of the script,
+# where the node architecture needed it. Section 4 (Ollama's bind address is a
+# tbx problem) and section 5 (the Talos disk cache is a tbx-only artefact) read
+# the same answer rather than asking `tbx doctor` again.
+SUBSTRATE="${INIT_SUBSTRATE}"
 
 # --- 4. Pull the optional host-side model used by kagent ----------------------
 if [[ "${SKIP_MODEL_PULL}" == "true" ]]; then

@@ -39,7 +39,11 @@ case "${1:-}" in
   *) die "Unknown argument: ${1} (see --help)" ;;
 esac
 
-SUBSTRATE="$(substrate_resolve)"
+# The _into form: `$(substrate_resolve)` is a subshell, so the `tbx doctor` memo
+# detection fills in (TBX_DOCTOR_RC, lib.sh) died with it and substrate_preflight
+# below re-ran the slowest read-only probe in the repo a second time.
+SUBSTRATE=""
+substrate_resolve_into SUBSTRATE
 info "Substrate: ${SUBSTRATE}"
 if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then
   info "  (tbx not used: $(substrate_doctor_reason))"
