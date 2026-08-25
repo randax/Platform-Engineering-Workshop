@@ -65,9 +65,11 @@ Kubernetes Ingress wildcard host matches exactly one label — which is what let
 than assuming, though: `.status.url` is the published truth.
 
 On the **docker** substrate `/etc/hosts` cannot hold a wildcard, so only the ksvc names
-`install.sh --print-hosts` lists resolve. For a ksvc you invent yourself, either add a
-line for it or use the Host-header form: `curl -H "Host: <the ksvc host>" http://localhost/`.
-On **tbx** the resolver answers the wildcard, so anything you create just works.
+`install.sh --print-hosts` lists resolve. For a ksvc you invent yourself, teach it the
+name — `./scripts/install.sh --add-hosts <first label>`, e.g. `--add-hosts hello-demo` —
+which remembers it, so a later rewrite of the block keeps it. Or skip the name entirely:
+`curl -H "Host: <the ksvc host>" http://localhost/`. On **tbx** the resolver answers the
+wildcard, so anything you create just works.
 </details>
 
 <details>

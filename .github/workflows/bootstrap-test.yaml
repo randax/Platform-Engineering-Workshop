@@ -921,6 +921,25 @@ jobs:
             || { echo "❌ demo-app didn't report a DB-backed counter (Postgres wiring?)"; echo "$got" | head -40; exit 1; }
           echo "$got" | grep -qi "Bucket <code>" || echo "⚠️ bucket line missing on the demo-app page"
           echo "✅ deploy-from-source: the demo app runs and USES its composed Postgres (visit counter) + bucket"
+          # --- install.sh --add-hosts, on the one name that proves it ----------
+          # ${app} is Console-created, so its ksvc host was NOT in the block
+          # create-cluster.sh wrote — /etc/hosts has no wildcards and only the
+          # three names the labs create are knowable in advance. Everything
+          # above reached it with an explicit Host header, which is exactly the
+          # workaround this replaces. Assert the BEFORE state too, so a future
+          # change that pre-lists every name turns this into a green test of
+          # nothing.
+          getent hosts "${host}" >/dev/null 2>&1 \
+            && { echo "❌ ${host} already resolves — this test can no longer prove --add-hosts does anything"; exit 1; }
+          ./scripts/install.sh --add-hosts "${app}-demo"
+          getent hosts "${host}" \
+            || { echo "❌ ${host} still does not resolve after --add-hosts"; exit 1; }
+          # The LITERAL published URL, no Host header, no port — what an attendee
+          # clicks in the Console.
+          url=$(kubectl -n demo get ksvc "${app}" -o jsonpath='{.status.url}')
+          curl -sS --max-time 20 "${url}/" | grep -qE 'visitor <b>#[0-9]' \
+            || { echo "❌ ${url} did not answer without a Host header"; exit 1; }
+          echo "✅ install.sh --add-hosts: ${url} is browsable directly on the docker substrate"
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
           { echo ""; echo "### Deploy-from-source + demo app (PRD-0012 / #35) — built cloudbox/demo-app from source; the running app uses its composed Postgres (live counter) + S3 bucket ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
@@ -1206,6 +1225,17 @@ jobs:
           "${HOME}/.local/bin/mise" trust
           "${HOME}/.local/bin/mise" install
 
+      - name: Snapshot /etc/hosts before anything touches it
+        run: |
+          set -euo pipefail
+          # The create writes a marked block and the destroy removes it. "Exactly
+          # reversible" is a claim nothing has ever checked — and the failure it
+          # guards against is silent: nine names still pointing at 127.0.0.1
+          # after the cluster is gone break the NEXT cluster (especially one on
+          # the other substrate) with no error anywhere.
+          cp /etc/hosts /tmp/hosts.before
+          wc -l < /tmp/hosts.before
+
       - name: First cluster of the day
         run: ./scripts/create-cluster.sh
 
@@ -1332,6 +1362,21 @@ jobs:
           [ -z "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" ] \
             || { echo "❌ destroy-cluster.sh left node containers behind"; docker ps -a; exit 1; }
           echo "✅ destroy left nothing of '${CLUSTER_NAME}' behind, and kept the unrelated context — a third cluster would create cleanly"
+
+          # /etc/hosts must be byte-identical to the snapshot taken before the
+          # first create — two creates and two destroys later. Anything else
+          # means the block is not exactly reversible: leftover names resolve to
+          # 127.0.0.1 forever, which is invisible until the next cluster.
+          if ! cmp -s /tmp/hosts.before /etc/hosts; then
+            echo "❌ /etc/hosts is not what it was before the first create:"
+            diff -u /tmp/hosts.before /etc/hosts || true
+            exit 1
+          fi
+          grep -q cloudbox-begin /etc/hosts \
+            && { echo "❌ a CloudBox marker survived the destroy"; exit 1; }
+          grep -qE 'cloudbox\.k8s\.test' /etc/hosts \
+            && { echo "❌ a *.cloudbox.k8s.test name survived the destroy"; exit 1; }
+          echo "✅ /etc/hosts is byte-identical to the pre-create snapshot — no markers, no names"
 
       - name: Recovery-path summary
         if: always()

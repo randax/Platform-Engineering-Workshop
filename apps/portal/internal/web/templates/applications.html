@@ -117,6 +117,7 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
 <h1>{{.Name}} <span class="badge {{.Readiness.Class}}">{{.Readiness.Label}}</span>
   {{if .SourceBuilt}}<span class="tag">source-built</span>{{end}}</h1>
 <p class="lede">One <code>Application</code> composing a workload, a database and a bucket, in project <code>{{.Namespace}}</code>.{{if .URL}} Serving at <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.URL}} ↗</a>.{{end}}</p>
+{{if .URL}}<p class="hint">Link dead on the <b>docker</b> substrate? <code>/etc/hosts</code> has no wildcards, and this name was invented after the cluster was built — teach it once with <code>./scripts/install.sh --add-hosts {{.Name}}-{{.Namespace}}</code>. On tbx the resolver already answers it.</p>{{end}}
 
 {{if .ShowDiag}}
 <h2>Diagnostics <small>why this app isn't ready</small></h2>

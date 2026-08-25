@@ -98,7 +98,11 @@ One hostname scheme, both substrates — `*.cloudbox.k8s.test`:
 On the **tbx** substrate talos-box's own resolver answers every one of these at the
 cluster's ingress VIP (`172.30.<n>.200`). On the **Docker** substrate they come from a
 marked `/etc/hosts` block; `./scripts/install.sh --print-hosts` prints it, and
-`create-cluster.sh` writes it (one `sudo` prompt). The published-NodePort URLs on
+`create-cluster.sh` writes it (one `sudo` prompt). A file has no wildcards, so the block
+lists the three Knative names the labs create — for one you invent yourself (anything the
+Console composes), `./scripts/install.sh --add-hosts <first label>` adds it and remembers
+it in `~/.cloudbox/extra-hosts`, so the next rewrite of the block keeps it.
+The published-NodePort URLs on
 localhost still work there as a fallback, but they exist on the Docker substrate only —
 which is why no lab names them. Zot is the deliberate exception in the other direction:
 attendees reach it by hostname, while the kubelet pulls from Zot's NodePort on the node

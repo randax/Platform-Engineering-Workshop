@@ -251,6 +251,10 @@ git instead?
   ```
   Deploy `my-app`, watch it turn Ready, and open its `*.kn.cloudbox.k8s.test` URL — the apex of the
   self-service arc, from a form.
+  On the **docker substrate** that URL is a name nobody could have listed in advance, and
+  `/etc/hosts` has no wildcards — so teach it once:
+  `./scripts/install.sh --add-hosts my-app-demo` (the first label of the URL the Console
+  shows you). On tbx it already resolves.
 - **Read _why_ something is broken (Diagnostics, DR-0005).** When an Application or Function
   isn't Ready, open its **detail page**: instead of a bare red dot, the console shows the
   cause a `kubectl describe` would — the failing conditions, the offending pods' container
