@@ -708,23 +708,82 @@ hosts_marked_block() {
 # asks this first, and an unpaired block that happened to match used to answer
 # "already correct", which skipped the assertion entirely and left the broken
 # file in place for the NEXT writer (or a hand edit) to truncate.
+#
+# What is compared is the ENTRIES — the "127.0.0.1 <name>" lines — and not the
+# comment paragraph above them. Byte-comparing the whole block makes the block's
+# own prose part of the contract: edit one word of it in this file (round 3 did,
+# twice) and every attendee whose block an older create wrote is told their
+# hosts file "carries lines that no longer belong", which is a diagnosis of a
+# problem they do not have, pointing at lines that are perfectly correct. The
+# entries are what resolve names; the comments are commentary.
+# hosts_block_text_current() below is the separate, non-failing question.
 hosts_block_present() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 1
   grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || return 1
   hosts_markers_paired || return 1
+  diff -q <(hosts_marked_block | hosts_entry_lines) \
+          <(cloudbox_hosts_block | hosts_entry_lines) >/dev/null 2>&1
+}
+
+# hosts_entry_lines — filter: keep only the 127.0.0.1 entry lines of a block.
+hosts_entry_lines() { grep -E '^[[:space:]]*127\.0\.0\.1[[:space:]]' || true; }
+
+# hosts_block_text_current — 0 when the marked block matches byte-for-byte,
+# comments included. Only the entries decide whether the names resolve, so this
+# is worth a note ("the block's text is outdated — --write-hosts refreshes it"),
+# never a failure.
+hosts_block_text_current() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 1
   diff -q <(hosts_marked_block) <(cloudbox_hosts_block) >/dev/null 2>&1
 }
 
-# hosts_loopback_lines — every "127.0.0.1 <a CloudBox name>" line in the file,
-# with line numbers, wherever it sits. Not "inside our block": the point is to
-# find the ones OUTSIDE it.
-hosts_loopback_lines() {
+# hosts_loopback_scan — ONE pass over ${CLOUDBOX_HOSTS_FILE}, printing
+# "<line number><TAB><CloudBox name><TAB><the line>" for every entry that makes a
+# CloudBox name resolve to 127.0.0.1. The single place that decides what "this
+# name is in the hosts file" means; hosts_loopback_lines and hosts_missing_names
+# are both views of it.
+#
+# It parses FIELDS, because /etc/hosts does. The rule the file actually follows
+# (hosts(5)) is: address first, then ANY NUMBER of names for it — so
+#
+#     127.0.0.1   localhost gitea.cloudbox.k8s.test
+#
+# resolves gitea exactly as its own line would. The previous regex anchored the
+# name immediately after the address, so that line was invisible to every caller:
+# the tbx staleness check called the file clean and then every workshop URL went
+# to the attendee's loopback, and `--check` reported the name missing while the
+# machine resolved it. Appending a name to the `localhost` line is, of all the
+# hand-edits, the most likely one — it is what most /etc/hosts advice on the
+# internet tells you to do.
+#
+# Comments are stripped first: `# 127.0.0.1 gitea…` (a line an attendee disabled
+# rather than deleted) resolves nothing, and must not be reported as if it did.
+# Only 127.0.0.1 counts — ::1 is a legal way to break the same names, but this
+# workshop never writes it, and reporting a line we did not write and cannot
+# rewrite would send an attendee editing something unrelated.
+hosts_loopback_scan() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
-  local n
-  while IFS= read -r n; do
-    grep -nE "^[[:space:]]*127\.0\.0\.1[[:space:]]+${n//./\\.}([[:space:]]|$)" \
-      "${CLOUDBOX_HOSTS_FILE}" || true
-  done < <(cloudbox_hostnames)
+  awk '
+    NR == FNR { want[$0] = 1; next }
+    {
+      raw = $0
+      line = $0
+      sub(/#.*/, "", line)
+      n = split(line, f, /[ \t]+/)
+      i = (f[1] == "" ? 2 : 1)          # a leading blank makes field 1 empty
+      if (f[i] != "127.0.0.1") next
+      for (i++; i <= n; i++)
+        if (f[i] in want) print FNR "\t" f[i] "\t" raw
+    }
+  ' <(cloudbox_hostnames) "${CLOUDBOX_HOSTS_FILE}"
+}
+
+# hosts_loopback_lines — every line in the file that points a CloudBox name at
+# 127.0.0.1, with line numbers, wherever it sits. Not "inside our block": the
+# point is to find the ones OUTSIDE it. Format matches `grep -n` ("N:line"),
+# one entry per line even when a line carries several of our names.
+hosts_loopback_lines() {
+  hosts_loopback_scan | awk -F'\t' '!seen[$1]++ { print $1 ":" $3 }'
 }
 
 # hosts_block_stale_for_tbx — 0 when this file would break a tbx cluster.
@@ -748,12 +807,16 @@ hosts_block_stale_for_tbx() {
 }
 
 # hosts_missing_names — the names NOT currently resolvable from the file, so a
-# FAIL message can name them instead of saying "the block is wrong".
+# FAIL message can name them instead of saying "the block is wrong". The other
+# view of hosts_loopback_scan, so "missing" and "stale" cannot disagree about
+# what counts as an entry (they did: a name appended to the `localhost` line was
+# reported missing while the machine resolved it perfectly well).
 hosts_missing_names() {
+  local found
+  found="$(hosts_loopback_scan | cut -f2)"
   local n
   while IFS= read -r n; do
-    grep -qE "^[[:space:]]*127\.0\.0\.1[[:space:]]+${n//./\\.}([[:space:]]|$)" \
-      "${CLOUDBOX_HOSTS_FILE}" 2>/dev/null || echo "${n}"
+    grep -qxF "${n}" <<<"${found}" || echo "${n}"
   done < <(cloudbox_hostnames)
 }
 
@@ -779,7 +842,11 @@ write_hosts_block() {
     warn "Fix the markers by hand, then: ./scripts/install.sh --write-hosts"
     return 1
   fi
-  hosts_block_present && { ok "${CLOUDBOX_HOSTS_FILE} block already correct"; return 0; }
+  # Byte-identical, not merely "the same names": the writer is the one place
+  # that can refresh an outdated comment paragraph, and `--check` tells the
+  # attendee it does. Everywhere the difference DECIDES something —
+  # hosts_block_present, and so every FAIL — only the entries count.
+  hosts_block_text_current && { ok "${CLOUDBOX_HOSTS_FILE} block already correct"; return 0; }
   local tmp; tmp="$(mktemp)"
   # Set AFTER mktemp so an early `return 0` above never runs it with tmp unset.
   # shellcheck disable=SC2064  # expand tmp NOW: at RETURN time the local is gone
@@ -821,9 +888,21 @@ write_hosts_block() {
   ok "${CLOUDBOX_HOSTS_FILE} updated ($(cloudbox_hostnames | wc -l | tr -d ' ') names)"
 }
 
+# remove_hosts_block — take the marked block out again. NEVER FATAL (see the
+# sudo branch at the bottom): it runs at the end of a destroy, where the cluster
+# is already gone and dying here would skip the mirror purge and the summary.
+# 0 when there is nothing to do or the block was removed, 1 when the file still
+# carries CloudBox lines and the caller should say so.
 remove_hosts_block() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
-  grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || return 0
+  # EITHER marker, not just the begin one. An end-only file is precisely the
+  # state the assertion below exists for — a truncated block, a half-finished
+  # hand edit — and keying the whole function on the begin marker made it return
+  # "nothing to do" there, silently, with the broken file left for the next
+  # writer to refuse (or for a hand edit to truncate).
+  grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" \
+    || grep -qxF "${CLOUDBOX_HOSTS_END}" "${CLOUDBOX_HOSTS_FILE}" \
+    || return 0
   # Same guard as write_hosts_block, and NOT fatal here: this runs on the
   # teardown path, where dying would abort a destroy over a file the destroy
   # does not need. The block stays; the message says how to remove it.
@@ -839,7 +918,7 @@ remove_hosts_block() {
       warn "These lines point CloudBox names at your loopback (line: text):"
       printf '   %s\n' "${stray}"
     fi
-    return 0
+    return 1
   fi
   local tmp; tmp="$(mktemp)"
   # shellcheck disable=SC2064  # see write_hosts_block
@@ -852,7 +931,17 @@ remove_hosts_block() {
   # own temp file; sudo is only needed for the write tee performs.
   if ! sudo tee "${CLOUDBOX_HOSTS_FILE}" < "${tmp}" >/dev/null; then
     rm -f "${tmp}"
-    die "Could not rewrite ${CLOUDBOX_HOSTS_FILE} (sudo declined or unavailable). Delete the lines between ${CLOUDBOX_HOSTS_BEGIN} and ${CLOUDBOX_HOSTS_END} by hand."
+    # NOT a die. By the time this runs the cluster is already destroyed, and
+    # dying here skipped everything after it — the mirror purge, the extras
+    # file, and the summary that tells the attendee what state they are in.
+    # A declined sudo password is a hosts-file problem, not a teardown failure.
+    fail "Could not rewrite ${CLOUDBOX_HOSTS_FILE} (sudo declined or unavailable)."
+    warn "The cluster is gone; only these name entries are left behind:"
+    local left; left="$(hosts_loopback_lines)"
+    [[ -n "${left}" ]] && printf '   %s\n' "${left}"
+    warn "Delete the lines between ${CLOUDBOX_HOSTS_BEGIN} and ${CLOUDBOX_HOSTS_END} by hand"
+    warn "(sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}) — on the tbx substrate they would override its resolver."
+    return 1
   fi
   rm -f "${tmp}"
   trap - RETURN   # see write_hosts_block

@@ -109,11 +109,36 @@ case "${1:-}" in
       cloudbox_valid_label "${name}" \
         || die "'${name}' is not a DNS label — RFC 1123 allows lowercase letters, digits and '-', starting and ending alphanumeric, at most 63 characters (pass the FIRST label only, e.g. my-app-demo for my-app-demo.${KNATIVE_DOMAIN}). Nothing was changed."
     done
+    # The persist has to come FIRST — cloudbox_hostnames() reads the extras file,
+    # so it is what the block is rendered from — but it must not SURVIVE a failed
+    # write. The privileged write is the step an attendee can decline, and a
+    # declined password used to leave the name recorded as "resolvable" while
+    # /etc/hosts had never heard of it: `--check` then reported a missing name
+    # for a service the attendee never successfully added, and only a hand edit
+    # of the extras file cleared it. So: snapshot, persist, write, and put the
+    # snapshot back if the write did not happen.
+    extras_backup="$(mktemp)"
+    extras_existed="false"
+    if [[ -f "${CLOUDBOX_EXTRA_HOSTS_FILE}" ]]; then
+      extras_existed="true"
+      cp "${CLOUDBOX_EXTRA_HOSTS_FILE}" "${extras_backup}"
+    fi
     for name in "$@"; do
       cloudbox_add_extra_host "${name}"
       info "will resolve: ${name}.${KNATIVE_DOMAIN}"
     done
-    write_hosts_block
+    if ! write_hosts_block; then
+      if [[ "${extras_existed}" == "true" ]]; then
+        cp "${extras_backup}" "${CLOUDBOX_EXTRA_HOSTS_FILE}"
+      else
+        rm -f "${CLOUDBOX_EXTRA_HOSTS_FILE}"
+      fi
+      rm -f "${extras_backup}"
+      fail "Nothing was added: ${CLOUDBOX_EXTRA_HOSTS_FILE} is back as it was, so the names it lists and the ones ${CLOUDBOX_HOSTS_FILE} resolves still agree."
+      warn "Fix what the write complained about (above), then re-run: ./scripts/install.sh --add-hosts $*"
+      exit 1
+    fi
+    rm -f "${extras_backup}"
     info "Remove one again: \$EDITOR ${CLOUDBOX_EXTRA_HOSTS_FILE}   # then: ./scripts/install.sh --write-hosts"
     exit 0 ;;
   "") usage; echo ;;
@@ -284,8 +309,20 @@ step "Workshop host ports"
 if [[ "${SUBSTRATE}" != "docker" ]]; then
   ok "tbx substrate — the workshop publishes no host ports at all"
   info "  (NodePorts live inside the VMs; the ingress is a LoadBalancer VIP on the cluster's own segment)"
-elif have docker && [[ -n "$(docker ps -q --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
-  ok "Cluster '${CLUSTER_NAME}' is already running — its ports are expected to be bound"
+elif have docker && [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
+  # `-aq`, the same filter substrate_preflight uses (substrate/docker.sh), not
+  # `-q`. With the node containers STOPPED — a laptop that was rebooted, a
+  # `docker stop` — the running-only filter fell through to the port scan, found
+  # every port free, and reported a machine that is ready to create. It is not:
+  # preflight sees those containers with `-aq` and refuses. A go/no-go gate that
+  # says "ready" and then a create that dies is the gate failing at its one job.
+  if [[ -n "$(docker ps -q --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
+    ok "Cluster '${CLUSTER_NAME}' is already running — its ports are expected to be bound"
+  else
+    check_fail "Cluster '${CLUSTER_NAME}' containers exist but are STOPPED — ./scripts/create-cluster.sh refuses to create over them"
+    echo "     Bring the existing cluster back:  docker start \$(docker ps -aq --filter label=talos.cluster.name=${CLUSTER_NAME})"
+    echo "     Or start over:                    ./scripts/destroy-cluster.sh"
+  fi
 else
   # Every NODEPORT_* in versions.env, or preflight passes and the module that
   # needs the missed port fails at the venue instead. Plus port 80, which the
@@ -339,6 +376,10 @@ elif ! hosts_markers_paired; then
   echo "     Fix by hand: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # then: ./scripts/install.sh --print-hosts"
 elif hosts_block_present; then
   ok "${CLOUDBOX_HOSTS_FILE} has the CloudBox block ($(cloudbox_hostnames | wc -l | tr -d ' ') names)"
+  # Entries right, prose stale: the block was written by an older copy of this
+  # repo whose comment paragraph read differently. Nothing resolves any worse
+  # for it, so this is a note and not a failure.
+  hosts_block_text_current || info "  (the block's comment text is outdated — ./scripts/install.sh --write-hosts refreshes it)"
 elif [[ -z "$(substrate_current)" ]]; then
   info "No cluster yet — ./scripts/create-cluster.sh writes the ${CLOUDBOX_HOSTS_FILE} block (asks for sudo once)"
   info "  Preview the lines: ./scripts/install.sh --print-hosts"

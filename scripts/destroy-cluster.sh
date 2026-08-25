@@ -177,8 +177,16 @@ fi
 # is the only difference the round trip can produce, and it is invisible to
 # every consumer of the file.
 # A no-op on tbx (nothing was ever written) and when the block is absent.
+#
+# `|| hosts_left=true`, and remove_hosts_block never dies: everything below this
+# line — the extras file, the 7 GB mirror purge, the summary that tells the
+# attendee what state their machine is in — used to be skipped when the sudo
+# password was declined (or the block's markers were unpaired). The one part of
+# a teardown an attendee can refuse was running before all the parts they
+# cannot, which is the same ordering bug create-cluster.sh had.
+hosts_left="false"
 if [[ "${SUBSTRATE}" == "docker" ]]; then
-  remove_hosts_block
+  remove_hosts_block || hosts_left="true"
 fi
 # The attendee's own extra Knative names (install.sh --add-hosts) are a
 # PREFERENCE, not cluster state: the block is gone either way, and someone who
@@ -214,4 +222,11 @@ else
 fi
 
 echo
+if [[ "${hosts_left}" == "true" ]]; then
+  warn "One thing is left on this machine: the CloudBox lines in ${CLOUDBOX_HOSTS_FILE} (see above)."
+  warn "They resolve names to 127.0.0.1 where nothing listens now, and on the tbx substrate"
+  warn "they would OVERRIDE talos-box's resolver on a healthy cluster. Remove them with:"
+  warn "  sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}          # delete the marked block"
+  warn "A later ./scripts/create-cluster.sh on docker rewrites the block and is unaffected."
+fi
 ok "Done. Recreate with: ./scripts/create-cluster.sh"

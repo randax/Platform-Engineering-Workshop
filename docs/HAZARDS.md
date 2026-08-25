@@ -226,11 +226,25 @@ header + no block) and prints both.
 also prints the note that the same lines belong in
 `C:\Windows\System32\drivers\etc\hosts`, edited as Administrator, for the Windows browser
 to resolve them. **Every** `destroy-cluster.sh` on the docker
-substrate removes the block again — not only `--purge-mirror`, which is how it used to be:
+substrate *asks to* remove the block again — not only `--purge-mirror`, which is how it
+used to be:
 a block left behind after a docker destroy points nine names at `127.0.0.1`, and
 `/etc/hosts` beats talos-box's resolver, so the *next* cluster created on tbx has every URL
 silently dead on a perfectly healthy cluster. `substrate_preflight` on the tbx backend now
-refuses to create over leftover entries for the same reason.
+refuses to create over leftover entries for the same reason. "Asks to" is exact: the sudo
+prompt is the one step of a teardown an attendee can decline, so `remove_hosts_block` is
+never fatal — it returns 1, the destroy still purges the mirror and prints its summary,
+and the summary names the lines that are still there. Dying at that prompt used to skip
+everything after it, including the 7 GB mirror the attendee had just asked to purge.
+
+**"Leftover" also means a name on somebody else's line.** `/etc/hosts` lets one address
+carry any number of names, so `127.0.0.1 localhost gitea.cloudbox.k8s.test` resolves gitea
+exactly as its own line would — and the first version of this sweep matched the name only
+in the FIRST position after the address, so that line was invisible to every caller: the
+tbx staleness check called the file clean, `--check` reported the name missing while the
+machine resolved it, and the destroy left it behind. `hosts_loopback_scan` in `lib.sh`
+parses fields (comments stripped, address field must be `127.0.0.1`, any later field may
+be one of ours) and is the single definition all three questions are asked through.
 
 **"Leftover" means the ENTRIES, not the markers.** The tbx preflight and `--check` used to
 ask "is the begin marker there?", which is the narrowest possible version of the question:

@@ -189,9 +189,10 @@ perfectly healthy cluster — the cluster itself is fine and stays up, and
 `./scripts/install.sh --write-hosts` writes the block whenever you are ready.
 That is also the command to run if the names ever stop resolving: **WSL2 regenerates
 `/etc/hosts` on every restart** unless you tell it not to (see `lab/00-setup`).
-*Every* `./scripts/destroy-cluster.sh` on the Docker substrate removes the block again —
-not only `--purge-mirror`, which additionally forgets the extra names you added with
-`--add-hosts`. On the tbx substrate nothing touches `/etc/hosts` — talos-box's own
+*Every* `./scripts/destroy-cluster.sh` on the Docker substrate *asks* to remove the block
+again — not only `--purge-mirror`, which additionally forgets the extra names you added
+with `--add-hosts`. It is one more sudo prompt, and you may decline it: the teardown
+finishes either way and says which lines are still there. On the tbx substrate nothing touches `/etc/hosts` — talos-box's own
 resolver answers the names.
 
 Fell behind or broke something interesting? `./scripts/catch-up.sh <module>` force-pushes
