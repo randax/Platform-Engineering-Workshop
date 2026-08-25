@@ -299,35 +299,6 @@ cilium_values=(
   --set cgroup.hostRoot=/sys/fs/cgroup
   --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}"
   --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
-  # One ingress endpoint for the whole platform. `shared` means every Ingress
-  # object lands on ONE Service (cilium-ingress in kube-system) instead of one
-  # LoadBalancer per Ingress — which on tbx would burn a VIP per hostname and on
-  # docker would need a published port per hostname. Both substrates get the
-  # same values so `ingressClassName: cilium` means the same thing in both.
-  --set ingressController.enabled=true
-  --set ingressController.loadbalancerMode=shared
-  # EVERY hostname now goes through Cilium's Envoy, and Envoy's default route
-  # timeout is 15 s. The NodePorts this replaced had no proxy in the path at
-  # all, so nothing in the workshop was ever timed: the 40 MiB seed-gitea push,
-  # the Console's SSE agent-ask stream and ArgoCD's gRPC-web watches would all
-  # start returning 504 at 15 seconds.
-  #
-  # Cilium leaves the route timeout UNSET when neither a backend nor a request
-  # timeout is configured (operator/pkg/model/translation/envoy_virtual_host.go
-  # :495-503 — it only sets MaxStreamDuration=0 there), and unset is Envoy's
-  # 15 s. The operator flag below is the global default for every Ingress,
-  # including the ones attendees create themselves.
-  #
-  # It is 24h and NOT 0: `--ingress-default-request-timeout` defaults to 0 and
-  # the ingestion code skips it precisely when it is 0
-  # (operator/pkg/model/ingestion/ingress.go:44-48, `if defaultRequestTimeout
-  # != 0`), so setting 0 is a no-op that reads like a fix. A duration long
-  # enough that nothing in a 4-hour workshop reaches it is the only value the
-  # flag can express. Per-Ingress, `ingress.cilium.io/request-timeout: "0s"`
-  # DOES mean "no timeout" (the annotation is parsed into a non-nil pointer,
-  # ibid. :49-58, and Envoy reads timeout 0 as disabled) — our four long-lived
-  # ingresses carry it. Verified against cilium v1.20.0 sources.
-  --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h"
   # L2 announcements are what make a LoadBalancer VIP answer ARP on the shared
   # L2 segment. Enabled on BOTH substrates deliberately: on docker there is no
   # LB-IPAM pool so nothing is announced, and keeping the flag identical means
@@ -340,13 +311,28 @@ cilium_values=(
   --set k8sClientRateLimit.qps=10
   --set k8sClientRateLimit.burst=20
 )
+# The ingress values come from cilium_ingress_values (lib.sh) — the SINGLE
+# source, shared with the kind lifeboat, because "the lifeboat serves the
+# identical labs" is only true while `ingressClassName: cilium` means the same
+# thing there. The argument is the service SHAPE, not the substrate name.
+#
+#   tbx    — a real VIP, handed out by the CiliumLoadBalancerIPPool
+#            substrate_post_cni() applies below (.200 by talos-box convention,
+#            which tbx's resolver already answers for every *.${CLOUDBOX_DOMAIN}
+#            name). Until that call runs the Service sits in <pending>, which is
+#            the correct state for a cluster with no LB-IPAM.
+#   docker — no LB implementation at all. The controlplane container publishes
+#            host 80 -> NODEPORT_INGRESS, so the hostnames work port-free too.
 if [[ "${SUBSTRATE}" == "tbx" ]]; then
-  # Real VIP, handed out by the CiliumLoadBalancerIPPool substrate_post_cni()
-  # applies below — .200 by talos-box convention, which tbx's resolver already
-  # answers for every *.${CLOUDBOX_DOMAIN} name. Until that call runs the
-  # Service sits in <pending>, which is the correct state for a cluster with no
-  # LB-IPAM.
-  cilium_values+=(--set ingressController.service.type=LoadBalancer)
+  cilium_ingress_shape="lb"
+else
+  cilium_ingress_shape="nodeport"
+fi
+while IFS= read -r cilium_flag; do
+  cilium_values+=("${cilium_flag}")
+done < <(cilium_ingress_values "${cilium_ingress_shape}")
+
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
   # tbx ONLY, and taken verbatim from talos-box's own curated Cilium values
   # (internal/manifests/manifests.go:137-138, `bpf: hostLegacyRouting: true`).
   # It routes pod traffic through the host stack instead of short-cutting out of
@@ -362,11 +348,6 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
   # flag costs the BPF fast path. See docs/HAZARDS.md — rehearsal step 3 (VIP
   # reachability from the host) is what retires the "unproven" mark on it.
   cilium_values+=(--set bpf.hostLegacyRouting=true)
-else
-  # No LB implementation in a docker cluster. The controlplane container
-  # publishes host 80 -> this NodePort, so the hostnames work port-free there too.
-  cilium_values+=(--set ingressController.service.type=NodePort)
-  cilium_values+=(--set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}")
 fi
 helm upgrade --install cilium \
   --server-side=false \

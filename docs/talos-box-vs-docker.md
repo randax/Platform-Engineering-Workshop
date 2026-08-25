@@ -249,11 +249,15 @@ Browser URLs are baked into deployed config, not just lab prose: Backstage base 
 (`cmd/tbx/main.go:324-343`): a NodePort is reachable at `node-ip:port`, never at
 `localhost:port`, so "keep NodePorts so URLs don't move" needs a new host-forwarding layer.
 
-**h. kind-fallback.** `scripts/kind-fallback.sh` holds a *shape* contract — same nine
-NodePorts, `disableDefaultCNI`, `kubeProxyMode: none`, same vendored Cilium chart
-(`:5-9`, `:41-65`, `:135-142`). It is still Docker-based, so under a VM substrate it
-becomes the *only* Docker path left — which is fine (it is the fallback) but it means
-Docker Desktop stays a prerequisite for the fallback anyway.
+**h. kind-fallback.** `scripts/kind-fallback.sh` used to hold a *shape* contract only —
+the nine NodePorts, `disableDefaultCNI`, `kubeProxyMode: none`, the vendored Cilium chart.
+That stopped being enough the moment every workshop URL became a hostname behind the shared
+Cilium ingress: it published nine ports and could not answer one name. It now holds the
+whole docker-substrate contract — the same `cilium_ingress_values` (lib.sh), host port 80 →
+`NODEPORT_INGRESS`, and the same marked `/etc/hosts` block — so modules 02 onward are
+identical, and `--delete` removes both the cluster and the block. It is still Docker-based,
+so under a VM substrate it becomes the *only* Docker path left — which is fine (it is the
+fallback) but it means Docker Desktop stays a prerequisite for the fallback anyway.
 
 ---
 

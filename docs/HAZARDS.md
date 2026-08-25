@@ -816,6 +816,38 @@ Now uses the same vendored chart: **exit 0 in 49 s, both nodes Ready, offline.**
 are the least-tested code you ship, and the most expensive to get wrong.** Every
 blocker in five rehearsals came from recovery or setup, never from the platform.
 
+## RESOLVED — the lifeboat published nine ports and could not answer one name
+
+The same lifeboat, one layer up. `kind-fallback.sh` held a **shape** contract:
+1 CP + 1 worker, `disableDefaultCNI`, `kubeProxyMode: none`, the vendored Cilium
+chart, the nine workshop NodePorts published on localhost. That was the whole
+contract while the workshop's URLs *were* NodePorts.
+
+The substrate split moved every URL to a hostname behind the shared Cilium
+ingress — and the lifeboat installed Cilium **without the ingress controller at
+all**, mapped no host port 80, and wrote no `/etc/hosts` block. So the first
+thing an attendee does after taking the lifeboat is `./scripts/seed-gitea.sh`,
+which pushes to `gitea.cloudbox.k8s.test`: a name nothing on that machine
+resolves, to an ingress that was never installed. **Module 02, first command.**
+
+Fixed by giving it the docker substrate's contract rather than a description of
+it: `extraPortMappings` 80 → `NODEPORT_INGRESS`, `cilium_ingress_values`
+(`scripts/lib.sh`) — the *same function* `create-cluster.sh` calls, asked for the
+same `nodeport` shape — and `write_hosts_block` after Ready, non-fatal, exactly
+as the create path does it. check-consistency 11b asserts both callers still
+share that function and that neither grew a private `--set ingressController.*`.
+
+**kind is deliberately not a substrate.** It writes no `~/.cloudbox/substrate`,
+because that file tells `destroy-cluster.sh` what to tear down and neither of its
+two answers is true here. The teardown is `./scripts/kind-fallback.sh --delete`,
+which deletes the cluster **and** removes the hosts block — otherwise the block
+outlives the lifeboat and a later tbx create dies on it
+(`hosts_block_stale_for_tbx`).
+
+**Still true of this file: nothing has ever run it end to end.** No CI job, no
+rehearsal. It is exercised only by someone already in trouble. Retired by a
+rehearsal that takes the lifeboat deliberately and runs modules 02→05 on it.
+
 ## TRAP — module 04's Crossplane Function is fetched by Crossplane, not by the mirror
 
 **Pre-existing, deliberate, and not on `images.txt` — recorded here because two
@@ -1770,6 +1802,30 @@ settles the log flood, not the prerelease.
 #5927 is fixed, but it was a whole-class reminder: if a sibling lands in
 another scanner module, the EnvFilter directive that fixed it targets one
 module path, not a class of bug, and would need widening.
+
+## UNPROVEN — `bpf.hostLegacyRouting` on tbx, taken on talos-box's word
+
+talos-box's own curated Cilium values set `bpf: hostLegacyRouting: true`
+(`internal/manifests/manifests.go:137-138`). Ours did not, and on tbx that is the
+setting standing between the attendee's browser and the ingress: the browser is
+outside the cluster's L2 segment and reaches the VIP across vmnet, so pod traffic
+short-cutting out of BPF instead of going through the host stack is exactly the
+path upstream found needed the flag. `create-cluster.sh` now sets it — **on the
+tbx branch only**.
+
+What is proven: the chart key exists in the vendored 1.20.0 values
+(`values.yaml:716`) and `helm template … --set bpf.hostLegacyRouting=true` renders
+`enable-host-legacy-routing: "true"` into the ConfigMap; without the flag the key
+is absent. What is **not** proven: that the VIP is reachable from the host with
+it, on real hardware. We have never run a tbx cluster.
+
+**Do not copy it to the docker branch.** That path is CI-proven as it stands, the
+host reaches the ingress through a published port rather than a VIP, and the flag
+costs the BPF fast path for nothing.
+
+**Retired by:** rehearsal step 3 — curl a `*.cloudbox.k8s.test` hostname from the
+host against a tbx cluster. If it fails *with* the flag, the next thing to check
+is the L2 announcement policy and the pool, not this line.
 
 ## PROVEN ONCE — Cilium 1.20.0 datapath comes up on Talos-in-Docker
 

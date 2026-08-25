@@ -196,6 +196,62 @@ mirror_target_arch() {
   if [[ "$(mirror_target_substrate)" == "tbx" ]]; then host_cpu_arch; else docker_server_arch; fi
 }
 
+# --- Cilium ingress values ---------------------------------------------------
+# cilium_ingress_values <lb|nodeport> — the chart flags that give a cluster ONE
+# shared ingress endpoint, printed one flag per line (read them into an array
+# with a `while read` loop; bash 3.2 on macOS has no mapfile and no namerefs).
+#
+# The single source for those flags. create-cluster.sh and kind-fallback.sh both
+# call it, because "the lifeboat serves the identical labs" is only true while
+# `ingressClassName: cilium` means the same thing in both — every hostname in
+# the workshop, and every Ingress in gitops/, depends on it.
+#
+# `shared` means every Ingress object lands on ONE Service (cilium-ingress in
+# kube-system) instead of a LoadBalancer per Ingress — which on tbx would burn a
+# VIP per hostname and on docker/kind would need a published port per hostname.
+#
+# EVERY hostname goes through Cilium's Envoy, and Envoy's default route timeout
+# is 15 s. The NodePorts this replaced had no proxy in the path at all, so
+# nothing in the workshop was ever timed: the 40 MiB seed-gitea push, the
+# Console's SSE agent-ask stream and ArgoCD's gRPC-web watches would all start
+# returning 504 at 15 seconds. Cilium leaves the route timeout UNSET when
+# neither a backend nor a request timeout is configured
+# (operator/pkg/model/translation/envoy_virtual_host.go:495-503 — it only sets
+# MaxStreamDuration=0 there), and unset is Envoy's 15 s. The operator flag is
+# the global default for every Ingress, including ones attendees create.
+#
+# It is 24h and NOT 0: `--ingress-default-request-timeout` defaults to 0 and the
+# ingestion code skips it precisely when it is 0
+# (operator/pkg/model/ingestion/ingress.go:44-48, `if defaultRequestTimeout !=
+# 0`), so setting 0 is a no-op that reads like a fix. A duration long enough
+# that nothing in a 4-hour workshop reaches it is the only thing the flag can
+# express. Per-Ingress, `ingress.cilium.io/request-timeout: "0s"` DOES mean "no
+# timeout" (ibid. :49-58, parsed into a non-nil pointer, and Envoy reads route
+# timeout 0 as disabled) — our four long-lived ingresses carry it. Verified
+# against cilium v1.20.0 sources.
+#
+# The argument is the SERVICE SHAPE, not the substrate: `lb` for a real
+# LoadBalancer VIP (tbx), `nodeport` for a fixed NodePort that the host reaches
+# through a published port 80 (docker's controlplane container, kind's
+# extraPortMappings). kind is not a substrate — it is the lifeboat — and asking
+# for the shape rather than the name is what lets it share these values without
+# pretending to be one.
+cilium_ingress_values() { # <lb|nodeport>
+  printf '%s\n' \
+    --set ingressController.enabled=true \
+    --set ingressController.loadbalancerMode=shared \
+    --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h"
+  case "$1" in
+    lb)
+      printf '%s\n' --set ingressController.service.type=LoadBalancer ;;
+    nodeport)
+      printf '%s\n' \
+        --set ingressController.service.type=NodePort \
+        --set "ingressController.service.insecureNodePort=${NODEPORT_INGRESS}" ;;
+    *) die "cilium_ingress_values: unknown service shape '$1' (lb|nodeport)" ;;
+  esac
+}
+
 # --- Host ports -------------------------------------------------------------
 # port_listeners <port> — the listener lines for that TCP port on ANY local
 # address, or empty when this shell has no tool to ask with.

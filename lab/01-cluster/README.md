@@ -164,5 +164,8 @@ changed what").
 
 The cluster is cattle: `./scripts/destroy-cluster.sh && ./scripts/create-cluster.sh` is
 always safe and takes ~5 minutes (images are already local). If Talos-in-Docker fights
-your machine specifically, `./scripts/kind-fallback.sh` gives you a kind+Cilium cluster —
-you lose the Talos exploration but every later module works the same.
+your machine specifically, `./scripts/kind-fallback.sh` gives you a kind+Cilium cluster
+with the same ingress, the same hostnames and the same `/etc/hosts` block — you lose the
+Talos exploration but every later module works the same. Remove it afterwards with
+`./scripts/kind-fallback.sh --delete` (cluster **and** hosts block); `destroy-cluster.sh`
+knows only the two real substrates.

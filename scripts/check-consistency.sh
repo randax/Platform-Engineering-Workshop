@@ -458,6 +458,25 @@ fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "both substrate backends carry the same cni:none machine-config patch"
 
+# --- 11b. one source for the Cilium ingress values ---------------------------
+# `ingressClassName: cilium` has to mean the same thing in create-cluster.sh and
+# in the kind lifeboat, or "the lifeboat serves the identical labs" is false: it
+# is the ingress that answers every *.${CLOUDBOX_DOMAIN} hostname the labs and
+# gitops/ are written against. Here the values are not duplicated at all — both
+# read cilium_ingress_values() in lib.sh — so the check is that they still do,
+# and that neither has grown a private `--set ingressController.*` beside it.
+before_fail=${FAILURES}
+for f in scripts/create-cluster.sh scripts/kind-fallback.sh; do
+  grep -q 'cilium_ingress_values' "${f}" \
+    || bad "${f} no longer calls cilium_ingress_values() — the shared ingress values are the contract the kind lifeboat and the docker substrate both meet; do not inline them"
+  grep -qE -- '--set[[:space:]]+"?ingressController\.' "${f}" \
+    && bad "${f} sets ingressController.* directly — those flags belong in cilium_ingress_values() (lib.sh), which is the single source both callers read"
+done
+grep -q 'cilium_ingress_values()' scripts/lib.sh \
+  || bad "cilium_ingress_values() is gone from scripts/lib.sh — check 11b asserts a helper that no longer exists"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "create-cluster.sh and kind-fallback.sh share one source for the Cilium ingress values"
+
 # --- 12. no browser-facing localhost:3xxxx literals --------------------------
 # The workshop serves one hostname scheme on both substrates. A leftover
 # localhost:30xxx URL works on exactly one of them, so it reads as a working

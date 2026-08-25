@@ -221,8 +221,16 @@ resolver answers the names.
 Fell behind or broke something interesting? `./scripts/catch-up.sh <module>` force-pushes
 the canonical state for that module to your Gitea and lets ArgoCD converge — scripted
 state, not hope. If neither substrate will cooperate on your machine,
-`./scripts/kind-fallback.sh` gives you a kind+Cilium cluster and you continue from
-module 2 onward.
+`./scripts/kind-fallback.sh` gives you a kind+Cilium cluster that meets the same
+contract: the same vendored Cilium with the **same ingress values**, host port 80
+mapped to the ingress, and the same marked `/etc/hosts` block — so every
+`*.cloudbox.k8s.test` hostname works and **modules 02 onward are identical**. You
+lose only the Talos content of module 1.
+
+kind is not one of the two substrates, so `destroy-cluster.sh` will never find that
+cluster. Tear it down with `./scripts/kind-fallback.sh --delete`, which deletes the
+kind cluster **and** removes the `/etc/hosts` block it wrote (one sudo prompt, and
+you may decline it — it then names the lines to delete by hand).
 
 ## Lab overview
 
