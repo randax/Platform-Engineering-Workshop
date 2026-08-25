@@ -41,7 +41,21 @@ export CLOUDBOX_SUBSTRATE="${SUBSTRATE}"
 source "${SCRIPT_DIR}/substrate/${SUBSTRATE}.sh"
 
 substrate_preflight
+# Persisted BEFORE the create, not after it. destroy-cluster.sh reads this file
+# to decide what to tear down and falls back to "docker" when it is absent — so
+# a tbx create that dies anywhere after `tbx up` (a failed apply-config, a
+# bootstrap that never converges, Ctrl-C during the maintenance-mode wait) used
+# to leave running VMs behind that the documented recovery command then never
+# looked for. Preflight has already established the substrate is usable and
+# that no cluster of this name exists; from here on, something may exist.
+# Writing it early is safe in the other direction too: the file records the
+# substrate, not the existence of a cluster, and every consumer treats "no such
+# cluster" as nothing to do.
+substrate_persist "${SUBSTRATE}"
 substrate_create
+# Idempotent by construction (substrate_persist is a whole-file write of the
+# same value). Kept so the happy path still ends with the answer written, even
+# if a backend ever grows a reason to change it mid-create.
 substrate_persist "${SUBSTRATE}"
 
 # NOT guarded at the top of this script — the backend above is what creates the

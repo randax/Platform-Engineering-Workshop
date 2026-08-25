@@ -2,13 +2,17 @@
 # =============================================================================
 # destroy-cluster.sh — tear down the CloudBox Talos cluster
 #
-# Destroys the Talos docker cluster and removes its kubeconfig entries.
+# Destroys the cluster (VMs on tbx, containers on docker) and removes its
+# kubeconfig and talosconfig entries. On the docker substrate it also removes
+# the marked /etc/hosts block create-cluster.sh wrote — asks for sudo once,
+# because names that still point at 127.0.0.1 after the cluster is gone break
+# the NEXT cluster, especially one created on the other substrate.
 # The cloudbox-mirror image registry is left running (it is expensive to
 # refill) unless you pass --purge-mirror.
 #
 # Usage:
 #   ./scripts/destroy-cluster.sh                 # destroy the cluster
-#   ./scripts/destroy-cluster.sh --purge-mirror  # also remove mirror + volume + the /etc/hosts block
+#   ./scripts/destroy-cluster.sh --purge-mirror  # also remove the mirror container + volume
 # =============================================================================
 set -euo pipefail
 
@@ -187,12 +191,28 @@ else
   ok "talosconfig context removed"
 fi
 
+# --- /etc/hosts -------------------------------------------------------------
+# Removed on EVERY docker destroy, not only under --purge-mirror. The block
+# points nine hostnames at 127.0.0.1, and once the docker cluster is gone
+# nothing answers there — but the names keep resolving. The failure that
+# earned this: destroy the docker cluster, create the next one on tbx, and
+# every *.${CLOUDBOX_DOMAIN} name still resolves to 127.0.0.1 instead of the
+# cluster's ingress VIP, because /etc/hosts wins over talos-box's resolver.
+# Every URL in the workshop then hangs or 404s on a cluster that is perfectly
+# healthy, and nothing in the room points at /etc/hosts.
+#
+# Symmetric with the create: create-cluster.sh writes it on docker, this
+# removes it on docker. One sudo prompt each way, and the mirror flag has
+# nothing to do with hostname resolution — coupling them was the bug.
+# Exactly reversible: only the lines between the two markers go, and the file
+# is left byte-identical to what it was before create-cluster.sh wrote them.
+# A no-op on tbx (nothing was ever written) and when the block is absent.
+if [[ "${SUBSTRATE}" == "docker" ]]; then
+  remove_hosts_block
+fi
+
 # --- Mirror ---------------------------------------------------------------------
 if [[ "${PURGE_MIRROR}" == "true" ]]; then
-  # Exactly reversible: only the lines between the two markers go, and the file
-  # is left byte-identical to what it was before create-cluster.sh wrote them.
-  # A no-op on tbx (nothing was ever written) and when the block is absent.
-  remove_hosts_block
   step "Purging the image mirror"
   # The mirror is a DOCKER container on both substrates, and this script only
   # requires the docker CLI on the docker path — so on a tbx machine without it
