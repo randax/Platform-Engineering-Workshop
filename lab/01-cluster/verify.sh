@@ -11,11 +11,22 @@ fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 # are containers Talos labels talos.cluster.name=cloudbox; on tbx they are VMs
 # only `tbx status` can see. Everything below this is plain kubectl and is
 # identical on both — which is the whole point of the substrate contract.
-SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
-if [ -z "$SUBSTRATE" ] && [ -r "$HOME/.cloudbox/substrate" ]; then
-  SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
-fi
-case "$SUBSTRATE" in tbx|docker|kind) ;; *) SUBSTRATE=docker ;; esac
+# The substrate decision is scripts/substrate-decide.sh — the SINGLE
+# implementation, sourced rather than copied. Three files carried their own
+# `case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac` ladder, and
+# copies drift: this one had no `kind` arm for a while, and lab 00's had no
+# platform gate at all, so the same laptop was graded on two different
+# substrates by two different scripts. substrate-decide.sh is deliberately
+# logging-neutral — it never calls ok/fail/warn/die and never exits — which is
+# what lets a verifier with its own counting ok()/fail() source it safely.
+# `|| SUBSTRATE=docker` covers the one failing case: an invalid
+# CLOUDBOX_SUBSTRATE, which lib.sh reports in its own voice and this file has no
+# business dying over.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=../../scripts/substrate-decide.sh
+. "${REPO_ROOT}/scripts/substrate-decide.sh"
+SUBSTRATE=""
+substrate_decide_into SUBSTRATE || SUBSTRATE=docker
 
 # The kind lifeboat (scripts/kind-fallback.sh) is the one identity this module
 # cannot grade. Everything below asserts a TALOS cluster — two nodes Talos

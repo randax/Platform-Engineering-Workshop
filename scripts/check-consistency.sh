@@ -467,15 +467,20 @@ fi
 # and that neither has grown a private `--set ingressController.*` beside it.
 before_fail=${FAILURES}
 for f in scripts/create-cluster.sh scripts/kind-fallback.sh; do
-  # The INVOCATION, not the string. Both files explain the shared helper in
+  # The INVOCATION IN ITS ONE WORKING FORM, not the string and not "a line that
+  # mentions it outside a comment". Both files explain the shared helper in
   # comments — at length, deliberately — so a bare `grep -q
-  # cilium_ingress_values` passed on prose alone: comment the call out, leave
-  # the paragraph that describes it, and this check stayed green while the two
-  # clusters' ingress values silently diverged. `^[^#]*` cannot span the `#`
-  # that opens a comment line, and the trailing space/`<(` demands a call with
-  # its shape argument.
-  grep -qE '^[^#]*(<\()?cilium_ingress_values[[:space:]]' "${f}" \
-    || bad "${f} no longer CALLS cilium_ingress_values() — the shared ingress values are the contract the kind lifeboat and the docker substrate both meet; do not inline them (a comment mentioning the helper is not a call)"
+  # cilium_ingress_values` passed on prose alone. Excluding comments was the
+  # first fix and it is still too loose: `echo cilium_ingress_values nodeport`,
+  # or any other line that happens to name the helper with a word after it,
+  # satisfies it while the values are inlined right below.
+  #
+  # There is exactly one way to call this helper — it prints one flag per line
+  # and bash 3.2 on macOS has no mapfile, so both callers feed a `while read`
+  # loop from a process substitution. Anchor on that, with the shape argument
+  # spelled out: nothing but a real call has this form.
+  grep -qE '^[[:space:]]*done[[:space:]]*<[[:space:]]*<\(cilium_ingress_values[[:space:]]+("?\$\{?[A-Za-z_]|nodeport|lb)' "${f}" \
+    || bad "${f} no longer CALLS cilium_ingress_values() as 'done < <(cilium_ingress_values <shape>)' — the shared ingress values are the contract the kind lifeboat and the docker substrate both meet; do not inline them (a comment, or a line that merely names the helper, is not a call)"
   grep -qE -- '--set[[:space:]]+"?ingressController\.' "${f}" \
     && bad "${f} sets ingressController.* directly — those flags belong in cilium_ingress_values() (lib.sh), which is the single source both callers read"
 done
@@ -645,6 +650,36 @@ else
   fi
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
+# --- 14. exactly ONE substrate decision ---------------------------------------
+# scripts/substrate-decide.sh exists because this decision was copied into four
+# files and the copies drifted — lab 00 had no platform gate (an Intel Mac with
+# tbx installed was graded `tbx`), lab 01 and lab 06 had no `kind` arm (the
+# lifeboat was graded as a Talos-in-Docker machine), and each was written as the
+# same little `case "$S" in tbx|docker) ;; *) S=docker ;; esac` ladder. The
+# copies are gone; this is what stops the next one, because re-adding one is
+# four keystrokes and reads like local defensiveness rather than a fork of a
+# shared rule.
+#
+# Comment lines are exempt (`^[^#]*` cannot span the `#` that opens one) — the
+# three files that used to carry a ladder now DESCRIBE it in the comment that
+# says why they source the shared file instead, and that sentence is the point.
+before_fail=${FAILURES}
+ladder_hits="$(grep -rEn '^[^#]*\bin[[:space:]]+"?tbx"?\|"?docker"?' scripts lab solutions 2>/dev/null \
+  | grep -v '^scripts/substrate-decide.sh:' || true)"
+if [[ -n "${ladder_hits}" ]]; then
+  bad "a substrate-decision case ladder outside scripts/substrate-decide.sh — source that file and call substrate_decide_into instead (it is logging-neutral by design, so a verifier with its own ok()/fail() can source it):"
+  printf '   %s\n' "${ladder_hits}"
+fi
+# …and the shared decision still has the entry point those callers use.
+grep -q '^substrate_decide_into()' scripts/substrate-decide.sh \
+  || bad "substrate_decide_into() is gone from scripts/substrate-decide.sh — check 14 forbids the copies and points at a function that no longer exists"
+for f in lab/00-setup/verify.sh lab/01-cluster/verify.sh lab/01-cluster/solve.sh lab/06-serverless/verify.sh; do
+  grep -q 'substrate-decide.sh' "${f}" \
+    || bad "${f} no longer sources scripts/substrate-decide.sh — it is one of the four files the shared decision was extracted FROM"
+done
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "one substrate decision (scripts/substrate-decide.sh), sourced by every caller"
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then

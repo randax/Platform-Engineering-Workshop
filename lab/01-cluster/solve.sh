@@ -12,15 +12,44 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # exist" is a question about containers on docker and about VMs on tbx. Each
 # branch asks it exactly the way that substrate's own backend guard does
 # (scripts/substrate/{docker,tbx}.sh), so this guard and create-cluster.sh can
-# never disagree. Resolved inline rather than by sourcing scripts/lib.sh, which
-# would also drag in the ordering this file deliberately controls below.
+# never disagree. The DECISION comes from scripts/substrate-decide.sh (below) —
+# not from scripts/lib.sh, whose sourcing would drag in the ordering this file
+# deliberately controls further down.
 # docker: -aq (not -q) matches stopped containers too — otherwise a stopped
 # cluster would slip past this guard and make create-cluster.sh die.
-SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
-if [[ -z "$SUBSTRATE" && -r "$HOME/.cloudbox/substrate" ]]; then
-  SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
+# The substrate decision is scripts/substrate-decide.sh — the SINGLE
+# implementation, sourced rather than copied. Three files carried their own
+# `case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac` ladder, and
+# copies drift: this one had no `kind` arm for a while, and lab 00's had no
+# platform gate at all, so the same laptop was graded on two different
+# substrates by two different scripts. substrate-decide.sh is deliberately
+# logging-neutral — it never calls ok/fail/warn/die and never exits — which is
+# what lets a verifier with its own counting ok()/fail() source it safely.
+# `|| SUBSTRATE=docker` covers the one failing case: an invalid
+# CLOUDBOX_SUBSTRATE, which lib.sh reports in its own voice and this file has no
+# business dying over.
+# shellcheck source=../../scripts/substrate-decide.sh
+. "${REPO_ROOT}/scripts/substrate-decide.sh"
+SUBSTRATE=""
+substrate_decide_into SUBSTRATE || SUBSTRATE=docker
+
+# The kind lifeboat, BEFORE cluster_exists() — which asks about Talos containers
+# and would answer "no", sending this straight into ./scripts/create-cluster.sh,
+# which refuses on this identity (require_identity_match / the kind arm). The
+# ladder above used to collapse kind to docker, so `catch-up.sh 01` and every
+# solve/verify CI pairing exited 1 on a lifeboat machine whose cluster is up and
+# working exactly as documented.
+#
+# Mirrors verify.sh: nothing to produce, nothing to fix, exit 0. The lifeboat's
+# promise is that modules 02 onward are identical; module 01's Talos content is
+# the whole price of taking it.
+if [[ "$SUBSTRATE" == kind ]]; then
+  echo "🛟 kind lifeboat: module 01 has no end state to produce here — it builds a Talos"
+  echo "   cluster, and this one is kind (./scripts/kind-fallback.sh). That is the"
+  echo "   documented trade-off; modules 02 onward are identical."
+  echo "   Your cluster: kubectl get nodes   ·   teardown: ./scripts/kind-fallback.sh --delete"
+  exit 0
 fi
-case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac
 
 cluster_exists() {
   if [[ "$SUBSTRATE" == tbx ]]; then

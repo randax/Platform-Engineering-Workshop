@@ -82,11 +82,25 @@ fi
 # only substrate-aware lines in this file. Resolved inline (sourcing
 # scripts/lib.sh would clobber the counting ok()/fail() above); no detection
 # needed, because by module 06 a cluster exists and its answer is persisted.
-SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
-if [ -z "$SUBSTRATE" ] && [ -r "$HOME/.cloudbox/substrate" ]; then
-  SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
-fi
-case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac
+# The substrate decision is scripts/substrate-decide.sh — the SINGLE
+# implementation, sourced rather than copied. Three files carried their own
+# `case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac` ladder, and
+# copies drift: this one had no `kind` arm for a while, and lab 00's had no
+# platform gate at all, so the same laptop was graded on two different
+# substrates by two different scripts. substrate-decide.sh is deliberately
+# logging-neutral — it never calls ok/fail/warn/die and never exits — which is
+# what lets a verifier with its own counting ok()/fail() source it safely.
+# `|| SUBSTRATE=docker` covers the one failing case: an invalid
+# CLOUDBOX_SUBSTRATE, which lib.sh reports in its own voice and this file has no
+# business dying over.
+# (kind resolves to its own value here and falls into the `else` arm below with
+# the docker answer, which is right: the lifeboat's ingress IS reached at
+# localhost:80, exactly like the docker substrate's.)
+LAB06_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=../../scripts/substrate-decide.sh
+. "${LAB06_REPO_ROOT}/scripts/substrate-decide.sh"
+SUBSTRATE=""
+substrate_decide_into SUBSTRATE || SUBSTRATE=docker
 if [ "$SUBSTRATE" = tbx ]; then
   INGRESS_ADDR="$(kubectl -n kube-system get svc cilium-ingress \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
