@@ -1,7 +1,7 @@
 # PRD-0003 — Golden-path `Application` XR (build your own Nais)
 
 **Status:** Proposed (headline feature) · **Verdict:** Build — woven across platform, console & slides
-**Depends on:** Crossplane v2 (module 04) · CloudNativePG + RustFS (03) · Knative Serving + sslip.io routing (06) · NATS JetStream ([PRD-0001](0001-durable-messaging-nats.md), built first)
+**Depends on:** Crossplane v2 (module 04) · CloudNativePG + RustFS (03) · Knative Serving + `*.kn.cloudbox.k8s.test` routing (06) · NATS JetStream ([PRD-0001](0001-durable-messaging-nats.md), built first)
 **Inspiration:** [Nais](https://nais.io) `Application`, Humanitec, Heroku, Backstage golden paths
 
 ## Problem
@@ -42,7 +42,7 @@ metadata:
   namespace: demo
 spec:
   image: ghcr.io/randax/cloudbox-uploader:v0.1.0
-  ingress: my-app.127.0.0.1.sslip.io   # optional; omit for cluster-local only
+  ingress: my-app-demo.kn.cloudbox.k8s.test  # optional; omit for cluster-local only
   replicas: { min: 0, max: 3 }         # scale-to-zero by default (Knative)
   database: true                        # → a WorkshopDatabase (CNPG cluster + bucket-less)
   bucket: true                          # → an S3 bucket in RustFS
@@ -53,7 +53,7 @@ spec:
 
 **Composition pipeline emits, in one reconcile:**
 1. a **Knative Service** for the workload (free scale-to-zero + a real
-   `*.127.0.0.1.sslip.io` URL via Kourier — no new ingress component needed);
+   `*.kn.cloudbox.k8s.test` URL via Kourier — no new ingress component needed);
 2. a **`WorkshopDatabase`** XR when `database: true` — *composition of compositions*,
    reusing module 04's CNPG path verbatim (this is the "add in CNPG" you asked for);
 3. an **S3 bucket** (the existing bucket-Job pattern) when `bucket: true`;
@@ -62,10 +62,15 @@ spec:
    injected into the workload's env, so the app boots already connected. This is the
    part that makes it feel like magic and is the real teaching beat.
 
-**Ingress — two tiers (you flagged nip.io/sslip.io):**
+**Ingress — two tiers:**
 - *App URLs (free):* because the workload is a Knative Service, `spec.ingress`
-  just sets the route host; Kourier + sslip.io already serve
-  `my-app.demo.127.0.0.1.sslip.io` at `:31080`. No new component.
+  just sets the route host; Kourier already serves
+  `my-app-demo.kn.cloudbox.k8s.test` behind the shared Cilium ingress — port-free on
+  both substrates, with `:31080` + a `Host` header as the fallback. No new component.
+  (This PRD originally prescribed `*.127.0.0.1.sslip.io`, which only ever worked where
+  the laptop's loopback *was* the cluster — i.e. the docker substrate. The single
+  `<name>-<namespace>.kn.cloudbox.k8s.test` scheme replaced it; see
+  `gitops/components/knative-serving/VENDOR.md` curations 3 and 4.)
 - *Platform-service URLs (optional polish, separable):* give ArgoCD/Gitea/console
   real hostnames instead of NodePorts via **Cilium Gateway API** (Cilium is already
   the CNI — keeps the eBPF story intact). Tracked as a stretch, not required for the

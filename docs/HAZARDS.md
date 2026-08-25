@@ -71,9 +71,28 @@ Talos-in-Docker, where a node's memory limit is *soft* in the attendee's favour:
 container shares the host's page cache, and `--memory-workers` is a cgroup ceiling the
 host quietly pads.
 
-A VM's memory is soft in the *other* direction. `TBX_CP_MEMORY="4GiB"` /
-`TBX_WORKER_MEMORY="8GiB"` (`scripts/versions.env:83-86`) are the ceiling the guest kernel
-boots with, but `tbxd` runs an **active balloon manager**: on macOS it samples host memory
+**The same 6 GiB reserve is also a hard admission gate, and it nearly shipped as "tbx
+does not work on a 16 GB Mac".** `tbx up` does not merely warn about overcommit — it
+**errors** when planned VM memory exceeds host RAM minus that reserve, unless you pass
+`-force` (upstream `internal/daemon/balloon.go:174-202`, reserve default
+`internal/balloon/manager.go:108-119`). A 16 GB Mac is 16384 MiB, so the budget is
+**10240 MiB**, and the flat `4GiB + 8GiB = 12288 MiB` pair exceeded it on **every machine
+at the published minimum spec**. Nothing in the workshop would have started; the review
+that caught it was reading upstream, not running it.
+
+The fix is to size the worker to the host at render time, the mirror image of what we
+already do to worker vCPUs: `worker_gib = clamp(host_gib − 6 − cp_gib, 4, TBX_WORKER_MEMORY)`
+(`tbx_worker_memory()` in `scripts/substrate/tbx.sh`, host RAM from `sysctl hw.memsize` /
+`/proc/meminfo` — the same sources tbxd reads). 16 GB → 4+6, fitting the budget exactly;
+24 GB and up → the full 4+8. We deliberately do **not** pass `-force`: silencing a memory
+gate on the machine that is about to run 21 apps is how a laptop swaps itself to death in
+front of a room. Note the gate is **macOS-only** upstream — `HostTotalMiB` has no Linux
+implementation (`internal/balloon/hostmem_stub.go`), so `checkOvercommit` stands down
+there; we scale on Linux anyway, because fitting the host is right on both.
+
+A VM's memory is soft in the *other* direction. `TBX_CP_MEMORY="4GiB"` and
+`TBX_WORKER_MEMORY="8GiB"` (`scripts/versions.env`, the latter now a **ceiling**) are the
+sizes the guest kernel boots with, but `tbxd` runs an **active balloon manager**: on macOS it samples host memory
 pressure and inflates the guests' virtio balloons when host free memory drops below a
 **6 GiB reserve**, taking memory back from a running node down to a **1 GiB per-node
 floor**, and deflating on release (upstream `docs/SPEC.md:319-328` and the closed G3 gate
@@ -86,10 +105,12 @@ is inert and the overcommit story stops working.
 That makes the OOM hazard **worse on a busy laptop, not better**: a node can *lose* memory
 mid-module because Slack and Chrome got hungry, rather than merely starting out too small.
 And the starting sizes are guesses — the CP matches the docker substrate
-(`TALOS_MEMORY_CONTROLPLANE="4096"` ↔ `4GiB`) but the worker is **raised**
-(`TALOS_MEMORY_WORKER="6144"` → `8GiB`) on nothing but the expectation that a VM needs
-more slack than a container — against a module-10 end state of 21 ArgoCD apps and 66–73
-pods that has never been run inside a VM.
+(`TALOS_MEMORY_CONTROLPLANE="4096"` ↔ `4GiB`) while the worker is now whatever the host
+allows up to `8GiB`, i.e. **`6GiB` on exactly the 16 GB machines the minimum spec
+publishes** (the docker substrate gives those a 6144 MiB worker too, so this is parity,
+not a regression) and `8GiB` above that — against a module-10 end state of 21 ArgoCD apps
+and 66–73 pods that has never been run inside a VM. Two unmeasured things, not one: the
+size, and what the balloon does to it.
 
 **How you would notice.** Pods OOMKilled, or the kubelet evicting, on a laptop where the
 docker substrate sails through the same module — the giveaway is `docker` working and
@@ -169,8 +190,9 @@ substrates serve has to come from somewhere: `create-cluster.sh:130-134` calls
 `write_hosts_block` (`scripts/lib.sh:302-430`), which replaces a block marked
 `# cloudbox-begin` / `# cloudbox-end` in `/etc/hosts` via a temp file and `sudo tee` —
 never an in-place `sudo sed`, because a half-written `/etc/hosts` breaks name resolution
-for the whole machine. Twelve names go in: the nine services plus `hello.demo.kn`,
-`uploader.pipeline.kn` and `resizer.pipeline.kn`, because `/etc/hosts` has no wildcards.
+for the whole machine. Twelve names go in: the nine services plus `hello-demo.kn`,
+`uploader-pipeline.kn` and `resizer-pipeline.kn`, because `/etc/hosts` has no wildcards
+(the dash is Knative's `domain-template` — see the retired Knative-namespaces entry below).
 The tbx substrate writes nothing — talos-box's resolver answers `*.cloudbox.k8s.test` —
 so this prompt appears on exactly half the room's laptops.
 
@@ -185,8 +207,18 @@ rather than left to `set -e`: `write_hosts_block` deletes its temp copy of `/etc
 (`scripts/install.sh:167-183`); `./scripts/install.sh --print-hosts` prints the block for
 hand-application, and on WSL2 also prints the note that the same lines belong in
 `C:\Windows\System32\drivers\etc\hosts`, edited as Administrator, for the Windows browser
-to resolve them (`scripts/install.sh:41-51`). `destroy-cluster.sh --purge-mirror` removes
-the block again (`scripts/destroy-cluster.sh:195`).
+to resolve them (`scripts/install.sh:41-51`). **Every** `destroy-cluster.sh` on the docker
+substrate removes the block again — not only `--purge-mirror`, which is how it used to be:
+a block left behind after a docker destroy points nine names at `127.0.0.1`, and
+`/etc/hosts` beats talos-box's resolver, so the *next* cluster created on tbx has every URL
+silently dead on a perfectly healthy cluster. `substrate_preflight` on the tbx backend now
+refuses to create over a leftover block for the same reason.
+
+Both rewrites also refuse to run at all unless the markers form exactly one ordered pair
+(`assert_hosts_block_wellformed`). The awk they use skips from the begin marker to the end
+marker, so a file with a begin marker and no end marker — a half-finished hand edit, an
+interrupted `sudo tee` — would have had **every line after it deleted**, including the
+machine's own `localhost` and whatever an employer's MDM put there.
 
 **Retired by:** nothing — it is the price of one hostname scheme on a substrate with no
 resolver. Say it out loud before `create-cluster.sh` runs so nobody is surprised by a
@@ -207,9 +239,13 @@ when the truth is that it does not exist yet.
 **Why the scripts are shaped the way they are.** `substrate_post_ready()`
 (`scripts/substrate/tbx.sh:362-380`) waits up to 180 s for `cilium-ingress` to actually
 carry a LoadBalancer address, and fails loudly there rather than letting module 02 discover
-it; it also warns if the VIP is *not* `.200`, because the resolver would then be pointing
-every hostname at whichever other Service took the address first. Delete that Service and
-re-run; do not repoint the resolver.
+it; it also **dies** if the VIP is not `.200` — the resolver answers `.200` unconditionally,
+without consulting who holds it, so an ingress anywhere else in the pool means every
+hostname in the workshop points at nothing while the cluster looks perfect. That used to
+be a warning, i.e. an attendee was handed the broken cluster anyway. `lab/01-cluster/verify.sh`
+asserts the same thing on the tbx branch. Fix it by deleting whichever other LoadBalancer
+Service took `.200` first (`kubectl get svc -A --field-selector spec.type=LoadBalancer`)
+and re-creating; do not repoint the resolver.
 
 ## TRAP — the pinned portal image predates `KNATIVE_DOMAIN`
 
@@ -223,8 +259,9 @@ substrate branch; **the image it runs does not have it yet.**
 `scripts/images.txt:169` and `gitops/components/portal/portal.yaml:83` — was
 built before that commit, and its binary hardcodes `127.0.0.1.sslip.io:31080`.
 So until the next release is published, module 08's Console shows function URLs
-that are wrong **on both substrates**: they are not the `*.demo.kn.cloudbox.k8s.test`
-names Knative actually programs (`gitops/components/knative-serving/ingress.yaml`),
+that are wrong **on both substrates**: they are not the `<name>-<namespace>.kn.cloudbox.k8s.test`
+names Knative actually programs (`gitops/components/knative-serving/serving-core.yaml`'s
+`domain-template`, routed by the single wildcard rule in `ingress.yaml`),
 and `127.0.0.1.sslip.io:31080` reaches nothing on tbx at all.
 
 **Do not fix this by editing the tag.** Pins are not hand-edited in this repo:
@@ -246,6 +283,61 @@ verify every ref resolves (the `crane manifest` loop in the publish-window entry
 below) → `./scripts/cloudbox-init.sh` re-mirrors. **Step 0 of rehearsal 5**
 (`docs/REHEARSALS.md`) — nothing else in that rehearsal proves the Console's
 function URLs until it is done.
+
+## RESOLVED — tbx's catch-all registry mirror would have broken every image we build
+
+Found by adversarial review before any rehearsal ran it, which is the only reason it is in
+this section and not in a post-mortem.
+
+`substrate_create()` on the tbx backend used to append `tbx manifests <cluster> mirrors` to
+the machine config as a bonus layer, on the reasoning that "explicit entries win over `*`
+in containerd, so this only covers registries our list does not name" — which is true, and
+was the wrong thing to conclude from. What that patch renders (upstream
+`internal/manifests/manifests.go:218-231`) is a `RegistryMirrorConfig` for `"*"` with
+**`skipFallback: true`**, and the registries our list does not name include
+**`localhost:30500`** — the in-cluster Zot, which is how the kubelet pulls every image
+lab 07, lab 09 and the Console *build*. tbx's mirror refuses to proxy a loopback or private
+authority (403 out of `validateResolvedAuthority` → `namespaceIPBlocked`,
+`internal/mirror/manager.go:313-327` and `:667-680`), and `skipFallback: true` forbids the
+direct pull that would otherwise rescue it. Every first-party image would have landed in
+`ImagePullBackOff`, on the tbx substrate only, from module 07 onward.
+
+**Why it looked safe.** Both halves of the reasoning were individually correct — explicit
+entries *do* win, and taking a free pull-through cache *does* normally cost nothing. The
+step that was missing is that `"*"` is not "the registries you forgot", it is *every*
+registry, including the one that is a lie about locality.
+
+**Fixed by** dropping the patch entirely. Our eight explicit mirrors cover everything in
+`scripts/images.txt`; the catch-all bought nothing that list did not already have.
+`check-consistency.sh` check 11 is unaffected — it compares the `cni:none` patch, which is
+still byte-identical across the two backends.
+
+## RESOLVED — a Knative Service in a namespace nobody listed had no route at all
+
+`gitops/components/knative-serving/ingress.yaml` used to carry one wildcard rule **per
+namespace** — `*.demo.kn.cloudbox.k8s.test` and `*.pipeline.kn.cloudbox.k8s.test` — with a
+comment explaining, correctly, that a Kubernetes Ingress wildcard host matches exactly one
+DNS label and Knative's default hosts are two labels deep (`<name>.<namespace>.<domain>`).
+
+The gap is what the comment then said: "a ksvc in a THIRD namespace needs another rule
+here." Modules 08 and 09 create ksvcs in namespaces **chosen by the attendee** — the
+Console's Application XR composes into whichever project they picked — so "add another
+rule" is advice nobody can act on at the time it is needed, and the symptom is a Ready
+Knative Service, a published `.status.url`, and a 404 from the ingress.
+
+**Fixed by** curating Knative's `domain-template` to
+`"{{.Name}}-{{.Namespace}}.{{.Domain}}"` (upstream's own documented alternative for exactly
+this problem, quoted in the `_example` block of `config-network`). Every ksvc host is then
+**one** label under `kn.cloudbox.k8s.test`, and one `*.kn.cloudbox.k8s.test` rule serves
+every namespace that will ever exist. `.status.url` reports the dashed host, so the labs'
+verifiers — which read it rather than assuming a shape — needed no change.
+
+**What is still substrate-shaped**, and is documented rather than fixed: on **docker**
+`/etc/hosts` has no wildcards, so only the three ksvc names the labs create are listed
+(`hello-demo`, `uploader-pipeline`, `resizer-pipeline`). An attendee who invents their own
+app on the docker substrate still needs a manual hosts line, `curl -H "Host: …"`, or
+NodePort 31080 — lab 06 says so. On **tbx** the resolver answers the wildcard and anything
+they create just works.
 
 ## LIVE — Ollama binds to loopback, and on tbx the cluster is not on loopback
 
@@ -529,6 +621,16 @@ into the Talos docker network. **macOS, Windows, and every Docker
 Desktop / OrbStack / Colima host does not** — and macOS is a fully supported
 platform in the published matrix (`docs/PRINCIPLES.md` §12) on which most of a
 JavaZone room will be sitting.
+
+**It does not prove the first-party image offline path either.** `bootstrap-test.yaml`
+builds `cloudbox-portal` / `-uploader` / `-resizer` / `-grafana` into the mirror as
+**`v0.1.0`** while every manifest pins **`v0.2.2`**, so the node's mirror lookup misses and
+the pull silently falls through to GHCR — over the runner's excellent internet. Green
+therefore says nothing about whether those images are reachable with the network cut, which
+is the one thing that matters at the venue. Long-standing (it predates the substrate work)
+and left alone deliberately: the tags are `release-please`-managed and not hand-editable
+(see the release-please entry below). Rehearsal step 7 is the only place this path is
+actually exercised.
 
 **Rehearsals 1, 2 and 4 have each found a workshop-stopping bug that CI cannot see,
 and every one of them was in the recovery path** — the second cluster of the day,

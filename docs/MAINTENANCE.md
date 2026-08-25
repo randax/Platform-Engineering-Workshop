@@ -175,14 +175,21 @@ has on PATH. Bumping it means all three of:
    it to `TBX_VERSION` and fails if they drift. That comment is the only other copy —
    do not add a third.
 2. **Re-read upstream before trusting the flags.** `scripts/substrate/tbx.sh` drives
-   `tbx up -f`, `tbx status -o json`, `tbx manifests <cluster> mirrors` and
+   `tbx up -f`, `tbx status -o json`, `tbx version` and
    `tbx cluster destroy <cluster> --force`, and `cloudbox-init.sh` drives
    `tbx cache pull --talos-version`. Read upstream `internal/config/config.go` for
    cluster-yaml schema changes (our `scripts/substrate/cloudbox.tbx.yaml.tmpl` is a
-   projection of it) and `internal/provision/inspection.go` for `tbx manifests` section
-   renames — `balloon` was already deprecated into an error once. A renamed section or a
-   changed JSON shape breaks the substrate silently at `create-cluster.sh` time, on a
-   laptop, at the venue.
+   projection of it). We deliberately consume **no** `tbx manifests` section any more —
+   `balloon` was deprecated into an error, and the `mirrors` catch-all turned out to be
+   actively harmful (see `docs/HAZARDS.md`) — so a section rename upstream is no longer
+   something that can break us silently. Two things upstream *can* still move under us:
+   the `tbx status -o json` shape, and `checkOvercommit`'s reserve in
+   `internal/balloon/manager.go` (mirrored as `TBX_HOST_RESERVE_GIB` in `versions.env`;
+   if the upstream default moves, move ours in the same commit or every 16 GB laptop
+   fails to start a cluster).
+   Also re-check the version STRING: `tbx_version_check()` in `scripts/lib.sh` parses
+   field 2 of `tbx version` and both `install.sh --check` and the tbx preflight compare it
+   to `TBX_VERSION`.
 3. **Re-run a full tbx rehearsal.** There is **no CI for this substrate** —
    `bootstrap-test.yaml` runs Docker on a GitHub runner and always will. A tbx pin that
    passes `check-consistency.sh` has been proven to agree with itself and nothing more.

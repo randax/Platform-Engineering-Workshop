@@ -140,20 +140,33 @@ then `dig +short gitea.cloudbox.k8s.test` → the `.200` VIP, and
 or timeouts. Gitea's UI clone box shows the in-cluster URL — use the hostname.
 
 **6. Labs 01–06.** `solve.sh` then `verify.sh` for each. Lab 06 must pass **via its
-own URL**, not the fallback.
+own URL**, not the fallback — and that URL is now
+`http://hello-demo.kn.cloudbox.k8s.test/`, one label, from the `domain-template`
+curation. Then do the thing the fixed rules exist for: create a ksvc in a namespace
+nobody listed (`kubectl create ns scratch` + any ksvc) and confirm it answers on tbx
+with no extra Ingress rule. On docker it will not resolve — that is expected and
+documented; `curl -H "Host: …" http://localhost/` must still answer.
+*Retires:* RESOLVED — a Knative Service in a namespace nobody listed had no route.
 
 **7. Module 07.** `./scripts/catch-up.sh 07 && (cd lab/07-ci && ./verify.sh)`. The
 `crane copy` goes to `zot.cloudbox.k8s.test` through the ingress; the in-cluster
 build pushes and pulls `localhost:30500` from a real node. Both halves matter —
-they are the two sides of the hostname/NodePort split.
+they are the two sides of the hostname/NodePort split, and the node-side half is
+specifically what tbx's catch-all `"*"` mirror would have broken (see the RESOLVED
+entry in `docs/HAZARDS.md`). **CI does not prove this**: `bootstrap-test.yaml` builds
+the first-party images locally as `v0.1.0` while the manifests pin `v0.2.2`, so the
+cluster silently falls back to GHCR and the offline first-party image path is never
+exercised on any runner. This step is the only place it is.
+*Retires:* the tbx half of the catch-all mirror — the one path a green CI run cannot
+speak to.
 *Retires:* the tbx half of the catch-up clone-URL fix — `catch-up.sh` used to
 clone the platform repo from a NodePort that only exists on docker.
 
 **8. Modules 08 and 09.** `http://portal.cloudbox.k8s.test` loads; upload a
 picture; the presigned URL is `http://s3.cloudbox.k8s.test/...` **and loads** (a
 `SignatureDoesNotMatch` means the Host rewrite is wrong, not the credentials);
-Console app URLs read `*.demo.kn.cloudbox.k8s.test` — which is what proves step 0
-landed.
+Console app URLs read `<name>-<namespace>.kn.cloudbox.k8s.test` — which is what proves
+step 0 landed.
 *Retires:* TRAP — the pinned portal image predates `KNATIVE_DOMAIN`.
 
 **9. Module 10.** `OLLAMA_HOST=0.0.0.0 ollama serve`; enable kagent; then
