@@ -87,6 +87,23 @@ source "${CONTEXT_GUARD_DIR}/versions.env"
 # if the two ever drift apart.
 CLOUDBOX_KUBECONFIG="${HOME}/.kube/cloudbox.conf"
 
+# The address create-cluster.sh left this machine's workshop API server on.
+# Written by the create (api_endpoint_persist in lib.sh), removed by the
+# destroy, refreshed by `create-cluster.sh --refresh-endpoint`. The file and its
+# reader live HERE, not in lib.sh, because lab/common.sh sources this guard
+# without lib.sh and the guard is what has to read it.
+CLOUDBOX_API_ENDPOINT_FILE="${HOME}/.cloudbox/api-endpoint"
+
+# api_endpoint_current — the persisted address, or empty. Prints nothing rather
+# than failing: "no cluster has been created on this machine" is a normal state.
+api_endpoint_current() {
+  [ -r "${CLOUDBOX_API_ENDPOINT_FILE}" ] || return 0
+  local v
+  v="$(head -n1 "${CLOUDBOX_API_ENDPOINT_FILE}" 2>/dev/null || true)"
+  v="${v#"${v%%[![:space:]]*}"}"; v="${v%"${v##*[![:space:]]}"}"
+  printf '%s\n' "${v}"
+}
+
 # kubeconfig_in_use — the file the tools in this shell will actually read.
 # Three cases, because there are three populations:
 #   * KUBECONFIG set (mise activated, or `mise run`/`mise exec`): that file.
@@ -165,20 +182,47 @@ workshop_cluster_is_elsewhere() {
 #                             the node address. 172.30.0.0/16 is RFC1918 and
 #                             talos-box-owned; a corporate cluster reachable at
 #                             one of these would need to be on the same laptop.
+#
+# On tbx the SHAPE is not enough, and this is where the guard nearly stopped
+# being a guard. 172.30.0.0/16 is a range talos-box hands out per cluster, so
+# "any 172.30.x.y:6443" accepts the OTHER tbx cluster on the same laptop — and
+# accepts a stale context whose VM's DHCP lease has since moved to a different
+# machine entirely, which is the exact failure the stale-context reaper in the
+# create path exists to prevent. So a 172.30 address is accepted only when it is
+# THE address create-cluster.sh recorded (${CLOUDBOX_API_ENDPOINT_FILE}).
+# With no such file the answer is no: on tbx, failing closed means the attendee
+# runs one create (or one --refresh-endpoint), while failing open means the
+# scripts write to whatever is on the other end.
 workshop_api_server() { # <server-url>
   case "$1" in
     https://127.0.0.1:[0-9]*|https://localhost:[0-9]*) return 0 ;;
     "https://${TALOS_SUBNET_GATEWAY%.*}.2:6443")       return 0 ;;
   esac
   # Pattern-matched rather than globbed: bash globs cannot express "1-3 digits".
-  [[ "$1" =~ ^https://172\.30\.[0-9]{1,3}\.[0-9]{1,3}:6443$ ]]
+  [[ "$1" =~ ^https://172\.30\.[0-9]{1,3}\.[0-9]{1,3}:6443$ ]] || return 1
+  [ "$1" = "$(api_endpoint_current)" ]
+}
+
+# api_endpoint_hint — why a 172.30 address was refused, in the words that say
+# what to do about it. Empty for every other address.
+api_endpoint_hint() { # <server-url>
+  case "$1" in https://172.30.*) ;; *) return 0 ;; esac
+  local recorded; recorded="$(api_endpoint_current)"
+  # The address IS the recorded one: whatever the guard refused, it was not
+  # this, and a hint about the endpoint file would send the reader the wrong way.
+  [ "$1" = "${recorded}" ] && return 0
+  if [ -z "${recorded}" ]; then
+    echo "That is a talos-box address, but ${CLOUDBOX_API_ENDPOINT_FILE} does not exist, so nothing here knows it is YOUR cluster. ./scripts/create-cluster.sh writes it; after 'tbx cluster start ${CLUSTER_NAME}' refresh it with ./scripts/create-cluster.sh --refresh-endpoint"
+  else
+    echo "This machine's workshop cluster was recorded at ${recorded} (${CLOUDBOX_API_ENDPOINT_FILE}). If the VM's DHCP lease moved — after a reboot or 'tbx cluster start' — run ./scripts/create-cluster.sh --refresh-endpoint"
+  fi
 }
 
 # require_workshop_context — exit non-zero unless kubectl's CURRENT context is
 # this workshop's cluster. Call it before the first kubectl call that could
 # reach a cluster; never at source time in scripts/lib.sh (see the header).
 require_workshop_context() {
-  local ctx server reason kubectl_err
+  local ctx server reason kubectl_err endpoint_hint
   ctx="$(kubectl config current-context 2>/dev/null || true)"
   server=""
   kubectl_err=""
@@ -218,11 +262,16 @@ require_workshop_context() {
   current context : ${ctx:-<none>}
   API server      : ${server:-<none>}
   kubeconfig      : $(kubeconfig_in_use)
-  expected        : admin@${CLUSTER_NAME} (or kind-${CLUSTER_NAME}) on https://127.0.0.1:<port> (docker) or https://172.30.<n>.<h>:6443 (tbx)
+  expected        : admin@${CLUSTER_NAME} (or kind-${CLUSTER_NAME}) on https://127.0.0.1:<port> (docker), or on tbx the address recorded in ${CLOUDBOX_API_ENDPOINT_FILE}
 
 The workshop scripts create, patch and delete resources in whatever cluster
 kubectl points at, so this stops here instead of guessing.
 EOF
+
+  # A talos-box address that is not the recorded one is the case an attendee
+  # cannot diagnose from the block above — it LOOKS like a workshop address.
+  endpoint_hint="$(api_endpoint_hint "${server}")"
+  [ -n "${endpoint_hint}" ] && printf '\n⚠️  %s\n' "${endpoint_hint}" >&2
 
   # kubectl broke rather than answered. Print what it said — nothing below this
   # point can be computed (workshop_cluster_is_elsewhere runs kubectl too, and

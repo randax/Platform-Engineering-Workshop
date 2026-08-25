@@ -201,7 +201,11 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
     # is the point of a go/no-go gate — an attendee finds out at home, not at
     # the venue. Read-only, so it belongs in --check. Output is shown: the FAIL
     # lines are the actionable part, and summarising them would lose them.
-    if ! tbx doctor; then
+    # The memoised run (lib.sh): substrate_resolve above has usually already
+    # asked, and doctor is the slowest read-only probe here. Printed in full —
+    # an attendee sent down this path needs to READ the FAIL lines.
+    if ! tbx_doctor_run; then
+      printf '%s\n' "${TBX_DOCTOR_OUT}"
       check_fail "'tbx doctor' reports problems (above) — fix them, or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
     else
       ok "tbx doctor is clean"

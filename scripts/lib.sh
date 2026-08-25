@@ -176,11 +176,29 @@ substrate_doctor_reason() {
     echo "tbx is not installed (brew install randax/tap/tbx, or the release tarball on Linux)"
     return 0
   fi
-  local out
-  out="$(tbx doctor 2>&1 || true)"
+  tbx_doctor_run || true
   local line
-  line="$(printf '%s\n' "${out}" | grep -m1 '^FAIL ' || true)"
+  line="$(printf '%s\n' "${TBX_DOCTOR_OUT}" | grep -m1 '^FAIL ' || true)"
   echo "${line:-tbx doctor did not report a FAIL line}"
+}
+
+# tbx_doctor_run — `tbx doctor`, ONCE per process. Output in TBX_DOCTOR_OUT,
+# verdict in the return status. `tbx doctor` probes the helper, DNS, the routes
+# and the mirror; it is the slowest read-only thing this repo runs, and it was
+# being run three times over in a single `install.sh --check` — the detection
+# inside substrate_resolve, the visible run in the tbx section, and again by
+# substrate_doctor_reason to quote one FAIL line from output it had just thrown
+# away. Callers that want to SHOW it print TBX_DOCTOR_OUT.
+#
+# Memoised for the life of the process, which is the right scope: every caller
+# is within seconds of the others, and nothing here can change the verdict.
+TBX_DOCTOR_OUT=""
+TBX_DOCTOR_RC=""
+tbx_doctor_run() {
+  if [[ -z "${TBX_DOCTOR_RC}" ]]; then
+    if TBX_DOCTOR_OUT="$(tbx doctor 2>&1)"; then TBX_DOCTOR_RC=0; else TBX_DOCTOR_RC=1; fi
+  fi
+  [[ "${TBX_DOCTOR_RC}" == "0" ]]
 }
 
 # substrate_detect — the substrate this MACHINE can run, with no persisted
@@ -193,7 +211,7 @@ substrate_detect() {
   if have tbx; then
     case "${os}:${arch}" in
       Darwin:arm64|Linux:x86_64|Linux:aarch64|Linux:arm64|Linux:amd64)
-        if tbx doctor >/dev/null 2>&1; then echo "tbx"; return 0; fi ;;
+        if tbx_doctor_run; then echo "tbx"; return 0; fi ;;
     esac
   fi
   echo "docker"
@@ -210,6 +228,20 @@ substrate_persist() {
   printf '%s\n' "${value}" > "${CLOUDBOX_SUBSTRATE_FILE}.tmp"
   mv "${CLOUDBOX_SUBSTRATE_FILE}.tmp" "${CLOUDBOX_SUBSTRATE_FILE}"
 }
+
+# --- The persisted API endpoint --------------------------------------------
+# The WRITERS for ${CLOUDBOX_API_ENDPOINT_FILE}; the file itself and the reader
+# live in context-guard.sh, because lab/common.sh sources that guard WITHOUT
+# lib.sh and the guard is the one thing that must be able to read this.
+api_endpoint_persist() { # <https://host:port>
+  local value="$1"
+  [[ -n "${value}" ]] || return 1
+  mkdir -p "$(dirname "${CLOUDBOX_API_ENDPOINT_FILE}")"
+  printf '%s\n' "${value}" > "${CLOUDBOX_API_ENDPOINT_FILE}.tmp"
+  mv "${CLOUDBOX_API_ENDPOINT_FILE}.tmp" "${CLOUDBOX_API_ENDPOINT_FILE}"
+}
+
+api_endpoint_forget() { rm -f "${CLOUDBOX_API_ENDPOINT_FILE}"; }
 
 # substrate_current — the persisted answer, or empty when no cluster has been
 # created on this machine yet (or the persisted file holds anything other than
@@ -467,6 +499,15 @@ talos_contexts() { # -> one context name per line, '*' marker stripped
   talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'
 }
 
+# talos_config_target — the talosconfig FILE every context operation in this
+# repo acts on: the caller's TALOSCONFIG if they have one, else talosctl's
+# default. One expression, in one place, because create and destroy must not be
+# able to disagree about it — the tbx backend used to `unset TALOSCONFIG` before
+# merging, so on a laptop with a custom TALOSCONFIG the workshop's context went
+# into a file that attendee's talosctl never reads, and the destroy then looked
+# for it in the file it was not in.
+talos_config_target() { echo "${TALOSCONFIG:-${HOME}/.talos/config}"; }
+
 has_talos_context() { # $1 = context name
   local c
   while IFS= read -r c; do
@@ -498,7 +539,7 @@ remove_talos_context() {
     talosctl config context "${other}" >/dev/null 2>&1 || true
     talosctl config remove "${name}" --noconfirm >/dev/null 2>&1 || true
   else
-    rm -f "${TALOSCONFIG:-${HOME}/.talos/config}"
+    rm -f "$(talos_config_target)"
   fi
 }
 

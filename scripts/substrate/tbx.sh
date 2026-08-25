@@ -27,11 +27,12 @@ substrate_preflight() {
   # resolver, DNS wiring, forwarding, routes, host pressure, mirror health and
   # image access — all of which the workshop needs and none of which a bare
   # binary on PATH proves.
-  # Deliberately run VISIBLY here even though substrate_resolve() has usually
-  # already run it quietly during detection: detection only needs the exit code,
-  # while an attendee who has been sent down this path needs to READ the FAIL
-  # lines. The second run is the price of showing them, and doctor is read-only.
-  if ! tbx doctor; then
+  # Shown here, whatever detection did with it: detection only needs the exit
+  # code, and an attendee sent down this path needs to READ the FAIL lines.
+  # tbx_doctor_run (lib.sh) memoises the run for the process, so showing them
+  # costs a printf rather than a second full probe of the helper, DNS and routes.
+  if ! tbx_doctor_run; then
+    printf '%s\n' "${TBX_DOCTOR_OUT}"
     die "'tbx doctor' reports problems (above). Fix them, or run the fallback substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
   fi
   tbx_version_check die
@@ -41,7 +42,22 @@ substrate_preflight() {
   local absent=0
   tbx_cluster_absent "${CLUSTER_NAME}" || absent=$?
   case "${absent}" in
-    1) die "A '${CLUSTER_NAME}' tbx cluster already exists. Run ./scripts/destroy-cluster.sh first." ;;
+    1) # It exists — but "exists" covers two very different mornings. A cluster
+       # whose every node is stopped or suspended is what a laptop looks like
+       # after a reboot or a `tbx down`, and the answer there is to START it,
+       # not to throw it away. Telling that attendee to destroy first costs them
+       # the whole cluster and 20 minutes of re-create; `tbx cluster start
+       # <name>` (cmd/tbx/main.go, parseClusterStartOptions) brings the same one
+       # back. Phases come from `tbx status -o json`: stopped | suspended |
+       # unreachable | maintenance | configured (internal/daemon/phase.go).
+       if tbx_cluster_all_stopped; then
+         fail "The '${CLUSTER_NAME}' tbx cluster exists, and every node is stopped or suspended."
+         warn "That is a cluster waiting to be started, not one to throw away:"
+         warn "  tbx cluster start ${CLUSTER_NAME}"
+         warn "  ./scripts/create-cluster.sh --refresh-endpoint   # the VM addresses are DHCP leases and may have moved"
+         die "Start it (or ./scripts/destroy-cluster.sh if you really want a new one), then re-run."
+       fi
+       die "A '${CLUSTER_NAME}' tbx cluster already exists. Run ./scripts/destroy-cluster.sh first." ;;
     2) fail "Could not ask tbx whether a '${CLUSTER_NAME}' cluster already exists:"
        printf '   %s\n' "${TBX_CLUSTER_ABSENT_REASON}"
        die "Creating over an existing cluster is worse than not creating. Fix the above (is tbxd running? 'tbx doctor'), then re-run." ;;
@@ -167,6 +183,21 @@ tbx_subnet_index() {
 tbx_node_ip() { # <control-plane|worker>
   tbx_cluster_json \
     | jq -r --arg role "$1" '[.nodes[]? | select(.role == $role) | .ip] | first // ""' 2>/dev/null || true
+}
+
+# tbx_cluster_all_stopped — 0 when the cluster has nodes and NONE of them is
+# running. `stopped` and `suspended` are the two phases with no VM behind them
+# (internal/daemon/phase.go: PhaseStopped, PhaseSuspended, and Phase.Stopped()
+# treats them as one); `unreachable`, `maintenance` and `configured` all mean a
+# VM is up. Empty or unreadable status is NOT "all stopped" — an absent answer
+# must never turn into advice to start something.
+tbx_cluster_all_stopped() {
+  local verdict
+  verdict="$(tbx_cluster_json | jq -r '
+      if ((.nodes? // []) | length) == 0 then "unknown"
+      elif [.nodes[] | select(.phase != "stopped" and .phase != "suspended")] | length == 0
+        then "all-stopped" else "some-running" end' 2>/dev/null || true)"
+  [[ "${verdict}" == "all-stopped" ]]
 }
 
 # tbx_etcd_live <node-ip> — true when etcd is actually running on that node.
@@ -388,8 +419,19 @@ EOF
   # to check when kubectl later disagrees with you.
   info "kubeconfig: $(kubeconfig_in_use)"
   # Keep the talosconfig where `talosctl --context cloudbox dashboard` finds it:
-  # unset TALOSCONFIG first, or the merge target is the file being merged.
-  unset TALOSCONFIG
+  # point TALOSCONFIG back at the CALLER's file first, or the merge target is
+  # the throwaway workdir copy being merged.
+  #
+  # The caller's file — not `unset`. Unsetting sends the merge, the stale-context
+  # reap and the select to ${HOME}/.talos/config, and then the caller's own
+  # TALOSCONFIG is restored below: on a laptop where TALOSCONFIG points anywhere
+  # else, the workshop's context lands in a file that attendee's talosctl never
+  # reads. `talosctl --context cloudbox dashboard` says the context does not
+  # exist, on a cluster this script has just declared healthy. This one
+  # expression is the target for everything below, and it is what
+  # remove_talos_context/has_talos_context resolve to as well (talos_config_target
+  # in lib.sh), so create and destroy cannot act on two different files.
+  export TALOSCONFIG="${orig_talosconfig:-${HOME}/.talos/config}"
   # Same stale-context reaper the docker backend runs, for the same reason and
   # against the same file: `talosctl config merge` will not overwrite an
   # existing context, it RENAMES the incoming one to '${CLUSTER_NAME}-1'. Every
@@ -414,9 +456,13 @@ EOF
   # before — which on a re-create is the context we just reaped's replacement.
   talosctl config context "${CLUSTER_NAME}" >/dev/null 2>&1 \
     || warn "Could not select the '${CLUSTER_NAME}' talosconfig context — pass --context ${CLUSTER_NAME} to talosctl"
-  # ...and put the caller's environment back the way we found it.
+  # ...and put the caller's environment back EXACTLY as we found it — including
+  # the case where they had no TALOSCONFIG at all, which the line above left
+  # exported to the default path.
   if [[ -n "${orig_talosconfig_set}" ]]; then
     export TALOSCONFIG="${orig_talosconfig}"
+  else
+    unset TALOSCONFIG
   fi
   rm -rf "${workdir}"
 }

@@ -87,6 +87,11 @@ substrate_destroy
 # substrate a still-running cluster belongs to is unrecoverable from a script —
 # every later destroy would look for the wrong kind of thing.
 rm -f "${CLOUDBOX_SUBSTRATE_FILE}"
+# ...and the address that cluster's API server was on. Same rule, same moment:
+# a recorded endpoint for a cluster that no longer exists would let the context
+# guard accept a stale kubeconfig entry pointing at an address the next tbx
+# cluster (or someone else's VM) may now hold.
+api_endpoint_forget
 
 # --- Clean up kubeconfig / talosconfig contexts (best effort) -----------------
 # Cleaned in EVERY file the workshop could have written to, not just the one in
@@ -148,6 +153,12 @@ fi
 # cluster of the day. remove_talos_context() in lib.sh switches away first; the
 # pipe-free matchers it is built on are documented there (they are shared with
 # both create backends now).
+#
+# The FILE this acts on is talos_config_target() — the caller's TALOSCONFIG, or
+# talosctl's default. Both create backends now merge into exactly that file (the
+# tbx one used to unset TALOSCONFIG first and merge into the default while the
+# attendee's talosctl read another file), so the context this removes is the
+# context the create wrote.
 remove_talos_context "${CLUSTER_NAME}"
 if has_talos_context "${CLUSTER_NAME}"; then
   warn "talosconfig still has a '${CLUSTER_NAME}' context — remove it before recreating:"

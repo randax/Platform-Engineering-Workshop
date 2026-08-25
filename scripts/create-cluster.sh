@@ -23,6 +23,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
+REFRESH_ENDPOINT="false"
+case "${1:-}" in
+  --refresh-endpoint) REFRESH_ENDPOINT="true" ;;
+  "") ;;
+  -h|--help)
+    echo "Usage: $0 [--refresh-endpoint]"
+    echo "  (no flags)          create the CloudBox cluster"
+    echo "  --refresh-endpoint  re-read the running cluster's API address and"
+    echo "                      point the kubeconfig and \${HOME}/.cloudbox/api-endpoint at it."
+    echo "                      Creates nothing. Run it after 'tbx cluster start' or a reboot,"
+    echo "                      when the VM's DHCP lease has moved."
+    exit 0 ;;
+  *) die "Unknown argument: ${1} (see --help)" ;;
+esac
+
 SUBSTRATE="$(substrate_resolve)"
 info "Substrate: ${SUBSTRATE}"
 if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then
@@ -39,6 +54,43 @@ fi
 export CLOUDBOX_SUBSTRATE="${SUBSTRATE}"
 # shellcheck source=substrate/docker.sh
 source "${SCRIPT_DIR}/substrate/${SUBSTRATE}.sh"
+
+# --refresh-endpoint: the cluster already exists and has MOVED. On tbx a node's
+# address is a vmnet DHCP lease, so `tbx cluster start` after a reboot can bring
+# the control plane up on a different address than the one in the kubeconfig and
+# in ${CLOUDBOX_API_ENDPOINT_FILE}. Nothing else here can repair that: the
+# kubeconfig points at a dead address, and the context guard (correctly) refuses
+# an address it has no record of. This re-reads `tbx status`, rewrites both, and
+# does NOTHING else — no create, no helm, no /etc/hosts.
+if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
+  step "Refreshing this cluster's API endpoint"
+  if [[ "${SUBSTRATE}" != "tbx" ]]; then
+    die "--refresh-endpoint is tbx-only: on the docker substrate the API server is published on 127.0.0.1 and cannot move. If kubectl cannot reach the cluster there, the containers are stopped (docker start) or gone (./scripts/create-cluster.sh)."
+  fi
+  cp_ip="$(tbx_node_ip control-plane)"
+  [[ -n "${cp_ip}" ]] \
+    || die "Could not read the control plane's address from 'tbx status ${CLUSTER_NAME} -o json'. Is the cluster running? Start it with 'tbx cluster start ${CLUSTER_NAME}'."
+  endpoint="https://${cp_ip}:6443"
+  previous="$(api_endpoint_current)"
+  # The kubeconfig's CLUSTER entry, read from the context rather than assumed:
+  # talosctl names it after the cluster today, but the thing that must be
+  # rewritten is whatever `admin@${CLUSTER_NAME}` actually points at.
+  cluster_key="$(kubectl config view \
+    -o jsonpath="{.contexts[?(@.name=='admin@${CLUSTER_NAME}')].context.cluster}" 2>/dev/null || true)"
+  [[ -n "${cluster_key}" ]] || cluster_key="${CLUSTER_NAME}"
+  kubectl config set-cluster "${cluster_key}" --server="${endpoint}" >/dev/null \
+    || die "Could not point the kubeconfig cluster '${cluster_key}' at ${endpoint} — is $(kubeconfig_in_use) the file with your workshop cluster in it?"
+  api_endpoint_persist "${endpoint}"
+  if [[ "${previous}" == "${endpoint}" ]]; then
+    ok "API endpoint unchanged: ${endpoint}"
+  else
+    ok "API endpoint is now ${endpoint} (was ${previous:-unrecorded})"
+  fi
+  info "kubeconfig: $(kubeconfig_in_use)"
+  require_workshop_context
+  ok "The context guard accepts this cluster again."
+  exit 0
+fi
 
 substrate_preflight
 # Persisted BEFORE the create, not after it. destroy-cluster.sh reads this file
@@ -57,6 +109,13 @@ substrate_create
 # same value). Kept so the happy path still ends with the answer written, even
 # if a backend ever grows a reason to change it mid-create.
 substrate_persist "${SUBSTRATE}"
+
+# The API address this cluster ended up on, recorded for the context guard —
+# BEFORE require_workshop_context below, which on tbx now checks against it.
+# Both backends export CLOUDBOX_API_ENDPOINT; on docker the guard accepts the
+# loopback shape anyway and this is just accurate, on tbx it is the difference
+# between "some address in talos-box's /16" and "this machine's cluster".
+api_endpoint_persist "${CLOUDBOX_API_ENDPOINT}"
 
 # NOT guarded at the top of this script — the backend above is what creates the
 # workshop context, so there is nothing to assert until now. Here it is a

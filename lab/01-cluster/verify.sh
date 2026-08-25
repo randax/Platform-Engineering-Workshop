@@ -27,7 +27,16 @@ if [ "$SUBSTRATE" = tbx ]; then
     ok "cloudbox Talos VMs are running and configured (${NODES})"
   else
     PHASES="$(printf '%s' "$TBX_JSON" | jq -r '(if type == "array" then ((map(select(.name == "cloudbox")) | first) // {}) else . end) | [(.nodes // [])[] | "\(.role):\(.phase)"] | join(", ")' 2>/dev/null || true)"
-    fail "expected 2 configured Talos VMs, found ${NODES}${PHASES:+ (saw ${PHASES})} — 'tbx status cloudbox', then ./scripts/create-cluster.sh"
+    # Every node stopped or suspended is a cluster to START, not to re-create:
+    # it is what a reboot or `tbx down` leaves behind, and "run
+    # create-cluster.sh" there costs the attendee the cluster they still have.
+    # The phases are talos-box's own (internal/daemon/phase.go).
+    STOPPED="$(printf '%s' "$TBX_JSON" | jq -r '(if type == "array" then ((map(select(.name == "cloudbox")) | first) // {}) else . end) | (.nodes // []) | if length == 0 then "unknown" elif ([.[] | select(.phase != "stopped" and .phase != "suspended")] | length) == 0 then "all-stopped" else "some-running" end' 2>/dev/null || echo unknown)"
+    if [ "$STOPPED" = all-stopped ]; then
+      fail "the cloudbox VMs exist but are all stopped/suspended (${PHASES}) — start them, do not re-create: 'tbx cluster start cloudbox', then './scripts/create-cluster.sh --refresh-endpoint' (the VM addresses are DHCP leases and may have moved)"
+    else
+      fail "expected 2 configured Talos VMs, found ${NODES}${PHASES:+ (saw ${PHASES})} — 'tbx status cloudbox', then ./scripts/create-cluster.sh"
+    fi
   fi
 else
   # Filter on the talosctl-applied label — a name prefix would also match the

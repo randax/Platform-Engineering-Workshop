@@ -1174,6 +1174,57 @@ both directions on bash 3.2: clean on the current tree, and still failing when d
 is injected (`mise.toml` pointed at a different filename → `❌ FAIL`) — a gate that
 stops crying wolf is only worth anything if it still barks.
 
+## RESOLVED — on tbx the context guard checked a /16, and a stopped cluster was told to destroy itself
+
+Two halves of the same morning: the laptop was rebooted, and the tbx cluster is
+still there but not running.
+
+**The guard's half.** `workshop_api_server` accepted **any**
+`https://172.30.<n>.<h>:6443`, on the reasoning that 172.30.0.0/16 is
+talos-box-owned and RFC1918. That is a *range*, not a cluster — and the guard's
+entire job is to refuse the other cluster on this same laptop. Two tbx clusters
+are both inside it, and so is a stale `admin@cloudbox` context whose VM's vmnet
+**DHCP lease has since moved to a different VM**, which is precisely the
+scenario the create path's stale-context reaper exists for. `create-cluster.sh`
+now records the address it left the API server on in
+`~/.cloudbox/api-endpoint`; the guard accepts a 172.30 address only when it
+**equals** that record, and refuses — naming the file — when there is none.
+Fail-closed on tbx costs one command; failing open costs someone else's cluster.
+`destroy-cluster.sh` forgets the file with the substrate file, for the same
+reason.
+
+**The lease moves, and that is normal.** A node's address is a vmnet DHCP lease
+keyed by MAC (which is why `tbx_node_ip` reads it and never computes it), so
+after `tbx cluster start` the control plane can come up somewhere else in the
+/24 — leaving the kubeconfig pointing at a dead address and the guard refusing
+an address it has no record of. One command repairs both:
+
+    ./scripts/create-cluster.sh --refresh-endpoint
+
+It re-reads `tbx status`, rewrites the kubeconfig's server and the endpoint
+file, and does nothing else — no create, no Helm, no `/etc/hosts`. It is tbx-only
+(on docker the API server is published on loopback and cannot move).
+
+**The other half — "destroy first" for a cluster you want to keep.** The tbx
+preflight and `lab/01-cluster/verify.sh` both treated "a cloudbox cluster
+exists" as one state and said *run destroy-cluster.sh*. A cluster whose nodes
+are all `stopped`/`suspended` — a reboot, a `tbx down` — is not that state: it
+is a cluster waiting to be started, and destroying it costs the attendee
+everything they built plus 20 minutes. Both now read the node phases from `tbx
+status -o json` (`stopped` | `suspended` | `unreachable` | `maintenance` |
+`configured`, `internal/daemon/phase.go`; `PhaseSuspended` is a stopped node
+with saved memory) and, when nothing is running, say
+
+    tbx cluster start cloudbox
+    ./scripts/create-cluster.sh --refresh-endpoint
+
+`tbx cluster start <name>` is the real upstream verb (`cmd/tbx/main.go`,
+`parseClusterStartOptions`). An unreadable or empty status is *not* "all
+stopped" — absence must never become advice to start something.
+
+**Retired by:** nothing. Both are properties of running real VMs on a laptop
+that gets closed at the end of the day.
+
 ## RESOLVED — the workshop scripts ran against whatever cluster `kubectl` pointed at
 
 **Found in rehearsal 3, closed in `2b8de71` (lab/) and `b4f5e2d` (scripts/ +
