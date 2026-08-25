@@ -19,11 +19,14 @@ ArgoCD creates the object.
 
 | | |
 |---|---|
-| Image | `quay.io/argoproj/argocd:v3.5.1` — already on `scripts/images.txt`, and it ships `kubectl`. No new image enters the offline bundle for a one-field patch. |
-| RBAC | namespaced and `resourceNames`-scoped: `configmaps` `get` on `cloudbox-host` only, `modelconfigs` `get`+`patch` on `default-model-config` only. Nothing else, nowhere else — it reads one address and writes one field. |
+| Images | `registry.k8s.io/kubectl:v1.36.2@sha256:b0d792e0…` — the upstream distroless kubectl, pinned to the SAME 1.36.2 as the kubectl tool (`KUBERNETES_VERSION` in `versions.env`, `mise.toml`), multi-arch, added to `scripts/images.txt`. Plus `docker.io/library/busybox:1.37.0`, already on that list, as the init container. |
+| Why two containers | `registry.k8s.io/kubectl` is distroless: `crane export … \| tar -t` shows only `bin/kubectl` and `bin/kube-log-runner` — **no shell** to run a read-compare-patch script in, and **no `cp`** to side-load the binary into a shell image. (The ArgoCD image was tried first and rejected the same way: it ships argocd/helm/kustomize/git-lfs, no kubectl.) So the ConfigMap is mounted instead, busybox renders the merge patch from the mounted file, and kubectl — whose entrypoint *is* kubectl — applies it with `--patch-file`. |
+| Volumes | `cloudbox-host` ConfigMap with `optional: true` (its absence must not wedge a pod in ContainerCreating) and an `emptyDir` named `work` carrying the rendered patch between the two containers. |
+| RBAC | one verb on one object: `modelconfigs` `patch` on `default-model-config`. The ConfigMap needs no rule — a kubelet-mounted volume does not go through the ServiceAccount. |
 | Hook policy | `argocd.argoproj.io/hook: PostSync` runs it after ArgoCD has created the ModelConfig; `argocd.argoproj.io/hook-delete-policy: BeforeHookCreation` keeps the last run's pod until the next sync, so `kubectl -n kagent logs job/kagent-ollama-host` still says what it decided. |
-| Resources | one `kubectl` call and exit: requests `10m` CPU / `32Mi` memory, limit `128Mi` — small enough to be invisible in the workshop RAM budget, generous enough that the patch is never OOM-killed halfway. |
-| Idempotent | Reads the current `/spec/ollama/host` first and exits 0 when it already matches; exits 0 when the ConfigMap is absent (docker/CI, where git's default is already right). |
+| Security | `runAsNonRoot` at `runAsUser`/`runAsGroup` `65532` (both images' binaries are world-executable and neither needs a home; `HOME=/work` gives kubectl a writable cache dir), `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`, all capabilities dropped. |
+| Resources | one patch call and exit: busybox requests `10m` CPU / `16Mi` memory (limit `64Mi`), kubectl `10m` / `32Mi` (limit `128Mi`) — invisible in the workshop RAM budget, generous enough never to be OOM-killed halfway. |
+| Idempotent | A merge patch that sets the field to the value it already holds is a server-side no-op; when the ConfigMap is absent (docker/CI, where git's default is already right) the init container renders `{}`, an empty merge patch that changes nothing. |
 | Why it is not reverted | The kagent Application `ignoreDifferences` `/spec/ollama/host` with `RespectIgnoreDifferences=true` (`gitops/catalog/kagent.yaml`). |
 
 ## Re-vendor

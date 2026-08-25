@@ -120,6 +120,13 @@ docker.io/library/postgres:18.3-alpine
 # scripts/check-consistency.sh.
 ghcr.io/kagent-dev/kagent/app:0.9.12
 ghcr.io/kagent-dev/kagent/skills-init:0.9.12
+# The ollama-host-hook Job (gitops/components/kagent/ollama-host-hook.yaml)
+# patches the ModelConfig's Ollama host at enable-time. Same 1.36.2 as the
+# kubectl tool pin (KUBERNETES_VERSION in versions.env, mise.toml) — the
+# upstream distroless kubectl image, multi-arch (amd64 + arm64 verified with
+# crane 2026-08-25), digest-pinned. Its shell-less sibling in that Job is
+# busybox 1.37.0, already listed under wave 0.
+registry.k8s.io/kubectl:v1.36.2@sha256:b0d792e0d8dfb9bb1b922b78b23137e2a34bb6f9667640353a9d2aadd1fd7761
 
 # --- Observability v2 (Victoria stack, issue #57) — the on-demand observability
 # capability that REPLACED otel-lgtm: metrics + logs + traces + Grafana, fed by

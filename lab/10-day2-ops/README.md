@@ -439,8 +439,10 @@ calls, then evidence that goes unread — is the point.
 >
 > ```bash
 > kubectl -n kagent logs deploy/k8s-agent -f
-> # POST http://host.docker.internal:11434/api/chat  →  your host model answered
-> # POST http://kagent-tools.kagent:8084/mcp        →  a tool call actually happened
+> # POST http://<your host>:11434/api/chat    →  your host model answered
+> #   (host.docker.internal on macOS/WSL2 docker, 10.5.0.1 on native Linux,
+> #    172.30.<n>.1 on talos-box — whatever the ModelConfig says)
+> # POST http://kagent-tools.kagent:8084/mcp  →  a tool call actually happened
 > ```
 >
 > (Until cloudbox-portal v0.2.1 the Console could not read kagent 0.9.12's frames at all

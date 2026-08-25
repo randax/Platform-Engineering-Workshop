@@ -13,11 +13,24 @@
 # untouched on two substrates out of three.
 #
 # This PostSync hook closes that gap at the only moment that works — right
-# after ArgoCD has created the ModelConfig. It reads the ConfigMap and patches
-# the live object; the kagent Application ignoreDifferences /spec/ollama/host
-# (with RespectIgnoreDifferences=true), so selfHeal leaves the patch alone.
-# On docker/CI, where the ConfigMap may be absent, it exits 0 and changes
-# nothing — the git default is already correct there.
+# after ArgoCD has created the ModelConfig. The kagent Application
+# ignoreDifferences /spec/ollama/host (with RespectIgnoreDifferences=true), so
+# selfHeal leaves the patched value alone.
+#
+# WHY TWO CONTAINERS AND NO `kubectl` PIPELINE
+# registry.k8s.io/kubectl is distroless: its only binaries are /bin/kubectl and
+# /bin/kube-log-runner (verified with `crane export … | tar -t`). There is no
+# shell, so the "read the ConfigMap, compare, then patch" script cannot run
+# there — and there is no `cp` either, so the binary cannot be side-loaded into
+# a shell image. Instead the ConfigMap is MOUNTED (optional, so its absence is
+# not a startup failure), a busybox init container renders the merge patch from
+# the mounted file, and kubectl — whose entrypoint IS kubectl — applies that
+# file. No shell needed in the image that talks to the API server.
+#
+# Idempotence: a merge patch that sets the field to the value it already holds
+# is a server-side no-op, and when the ConfigMap is absent (docker/CI, where
+# git's default is already right) the init container renders `{}` — an empty
+# merge patch, which kubectl accepts and which changes nothing.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -30,17 +43,12 @@ metadata:
   name: kagent-ollama-host
   namespace: kagent
 rules:
-  # Read the address bootstrap-gitops.sh recorded.
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    resourceNames: ["cloudbox-host"]
-    verbs: ["get"]
-  # Read the current value (so a re-run is a no-op) and set it. No create, no
-  # delete, no other kind: this hook edits one field of one object.
+  # One verb on one object. The ConfigMap needs no rule at all: it arrives as a
+  # kubelet-mounted volume, which does not go through this ServiceAccount.
   - apiGroups: ["kagent.dev"]
     resources: ["modelconfigs"]
     resourceNames: ["default-model-config"]
-    verbs: ["get", "patch"]
+    verbs: ["patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -79,32 +87,78 @@ spec:
       restartPolicy: OnFailure
       securityContext:
         runAsNonRoot: true
-        runAsUser: 999
-      containers:
-        - name: patch
-          # The ArgoCD image is already on the pre-pull list (scripts/images.txt,
-          # "ArgoCD v3.5.1") and ships kubectl — no new image, no extra bytes in
-          # the offline bundle.
-          image: quay.io/argoproj/argocd:v3.5.1
+        # Both images ship world-readable/executable binaries and neither needs
+        # a home directory, so an arbitrary unprivileged UID works. 65532 is the
+        # conventional distroless "nonroot" id.
+        runAsUser: 65532
+        runAsGroup: 65532
+      volumes:
+        # optional: bootstrap-gitops.sh writes this ConfigMap, but a cluster
+        # built some other way (or one whose gateway lookup failed) must still
+        # sync kagent — an absent ConfigMap here means "no patch", not a pod
+        # stuck in ContainerCreating.
+        - name: cloudbox-host
+          configMap:
+            name: cloudbox-host
+            optional: true
+        - name: work
+          emptyDir: {}
+      initContainers:
+        - name: render-patch
+          image: docker.io/library/busybox:1.37.0
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -eu
-              host="$(kubectl -n kagent get configmap cloudbox-host \
-                -o jsonpath='{.data.ollama}' 2>/dev/null || true)"
-              if [ -z "${host}" ]; then
+              if [ -s /cloudbox/ollama ]; then
+                host="$(cat /cloudbox/ollama)"
+                printf '{"spec":{"ollama":{"host":"%s"}}}' "${host}" > /work/patch.json
+                echo "kagent Ollama host for this machine: ${host}"
+              else
+                # No ConfigMap: keep whatever git carries. An empty merge patch
+                # is still a valid request, so the next container needs no
+                # branch of its own.
+                printf '{}' > /work/patch.json
                 echo "no configmap kagent/cloudbox-host — keeping the ModelConfig's git default"
-                exit 0
               fi
-              current="$(kubectl -n kagent get modelconfig default-model-config \
-                -o jsonpath='{.spec.ollama.host}' 2>/dev/null || true)"
-              if [ "${current}" = "${host}" ]; then
-                echo "ModelConfig already points at ${host}"
-                exit 0
-              fi
-              kubectl -n kagent patch modelconfig default-model-config --type merge \
-                -p "{\"spec\":{\"ollama\":{\"host\":\"${host}\"}}}"
-              echo "ModelConfig Ollama host: ${current:-<unset>} -> ${host}"
+          volumeMounts:
+            - name: cloudbox-host
+              mountPath: /cloudbox
+              readOnly: true
+            - name: work
+              mountPath: /work
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        - name: patch
+          # Distroless; ENTRYPOINT is /bin/kubectl, so `args` are its flags.
+          # Pinned to the same 1.36.2 as the kubectl tool (scripts/versions.env
+          # KUBERNETES_VERSION, mise.toml) and listed in scripts/images.txt.
+          image: registry.k8s.io/kubectl:v1.36.2@sha256:b0d792e0d8dfb9bb1b922b78b23137e2a34bb6f9667640353a9d2aadd1fd7761
+          args:
+            - "--namespace=kagent"
+            - "patch"
+            - "modelconfig"
+            - "default-model-config"
+            - "--type=merge"
+            - "--patch-file=/work/patch.json"
+          env:
+            # kubectl writes a discovery cache under $HOME; point it at the
+            # writable emptyDir so a read-only root filesystem is no obstacle.
+            - name: HOME
+              value: /work
+          volumeMounts:
+            - name: work
+              mountPath: /work
           resources:
             requests:
               cpu: 10m
@@ -113,5 +167,6 @@ spec:
               memory: 128Mi
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
