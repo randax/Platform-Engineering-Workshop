@@ -8,7 +8,7 @@ layout: section
 
 <div class="modlogos"><Logo name="talos" label size="2.6rem"/> <Logo name="cilium" label size="2.6rem"/></div>
 
-<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their new datacenter is two VMs on this laptop — an immutable OS with no server to SSH into and pet.</div>
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their new datacenter is two Talos nodes on this laptop — VMs or containers, depending on your substrate — an immutable OS with no server to SSH into and pet.</div>
 
 <!--
 The first real module, and the biggest identity shift of the day: every cloud provider runs an operating system under your Kubernetes that you never get to see. For the next 35 minutes, attendees take ownership of that layer.

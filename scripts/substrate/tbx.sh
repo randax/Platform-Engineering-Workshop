@@ -46,14 +46,17 @@ substrate_preflight() {
        # whose every node is stopped or suspended is what a laptop looks like
        # after a reboot or a `tbx down`, and the answer there is to START it,
        # not to throw it away. Telling that attendee to destroy first costs them
-       # the whole cluster and 20 minutes of re-create; `tbx cluster start
-       # <name>` (cmd/tbx/main.go, parseClusterStartOptions) brings the same one
-       # back. Phases come from `tbx status -o json`: stopped | suspended |
-       # unreachable | maintenance | configured (internal/daemon/phase.go).
+       # the whole cluster and 20 minutes of re-create; `tbx cluster start|resume
+       # <name>` (cmd/tbx/main.go) brings the same one back. Phases come from
+       # `tbx status -o json`: stopped | suspended | unreachable | maintenance |
+       # configured (internal/daemon/phase.go). WHICH verb matters:
+       # tbx_restart_verb picks `resume` for a suspended cluster, because
+       # `start` cold-boots it and discards the saved memory.
        if tbx_cluster_all_stopped; then
+         local verb; verb="$(tbx_restart_verb)"
          fail "The '${CLUSTER_NAME}' tbx cluster exists, and every node is stopped or suspended."
-         warn "That is a cluster waiting to be started, not one to throw away:"
-         warn "  tbx cluster start ${CLUSTER_NAME}"
+         warn "That is a cluster waiting to be brought back, not one to throw away:"
+         warn "  tbx cluster ${verb} ${CLUSTER_NAME}"
          warn "  ./scripts/create-cluster.sh --refresh-endpoint   # the VM addresses are DHCP leases and may have moved"
          die "Start it (or ./scripts/destroy-cluster.sh if you really want a new one), then re-run."
        fi
@@ -198,6 +201,26 @@ tbx_cluster_all_stopped() {
       elif [.nodes[] | select(.phase != "stopped" and .phase != "suspended")] | length == 0
         then "all-stopped" else "some-running" end' 2>/dev/null || true)"
   [[ "${verdict}" == "all-stopped" ]]
+}
+
+# tbx_restart_verb — "resume" or "start": which `tbx cluster <verb>` brings THIS
+# cluster back. They are not interchangeable and only one of them is free.
+#
+# A SUSPENDED node has its RAM saved to disk; `tbx cluster resume` restores it
+# and the cluster is back where it was. `tbx cluster start` on the same cluster
+# is a COLD BOOT that deliberately discards those saves
+# (internal/daemon/operations.go, the discardSavedState loop in the start op:
+# "start is a cold boot: suspended memory left by an earlier suspend is
+# superseded by these launches"). Both end with a running cluster, so the wrong
+# verb never looks like an error — it just throws away the suspend and takes the
+# slow path, which is the whole reason talos-box has two verbs.
+#
+# Says "start" when nothing is suspended, and when status cannot be read: start
+# is the verb that works on a stopped cluster, and resume on one is an error.
+tbx_restart_verb() {
+  local any
+  any="$(tbx_cluster_json | jq -r '[(.nodes? // [])[] | select(.phase == "suspended")] | length' 2>/dev/null || true)"
+  if [[ "${any}" =~ ^[0-9]+$ ]] && [[ "${any}" -gt 0 ]]; then echo "resume"; else echo "start"; fi
 }
 
 # tbx_etcd_live <node-ip> — true when etcd is actually running on that node.

@@ -1274,12 +1274,21 @@ status -o json` (`stopped` | `suspended` | `unreachable` | `maintenance` |
 `configured`, `internal/daemon/phase.go`; `PhaseSuspended` is a stopped node
 with saved memory) and, when nothing is running, say
 
-    tbx cluster start cloudbox
+    tbx cluster start|resume cloudbox
     ./scripts/create-cluster.sh --refresh-endpoint
 
-`tbx cluster start <name>` is the real upstream verb (`cmd/tbx/main.go`,
-`parseClusterStartOptions`). An unreadable or empty status is *not* "all
-stopped" — absence must never become advice to start something.
+Both are real upstream verbs (`cmd/tbx/main.go`: `cluster
+create|start|stop|suspend|resume|destroy|list`), and they are **not**
+interchangeable. A `suspended` node holds its RAM in a save file; `cluster
+resume` restores it, while `cluster start` is a deliberate cold boot that
+discards those saves (`internal/daemon/operations.go`, the `discardSavedState`
+loop in the start op — "start is a cold boot: suspended memory left by an
+earlier suspend is superseded by these launches"). Both leave a running cluster,
+so the wrong verb never looks like a failure — it silently throws away the
+suspend and takes the slow path. The preflight, `verify.sh` and `solve.sh` pick
+the verb from the phases (`tbx_restart_verb`), defaulting to `start`, because
+`resume` on a plain stopped cluster is an error. An unreadable or empty status is
+*not* "all stopped" — absence must never become advice to start something.
 
 **Retired by:** nothing. Both are properties of running real VMs on a laptop
 that gets closed at the end of the day.

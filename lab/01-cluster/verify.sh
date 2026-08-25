@@ -33,7 +33,13 @@ if [ "$SUBSTRATE" = tbx ]; then
     # The phases are talos-box's own (internal/daemon/phase.go).
     STOPPED="$(printf '%s' "$TBX_JSON" | jq -r '(if type == "array" then ((map(select(.name == "cloudbox")) | first) // {}) else . end) | (.nodes // []) | if length == 0 then "unknown" elif ([.[] | select(.phase != "stopped" and .phase != "suspended")] | length) == 0 then "all-stopped" else "some-running" end' 2>/dev/null || echo unknown)"
     if [ "$STOPPED" = all-stopped ]; then
-      fail "the cloudbox VMs exist but are all stopped/suspended (${PHASES}) — start them, do not re-create: 'tbx cluster start cloudbox', then './scripts/create-cluster.sh --refresh-endpoint' (the VM addresses are DHCP leases and may have moved)"
+      # `resume` when anything is suspended, `start` otherwise: start on a
+      # suspended cluster is a cold boot that discards its saved memory
+      # (talos-box's own start op does the discarding), and both verbs end with
+      # a running cluster, so the wrong one never looks like a mistake.
+      VERB=start
+      case "$PHASES" in *suspended*) VERB=resume ;; esac
+      fail "the cloudbox VMs exist but are all stopped/suspended (${PHASES}) — bring them back, do not re-create: 'tbx cluster ${VERB} cloudbox', then './scripts/create-cluster.sh --refresh-endpoint' (the VM addresses are DHCP leases and may have moved)"
     else
       fail "expected 2 configured Talos VMs, found ${NODES}${PHASES:+ (saw ${PHASES})} — 'tbx status cloudbox', then ./scripts/create-cluster.sh"
     fi

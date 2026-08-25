@@ -46,10 +46,20 @@ tbx_all_stopped() {
            tbx_cluster_all_stopped' _ "$REPO_ROOT"
 }
 
+# Which verb brings it back — same helper, same reason: `start` on a SUSPENDED
+# cluster cold-boots it and throws away the saved memory, so a script that
+# always says "start" quietly costs the attendee the suspend they took.
+tbx_verb() {
+  bash -c 'source "$1/scripts/lib.sh" >/dev/null 2>&1
+           source "$1/scripts/substrate/tbx.sh" >/dev/null 2>&1
+           tbx_restart_verb' _ "$REPO_ROOT"
+}
+
 if cluster_exists; then
   if [[ "$SUBSTRATE" == tbx ]] && tbx_all_stopped; then
-    echo "cloudbox VMs exist but are all stopped/suspended — starting them, not re-creating."
-    tbx cluster start cloudbox
+    VERB="$(tbx_verb)"
+    echo "cloudbox VMs exist but are all stopped/suspended — 'tbx cluster ${VERB}', not re-creating."
+    tbx cluster "$VERB" cloudbox
     # The VM addresses are vmnet DHCP leases and may have moved while the
     # cluster was down; this repoints the kubeconfig, the talosconfig context
     # and ~/.cloudbox/api-endpoint at where the control plane came back.
