@@ -34,6 +34,7 @@ func init() {
 			{"GET /databases/list", handleDatabasesList}, // polled by htmx
 			{"GET /databases/{name}", handleDatabaseDetail},
 			{"POST /databases", handleCreateDatabase},
+			{"POST /databases/{name}/query", handleDatabaseQuery},
 			{"POST /databases/{name}/resize", handleResizeDatabase},
 			{"DELETE /databases/{name}", handleDeleteDatabase},
 		},
