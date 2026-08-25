@@ -204,7 +204,7 @@ func TestGenerateScreenshots(t *testing.T) {
 	// fragment and inline it into the placeholder so every page shows the selector.
 	var barBuf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&barBuf, "project-bar", projectBarData{
-		Active: "demo", Default: "demo", Projects: []string{"demo", "team-a"},
+		Active: "demo", Default: "demo", Projects: projectEntries([]string{"demo", "team-a"}),
 	}); err != nil {
 		t.Fatalf("render project-bar: %v", err)
 	}

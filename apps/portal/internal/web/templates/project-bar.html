@@ -9,12 +9,19 @@
     <div class="proj-menu">
       {{range .Projects}}
       <div class="proj-row">
+        {{if .Switchable}}
         {{/* plain link: the switch handler 303-redirects back, so it works
              without JS; htmx turns it into an in-page reload. */}}
-        <a class="proj-item{{if eq . $.Active}} active{{end}}" href="/project?set={{.}}">{{.}}</a>
-        {{if ne . $.Default}}
-        <button class="proj-del" title="Delete project {{.}}"
-          hx-delete="/projects/{{.}}" hx-confirm="Delete project {{.}}? This removes the namespace and everything in it.">×</button>
+        <a class="proj-item{{if eq .Name $.Active}} active{{end}}" href="/project?set={{.Name}}">{{.Name}}</a>
+        {{else}}
+        {{/* A legacy hyphenated project: the switch handler answers 400, so no
+             link — a read-only row that says why. Delete still works. */}}
+        <span class="proj-item proj-legacy"
+          title="{{.Name}} can't be opened: a project name with '-' makes two different apps able to claim the same URL (<app>-<project>). Read-only — delete it, or make a hyphen-free one.">{{.Name}} <small>(read-only)</small></span>
+        {{end}}
+        {{if ne .Name $.Default}}
+        <button class="proj-del" title="Delete project {{.Name}}"
+          hx-delete="/projects/{{.Name}}" hx-confirm="Delete project {{.Name}}? This removes the namespace and everything in it.">×</button>
         {{end}}
       </div>
       {{end}}

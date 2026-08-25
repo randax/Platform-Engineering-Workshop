@@ -29,17 +29,38 @@ func (s *Server) projectList(ctx context.Context) []string {
 	return out
 }
 
+// projectEntry is one row of the selector. Switchable is false for a LEGACY
+// hyphenated project: HandleProjectSwitch refuses those with 400, so rendering
+// a switch link for one hands the attendee a link whose only outcome is an
+// error page. It is still listed (it exists, and its resources are visible from
+// the CLI) and still deletable — deleting is the one thing you can do with it.
+type projectEntry struct {
+	Name       string
+	Switchable bool
+}
+
 type projectBarData struct {
 	Active   string
-	Projects []string
+	Projects []projectEntry
 	Default  string // the un-deletable default project
 	Flash    flash
+}
+
+// projectEntries decorates the names with the SAME predicate the switch handler
+// enforces (kube.ValidProjectName), so the bar cannot offer a door the server
+// closes.
+func projectEntries(names []string) []projectEntry {
+	out := make([]projectEntry, 0, len(names))
+	for _, n := range names {
+		out = append(out, projectEntry{Name: n, Switchable: kube.ValidProjectName(n)})
+	}
+	return out
 }
 
 func (s *Server) barData(r *http.Request, fl flash) projectBarData {
 	return projectBarData{
 		Active:   s.activeProject(r),
-		Projects: s.projectList(r.Context()),
+		Projects: projectEntries(s.projectList(r.Context())),
 		Default:  kube.XRNamespace,
 		Flash:    fl,
 	}

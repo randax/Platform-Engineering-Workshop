@@ -55,21 +55,26 @@ func TestProjectBarRender(t *testing.T) {
 	var buf bytes.Buffer
 	// team-a here is deliberately a LEGACY project: the bar still lists and
 	// offers to delete one, it just cannot be switched into or deployed to.
-	data := projectBarData{Active: "teama", Default: "demo", Projects: []string{"demo", "team-a"}}
+	data := projectBarData{Active: "teama", Default: "demo", Projects: projectEntries([]string{"demo", "team-a"})}
 	if err := tmpl.ExecuteTemplate(&buf, "project-bar", data); err != nil {
 		t.Fatalf("render project-bar: %v", err)
 	}
 	out := buf.String()
 	for _, want := range []string{
 		`href="/project?set=demo"`,     // switch to the default
-		`href="/project?set=team-a"`,   // switch to team-a
 		`hx-delete="/projects/team-a"`, // delete a non-default project
 		`hx-post="/projects"`,          // the create form
 		`for="proj-modal"`,             // the New-project trigger
+		`(read-only)`,                  // ...and team-a says why it is not a link
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("project-bar missing %q", want)
 		}
+	}
+	// A legacy project must NOT get a switch link: HandleProjectSwitch answers
+	// 400 for it, so the link's only outcome is an error page.
+	if strings.Contains(out, `href="/project?set=team-a"`) {
+		t.Error("a hyphenated project must not be rendered as a switch link")
 	}
 	// The default project must NOT be deletable.
 	if strings.Contains(out, `hx-delete="/projects/demo"`) {
