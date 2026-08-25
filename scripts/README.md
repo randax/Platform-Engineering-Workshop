@@ -93,7 +93,7 @@ One hostname scheme, both substrates — `*.cloudbox.k8s.test`:
 | Zot registry | http://zot.cloudbox.k8s.test | (enabled in module S2) |
 | NATS monitoring | http://nats.cloudbox.k8s.test | (enabled in module S3) |
 | Backstage | http://backstage.cloudbox.k8s.test | (presenter demo) |
-| Knative services | `http://<name>.<namespace>.kn.cloudbox.k8s.test` | (enabled in module S1) |
+| Knative services | `http://<name>-<namespace>.kn.cloudbox.k8s.test` | (enabled in module S1) |
 
 On the **tbx** substrate talos-box's own resolver answers every one of these at the
 cluster's ingress VIP (`172.30.<n>.200`). On the **Docker** substrate they come from a

@@ -76,7 +76,7 @@ func handleApplicationDetail(s *Server, w http.ResponseWriter, r *http.Request) 
 	data.Found = true
 	data.Readiness = app.Readiness()
 	if data.Readiness.Class == "ok" {
-		data.URL = fmt.Sprintf("http://%s.%s.%s", name, ns, s.knativeDomain())
+		data.URL = s.ksvcURL(name, ns)
 	}
 	repo, branch, _, sourceBuilt := app.Source()
 	data.SourceBuilt, data.Repo, data.Branch = sourceBuilt, repo, branch

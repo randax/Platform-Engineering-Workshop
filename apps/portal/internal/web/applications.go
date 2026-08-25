@@ -43,8 +43,7 @@ func init() {
 }
 
 // appRow decorates an Application XR with the URL its composed Knative Service
-// answers on (Knative programs <name>.<ns>.kn.cloudbox.k8s.test through the
-// Cilium ingress) — shown once the app is Ready.
+// answers on — see ksvcURL — shown once the app is Ready.
 type appRow struct {
 	kube.Application
 	URL         string
@@ -67,7 +66,7 @@ func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (app
 		_, _, _, sourceBuilt := a.Source()
 		row := appRow{Application: a, SourceBuilt: sourceBuilt}
 		if a.Readiness().Class == "ok" {
-			row.URL = fmt.Sprintf("http://%s.%s.%s", a.Metadata.Name, a.Metadata.Namespace, s.knativeDomain())
+			row.URL = s.ksvcURL(a.Metadata.Name, a.Metadata.Namespace)
 		}
 		rows = append(rows, row)
 	}
@@ -79,6 +78,22 @@ func (s *Server) knativeDomain() string {
 		return s.KnativeDomain
 	}
 	return "kn.cloudbox.k8s.test"
+}
+
+// ksvcURL is the browser URL a Knative Service answers on. ONE definition,
+// because this shape is not obvious and getting it wrong shows up as a dead
+// link rather than an error.
+//
+// The separator between name and namespace is a DASH, not a dot: the cluster
+// sets Knative's domain-template to "{{.Name}}-{{.Namespace}}.{{.Domain}}"
+// (gitops/components/knative-serving/serving-core.yaml). Upstream's default
+// dotted form would put every ksvc two DNS labels under the domain, and a
+// Kubernetes Ingress wildcard host matches exactly one label — so the single
+// *.kn.cloudbox.k8s.test rule that serves every namespace could not exist, and
+// the namespaces THIS console composes into are precisely the ones nobody can
+// enumerate in advance. Change one of these two and change the other.
+func (s *Server) ksvcURL(name, namespace string) string {
+	return fmt.Sprintf("http://%s-%s.%s", name, namespace, s.knativeDomain())
 }
 
 func handleApplications(s *Server, w http.ResponseWriter, r *http.Request) {

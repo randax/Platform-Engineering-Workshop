@@ -110,7 +110,9 @@ spec:
             - name: GRAFANA_URL
               value: http://grafana.cloudbox.k8s.test
             # Browser-facing domain for composed Knative Services. The portal
-            # builds <name>.<namespace>.<domain> links for Application XRs.
+            # builds <name>-<namespace>.<domain> links for Application XRs
+            # (the dash is Knative's domain-template — see ksvcURL in
+            # apps/portal/internal/web/applications.go).
             - name: KNATIVE_DOMAIN
               value: kn.cloudbox.k8s.test
             # Gitea credentials for the scaffold bridge (PRD-0012): the console

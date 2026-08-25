@@ -17,7 +17,7 @@ Crossplane v2 pipeline + `function-patch-and-transform` — no new components.
 ## What one `Application` composes (in the XR's own namespace)
 
 1. **workload** — a Knative `Service` named after the XR. Free scale-to-zero and
-   a `http://<name>.<namespace>.kn.cloudbox.k8s.test` URL via Kourier — no
+   a `http://<name>-<namespace>.kn.cloudbox.k8s.test` URL via Kourier — no
    separate ingress component. `spec.image` → the container; `spec.replicas`
    `{min,max}` → the `autoscaling.knative.dev/minScale` and
    `autoscaling.knative.dev/maxScale` annotations. **`spec.env` is

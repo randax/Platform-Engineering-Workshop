@@ -155,7 +155,7 @@ func TestTemplatesRender(t *testing.T) {
 				`name="image"`, `Min scale`, `Max scale`, // the fuller input set
 				`name="source"`, `Build from a repo`, `name="repo"`, // deploy-from-source toggle
 				`Attach a Postgres database`, `Attach an S3 bucket`, // dependency toggles
-				`web.demo.kn.cloudbox.k8s.test`, // the Ready app's URL
+				`web-demo.kn.cloudbox.k8s.test`, // the Ready app's URL
 				`href="/applications/web"`,      // name + Details link into the detail view
 				`hx-delete="/applications/web"`, // per-row delete
 			},
@@ -171,7 +171,7 @@ func TestTemplatesRender(t *testing.T) {
 				`hx-post="/applications/api/redeploy"`, // Redeploy lives on the detail now
 				`hx-delete="/applications/api"`,        // delete from the danger zone
 				`polyline`,                             // the monitoring sparkline (Telemetry branch)
-				`api.demo.kn.cloudbox.k8s.test`,        // the Ready workload URL
+				`api-demo.kn.cloudbox.k8s.test`,        // the Ready workload URL
 			},
 		},
 		"function-detail": {

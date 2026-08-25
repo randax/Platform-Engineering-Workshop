@@ -58,9 +58,16 @@ The URL is in the `kn.cloudbox.k8s.test` domain and routes through the Cilium in
 curl "$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')/"
 ```
 
-On the docker substrate `/etc/hosts` cannot hold a wildcard, so only the ksvc names
+The host is `<ksvc>-<namespace>.kn.cloudbox.k8s.test` — `hello-demo.kn.cloudbox.k8s.test`
+here. That dash is not cosmetic: it keeps every ksvc one DNS label under the domain, and a
+Kubernetes Ingress wildcard host matches exactly one label — which is what lets a single
+`*.kn.cloudbox.k8s.test` rule serve every namespace anyone invents. Ask the cluster rather
+than assuming, though: `.status.url` is the published truth.
+
+On the **docker** substrate `/etc/hosts` cannot hold a wildcard, so only the ksvc names
 `install.sh --print-hosts` lists resolve. For a ksvc you invent yourself, either add a
 line for it or use the Host-header form: `curl -H "Host: <the ksvc host>" http://localhost/`.
+On **tbx** the resolver answers the wildcard, so anything you create just works.
 </details>
 
 <details>

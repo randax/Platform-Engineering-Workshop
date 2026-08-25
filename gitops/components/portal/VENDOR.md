@@ -77,7 +77,8 @@ extra-file — its version is prose, kept honest by review.
   see `../grafana/VENDOR.md`).
 - **`KNATIVE_DOMAIN=kn.cloudbox.k8s.test`** — browser-facing domain for
   composed Application XR workloads; the portal constructs
-  `<name>.<namespace>.<domain>` links from it.
+  `<name>-<namespace>.<domain>` links from it (the dash is Knative's
+  `domain-template`; see `ksvcURL` in `apps/portal/internal/web/applications.go`).
 - **`GITEA_USER=gitea_admin` / `GITEA_PASSWORD=cloudbox123`** — the scaffold
   bridge (PRD-0012): the console calls Gitea's *generate* API to create a
   tenant repo from a template. Workshop-grade and committed like the S3 creds;

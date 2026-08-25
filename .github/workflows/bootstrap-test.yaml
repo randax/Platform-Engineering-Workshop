@@ -126,7 +126,7 @@ jobs:
           set -euo pipefail
           ./scripts/install.sh --print-hosts
           getent hosts gitea.cloudbox.k8s.test
-          getent hosts hello.demo.kn.cloudbox.k8s.test
+          getent hosts hello-demo.kn.cloudbox.k8s.test
 
       - name: Bootstrap GitOps (Gitea + ArgoCD)
         run: ./scripts/bootstrap-gitops.sh

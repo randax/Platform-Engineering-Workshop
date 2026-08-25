@@ -8,7 +8,7 @@
 # DATABASE_URL + S3_* into the workload so it boots already connected.
 #
 # Reach it at (once Ready):
-#   http://my-app.<namespace>.kn.cloudbox.k8s.test
+#   http://my-app-<namespace>.kn.cloudbox.k8s.test
 apiVersion: platform.cloudbox.io/v1alpha1
 kind: Application
 metadata:

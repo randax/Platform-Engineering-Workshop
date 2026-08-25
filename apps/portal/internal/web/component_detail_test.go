@@ -247,7 +247,7 @@ func sampleApplications() applicationsData {
 		}
 		row := appRow{Application: a}
 		if ready {
-			row.URL = "http://" + name + ".demo.kn.cloudbox.k8s.test"
+			row.URL = "http://" + name + "-demo.kn.cloudbox.k8s.test"
 		}
 		return row
 	}
@@ -269,7 +269,7 @@ func sampleAppDetail() appDetailData {
 	return appDetailData{
 		Name: "api", Namespace: "demo", Found: true,
 		Readiness:   kube.Readiness{Label: "Creating", Class: "meh"},
-		URL:         "http://api.demo.kn.cloudbox.k8s.test",
+		URL:         "http://api-demo.kn.cloudbox.k8s.test",
 		SourceBuilt: true,
 		Repo:        "http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/api.git",
 		Branch:      "main",
@@ -299,7 +299,7 @@ func sampleFnDetail() fnDetailData {
 	return fnDetailData{
 		Name: "fn-hello", Namespace: "demo", Found: true,
 		Readiness: kube.Readiness{Label: "RevisionFailed", Class: "meh"},
-		URL:       "http://fn-hello.demo.kn.cloudbox.k8s.test",
+		URL:       "http://fn-hello-demo.kn.cloudbox.k8s.test",
 		Deletable: true,
 		Why:       `Revision "fn-hello-00001" failed: unable to fetch image`,
 		ShowDiag:  true,
@@ -349,11 +349,11 @@ func sampleServices() []serviceRow {
 		return r
 	}
 	return []serviceRow{
-		mk("uploader", "pipeline", "http://uploader.pipeline.kn.cloudbox.k8s.test",
+		mk("uploader", "pipeline", "http://uploader-pipeline.kn.cloudbox.k8s.test",
 			[]float64{0, 1, 3, 2, 5, 4, 6, 5, 7, 6, 5, 6}, []float64{0.02, 0.03, 0.025, 0.04, 0.035, 0.05, 0.045, 0.06, 0.05, 0.055, 0.048, 0.052}, "52 ms", "2 running"),
-		mk("resizer", "pipeline", "http://resizer.pipeline.kn.cloudbox.k8s.test",
+		mk("resizer", "pipeline", "http://resizer-pipeline.kn.cloudbox.k8s.test",
 			[]float64{0, 0, 1, 2, 1, 3, 2, 4, 3, 2, 3, 2}, []float64{0.1, 0.12, 0.11, 0.18, 0.15, 0.22, 0.19, 0.2, 0.17, 0.19, 0.16, 0.18}, "180 ms", "idle · 0 pods"),
-		mk("fn-hello-site", "demo", "http://fn-hello-site.demo.kn.cloudbox.k8s.test",
+		mk("fn-hello-site", "demo", "http://fn-hello-site-demo.kn.cloudbox.k8s.test",
 			[]float64{0, 0, 0, 1, 0, 0, 2, 1, 0, 0, 1, 0}, []float64{0.01, 0.02, 0.015, 0.03, 0.02, 0.04, 0.03, 0.05, 0.03, 0.02, 0.04, 0.03}, "31 ms", "idle · 0 pods"),
 	}
 }

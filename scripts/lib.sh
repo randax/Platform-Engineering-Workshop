@@ -419,12 +419,17 @@ CLOUDBOX_HOSTS_FILE="${CLOUDBOX_HOSTS_FILE:-/etc/hosts}"
 # Derived from the *_HOST_URL pins in versions.env rather than re-typed here:
 # there is exactly one place a hostname is written down, and renaming a service
 # there moves the /etc/hosts line with it. The nine service names, plus the
-# three Knative names the labs create (lab/06-serverless -> hello.demo,
-# gitops/components/picture-pipeline -> uploader.pipeline, resizer.pipeline):
-# /etc/hosts has no wildcards, so the `*.<ns>.kn.` rules in
-# gitops/components/knative-serving/ingress.yaml cannot be expressed. Anything
-# else an attendee creates needs a manual line — lab/06 says so, and its
-# verifier reads the Knative Service's published .status.url.
+# three Knative names the labs create (lab/06-serverless -> hello-demo,
+# gitops/components/picture-pipeline -> uploader-pipeline, resizer-pipeline).
+#
+# Knative hosts are <name>-<namespace>.${KNATIVE_DOMAIN} — the single-label
+# `domain-template` curation in knative-serving/serving-core.yaml. On tbx that
+# whole shape is covered by talos-box's wildcard resolver and this list is not
+# consulted at all; /etc/hosts has no wildcards, so on docker the three names
+# the labs create are enumerated and anything an attendee creates themselves
+# needs a manual line, a `curl -H Host:`, or NodePort 31080. lab/06 says so,
+# and its verifier reads the Knative Service's published .status.url rather
+# than assuming the shape.
 cloudbox_hostnames() {
   local url host
   for url in "${GITEA_HOST_URL}" "${ARGOCD_HOST_URL}" "${PORTAL_HOST_URL}" \
@@ -434,7 +439,7 @@ cloudbox_hostnames() {
     echo "${host%%[:/]*}"     # drop any :port or /path
   done
   local n
-  for n in hello.demo uploader.pipeline resizer.pipeline; do
+  for n in hello-demo uploader-pipeline resizer-pipeline; do
     echo "${n}.${KNATIVE_DOMAIN}"
   done
 }

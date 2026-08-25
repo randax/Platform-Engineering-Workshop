@@ -48,7 +48,11 @@ spec:
         resources:
           # ---------------------------------------------------- the workload
           # A Knative Service. Named after the XR, so the developer gets a
-          # predictable URL: http://<name>.<namespace>.kn.cloudbox.k8s.test
+          # predictable URL: http://<name>-<namespace>.kn.cloudbox.k8s.test
+          # (the DASH is Knative's domain-template — see
+          # gitops/components/knative-serving/serving-core.yaml; it is what lets
+          # ONE wildcard Ingress serve every namespace an Application lands in,
+          # which for a Console-created app is not knowable in advance)
           - name: workload
             base:
               apiVersion: serving.knative.dev/v1

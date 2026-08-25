@@ -8376,6 +8376,18 @@ metadata:
 data:
   # Workshop curation: Kourier is the only ingress implementation installed.
   ingress-class: "kourier.ingress.networking.knative.dev"
+  # Workshop curation: ONE DNS label per ksvc. Upstream's default template is
+  # "{{.Name}}.{{.Namespace}}.{{.Domain}}", which makes every ksvc host two
+  # labels deep under kn.cloudbox.k8s.test — and a Kubernetes Ingress wildcard
+  # host matches exactly ONE label, so that shape cannot be covered by any
+  # single rule. It forced a per-namespace rule per namespace, and a ksvc in a
+  # namespace nobody had listed (the portal's Application XR composes into
+  # whatever project the attendee picked) had no route at all. The dash form is
+  # upstream's own documented alternative for exactly this problem — see the
+  # domain-template commentary in the _example block below. With it, hosts are
+  # <name>-<namespace>.kn.cloudbox.k8s.test and one *.kn.cloudbox.k8s.test rule
+  # in ingress.yaml covers every namespace forever.
+  domain-template: "{{.Name}}-{{.Namespace}}.{{.Domain}}"
   _example: |
     ################################
     #                              #
