@@ -776,15 +776,36 @@ hosts_file_lf() {
   tr -d '\r' < "${CLOUDBOX_HOSTS_FILE}"
 }
 
+# hosts_marker_lines — the file as the MARKER questions must read it: carriage
+# returns gone (hosts_file_lf) and trailing spaces/tabs gone too.
+#
+# A marker with a trailing space is invisible on every path that looks for one.
+# `grep -xF '# cloudbox-begin'` does not match "# cloudbox-begin ", and neither
+# does the awk's `l == b` — so a block whose begin marker picked up one space
+# (an editor that does not strip them, a paste into `sudo nano`, a Windows tool)
+# reads as "no block here" to --check, to the tbx staleness guard and to
+# remove_hosts_block, while write_hosts_block appends a SECOND block whose
+# duplicate markers the next run then refuses to touch. It is the CRLF bug with
+# a different invisible character, and it deserves the same normalisation.
+#
+# Line count and order are preserved (sed rewrites in place, one line for one),
+# so `grep -n` line numbers taken through this still name lines of the real file.
+# The trailing-blank strip is deliberately NOT in hosts_file_lf: every caller of
+# this one asks about markers, and the entry comparisons have their own
+# normalisation where they need it.
+hosts_marker_lines() {
+  hosts_file_lf | sed 's/[[:blank:]]*$//'
+}
+
 hosts_markers_paired() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
   local begins ends b_line e_line
-  begins="$(hosts_file_lf | grep -cxF "${CLOUDBOX_HOSTS_BEGIN}" || true)"
-  ends="$(hosts_file_lf | grep -cxF "${CLOUDBOX_HOSTS_END}" || true)"
+  begins="$(hosts_marker_lines | grep -cxF "${CLOUDBOX_HOSTS_BEGIN}" || true)"
+  ends="$(hosts_marker_lines | grep -cxF "${CLOUDBOX_HOSTS_END}" || true)"
   [[ "${begins}" == "0" && "${ends}" == "0" ]] && return 0
   [[ "${begins}" == "1" && "${ends}" == "1" ]] || return 1
-  b_line="$(hosts_file_lf | grep -nxF "${CLOUDBOX_HOSTS_BEGIN}" | cut -d: -f1)"
-  e_line="$(hosts_file_lf | grep -nxF "${CLOUDBOX_HOSTS_END}" | cut -d: -f1)"
+  b_line="$(hosts_marker_lines | grep -nxF "${CLOUDBOX_HOSTS_BEGIN}" | cut -d: -f1)"
+  e_line="$(hosts_marker_lines | grep -nxF "${CLOUDBOX_HOSTS_END}" | cut -d: -f1)"
   [[ "${e_line}" -gt "${b_line}" ]]
 }
 
@@ -792,8 +813,8 @@ assert_hosts_block_wellformed() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
   hosts_markers_paired && return 0
   local begins ends
-  begins="$(hosts_file_lf | grep -cxF "${CLOUDBOX_HOSTS_BEGIN}" || true)"
-  ends="$(hosts_file_lf | grep -cxF "${CLOUDBOX_HOSTS_END}" || true)"
+  begins="$(hosts_marker_lines | grep -cxF "${CLOUDBOX_HOSTS_BEGIN}" || true)"
+  ends="$(hosts_marker_lines | grep -cxF "${CLOUDBOX_HOSTS_END}" || true)"
   if [[ "${begins}" != "1" || "${ends}" != "1" ]]; then
     fail "${CLOUDBOX_HOSTS_FILE} has ${begins} '${CLOUDBOX_HOSTS_BEGIN}' marker(s) and ${ends} '${CLOUDBOX_HOSTS_END}' marker(s) — expected one of each."
     warn "Refusing to rewrite it: with unpaired markers the rewrite would delete every line"
@@ -806,8 +827,8 @@ assert_hosts_block_wellformed() {
   # Ordered, too: an end marker ABOVE the begin marker makes the awk skip from
   # the begin marker to EOF just as an absent one does.
   local b_line e_line
-  b_line="$(hosts_file_lf | grep -nxF "${CLOUDBOX_HOSTS_BEGIN}" | cut -d: -f1)"
-  e_line="$(hosts_file_lf | grep -nxF "${CLOUDBOX_HOSTS_END}" | cut -d: -f1)"
+  b_line="$(hosts_marker_lines | grep -nxF "${CLOUDBOX_HOSTS_BEGIN}" | cut -d: -f1)"
+  e_line="$(hosts_marker_lines | grep -nxF "${CLOUDBOX_HOSTS_END}" | cut -d: -f1)"
   if [[ "${e_line}" -lt "${b_line}" ]]; then
     fail "${CLOUDBOX_HOSTS_FILE} has '${CLOUDBOX_HOSTS_END}' (line ${e_line}) ABOVE '${CLOUDBOX_HOSTS_BEGIN}' (line ${b_line})."
     warn "Refusing to rewrite it — see ./scripts/install.sh --print-hosts for what the block should be."
@@ -825,7 +846,7 @@ assert_hosts_block_wellformed() {
 hosts_marked_block() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
   awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
-    '{ l = $0; sub(/\r$/, "", l) }
+    '{ l = $0; sub(/\r$/, "", l); sub(/[ \t]+$/, "", l) }
      l == b { p = 1 } p { print } l == e { p = 0 }' \
     "${CLOUDBOX_HOSTS_FILE}"
 }
@@ -857,14 +878,27 @@ hosts_marked_block() {
 # hosts_block_text_current() below is the separate, non-failing question.
 hosts_block_present() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 1
-  hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" || return 1
+  hosts_marker_lines | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" || return 1
   hosts_markers_paired || return 1
   diff -q <(hosts_marked_block | hosts_entry_lines) \
           <(cloudbox_hosts_block | hosts_entry_lines) >/dev/null 2>&1
 }
 
-# hosts_entry_lines — filter: keep only the 127.0.0.1 entry lines of a block.
-hosts_entry_lines() { grep -E '^[[:space:]]*127\.0\.0\.1[[:space:]]' || true; }
+# hosts_entry_lines — filter: keep only the 127.0.0.1 entry lines of a block,
+# NORMALISED — carriage returns and trailing blanks removed.
+#
+# Normalising here is what makes the comparison mean "do these lines resolve the
+# same names?" instead of "were these bytes written by the same editor".
+# hosts_marked_block prints the block RAW, so on a CRLF /etc/hosts (the WSL2
+# outcome) every entry carried a \r and diffed unequal against the LF block
+# cloudbox_hosts_block() writes — hosts_block_present answered "not what it
+# should be" on a file that resolves every name correctly, and `--check` told
+# the attendee their perfectly good hosts block was wrong. A trailing space does
+# the same thing for the same non-reason.
+hosts_entry_lines() {
+  tr -d '\r' | sed 's/[[:blank:]]*$//' \
+    | grep -E '^[[:space:]]*127\.0\.0\.1[[:space:]]' || true
+}
 
 # hosts_block_text_current — 0 when the marked block matches byte-for-byte,
 # comments included. Only the entries decide whether the names resolve, so this
@@ -952,8 +986,8 @@ hosts_loopback_lines() {
 # CloudBox name (pins + the attendee's extras) pointing at 127.0.0.1.
 hosts_block_stale_for_tbx() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 1
-  hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" && return 0
-  hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_END}" && return 0
+  hosts_marker_lines | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" && return 0
+  hosts_marker_lines | grep -qxF "${CLOUDBOX_HOSTS_END}" && return 0
   [[ -n "$(hosts_loopback_lines)" ]]
 }
 
@@ -1010,7 +1044,7 @@ write_hosts_block() {
   trap "rm -f '${tmp}'" RETURN
   if [[ -r "${CLOUDBOX_HOSTS_FILE}" ]]; then
     awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
-      '{ l = $0; sub(/\r$/, "", l) }
+      '{ l = $0; sub(/\r$/, "", l); sub(/[ \t]+$/, "", l) }
        l == b { skip = 1 } !skip { print } l == e { skip = 0 }' \
       "${CLOUDBOX_HOSTS_FILE}" > "${tmp}"
   fi
@@ -1058,8 +1092,8 @@ remove_hosts_block() {
   # hand edit — and keying the whole function on the begin marker made it return
   # "nothing to do" there, silently, with the broken file left for the next
   # writer to refuse (or for a hand edit to truncate).
-  hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" \
-    || hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_END}" \
+  hosts_marker_lines | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" \
+    || hosts_marker_lines | grep -qxF "${CLOUDBOX_HOSTS_END}" \
     || return 0
   # Same guard as write_hosts_block, and NOT fatal here: this runs on the
   # teardown path, where dying would abort a destroy over a file the destroy
@@ -1078,11 +1112,6 @@ remove_hosts_block() {
     fi
     return 1
   fi
-  # What is inside the block right now, so the postcondition below can be
-  # checked against the lines this call is supposed to have taken out.
-  # CR-stripped, so the comparison below speaks the same normalised dialect as
-  # hosts_file_lf on a CRLF file.
-  local doomed; doomed="$(hosts_marked_block | hosts_entry_lines | tr -d '\r')"
   local tmp; tmp="$(mktemp)"
   # shellcheck disable=SC2064  # see write_hosts_block
   trap "rm -f '${tmp}'" RETURN
@@ -1094,7 +1123,7 @@ remove_hosts_block() {
   # those very lines and told the attendee they sat OUTSIDE the markers — the
   # one place they were not.
   awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
-    '{ l = $0; sub(/\r$/, "", l) }
+    '{ l = $0; sub(/\r$/, "", l); sub(/[ \t]+$/, "", l) }
      l == b { skip = 1 } !skip { print } l == e { skip = 0 }' \
     "${CLOUDBOX_HOSTS_FILE}" > "${tmp}"
   warn "Removing the CloudBox block from ${CLOUDBOX_HOSTS_FILE} — this needs sudo."
@@ -1114,32 +1143,39 @@ remove_hosts_block() {
     warn "(sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}) — on the tbx substrate they would override its resolver."
     return 1
   fi
-  rm -f "${tmp}"
-  trap - RETURN   # see write_hosts_block
-  # Verify before claiming. "block removed" is the sentence destroy-cluster.sh's
-  # summary is built on, and it used to be printed by a function that had not
-  # looked at the file since it wrote it. The postcondition is exactly what the
-  # word means: neither marker survives, and none of the 127.0.0.1 lines that
-  # were inside the block are still in the file.
+  # Verify before claiming, and verify the RIGHT thing. "block removed" is the
+  # sentence destroy-cluster.sh's summary is built on, and it used to be printed
+  # by a function that had not looked at the file since it wrote it.
+  #
+  # The postcondition is: neither marker survives, AND the file on disk is
+  # byte-for-byte the content we handed `tee`. That second half is the whole
+  # question — did the write land? — and it is the only half that can answer it
+  # without inventing failures. The previous form searched the WHOLE file for
+  # each line that had been inside the block, so an identical
+  # `127.0.0.1 gitea.cloudbox.k8s.test` sitting OUTSIDE the markers (an attendee
+  # who added one by hand, a line left over above the block from an earlier
+  # workshop) failed a removal that had worked perfectly, told the attendee the
+  # block was still there, and returned 1 — which destroy-cluster.sh turns into
+  # "lines left behind", hiding the outside-the-block report that would have
+  # named the real line. Outside duplicates are hosts_loopback_lines' job, and
+  # the destroy summary asks it separately.
   local residual=""
-  if hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" \
-     || hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_END}"; then
+  if hosts_marker_lines | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" \
+     || hosts_marker_lines | grep -qxF "${CLOUDBOX_HOSTS_END}"; then
     residual="markers"
   fi
-  local left; left=""
-  if [[ -n "${doomed}" ]]; then
-    local l
-    while IFS= read -r l; do
-      [[ -n "${l}" ]] || continue
-      if hosts_file_lf | grep -qxF "${l}"; then left+="${l}"$'\n'; fi
-    done <<<"${doomed}"
-  fi
-  if [[ -n "${residual}" || -n "${left}" ]]; then
+  local unwritten=""
+  cmp -s "${tmp}" "${CLOUDBOX_HOSTS_FILE}" || unwritten="yes"
+  rm -f "${tmp}"
+  trap - RETURN   # see write_hosts_block
+  if [[ -n "${residual}" || -n "${unwritten}" ]]; then
     fail "Rewrote ${CLOUDBOX_HOSTS_FILE} but the CloudBox block is still there — remove it by hand."
     [[ -n "${residual}" ]] && warn "The ${CLOUDBOX_HOSTS_BEGIN} / ${CLOUDBOX_HOSTS_END} markers survived the rewrite."
+    [[ -n "${unwritten}" ]] && warn "The file on disk is not what was written to it — something else holds or rewrites it."
+    local left; left="$(hosts_loopback_lines)"
     if [[ -n "${left}" ]]; then
-      warn "These lines were inside the block and are still in the file:"
-      printf '   %s\n' "${left%$'\n'}"
+      warn "These lines still point CloudBox names at your loopback (line: text):"
+      printf '   %s\n' "${left}"
     fi
     warn "(sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}) — on the tbx substrate they would override its resolver."
     return 1
