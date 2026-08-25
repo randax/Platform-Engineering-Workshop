@@ -239,6 +239,30 @@ Docker-in-Docker and all tools preinstalled — the exact same workshop content:
   (VS Code, JetBrains, `devcontainer` CLI) — though if Docker works locally, you likely
   don't need the lifeboat.
 
+**One thing is different in Codespaces: how you open a service.** Everywhere else the
+workshop's URLs are hostnames (`http://gitea.cloudbox.k8s.test`). In a codespace your
+browser is not on the machine the cluster runs on — it reaches the container through
+`https://<codespace>-<port>.app.github.dev`, which sends whatever `Host` header GitHub
+chooses, and the platform's ingress routes **by hostname**. So the forwarded port-80 URL
+finds no matching rule and 404s, on a cluster that is completely healthy.
+
+Use the **Ports tab** instead. The devcontainer forwards a NodePort per service, and each
+row opens the right one directly, no `Host` header involved:
+
+| Ports tab entry | Service |
+|---|---|
+| NodePort 30300 | Gitea (in-cluster git) |
+| NodePort 30080 | ArgoCD |
+| NodePort 30600 | Cloudbox Console |
+| NodePort 30030 | Grafana |
+| NodePort 30900 | RustFS S3 |
+| NodePort 30500 | Zot registry |
+| NodePort 31080 | your apps (Kourier) — needs a `Host` header, so `curl` it from the terminal |
+
+Inside the codespace's own terminal the hostnames work normally (`curl` and the labs'
+`verify.sh` scripts resolve them from the container's `/etc/hosts`) — it is only the
+browser, which is somewhere else entirely, that needs the Ports tab.
+
 Note that Codespaces runs in Microsoft's cloud — a pragmatic irony for a sovereignty
 workshop, and exactly why it's the lifeboat and not the boat.
 

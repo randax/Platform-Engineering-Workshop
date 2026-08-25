@@ -43,14 +43,20 @@
   // once inside the container, before the workshop:
   //   ./scripts/cloudbox-init.sh && ./scripts/install.sh --check
   // MISE_VERSION pin: keep in sync with scripts/versions.env
-  // The /etc/hosts block create-cluster.sh writes lands inside the container, which
-  // is where the browser preview resolves from — nothing to do on the Codespaces host.
+  // The /etc/hosts block create-cluster.sh writes lands inside the container, so the
+  // hostnames work for everything that runs THERE: curl, kubectl, every verify.sh.
+  // The browser is the exception and the comment here used to get it wrong: a
+  // Codespaces preview is served from https://<codespace>-<port>.app.github.dev, so
+  // the request never carries a *.cloudbox.k8s.test Host header and the ingress —
+  // which routes by hostname — has no rule for it. Forwarded port 80 therefore 404s.
+  // Open services from the Ports tab instead (one forwarded NodePort each, below);
+  // README "Plan B: devcontainer / Codespaces" carries the table.
   "postCreateCommand": "curl -fsSL https://mise.run | MISE_VERSION=v2026.8.6 sh && export PATH=\"$HOME/.local/bin:$PATH\" && printf '\\n# mise (CloudBox workshop tools + KUBECONFIG)\\neval \"$($HOME/.local/bin/mise activate bash)\"\\n' >> \"$HOME/.bashrc\" && ./scripts/dev-setup.sh",
 
   // NodePorts exposed by the in-cluster platform.
   "forwardPorts": [80, 30300, 30080, 30500, 30600, 30700, 30900, 30030, 31080, 30422],
   "portsAttributes": {
-    "80": { "label": "Platform ingress (*.cloudbox.k8s.test)" },
+    "80": { "label": "Platform ingress — needs a Host header; use the NodePorts below in the browser" },
     "30030": { "label": "Grafana" },
     "30300": { "label": "Gitea (in-cluster git)" },
     "30080": { "label": "ArgoCD" },

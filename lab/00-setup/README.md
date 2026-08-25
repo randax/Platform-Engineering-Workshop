@@ -77,8 +77,14 @@ any personal Claude or OpenAI key, and its free tier is explicitly time-limited 
 - **Pair up.** The workshop is fully doable as a pair on one machine — arguably better,
   you'll talk through more. Red sticky note up, and we'll match you.
 - **Devcontainer / GitHub Codespaces.** The repo ships a `.devcontainer/` that runs the
-  identical content in Codespaces or any devcontainer-capable editor. Same labs, same
-  scripts, someone else's hardware. Open the repo in Codespaces and start from step 1.
+  same content in Codespaces or any devcontainer-capable editor. Same labs, same scripts,
+  someone else's hardware. Open the repo in Codespaces and start from step 1.
+  **One difference:** your browser is not on the machine running the cluster, and the
+  platform's ingress routes by hostname — so a forwarded port-80 preview 404s. Open
+  services from the **Ports tab**, which forwards a NodePort each (Gitea, ArgoCD, the
+  Console…). In the codespace's own terminal the hostnames work normally, so every
+  `verify.sh` behaves exactly as it does on a laptop. See the README's Plan B section
+  for the full table.
 
 ## Hints
 
