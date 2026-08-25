@@ -253,8 +253,15 @@ recovery an attendee would try — re-running `create-cluster.sh` — is refused
 because the node containers that very run created are exactly what preflight looks for. There
 was no re-entrant writer at all (`--add-hosts` needs a name to add). So the writer now
 warns and returns non-zero, the create finishes and says so, and
-**`./scripts/install.sh --write-hosts`** is the zero-argument, idempotent, docker-only
-command that writes the block whenever the attendee is ready.
+**`./scripts/install.sh --write-hosts`** is the zero-argument, idempotent command —
+available on the **docker and kind identities** (the lifeboat maps host port 80 to the
+ingress NodePort and needs the very same block; refusing there would leave the machine
+that needs the repair most with no command for it) and refused on tbx — that writes the
+block whenever the attendee is ready. `--add-hosts <name>` accepts the same two.
+Both additionally require that the identity they resolve to is the one
+`~/.cloudbox/substrate` *records*: `CLOUDBOX_SUBSTRATE=docker ./scripts/install.sh
+--write-hosts` on a tbx machine used to write exactly the block the tbx preflight dies
+on.
 
 **WSL2 deletes the block on every restart.** `generateHosts` defaults to true, so WSL
 regenerates `/etc/hosts` from the Windows hosts file at boot and the block written
@@ -887,6 +894,105 @@ The cost is written down where an attendee meets it: `lab/01-cluster/verify.sh`
 prints "kind lifeboat: module 01 is not gradeable here" and exits 0, because
 every check in that file asserts a Talos cluster and there is nothing on the
 lifeboat for the attendee to fix. The README and lab 01 both say so.
+
+## RESOLVED — an override for the decision was being read as permission over the record
+
+Round 9, and the top finding of both reviewers. `~/.cloudbox/substrate` answers two
+different questions that had been collapsed into one:
+
+* *which substrate should this machine use?* — a **preference**, and
+  `CLOUDBOX_SUBSTRATE` is rightly the documented way to overrule it;
+* *which substrate is this machine's cluster actually built on?* — a **fact about
+  state that exists**, which no environment variable can change.
+
+`substrate_resolve()` answers the first, and every mutating path was using that answer
+for the second. So the override became permission to act on the wrong cluster, and each
+of these is a real sequence, not a hypothetical:
+
+* `CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh` on a machine recording
+  `kind` — the docker teardown found no Talos containers, then removed the lifeboat's
+  `/etc/hosts` block and its kubeconfig entries, on a cluster that was still running;
+* the same command on a `tbx` machine — deleted `~/.cloudbox/substrate`, the only record
+  that those VMs exist, while the VMs kept running and no script could name them again;
+* `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh` on a `kind` machine — walked
+  past the by-name refusal (which reads the *desired* value) and persisted `docker` over
+  `kind`, after which `--delete` could no longer prove the hosts block was its own;
+* `CLOUDBOX_SUBSTRATE=docker ./scripts/install.sh --write-hosts` on a `tbx` machine —
+  wrote the exact 127.0.0.1 block the tbx preflight dies on, overriding talos-box's
+  resolver so every workshop URL reached the attendee's own loopback.
+
+**The fix is one helper, `require_identity_match <desired>` (`scripts/lib.sh`)**, called
+by `create-cluster.sh` (create and `--refresh-endpoint`), `destroy-cluster.sh`,
+`kind-fallback.sh` and `install.sh --write-hosts`/`--add-hosts` — in every case **before**
+a backend is sourced and before any state is touched. A valid recorded identity that
+differs from the desired one is a `die` naming the teardown command for what is
+*recorded*, then the create command for what was *asked for*. `substrate_decide_into`
+keeps env-first semantics unchanged: the decision is still the attendee's; only acting on
+state that disagrees is refused.
+
+Deliberately **not** relaxed by `CLOUDBOX_IGNORE_TBX=1`. That flag exists for exactly one
+condition — "tbx is installed but cannot be inspected" — and identity is not an
+inspection result; it is something these scripts wrote down themselves. (Round 9's minor
+list proposed the flag as an escape hatch for `kind-fallback.sh` over a persisted `tbx`;
+the controller ruling supersedes it, and the refusal there is unconditional.)
+
+A machine with **no** record is unaffected, which is what CI is: no
+`~/.cloudbox/substrate`, `CLOUDBOX_SUBSTRATE=docker`, silent pass. An **unreadable**
+record is also not a mismatch — `substrate_current()` now warns about it in its own voice
+(a 000-mode or root-owned file used to read as "no cluster was ever created") and the
+guard treats it as no answer, leaving the run's own preflight to find what is really
+there.
+
+## RESOLVED — three ways a lifeboat and a Talos cluster could exist at once
+
+Round 9, and all three are the same shape: a guard that asks about one kind of thing on a
+machine that can hold two.
+
+* **`kind_nodes_running()` checked only the control plane.** Every host port the lifeboat
+  publishes is mapped from the **worker** container (`extraPortMappings` sit under
+  `role: worker` in `kind-fallback.sh`), so a stopped worker means no `*.cloudbox.k8s.test`
+  URL resolves to anything — while `install.sh --check` said "running — its ports are
+  expected to be bound". It now counts both node containers (`docker ps` filters of the
+  same key are OR-ed, so one filter per node and a count of 2 is the assertion), and the
+  FAIL names which one is down and why the worker is the expensive one.
+* **Neither `substrate_preflight` refused over a kind cluster.** kind's node containers
+  carry `io.x-k8s.kind.cluster`, not `talos.cluster.name`, so the docker backend's
+  `-aq` filter stepped straight over them; on tbx the lifeboat is invisible to
+  `tbx status` and was caught only while its `/etc/hosts` block was still present (a
+  declined sudo makes it invisible there too). Both now refuse over
+  `label=io.x-k8s.kind.cluster=cloudbox`, running or stopped, and name
+  `./scripts/kind-fallback.sh --delete`. `kind-fallback.sh` has refused over Talos
+  containers since round 8; this is the other direction, which stayed open.
+* **The docker substrate had no host-port scan.** `talosctl cluster create` publishes its
+  ten ports *after* creating the node containers, so anything already holding port 80 (or
+  a NodePort) fails the create with "bind: address already in use" and leaves containers,
+  a Talos state directory and a talosconfig context behind. `kind-fallback.sh` has scanned
+  since round 8; the docker backend, which binds the same ten ports, did not. Both now
+  call `assert_host_ports_free` over the one list, `cloudbox_host_ports` (`lib.sh`), which
+  `install.sh --check` reads too.
+
+## TRAP — `hosts_block_present` compares entries; `hosts_block_text_current` compares bytes
+
+Two predicates, one block, and the split is deliberate — worth writing down because
+"they both check the hosts block" is the reading that will collapse them again.
+
+* **`hosts_block_present`** compares only the `127.0.0.1 <name>` **entry lines**
+  (through `hosts_entry_lines`, which strips CRs and trailing blanks). Those are what
+  resolve names. It is what the writer asks before deciding to write, and what
+  `install.sh --check` **FAILs** on: a mismatch here means a name does not resolve, or a
+  retired name still does.
+* **`hosts_block_text_current`** compares the whole marked block byte-for-byte, comments
+  included, and never fails anything — `--check` prints one `info` line suggesting
+  `--write-hosts` refreshes the prose.
+
+Byte-comparing the whole block in the failing predicate is a bug this repo has already
+shipped twice: the block carries a five-line comment paragraph that is edited whenever the
+surrounding scripts change (round 3 edited it twice), and every attendee whose block an
+older `create-cluster.sh` wrote was then told their hosts file "carries lines that no
+longer belong" — a diagnosis of a problem they do not have, pointing at lines that are
+perfectly correct, on the one file where following bad advice is expensive. **The entries
+are the contract; the comments are commentary.** A new question about this block belongs
+on one side of that line, explicitly.
 
 ## TRAP — module 04's Crossplane Function is fetched by Crossplane, not by the mirror
 

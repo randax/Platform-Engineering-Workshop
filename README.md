@@ -167,6 +167,21 @@ scripts pick for you and remember the choice in `~/.cloudbox/substrate`; overrid
 `CLOUDBOX_SUBSTRATE=docker` or `=tbx`. On Linux, watch out for firewalld/nftables
 interference on either substrate.
 
+**The override picks; it does not overrule what is already there.** Once a cluster has
+been created, `~/.cloudbox/substrate` is a *record*, not a preference — and `create-cluster.sh`,
+`destroy-cluster.sh`, `kind-fallback.sh`, `--refresh-endpoint` and
+`install.sh --write-hosts`/`--add-hosts` all refuse, before touching anything, when the
+substrate you are asking for is not the one this machine recorded. Changing substrates is
+two commands and they say so:
+
+```bash
+CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh   # (or ./scripts/kind-fallback.sh --delete)
+CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh
+```
+
+A machine with no record — a fresh laptop, CI — is unaffected: the override is simply the
+answer there.
+
 **Linux + tbx, the fine print.** Detection gates on `tbx doctor`, and at the pinned
 v0.1.1 one of its Linux checks turns a *permission* problem into a verdict: with
 `br_netfilter` active it runs `iptables -S FORWARD`, and an unprivileged shell's exit 4
@@ -236,9 +251,15 @@ Tear it down with `./scripts/kind-fallback.sh --delete`, which deletes the kind
 cluster, removes the `/etc/hosts` block it wrote (one sudo prompt, and you may
 decline it — it then names the lines to delete by hand) and clears the identity.
 It removes that block only when the identity says `kind`, so running it on a
-Docker-substrate machine cannot take out a live cluster's names. If the file is
-missing — a lifeboat taken before this existed — say so for the session:
-`CLOUDBOX_SUBSTRATE=kind ./scripts/install.sh --check`.
+Docker-substrate machine cannot take out a live cluster's names — and it clears the
+identity only once the cluster is gone *and* the block is removed (or proven absent), so a
+declined sudo leaves you able to retry rather than stranded with a block no command will
+own. If the file is missing — a lifeboat taken before this existed — say so for the
+session: `CLOUDBOX_SUBSTRATE=kind ./scripts/install.sh --check`. The same override works
+for the teardown, `CLOUDBOX_SUBSTRATE=kind ./scripts/kind-fallback.sh --delete`, but there
+it is honoured only against proof: `kind` must list a `cloudbox` cluster, or the marked
+`/etc/hosts` block must still be there. An environment variable is a claim, and the script
+will not delete a block it cannot show is its own.
 
 The one thing you give up is **module 01**: `lab/01-cluster/verify.sh` checks a Talos
 cluster, so on the lifeboat it prints "not gradeable here" and exits 0 rather than
