@@ -116,6 +116,11 @@ func BuildFunctionService(ns, name string, opts FnOpts) ([]byte, error) {
 	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
+	// The ksvc is "fn-<name>", so those three characters come out of the
+	// 63-character host label budget too. See ValidKnativeHost.
+	if err := ValidKnativeHost("fn-"+name, ns); err != nil {
+		return nil, err
+	}
 	annotations := map[string]any{"autoscaling.knative.dev/window": "30s"}
 	if opts.KeepWarm {
 		// Pin one instance warm — the opposite of the scale-to-zero default,

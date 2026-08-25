@@ -160,6 +160,44 @@ func TestBuildApplicationValidation(t *testing.T) {
 	}
 }
 
+// A ksvc's external host is ONE DNS label: "<name>-<namespace>.kn.<domain>"
+// (Knative's domain-template). ValidName caps a name at 40 characters and says
+// nothing about the namespace it lands in, so a legal name in a legal namespace
+// could still compose an illegal 71-character label — an Application that goes
+// Ready and is unreachable. The pair is what has to fit.
+func TestKnativeHostLabelLength(t *testing.T) {
+	n40 := strings.Repeat("a", 40) // the longest name ValidName allows
+	for _, tc := range []struct {
+		name, ns string
+		wantErr  bool
+	}{
+		{"ok", "demo", false},
+		{n40, "demo", false},                     // 40+1+4  = 45
+		{strings.Repeat("a", 22), "demo", false}, // 22+1+4  = 27
+		{n40, strings.Repeat("p", 22), false},    // 40+1+22 = 63, exactly the limit
+		{n40, strings.Repeat("p", 23), true},     // 40+1+23 = 64, one over
+	} {
+		err := ValidKnativeHost(tc.name, tc.ns)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("ValidKnativeHost(%d chars, %d chars): err=%v, wantErr=%v",
+				len(tc.name), len(tc.ns), err, tc.wantErr)
+		}
+	}
+
+	// Both doors into a ksvc enforce it — and the function door pays for the
+	// "fn-" prefix, so its budget is three characters smaller.
+	if _, err := BuildApplication(strings.Repeat("p", 23), n40, AppOpts{Image: "x"}); err == nil {
+		t.Error("BuildApplication: expected a rejection for a 64-character host label")
+	}
+	if _, err := BuildFunctionService("demo", n40, FnOpts{}); err != nil {
+		t.Errorf("BuildFunctionService: unexpected rejection at fn-<40>-demo (48): %v", err)
+	}
+	// fn-<40> is 43, so the namespace budget is 19, not 22.
+	if _, err := BuildFunctionService(strings.Repeat("p", 20), n40, FnOpts{}); err == nil {
+		t.Error("BuildFunctionService: expected a rejection — 'fn-' is part of the budget")
+	}
+}
+
 // ValidGitBranch guards the branch that becomes the Argo build's git revision:
 // permissive for real branch names, but no whitespace, shell metacharacters or
 // path traversal — parity with the repo's orgRepoRe guard. The default "main"

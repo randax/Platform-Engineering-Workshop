@@ -27,6 +27,26 @@ spec:
         openAPIV3Schema:
           type: object
           properties:
+            # The name is load-bearing HERE, not just in the API server: the
+            # composed ksvc is named after the XR and its external host is
+            # "<name>-<namespace>.kn.cloudbox.k8s.test" — name and namespace
+            # share ONE DNS label (63 characters, RFC 1035). Crossplane honours
+            # this restriction rather than dropping it: genCrdVersion takes
+            # min(its own default, metadata.properties.name.maxLength) and
+            # writes it into the generated CRD (crossplane internal/xcrd/crd.go,
+            # `if old := s.Properties["metadata"]…MaxLength; old != nil && *old
+            # < maxLength`). 40 is the same cap the Console enforces
+            # (apps/portal/internal/kube/resources.go, dnsName), so kubectl and
+            # the Console agree about what a name may be. The Console also
+            # checks the name+namespace PAIR (ValidKnativeHost); a schema cannot
+            # — it does not know the namespace — so 40 is the floor under it,
+            # not the whole rule. See docs/HAZARDS.md.
+            metadata:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 40
             spec:
               type: object
               required:

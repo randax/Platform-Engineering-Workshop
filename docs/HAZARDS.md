@@ -339,6 +339,44 @@ app on the docker substrate still needs a manual hosts line, `curl -H "Host: …
 NodePort 31080 — lab 06 says so. On **tbx** the resolver answers the wildcard and anything
 they create just works.
 
+## TRAP — the dash that made routing work put the name and the namespace in one DNS label
+
+`domain-template: "{{.Name}}-{{.Namespace}}.{{.Domain}}"` is what lets a single
+`*.kn.cloudbox.k8s.test` wildcard Ingress serve every namespace (see the
+RESOLVED entry above). The price is that a ksvc's name and its namespace now
+share **one DNS label**, and a label has two properties nothing else in
+Kubernetes imposes on this pair:
+
+**1. 63 characters, together.** `metadata.name` may be 253; a hostname label may
+be 63. A 40-character name (the Console's own cap) in a 30-character project
+namespace composes a 71-character host. Knative builds it anyway and publishes
+it in `.status.url`, so the failure is an Application whose XR, ksvc, revision
+and pods are **all Ready** and whose URL has never worked — the exact shape
+nobody debugs by counting characters.
+
+*What handles it:* `ValidKnativeHost` in
+`apps/portal/internal/kube/resources.go` refuses `len(name)+1+len(ns) > 63` at
+both doors (`BuildApplication`, and `BuildFunctionService`, whose ksvc is
+`fn-<name>` — those three characters come out of the same budget), with the
+shortfall in the message. Covered by `TestKnativeHostLabelLength`. The
+`Application` XRD caps `metadata.name` at 40 so `kubectl apply` and the Console
+agree; a schema cannot check the pair, because it does not know the namespace.
+
+**2. The dash is ambiguous.** `a-b` in namespace `c` and `a` in namespace `b-c`
+both compose `a-b-c.kn.cloudbox.k8s.test`. Whichever Knative programmed last
+owns the host; the other silently answers the wrong app. Nothing detects this —
+not Knative, not Cilium, not the Console.
+
+*What handles it:* the workshop's namespaces (`demo`, `pipeline`) have no
+hyphens, which makes the split unambiguous by construction. The rule to keep is
+**project namespaces without hyphens**; with a hyphen-free namespace the last
+dash-group is always the namespace, and no two (name, namespace) pairs can
+collide. A `my-project` namespace is the first thing that would break it.
+
+**Retired by:** nothing. The alternative is the dotted default template, which
+costs every namespace its own Ingress rule — that is the bug the dash fixed.
+Both properties are inherent to putting two names in one label.
+
 ## LIVE — Ollama binds to loopback, and on tbx the cluster is not on loopback
 
 kagent's ModelConfig points at `<host-gateway>:11434`, written by
