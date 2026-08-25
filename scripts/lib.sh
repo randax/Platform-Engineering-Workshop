@@ -236,13 +236,20 @@ substrate_current() {
 #      "docker" (the go-live gate having flipped it), detection never upgrades.
 # Callers: assign the result to a variable first (`local s; s="$(substrate_resolve)"`)
 # and check it there — never compare inside `[[ "$(substrate_resolve)" == ... ]]`,
-# since a `die` inside that command substitution only kills the subshell and the
-# comparison would silently see an empty string instead of aborting.
+# since a failure inside that command substitution only ends the subshell and
+# the comparison would silently see an empty string instead of aborting.
+#
+# The rejection is `fail … >&2; return 1`, not `die`: die() prints through
+# fail() on STDOUT (kept that way on purpose — every other caller in the tree
+# reads those messages on stdout), and inside `s="$(substrate_resolve)"` a
+# stdout message becomes the *value* of s, not a diagnostic anyone sees. On
+# stderr the attendee reads the real reason, the assignment gets an empty
+# string, and the non-zero status aborts the caller under `set -e`.
 substrate_resolve() {
   if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
     case "${CLOUDBOX_SUBSTRATE}" in
       tbx|docker) echo "${CLOUDBOX_SUBSTRATE}"; return 0 ;;
-      *) die "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker'" ;;
+      *) fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker'" >&2; return 1 ;;
     esac
   fi
   local persisted
@@ -353,6 +360,28 @@ tbx_host_memory_mib() {
       [[ "${raw}" =~ ^[0-9]+$ ]] && echo $((raw / 1024))
       ;;
   esac
+  return 0
+}
+
+# host_cpu_count — the host's online core count, or nothing when no probe on
+# this platform answers. The same expression substrate/tbx.sh already uses to
+# size the worker VM (`getconf _NPROCESSORS_ONLN`), with the two usual fallbacks,
+# so preflight and the renderer cannot disagree about how many cores this
+# machine has.
+#
+# It exists because the published MIN_CPUS=4 was only ever enforced through
+# `docker info -f '{{.NCPU}}'` — i.e. on the docker substrate. On tbx the nodes
+# are VMs sized from the host, Docker's slice is irrelevant, and the whole
+# CPU gate was skipped: a 2-core laptop passed preflight against a README that
+# promises 4.
+# Prints nothing rather than dying: it runs inside $( ), and an unreadable host
+# is reported by the caller as "could not read", not as a failure.
+host_cpu_count() {
+  local n
+  n="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"
+  [[ "${n}" =~ ^[0-9]+$ ]] || n="$(sysctl -n hw.ncpu 2>/dev/null || true)"
+  [[ "${n}" =~ ^[0-9]+$ ]] || n="$(nproc 2>/dev/null || true)"
+  [[ "${n}" =~ ^[0-9]+$ ]] && echo "${n}"
   return 0
 }
 

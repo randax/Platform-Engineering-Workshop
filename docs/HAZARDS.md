@@ -722,10 +722,18 @@ prerequisites that the full stack wants ≥8 cores; (2) raise the minimum for th
 stretch path and say so in the published matrix; (3) implement the resource
 requests, the only option that makes a 4-core machine degrade instead of thrash;
 (4) measure it — one `catch-up.sh 10` on a 4-CPU Docker daemon would settle the
-whole question in twenty minutes. `install.sh --check` verifies the *host* core
-count, which since the fix is also what the cluster gets, so it no longer understates
-the truth — it just cannot tell a 4-core machine that modules 08–10 are untested
-on it.
+whole question in twenty minutes.
+
+**What `--check` actually enforces, precisely.** On the docker substrate it reads
+`docker info -f '{{.NCPU}}'` — the daemon's slice, which since the uncapping fix
+is also what the cluster gets. On tbx that number is meaningless (the nodes are
+VMs; Docker only runs the mirror), and for one round the CPU gate was therefore
+skipped on tbx **entirely**: a 2-core laptop passed a preflight whose README
+promises 4. It now reads the host directly (`host_cpu_count()` in `lib.sh` —
+`getconf _NPROCESSORS_ONLN`, the same expression that sizes the worker VM), on
+the tbx branch of `install.sh --check` and in `lab/00-setup/verify.sh`. Neither
+gate can tell a 4-core machine that modules 08–10 are untested on it; that is
+still the open decision above.
 
 ## RESOLVED — the lifeboat needed the internet, and sank without it
 

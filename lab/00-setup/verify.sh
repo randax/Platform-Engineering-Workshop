@@ -112,6 +112,22 @@ else
   else
     fail "host memory: ${HOST_GB:-0} GB — the tbx substrate needs >= 16 GB. Use the docker substrate instead: CLOUDBOX_SUBSTRATE=docker"
   fi
+  # ...and the host's cores, for the same reason: the worker VM takes them from
+  # the host, so Docker's NCPU (checked on the other branch) says nothing here.
+  # MIN_CPUS is a published promise; before this it was enforced on the docker
+  # substrate only.
+  # Inlined for the same reason the substrate precedence above is: this file
+  # deliberately does not source lib.sh. Keep it identical to host_cpu_count()
+  # there — it is what sizes the worker VM.
+  HOST_CPUS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || true)"
+  case "$HOST_CPUS" in ''|*[!0-9]*) HOST_CPUS="" ;; esac
+  if [ -z "$HOST_CPUS" ]; then
+    fail "could not read this host's core count — the tbx substrate needs >= ${MIN_CPUS} CPUs"
+  elif [ "$HOST_CPUS" -ge "$MIN_CPUS" ]; then
+    ok "host CPUs: ${HOST_CPUS} (need >= ${MIN_CPUS} for the VM substrate)"
+  else
+    fail "host CPUs: ${HOST_CPUS} — the tbx substrate needs >= ${MIN_CPUS}. The node VMs take their cores from the host, so there is nothing to raise: use a bigger machine, or CLOUDBOX_SUBSTRATE=docker"
+  fi
   # Memoised: on the detection path doctor has already run, and this reuses that
   # exit code instead of paying for a second probe.
   if tbx_doctor_ok; then

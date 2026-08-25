@@ -72,7 +72,13 @@ case "${1:-}" in
   --write-hosts)
     shift
     [[ $# -eq 0 ]] || { usage; die "--write-hosts takes no arguments (to add a name: --add-hosts <name>)"; }
-    if [[ "$(substrate_resolve)" != "docker" ]]; then
+    # Assigned, never compared inline (lib.sh's substrate_resolve): an invalid
+    # CLOUDBOX_SUBSTRATE makes it fail, and inside `[[ "$(…)" != docker ]]` that
+    # failure is invisible — the empty string is simply "not docker", so the
+    # attendee was told `--write-hosts` is tbx-only when the real problem was a
+    # typo in their own override.
+    write_substrate="$(substrate_resolve)"
+    if [[ "${write_substrate}" != "docker" ]]; then
       die "--write-hosts is docker-substrate only. On tbx, talos-box's resolver answers every *.${CLOUDBOX_DOMAIN} name — 127.0.0.1 lines would override it and send every URL to your own loopback."
     fi
     write_hosts_block
@@ -191,6 +197,22 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
     fi
   else
     warn "Could not read this host's RAM — the tbx VM sizing falls back to the pinned ceiling"
+  fi
+
+  # The CPU half of the same budget. Docker's NCPU gate below is docker-only —
+  # correctly, since on tbx the nodes are VMs — which left MIN_CPUS, a published
+  # promise, unenforced on this substrate entirely. The worker VM is sized
+  # max(TBX_WORKER_CPUS, NCPU-2) from exactly this number (substrate/tbx.sh),
+  # so it is the budget that matters here.
+  host_cpus="$(host_cpu_count)"
+  if [[ "${host_cpus}" =~ ^[0-9]+$ ]]; then
+    if [[ "${host_cpus}" -ge "${MIN_CPUS}" ]]; then
+      ok "Host CPUs: ${host_cpus} (need >= ${MIN_CPUS})"
+    else
+      check_fail "Host CPUs: ${host_cpus} — the published minimum is ${MIN_CPUS}. On tbx the node VMs take their cores from the host, so there is no setting to raise; use a bigger machine, or the docker substrate with CLOUDBOX_SUBSTRATE=docker."
+    fi
+  else
+    warn "Could not read this host's core count — MIN_CPUS=${MIN_CPUS} not verified"
   fi
 fi
 
