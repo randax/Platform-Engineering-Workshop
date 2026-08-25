@@ -455,6 +455,47 @@ cloudbox_hosts_block() {
   echo "${CLOUDBOX_HOSTS_END}"
 }
 
+# assert_hosts_block_wellformed — refuse to rewrite ${CLOUDBOX_HOSTS_FILE}
+# unless its markers form exactly one ordered pair (or none at all).
+#
+# Both rewrites below are the same awk: "stop printing at the begin marker,
+# resume after the end marker". That awk is only exactly-reversible while the
+# markers are paired. With a begin marker and NO end marker — a half-finished
+# hand edit, an interrupted `sudo tee`, a file someone truncated — it silently
+# drops EVERY LINE after the begin marker, and on /etc/hosts that means the
+# machine's own `localhost` entry and anything the attendee or their employer's
+# MDM put below ours. The block was ours; the rest of the file never was.
+#
+# So this is a hard stop with manual-repair guidance, not a repair: we cannot
+# know where the missing marker belonged, and guessing writes /etc/hosts.
+assert_hosts_block_wellformed() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
+  local begins ends
+  begins="$(grep -cxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || true)"
+  ends="$(grep -cxF "${CLOUDBOX_HOSTS_END}" "${CLOUDBOX_HOSTS_FILE}" || true)"
+  [[ "${begins}" == "0" && "${ends}" == "0" ]] && return 0
+  if [[ "${begins}" != "1" || "${ends}" != "1" ]]; then
+    fail "${CLOUDBOX_HOSTS_FILE} has ${begins} '${CLOUDBOX_HOSTS_BEGIN}' marker(s) and ${ends} '${CLOUDBOX_HOSTS_END}' marker(s) — expected one of each."
+    warn "Refusing to rewrite it: with unpaired markers the rewrite would delete every line"
+    warn "after the begin marker, including entries this workshop never wrote."
+    warn "Fix it by hand (sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}): keep ONE ${CLOUDBOX_HOSTS_BEGIN} …"
+    warn "${CLOUDBOX_HOSTS_END} pair, or delete both markers and the lines between them, then re-run."
+    warn "The lines that belong inside: ./scripts/install.sh --print-hosts"
+    return 1
+  fi
+  # Ordered, too: an end marker ABOVE the begin marker makes the awk skip from
+  # the begin marker to EOF just as an absent one does.
+  local b_line e_line
+  b_line="$(grep -nxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" | cut -d: -f1)"
+  e_line="$(grep -nxF "${CLOUDBOX_HOSTS_END}" "${CLOUDBOX_HOSTS_FILE}" | cut -d: -f1)"
+  if [[ "${e_line}" -lt "${b_line}" ]]; then
+    fail "${CLOUDBOX_HOSTS_FILE} has '${CLOUDBOX_HOSTS_END}' (line ${e_line}) ABOVE '${CLOUDBOX_HOSTS_BEGIN}' (line ${b_line})."
+    warn "Refusing to rewrite it — see ./scripts/install.sh --print-hosts for what the block should be."
+    return 1
+  fi
+  return 0
+}
+
 # hosts_block_present — 0 when the block exists AND lists every current name.
 # A block that is merely present is not enough: adding a hostname to
 # cloudbox_hostnames must make this fail so the block gets rewritten.
@@ -484,6 +525,8 @@ hosts_missing_names() {
 # half-written /etc/hosts breaks name resolution for the whole machine.
 write_hosts_block() {
   hosts_block_present && { ok "${CLOUDBOX_HOSTS_FILE} block already correct"; return 0; }
+  assert_hosts_block_wellformed \
+    || die "Not touching ${CLOUDBOX_HOSTS_FILE} (see above). The cluster is fine; only the hostnames are."
   local tmp; tmp="$(mktemp)"
   # Set AFTER mktemp so an early `return 0` above never runs it with tmp unset.
   # shellcheck disable=SC2064  # expand tmp NOW: at RETURN time the local is gone
@@ -517,6 +560,13 @@ write_hosts_block() {
 remove_hosts_block() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
   grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || return 0
+  # Same guard as write_hosts_block, and NOT fatal here: this runs on the
+  # teardown path, where dying would abort a destroy over a file the destroy
+  # does not need. The block stays; the message says how to remove it.
+  if ! assert_hosts_block_wellformed; then
+    warn "Leaving ${CLOUDBOX_HOSTS_FILE} alone — remove the CloudBox lines by hand."
+    return 0
+  fi
   local tmp; tmp="$(mktemp)"
   # shellcheck disable=SC2064  # see write_hosts_block
   trap "rm -f '${tmp}'" RETURN
