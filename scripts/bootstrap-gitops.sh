@@ -200,6 +200,9 @@ info "Publishing Gitea and ArgoCD on ${GITEA_HOST_URL} / ${ARGOCD_HOST_URL}"
 # Ingress objects. The manifests live in gitops/components/{gitea,argocd}/ so
 # all nine ingress files (eleven host rules — rustfs has two, knative-serving
 # two wildcards) read as one set; only these two are applied by hand.
+# Recount both numbers with:
+#   find gitops -name ingress.yaml | wc -l
+#   grep -rhcE '^\s*- host:' gitops --include=ingress.yaml | paste -sd+ - | bc
 kubectl apply -f "${REPO_ROOT}/gitops/components/gitea/ingress.yaml"
 kubectl apply -f "${REPO_ROOT}/gitops/components/argocd/ingress.yaml"
 

@@ -257,6 +257,53 @@ fi
 
 ok "All ${total} images pre-pulled. The mirror survives reboots and cluster rebuilds."
 
+# ollama_bind_check — warn when Ollama listens on loopback only and the cluster
+# is going to reach it from OUTSIDE the host's loopback.
+#
+# kagent's ModelConfig points at ${gateway}:11434, where the gateway is
+# host.docker.internal on docker/macOS (Docker Desktop maps that to the host's
+# loopback, so a 127.0.0.1-bound Ollama answers) but 172.30.<n>.1 on tbx — a
+# real vmnet address on the host. Ollama's default bind is 127.0.0.1:11434, so a
+# connection to 172.30.<n>.1:11434 is REFUSED, which surfaces in module 10 as an
+# agent that never answers rather than as a bind problem.
+#
+# Warns, never dies: the model is optional, module 10 is a stretch module, and
+# this runs during prework where dying would block the image pre-pull everyone
+# needs. Probing 127.0.0.1 says whether Ollama is up at all; the LISTEN address
+# says whether anything other than this host can reach it.
+ollama_bind_check() {
+  if [[ "${SUBSTRATE}" == "docker" ]]; then return 0; fi
+  have curl || return 0
+  if ! curl -fsS --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1; then
+    info "Ollama is not serving on 127.0.0.1:11434 right now — start it before module 10."
+    return 0
+  fi
+  local listen=""
+  if have lsof; then
+    listen="$(lsof -nP -iTCP:11434 -sTCP:LISTEN 2>/dev/null || true)"
+  elif have ss; then
+    listen="$(ss -ltn 2>/dev/null | grep ':11434' || true)"
+  fi
+  # No tool to ask with: say nothing rather than guess.
+  [[ -n "${listen}" ]] || return 0
+  # Not loopback-only as soon as ONE listen address is a wildcard.
+  if printf '%s\n' "${listen}" | grep -qE '(\*|0\.0\.0\.0|\[::\]):11434'; then
+    ok "Ollama listens on all interfaces — the tbx VMs can reach it at <cluster-gateway>:11434."
+    return 0
+  fi
+  warn "Ollama is bound to loopback only (127.0.0.1:11434). On the tbx substrate the"
+  warn "cluster reaches the host at 172.30.<n>.1, and that connection will be REFUSED —"
+  warn "module 10's kagent agent then hangs instead of answering. Fix it before the venue:"
+  warn "  macOS:  launchctl setenv OLLAMA_HOST 0.0.0.0   # then quit and reopen Ollama.app"
+  warn "  either: OLLAMA_HOST=0.0.0.0 ollama serve       # if you run it in a terminal"
+}
+
+# The substrate this machine will use — resolved ONCE here because both section
+# 4 (Ollama's bind address is a tbx problem) and section 5 (the Talos disk cache
+# is a tbx-only artefact) need it. Assigned before it is compared: a die() inside
+# `[[ "$(substrate_resolve)" == … ]]` would only kill the subshell (lib.sh).
+SUBSTRATE="$(substrate_resolve)"
+
 # --- 4. Pull the optional host-side model used by kagent ----------------------
 if [[ "${SKIP_MODEL_PULL}" == "true" ]]; then
   info "Model pull skipped (--skip-model-pull). Before enabling kagent, run: ollama pull ${KAGENT_OLLAMA_MODEL}"
@@ -271,6 +318,7 @@ else
     warn "Ollama could not pull ${KAGENT_OLLAMA_MODEL}; the image pre-pull completed successfully."
     warn "Re-run ./scripts/cloudbox-init.sh --skip-model-pull to finish without it, or fix Ollama and re-run."
   fi
+  ollama_bind_check
 fi
 
 # --- 5. Talos disk image for the tbx substrate ---------------------------------
@@ -287,7 +335,6 @@ fi
 # Note this is IN ADDITION to everything above: a tbx attendee still needs Docker
 # running for prework, because the crane mirror the VMs pull from is itself a
 # Docker container. tbx replaces the NODES, not the mirror.
-SUBSTRATE="$(substrate_resolve)"
 if [[ "${SUBSTRATE}" == "tbx" ]]; then
   if ! have tbx; then
     # Only reachable via CLOUDBOX_SUBSTRATE=tbx on a machine without the binary:

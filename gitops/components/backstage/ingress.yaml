@@ -1,8 +1,8 @@
 # Backstage at http://backstage.cloudbox.k8s.test (scripts/versions.env:166,
 # BACKSTAGE_HOST_URL — literal here because YAML cannot expand a shell var).
 # app.baseUrl, backend.baseUrl and backend.cors.origin move with this host —
-# see backstage.yaml:125,129,135 (Task 11 owns that edit); all three must agree
-# with the host below or the SPA loads and every API call is CORS-blocked.
+# see backstage.yaml:125,129,135 — all three must agree with the host below,
+# or the SPA loads and every API call is CORS-blocked.
 # Backend: Service `backstage`, port 7007 (backstage.yaml:231-243).
 apiVersion: networking.k8s.io/v1
 kind: Ingress

@@ -81,7 +81,14 @@ require_workshop_context
 need git
 
 # Credentials are supplied via GIT_ASKPASS (git_as_gitea_admin), not the URL.
-CLONE_URL="http://localhost:${NODEPORT_GITEA}/${PLATFORM_REPO_PATH}.git"
+#
+# The HOSTNAME, not a localhost NodePort URL: NODEPORT_GITEA is published on
+# the host by the docker backend only. On tbx the NodePorts live inside the VMs
+# and nothing binds them on the laptop, so a localhost clone here would hang on
+# TCP connect for half the room. ${GITEA_HOST_URL} is the one URL that resolves
+# on both substrates (talos-box's resolver on tbx, the /etc/hosts block on
+# docker) — the same URL seed-gitea.sh pushes to (scripts/seed-gitea.sh:44).
+CLONE_URL="${GITEA_HOST_URL}/${PLATFORM_REPO_PATH}.git"
 
 # --- 1. Clone the attendee's platform repo from Gitea -----------------------------
 step "Cloning your platform repo from Gitea"

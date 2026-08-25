@@ -92,7 +92,12 @@ fi
 
 # --- Docker ---------------------------------------------------------------------
 if ! have docker; then
-  check_fail "docker CLI not found — install Docker Desktop, OrbStack or docker-ce"
+  # A hard FAIL on BOTH substrates, on purpose. tbx replaces the NODES, not the
+  # mirror: cloudbox-init.sh's crane mirror is itself a Docker container
+  # (cloudbox-mirror on :${MIRROR_PORT}), and it is what every node pulls from
+  # offline. A tbx laptop without Docker can start a cluster and then has
+  # nothing to pull images from at the venue.
+  check_fail "docker CLI not found — install Docker Desktop, OrbStack or docker-ce. Needed on the tbx substrate too: the offline image mirror the VMs pull from is a Docker container (./scripts/cloudbox-init.sh)"
 elif ! docker_running; then
   check_fail "Docker daemon not reachable — is Docker started?"
 else
@@ -169,7 +174,11 @@ elif [[ -z "$(substrate_current)" ]]; then
   info "No cluster yet — ./scripts/create-cluster.sh writes the ${CLOUDBOX_HOSTS_FILE} block (asks for sudo once)"
   info "  Preview the lines: ./scripts/install.sh --print-hosts"
 else
-  check_fail "${CLOUDBOX_HOSTS_FILE} is missing $(hosts_missing_names | wc -l | tr -d ' ') CloudBox name(s): $(hosts_missing_names | tr '\n' ' ')"
+  # Captured once: hosts_missing_names greps ${CLOUDBOX_HOSTS_FILE} once per
+  # name, and calling it twice in one message re-reads the file for a count it
+  # already had — and could report a count and a list from two different reads.
+  missing_names="$(hosts_missing_names)"
+  check_fail "${CLOUDBOX_HOSTS_FILE} is missing $(printf '%s\n' "${missing_names}" | wc -l | tr -d ' ') CloudBox name(s): $(printf '%s\n' "${missing_names}" | tr '\n' ' ')"
   echo "     Fix: ./scripts/install.sh --print-hosts   # then add them, or re-run create-cluster.sh"
 fi
 

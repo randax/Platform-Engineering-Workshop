@@ -374,6 +374,9 @@ hosts_missing_names() {
 write_hosts_block() {
   hosts_block_present && { ok "${CLOUDBOX_HOSTS_FILE} block already correct"; return 0; }
   local tmp; tmp="$(mktemp)"
+  # Set AFTER mktemp so an early `return 0` above never runs it with tmp unset.
+  # shellcheck disable=SC2064  # expand tmp NOW: at RETURN time the local is gone
+  trap "rm -f '${tmp}'" RETURN
   if [[ -r "${CLOUDBOX_HOSTS_FILE}" ]]; then
     awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
       '$0 == b { skip = 1 } !skip { print } $0 == e { skip = 0 }' \
@@ -385,7 +388,16 @@ write_hosts_block() {
   # shellcheck disable=SC2024  # deliberate: the INPUT redirect is our own
   # mktemp file, readable without sudo; only the WRITE needs root, and tee does
   # that. `sudo cat | tee` would be the wrong way round here.
-  sudo tee "${CLOUDBOX_HOSTS_FILE}" < "${tmp}" >/dev/null
+  #
+  # The failure is handled rather than left to `set -e`, because THIS is the
+  # command an attendee can refuse: a declined (or absent) sudo password makes
+  # tee exit non-zero, and a bare `set -e` abort here would leave a full copy of
+  # /etc/hosts in $TMPDIR forever. The RETURN trap above covers the ordinary
+  # paths; only an exit can escape it, so the exiting path cleans up itself.
+  if ! sudo tee "${CLOUDBOX_HOSTS_FILE}" < "${tmp}" >/dev/null; then
+    rm -f "${tmp}"
+    die "Could not write ${CLOUDBOX_HOSTS_FILE} (sudo declined or unavailable). Add the lines by hand: ./scripts/install.sh --print-hosts"
+  fi
   rm -f "${tmp}"
   hosts_block_present || die "Wrote ${CLOUDBOX_HOSTS_FILE} but the names still do not resolve — check it by hand"
   ok "${CLOUDBOX_HOSTS_FILE} updated ($(cloudbox_hostnames | wc -l | tr -d ' ') names)"
@@ -395,13 +407,18 @@ remove_hosts_block() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
   grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || return 0
   local tmp; tmp="$(mktemp)"
+  # shellcheck disable=SC2064  # see write_hosts_block
+  trap "rm -f '${tmp}'" RETURN
   awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
     '$0 == b { skip = 1 } !skip { print } $0 == e { skip = 0 }' \
     "${CLOUDBOX_HOSTS_FILE}" > "${tmp}"
   warn "Removing the CloudBox block from ${CLOUDBOX_HOSTS_FILE} — this needs sudo."
   # shellcheck disable=SC2024  # see write_hosts_block: the redirect reads our
   # own temp file; sudo is only needed for the write tee performs.
-  sudo tee "${CLOUDBOX_HOSTS_FILE}" < "${tmp}" >/dev/null
+  if ! sudo tee "${CLOUDBOX_HOSTS_FILE}" < "${tmp}" >/dev/null; then
+    rm -f "${tmp}"
+    die "Could not rewrite ${CLOUDBOX_HOSTS_FILE} (sudo declined or unavailable). Delete the lines between ${CLOUDBOX_HOSTS_BEGIN} and ${CLOUDBOX_HOSTS_END} by hand."
+  fi
   rm -f "${tmp}"
   ok "${CLOUDBOX_HOSTS_FILE} block removed"
 }

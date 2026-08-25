@@ -12,6 +12,24 @@
 #           substrate_post_ready, substrate_destroy.
 # =============================================================================
 
+# port80_listeners — print who is holding host port 80, or say we could not
+# tell. Best-effort and never fatal: it runs only on a create that has already
+# failed, purely to turn "bind: address already in use" into a name.
+port80_listeners() {
+  local out=""
+  if have lsof; then
+    out="$(lsof -nP -iTCP:80 -sTCP:LISTEN 2>/dev/null || true)"
+  elif have ss; then
+    out="$(ss -ltn 2>/dev/null | grep -E '[:.]80[[:space:]]' || true)"
+  fi
+  if [[ -n "${out}" ]]; then
+    printf '   %s\n' "${out}"
+  else
+    warn "  (nothing found listening on port 80 from this shell — on macOS the holder may"
+    warn "   be inside the Docker/Colima VM, so also check: docker ps --filter publish=80)"
+  fi
+}
+
 substrate_preflight() {
   need talosctl
   need kubectl
@@ -175,7 +193,15 @@ EOF
   # on purpose: lab 07 and the portal pull images through localhost:${NODEPORT_ZOT}
   # from the NODE side, and keeping the rest means a broken /etc/hosts block
   # degrades to "use the port URL", not "nothing works".
-  talosctl cluster create docker \
+  # Wrapped rather than left to `set -e`: the ONE thing in that flag soup that
+  # can fail for a reason outside this workshop is the last --exposed-ports
+  # entry, host port 80. It is the only privileged port the workshop binds, and
+  # anything already listening on it — a local web server, another Talos or kind
+  # cluster, Colima/Lima's own privileged-port forwarder — makes the create die
+  # with a docker port-binding error that names no owner. `install.sh --check`
+  # tests port 80 only BEFORE a cluster exists, so a listener started since then
+  # is exactly the case this message exists for. See docs/HAZARDS.md.
+  if ! talosctl cluster create docker \
     --name "${CLUSTER_NAME}" \
     --image "${TALOS_IMAGE}" \
     --kubernetes-version "${KUBERNETES_VERSION}" \
@@ -186,7 +212,17 @@ EOF
     --cpus-workers "${CPUS_WORKER}" \
     --subnet "${TALOS_SUBNET}" \
     --exposed-ports "${NODEPORT_GITEA}:${NODEPORT_GITEA}/tcp,${NODEPORT_ARGOCD}:${NODEPORT_ARGOCD}/tcp,${NODEPORT_ZOT}:${NODEPORT_ZOT}/tcp,${NODEPORT_PORTAL}:${NODEPORT_PORTAL}/tcp,${NODEPORT_BACKSTAGE}:${NODEPORT_BACKSTAGE}/tcp,${NODEPORT_RUSTFS_S3}:${NODEPORT_RUSTFS_S3}/tcp,${NODEPORT_GRAFANA}:${NODEPORT_GRAFANA}/tcp,${NODEPORT_KOURIER}:${NODEPORT_KOURIER}/tcp,${NODEPORT_NATS}:${NODEPORT_NATS}/tcp,80:${NODEPORT_INGRESS}/tcp" \
-    "${patches[@]}"
+    "${patches[@]}"; then
+    fail "talosctl cluster create failed."
+    warn "This cluster publishes host port 80 (-> NodePort ${NODEPORT_INGRESS}), the only"
+    warn "privileged port the workshop binds — it is what makes http://<name>.${CLOUDBOX_DOMAIN}"
+    warn "work without a port. If the error above mentions a port binding, port 80 is the"
+    warn "likely culprit; here is what holds it:"
+    port80_listeners
+    warn "Stop that listener and re-run, or use the tbx substrate, whose ingress VIP needs"
+    warn "no host port at all: CLOUDBOX_SUBSTRATE=tbx ./scripts/create-cluster.sh"
+    exit 1
+  fi
 
   # --- 2. kubeconfig ------------------------------------------------------------------
   step "Merging kubeconfig"

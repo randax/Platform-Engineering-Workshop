@@ -38,11 +38,39 @@ need talosctl
 # The substrate the cluster was CREATED on, not the one this machine would
 # detect today: a laptop that has lost `tbx doctor` since the create must still
 # be told to destroy VMs, not to look for docker containers that never existed.
-SUBSTRATE="$(substrate_resolve)"
-info "Substrate: ${SUBSTRATE} (from ${CLOUDBOX_SUBSTRATE_FILE})"
+#
+# Deliberately NOT substrate_resolve(): its third step is DETECTION, and
+# detection is wrong for a destroy. With no persisted answer, detection on a
+# healthy tbx laptop returns "tbx" and this script would then look for VMs — and
+# find none, while the docker containers a pre-substrate-split create left behind
+# (or a create that died before it could persist anything) survive the "nothing
+# to destroy" it prints. Detection also SHELLS OUT to `tbx doctor`, which a
+# teardown has no business doing. So: the env override still wins, then the
+# persisted answer, and the floor is docker — the substrate whose leftovers are
+# the ones that can exist without a persisted answer.
+if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
+  # Assigned, never compared inline: substrate_resolve() validates the override
+  # and die()s on a bad value, and only an ASSIGNMENT propagates that exit
+  # status out of the command substitution for `set -e` to act on (lib.sh).
+  SUBSTRATE="$(substrate_resolve)"
+  info "Substrate: ${SUBSTRATE} (from CLOUDBOX_SUBSTRATE)"
+else
+  SUBSTRATE="$(substrate_current || true)"
+  if [[ -n "${SUBSTRATE}" ]]; then
+    info "Substrate: ${SUBSTRATE} (from ${CLOUDBOX_SUBSTRATE_FILE})"
+  else
+    SUBSTRATE="docker"
+    warn "No substrate recorded in ${CLOUDBOX_SUBSTRATE_FILE} — assuming docker rather than"
+    warn "detecting one, so any leftover Talos-in-Docker containers actually get destroyed."
+    warn "If this machine ran the cluster on tbx: CLOUDBOX_SUBSTRATE=tbx $0 ${1:-}"
+  fi
+fi
 # `need docker` only where the backend actually needs it — a tbx machine has no
-# reason to have the docker CLI. Written as an `if`, not `[[ … ]] && need docker`:
-# under `set -e` a failing test as a whole statement kills the script.
+# reason to have the docker CLI. Written as an `if` for readability, not because
+# `[[ … ]] && need docker` would trip `set -e`: it would not. In an AND-list only
+# the LAST command's status is examined, so a false `[[ … ]]` is ignored — the
+# real trap with that form is a list as the last statement of a script or
+# function, whose non-zero status then becomes the exit status.
 if [[ "${SUBSTRATE}" == "docker" ]]; then
   need docker
 fi
@@ -166,9 +194,22 @@ if [[ "${PURGE_MIRROR}" == "true" ]]; then
   # A no-op on tbx (nothing was ever written) and when the block is absent.
   remove_hosts_block
   step "Purging the image mirror"
-  docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
-  docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true
-  ok "Mirror container and volume removed (re-run ./scripts/cloudbox-init.sh to refill)"
+  # The mirror is a DOCKER container on both substrates, and this script only
+  # requires the docker CLI on the docker path — so on a tbx machine without it
+  # the two removals below are no-ops. Saying "removed" there would be a lie of
+  # exactly the shape docs/HAZARDS.md calls out ("recovery tooling that lies"):
+  # the attendee would believe the 7 GB mirror was gone and it would still be
+  # there, serving stale images to the next cluster.
+  if have docker; then
+    docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
+    docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true
+    ok "Mirror container and volume removed (re-run ./scripts/cloudbox-init.sh to refill)"
+  else
+    warn "docker CLI not found — the image mirror (container ${MIRROR_NAME}, volume"
+    warn "${MIRROR_VOLUME}) could NOT be purged from here. It is a Docker object on both"
+    warn "substrates; remove it wherever Docker actually runs, or re-run this with docker"
+    warn "on PATH."
+  fi
 else
   info "Image mirror kept (pass --purge-mirror to remove it)"
 fi

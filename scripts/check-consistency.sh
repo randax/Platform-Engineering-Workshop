@@ -516,6 +516,38 @@ else
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] || true
 
+# --- 12c. no host-side localhost:${NODEPORT_*} outside the docker backend ----
+# The literal-port sweep above cannot see the templated form. A host-side
+# `http://localhost:${NODEPORT_GITEA}` is a docker-substrate fact: the docker
+# backend publishes those ports on the laptop, tbx does not — the NodePorts
+# live inside the VMs, so on tbx such a URL hangs on TCP connect. (This is what
+# broke scripts/catch-up.sh, which cloned the platform repo from a port that
+# only exists on half the room's machines.)
+#
+# Allowlisted, each because the line is docker-gated at runtime:
+#   * scripts/substrate/docker.sh — the docker backend itself; every NodePort
+#     it names it also publishes.
+#   * scripts/bootstrap-gitops.sh's "The NodePort URLs still work" hint, printed
+#     only inside `if [[ "${BOOTSTRAP_SUBSTRATE}" == "docker" ]]` (:259-263).
+#     Anchored on the text, not the line number, so a NEW violation in that same
+#     file is still caught.
+# (.github/workflows/bootstrap-test.yaml is docker-only by construction and is
+# not in the search set.)
+before_fail=${FAILURES}
+tmpl_nodeport="$(grep -rnE '(localhost|127\.0\.0\.1):\$\{?NODEPORT_' \
+  --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' \
+  scripts lab solutions 2>/dev/null \
+  | grep -v '^scripts/check-consistency.sh:' \
+  | grep -v '^scripts/substrate/docker.sh:' \
+  | grep -v '^scripts/bootstrap-gitops.sh:[0-9]*:.*The NodePort URLs still work' || true)"
+if [[ -n "${tmpl_nodeport}" ]]; then
+  bad "host-side localhost:\${NODEPORT_*} outside the docker backend — those ports are published on the host by the docker substrate only, and hang on tbx:"
+  printf '   %s\n' "${tmpl_nodeport}" | head -30
+else
+  ok "no host-side localhost:\${NODEPORT_*} outside the docker-gated allowlist"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then
   printf '❌ %d consistency failure(s) — fix the drift before merging.\n' "${FAILURES}"
