@@ -167,7 +167,10 @@ func TestHandleCreateProject(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusCreated)
 	})
-	req := formReq(http.MethodPost, "/projects", url.Values{"name": {"team-a"}})
+	// "teama", not "team-a": project namespaces are hyphen-free, because the
+	// Knative host is "<app>-<project>" in ONE label (kube.CreateProject,
+	// TestCreateProjectRejectsHyphen, docs/HAZARDS.md).
+	req := formReq(http.MethodPost, "/projects", url.Values{"name": {"teama"}})
 	req.Header.Set("HX-Request", "true")
 	rec := httptest.NewRecorder()
 
@@ -179,7 +182,31 @@ func TestHandleCreateProject(t *testing.T) {
 	if rec.Header().Get("HX-Refresh") != "true" {
 		t.Error("expected HX-Refresh after create")
 	}
-	if !strings.Contains(rec.Header().Get("Set-Cookie"), "project=team-a") {
+	if !strings.Contains(rec.Header().Get("Set-Cookie"), "project=teama") {
 		t.Errorf("active-project cookie not set to the new project: %q", rec.Header().Get("Set-Cookie"))
+	}
+}
+
+// The other half of the same rule, at the HTTP door: a hyphenated project name
+// must come back as an error flash rather than a namespace.
+func TestHandleCreateProjectRefusesHyphen(t *testing.T) {
+	var posts int
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			posts++
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+	req := formReq(http.MethodPost, "/projects", url.Values{"name": {"team-a"}})
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+
+	HandleCreateProject(srv, rec, req)
+
+	if posts != 0 {
+		t.Errorf("a hyphenated project name reached the API server (%d POSTs)", posts)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "Create failed") {
+		t.Errorf("expected the error flash in the fragment, got:\n%s", body)
 	}
 }

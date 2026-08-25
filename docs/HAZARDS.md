@@ -362,6 +362,24 @@ shortfall in the message. Covered by `TestKnativeHostLabelLength`. The
 `Application` XRD caps `metadata.name` at 40 so `kubectl apply` and the Console
 agree; a schema cannot check the pair, because it does not know the namespace.
 
+*And a CEL rule cannot close that gap* — two independent reasons, both read in
+the sources rather than inferred, so the next person does not spend an afternoon
+on `size(self.metadata.name) + 1 + size(self.metadata.namespace) <= 63`:
+
+1. **Kubernetes does not expose the namespace to CEL.** Validation rules can
+   select `apiVersion`, `kind`, `metadata.name` and `metadata.generateName`, and
+   the CRD documentation is explicit that "No other metadata properties are
+   accessible". `self.metadata.namespace` does not exist for a rule.
+2. **Crossplane would drop a root-level rule anyway.** `genCrdVersion`
+   (`internal/xcrd/crd.go`, v2.0.0) builds the CRD schema from `BaseProps()` and
+   copies `XValidations` from the XRD's `spec` and `status` sub-schemas only
+   (`cSpec.XValidations`, `cStatus.XValidations`); from the root it takes the
+   description and `metadata.properties.name.maxLength`, nothing else.
+
+So the 40-character cap really is the floor, the Console really is the only
+place the pair is checked, and a hand-written XR in a long namespace is a
+documented limitation — lab 04 says so in the attendee's own words.
+
 **2. The dash is ambiguous.** `a-b` in namespace `c` and `a` in namespace `b-c`
 both compose `a-b-c.kn.cloudbox.k8s.test`. Whichever Knative programmed last
 owns the host; the other silently answers the wrong app. Nothing detects this —
@@ -372,6 +390,17 @@ hyphens, which makes the split unambiguous by construction. The rule to keep is
 **project namespaces without hyphens**; with a hyphen-free namespace the last
 dash-group is always the namespace, and no two (name, namespace) pairs can
 collide. A `my-project` namespace is the first thing that would break it.
+
+That rule used to live only in this file, while lab 08 told attendees to create
+a project called `team-a` — the exact shape it forbids. It is now enforced where
+project namespaces are created: `kube.CreateProject`
+(`apps/portal/internal/kube/projects.go`) refuses a name containing `-` and says
+why, the New-project form's pattern and placeholder match
+(`[a-z0-9]+`, `teama`), and `TestCreateProjectRejectsHyphen` covers both doors.
+Deleting a hyphenated project still works — the rule is on the way in. The
+`Application` composition creates no namespace of its own (it composes into the
+XR's), so a hand-created namespace is the only remaining way in; lab 04 and lab
+08 state the rule for that case.
 
 **Retired by:** nothing. The alternative is the dotted default template, which
 costs every namespace its own Ingress rule — that is the bug the dash fixed.

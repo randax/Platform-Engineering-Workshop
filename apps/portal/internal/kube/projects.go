@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // ProjectLabel marks a namespace as a console Project. New projects get it; the
@@ -46,9 +47,24 @@ func (k *Client) ListProjects(ctx context.Context) ([]string, error) {
 
 // CreateProject provisions a project namespace and binds the portal's tenant
 // grant into it, so the console can immediately create resources there.
+//
+// Project names carry ONE extra rule beyond ValidName: no hyphens. Knative's
+// domain-template composes a ksvc's external host as "<name>-<namespace>", so
+// the name and the namespace share one DNS label with a single '-' between
+// them — and with a hyphen in the namespace the split back is ambiguous:
+// `web-api` in `team` and `web` in `api-team` both compose
+// web-api-team.kn.cloudbox.k8s.test. Whichever Knative programmed last owns the
+// host; the other silently answers the wrong app, and nothing anywhere detects
+// it (see docs/HAZARDS.md, "the dash that made routing work"). With hyphen-free
+// namespaces the last dash-group is always the namespace, so no two
+// (name, namespace) pairs can collide — enforced here, at the only door that
+// creates a project namespace.
 func (k *Client) CreateProject(ctx context.Context, name string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
+	}
+	if strings.Contains(name, "-") {
+		return fmt.Errorf("project name %q can't contain '-': a Knative app's hostname is \"<app>-<project>\", so a hyphen here makes two different apps able to claim the same URL. Use %q", name, strings.ReplaceAll(name, "-", ""))
 	}
 	ns := map[string]any{
 		"apiVersion": "v1",

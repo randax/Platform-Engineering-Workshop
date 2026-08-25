@@ -41,6 +41,19 @@ spec:
             # checks the name+namespace PAIR (ValidKnativeHost); a schema cannot
             # — it does not know the namespace — so 40 is the floor under it,
             # not the whole rule. See docs/HAZARDS.md.
+            #
+            # A CEL rule cannot rescue that either, and it fails twice over —
+            # checked against the sources, so nobody spends an afternoon on it:
+            #   1. Kubernetes exposes only apiVersion, kind, metadata.name and
+            #      metadata.generateName to x-kubernetes-validations ("No other
+            #      metadata properties are accessible", CRD docs). There is no
+            #      self.metadata.namespace for a rule to read.
+            #   2. Crossplane's generated CRD keeps XValidations only from the
+            #      XRD's spec and status sub-schemas (internal/xcrd/crd.go,
+            #      genCrdVersion: cSpec.XValidations / cStatus.XValidations).
+            #      The root schema is BaseProps() plus our description, so a
+            #      root-level rule never reaches the API server at all.
+            # The pair is enforced in the Console and documented in lab 04.
             metadata:
               type: object
               properties:

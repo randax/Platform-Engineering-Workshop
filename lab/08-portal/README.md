@@ -297,9 +297,13 @@ git instead?
   cp "$WORKSHOP/lab/08-portal/portal-projects-access.yaml" gitops/components/demo/
   git add . && git commit -m "grant portal: create projects (scoped)" && git push
   ```
-  Then create `team-a` from the selector, switch to it, and provision a database — note it
-  lands in the `team-a` namespace, not `demo`. (See [DR-0004](../../docs/prd/0004-console-write-model.md)
+  Then create `teama` from the selector, switch to it, and provision a database — note it
+  lands in the `teama` namespace, not `demo`. (See [DR-0004](../../docs/prd/0004-console-write-model.md)
   for why project *creation* is console-direct rather than a git round-trip.)
+  Project names have **no hyphens**, and the Console refuses one: a Knative app's URL is
+  `<app>-<project>.kn.cloudbox.k8s.test` — name and namespace in a single DNS label — so
+  `web-api` in `team` and `web` in `api-team` would compose the same hostname and one app
+  would silently answer for the other. See [docs/HAZARDS.md](../../docs/HAZARDS.md).
 - **Add a column.** Show each CNPG cluster's `instances` count on the Databases page
   (`resources.go` + `databases.html` — it's one field and one `<td>`).
 - **Add a page.** The portal already has RBAC to list pods. A "Pods" page is ~30 lines

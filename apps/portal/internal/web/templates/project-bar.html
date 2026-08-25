@@ -34,7 +34,11 @@
     itself scoped access (a <code>RoleBinding</code> to <code>portal-tenant</code>) — the databases,
     functions and apps you create then land in it. <small>Grant via git; act via console.</small></p>
     <form hx-post="/projects" hx-target="#project-bar" hx-swap="innerHTML">
-      <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="team-a"></label>
+      <!-- No hyphens: an app's hostname is "<app>-<project>" in one DNS label,
+           so a hyphenated project makes two different apps able to claim the
+           same URL. The server enforces it too (kube.CreateProject). -->
+      <label>Name <input name="name" required pattern="[a-z0-9]+" placeholder="teama"
+        title="Lowercase letters and digits, no hyphens — an app's URL is <app>-<project>.kn.cloudbox.k8s.test"></label>
       <div class="modal-actions">
         <label for="proj-modal" class="btn ghost">Cancel</label>
         <button type="submit">Create project</button>
