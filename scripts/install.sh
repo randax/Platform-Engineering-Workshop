@@ -350,9 +350,18 @@ else
   ports=("${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
          "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
          "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}" 80)
+  # port_in_use (lib.sh), not a bare connect to 127.0.0.1. The cluster publishes
+  # these on 0.0.0.0, and the connect probe only ever saw loopback: a listener
+  # bound to this machine's LAN address alone answered nothing at 127.0.0.1, so
+  # every port read "free" and the create then died on "bind: address already in
+  # use" — the one failure this gate exists to predict. Port 80 is the one it
+  # hurts most, being the only privileged port the workshop binds and the thing
+  # that makes the hostnames work without a port.
   for port in "${ports[@]}"; do
-    if (echo > "/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
-      check_fail "Port ${port} is already in use — the cluster needs it; free it first (lsof -i :${port})"
+    if port_in_use "${port}"; then
+      check_fail "Port ${port} is already in use — the cluster needs it; free it first"
+      holder="$(port_listeners "${port}")"
+      [[ -n "${holder}" ]] && printf '     %s\n' "${holder}"
     else
       ok "Port ${port} is free"
     fi
@@ -531,21 +540,24 @@ else
   section=""
   host_missing=0; mirror_missing=0; host_total=0; mirror_total=0
   mirror_arch_bad=0
-  # The arch the NODES will run, which is not the same question on both
-  # substrates: the daemon's on docker (the nodes are containers on it — and an
-  # x86_64 Rosetta shell on Apple Silicon would make uname -m the wrong answer),
-  # the HOST's on tbx (the nodes are natively virtualised VMs, and the Docker
-  # daemon here only runs the mirror). Empty on failure: the arch checks then
-  # pass open rather than guessing.
-  mirror_arch="$(node_arch "${SUBSTRATE}" || true)"
-  # An amd64 Colima/Lima VM on an arm64 Mac with tbx selected is the case that
-  # made this worth saying out loud: cloudbox-init.sh mirrors for the NODES, so
-  # the mirror is arm64 and the Docker daemon next to it is amd64. Nothing is
-  # broken — but switching substrates then needs the mirror rebuilt, and the
-  # attendee should hear that from the preflight rather than from a crashloop.
+  # The arch the mirror was FILLED for — mirror_target_arch (lib.sh), the same
+  # helper cloudbox-init.sh decides with, and deliberately not `node_arch
+  # "${SUBSTRATE}"`. Those two disagree on the machine that has tbx installed
+  # and failing `tbx doctor` today: prework warms for the tbx VMs (the substrate
+  # the attendee is heading towards), SUBSTRATE resolves to docker, and grading
+  # arm64 mirror content against an amd64 daemon turned a correctly warmed
+  # laptop red with "re-run cloudbox-init.sh" — advice that would have made it
+  # worse. Empty on failure: the arch checks then pass open rather than guess.
+  mirror_arch="$(mirror_target_arch || true)"
+  mirror_for="$(mirror_target_substrate)"
+  # An amd64 Colima/Lima VM on an arm64 Mac with tbx installed is the case that
+  # made this worth saying out loud: the mirror is arm64 (the VMs' arch) and the
+  # Docker daemon next to it is amd64. Nothing is broken — but creating on the
+  # docker substrate then needs the mirror rebuilt, and the attendee should hear
+  # that from the preflight rather than from a crashloop.
   daemon_arch="$(docker_server_arch || true)"
   if [[ -n "${mirror_arch}" && -n "${daemon_arch}" && "${mirror_arch}" != "${daemon_arch}" ]]; then
-    warn "The mirror serves ${mirror_arch} — the arch your ${SUBSTRATE} nodes run — while this machine's Docker daemon is ${daemon_arch}. That is correct for ${SUBSTRATE}; if you switch to the other substrate, re-run ./scripts/cloudbox-init.sh so the mirror is rebuilt for it."
+    warn "The mirror serves ${mirror_arch} — the arch your ${mirror_for} nodes run — while this machine's Docker daemon is ${daemon_arch}. That is correct for ${mirror_for}; if you create on the other substrate, re-run ./scripts/cloudbox-init.sh so the mirror is rebuilt for it."
   fi
 
   # Is the mirror registry up at all?
@@ -679,9 +691,9 @@ else
       check_fail "Mirror images: $((mirror_total - mirror_missing))/${mirror_total} present — run ./scripts/cloudbox-init.sh"
     fi
     if [[ ${mirror_arch_bad} -gt 0 ]]; then
-      check_fail "${mirror_arch_bad} mirror image(s) are for a different CPU architecture than Docker runs (${mirror_arch:-unknown}) — re-run ./scripts/cloudbox-init.sh on THIS machine"
+      check_fail "${mirror_arch_bad} mirror image(s) are for a different CPU architecture than your ${mirror_for} nodes run (${mirror_arch:-unknown}) — re-run ./scripts/cloudbox-init.sh on THIS machine"
     elif [[ -n "${mirror_arch}" && ${mirror_total} -gt 0 && ${mirror_missing} -eq 0 ]]; then
-      ok "Mirror content matches Docker's architecture (${mirror_arch})"
+      ok "Mirror content matches the architecture your ${mirror_for} nodes run (${mirror_arch})"
     fi
   fi
 fi

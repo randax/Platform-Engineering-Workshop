@@ -12,24 +12,6 @@
 #           substrate_post_ready, substrate_destroy.
 # =============================================================================
 
-# port80_listeners — print who is holding host port 80, or say we could not
-# tell. Best-effort and never fatal: it runs only on a create that has already
-# failed, purely to turn "bind: address already in use" into a name.
-port80_listeners() {
-  local out=""
-  if have lsof; then
-    out="$(lsof -nP -iTCP:80 -sTCP:LISTEN 2>/dev/null || true)"
-  elif have ss; then
-    out="$(ss -ltn 2>/dev/null | grep -E '[:.]80[[:space:]]' || true)"
-  fi
-  if [[ -n "${out}" ]]; then
-    printf '   %s\n' "${out}"
-  else
-    warn "  (nothing found listening on port 80 from this shell — on macOS the holder may"
-    warn "   be inside the Docker/Colima VM, so also check: docker ps --filter publish=80)"
-  fi
-}
-
 substrate_preflight() {
   need talosctl
   need kubectl

@@ -168,6 +168,80 @@ node_arch() { # [substrate]
   docker_server_arch
 }
 
+# mirror_target_substrate / mirror_target_arch — which substrate the image
+# MIRROR is filled for, and the CPU architecture that implies. The single
+# source for that decision: cloudbox-init.sh fills the mirror by it and
+# install.sh --check judges the mirror's content by it, and the two disagreeing
+# is a --check that goes red on a correctly warmed machine.
+#
+# Gated on the tbx BINARY, not on substrate_resolve()'s answer — the same bet
+# cloudbox-init.sh's Talos-disk warm makes, and for the same reason. Those two
+# differ exactly where it matters: `tbx doctor` fails at home (the helper is not
+# installed yet, the resolver is not wired up), detection says "docker", and the
+# mirror gets filled for the DOCKER DAEMON — which on an amd64 Colima VM on an
+# Apple Silicon Mac is the wrong answer by a whole architecture. The attendee
+# fixes tbx before the venue, `tbx doctor` passes there, create-cluster.sh picks
+# tbx, and every mirrored image is amd64 for arm64 VMs. Offline, with "exec
+# format error" as the only clue (docs/HAZARDS.md, "a wrong-architecture mirror
+# serves happily"). An explicit CLOUDBOX_SUBSTRATE=docker still wins, because
+# that is an attendee saying which substrate they are on.
+mirror_target_substrate() {
+  if [[ "${CLOUDBOX_SUBSTRATE:-}" != "docker" ]] && have tbx; then echo "tbx"; else echo "docker"; fi
+}
+
+# The tbx VMs are natively virtualised, so their arch is the CPU's —
+# host_cpu_arch, which sees through a Rosetta shell where `uname -m` does not.
+# Docker nodes ARE containers on the local daemon, so theirs is the daemon's.
+mirror_target_arch() {
+  if [[ "$(mirror_target_substrate)" == "tbx" ]]; then host_cpu_arch; else docker_server_arch; fi
+}
+
+# --- Host ports -------------------------------------------------------------
+# port_listeners <port> — the listener lines for that TCP port on ANY local
+# address, or empty when this shell has no tool to ask with.
+#
+# ENUMERATION, not a connect probe, because those answer different questions.
+# The cluster publishes its ports on 0.0.0.0, so a listener already bound to one
+# SPECIFIC non-loopback address — an nginx on the LAN address, another
+# container published as 192.168.1.5:80 — makes that bind fail with "address
+# already in use" while a connect to 127.0.0.1:<port> finds nothing at all and
+# reports the port free. That is a go/no-go gate saying "ready" in front of a
+# create that then dies.
+#
+# Best-effort in the other direction too: `lsof` unprivileged on macOS cannot
+# see sockets owned by other users, so a root-owned listener on 80 is invisible
+# here — which is exactly why port_in_use below keeps the connect probe as well
+# instead of trusting this alone.
+port_listeners() { # <port>
+  local port="$1"
+  if have lsof; then
+    lsof -nP -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true
+  elif have ss; then
+    ss -ltnH "sport = :${port}" 2>/dev/null || true
+  fi
+}
+
+# port_in_use <port> — 0 when anything holds it. EITHER view counts: each of the
+# two misses cases the other catches (see port_listeners), and with neither lsof
+# nor ss installed the connect probe is the only answer left.
+port_in_use() { # <port>
+  [[ -n "$(port_listeners "$1")" ]] && return 0
+  (echo > "/dev/tcp/127.0.0.1/$1") 2>/dev/null
+}
+
+# port80_listeners — print who is holding host port 80, or say we could not
+# tell. Best-effort and never fatal: it runs only on a create that has already
+# failed, purely to turn "bind: address already in use" into a name.
+port80_listeners() {
+  local out; out="$(port_listeners 80)"
+  if [[ -n "${out}" ]]; then
+    printf '   %s\n' "${out}"
+  else
+    warn "  (nothing found listening on port 80 from this shell — on macOS the holder may"
+    warn "   be inside the Docker/Colima VM, so also check: docker ps --filter publish=80)"
+  fi
+}
+
 # is_wsl2 — true when running inside Windows Subsystem for Linux.
 is_wsl2() {
   [[ -f /proc/version ]] && grep -qi microsoft /proc/version
@@ -215,6 +289,15 @@ substrate_doctor_reason() {
     echo "tbx is not installed (brew install randax/tap/tbx, or the release tarball on Linux)"
     return 0
   fi
+  # The platform gate substrate_detect_into applies, in words. Without it an
+  # Intel Mac with tbx installed was told "tbx doctor did not report a FAIL
+  # line" — a true sentence that explains nothing about why it is on docker.
+  local os arch; os="$(uname -s)"; arch="$(host_cpu_arch || true)"
+  case "${os}:${arch}" in
+    Darwin:arm64|Linux:x86_64|Linux:aarch64|Linux:arm64|Linux:amd64) ;;
+    *) echo "talos-box virtualises natively and this is ${os}/${arch:-unknown} — supported: arm64 macOS, or Linux"
+       return 0 ;;
+  esac
   tbx_doctor_run || true
   local line
   line="$(printf '%s\n' "${TBX_DOCTOR_OUT}" | grep -m1 '^FAIL ' || true)"
@@ -244,9 +327,20 @@ tbx_doctor_run() {
 # answer and no override. tbx needs its daemon+helper installed and healthy, so
 # `tbx doctor` (which exits non-zero on any FAIL — cmd/tbx/doctor.go:345-347) is
 # the gate, not the mere presence of the binary.
+#
+# The arch comes from host_cpu_arch(), NOT `uname -m`. A Rosetta shell on an
+# Apple Silicon Mac reports x86_64 (an IDE terminal, an older brew, "Open using
+# Rosetta"), which made this read `Darwin:x86_64` — not a supported pair — and
+# quietly select docker on a machine whose `tbx doctor` passes and whose VMs are
+# natively virtualised arm64. The attendee then ran the whole workshop on the
+# fallback substrate, with no message saying why, because the "why not tbx" line
+# only speaks for a doctor that failed. host_cpu_arch asks the CPU
+# (`sysctl -n hw.optional.arm64`, which Rosetta does not translate) and
+# normalises to amd64/arm64, so the Linux aliases below can no longer be
+# produced — they stay as a belt on a helper that could grow another caller.
 substrate_detect_into() { # <varname>
   local os arch
-  os="$(uname -s)"; arch="$(uname -m)"
+  os="$(uname -s)"; arch="$(host_cpu_arch || true)"
   printf -v "$1" '%s' "docker"
   if have tbx; then
     case "${os}:${arch}" in
