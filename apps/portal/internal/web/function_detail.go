@@ -58,9 +58,11 @@ func handleFunctionDetail(s *Server, w http.ResponseWriter, r *http.Request) {
 	data.URL = svc.Status.URL
 
 	// Delete is offered only for functions in a project namespace (the portal's
-	// portal-tenant grant) — same rule as the list.
+	// portal-tenant grant) — same rule as the list, hyphen rule included: a
+	// legacy hyphenated project is read-only in the console, and the delete
+	// handler refuses it regardless of what this page draws.
 	for _, p := range s.projectList(r.Context()) {
-		if p == ns {
+		if p == ns && kube.ValidProjectName(ns) {
 			data.Deletable = true
 			break
 		}

@@ -104,10 +104,14 @@ func fetchFunctions(s *Server, r *http.Request, fl flash) (functionsData, error)
 	}
 	// Delete is offered only for functions in a project namespace — the ones the
 	// portal has a portal-tenant grant to remove. Capstone ksvcs (ns pipeline,
-	// not a project) stay read-only.
+	// not a project) stay read-only, and so does a LEGACY HYPHENATED project:
+	// round 4 made those read-only everywhere else (activeProject,
+	// mutableProject), and a Delete button is a mutation like any other.
 	projects := make(map[string]bool)
 	for _, p := range s.projectList(r.Context()) {
-		projects[p] = true
+		if kube.ValidProjectName(p) {
+			projects[p] = true
+		}
 	}
 	rows := make([]serviceRow, 0, len(svcs))
 	for _, k := range svcs {
@@ -285,16 +289,32 @@ func handleInvokeFunction(s *Server, w http.ResponseWriter, r *http.Request) {
 
 // handleDeleteFunction deletes a Knative Service and re-renders the list. The
 // namespace comes from the URL path, not the project cookie: the Functions list
-// is cluster-wide, so a function viewed under project team-a must be deleted
-// from team-a even when the cookie points elsewhere (mirrors the Invoke route).
+// is cluster-wide, so a function viewed under project teama must be deleted
+// from teama even when the cookie points elsewhere (mirrors the Invoke route).
 // Only project-namespace functions expose a Delete button (the template gates
 // on it), matching the portal-tenant RBAC grant; a stray DELETE for anything
 // else just surfaces the API's forbidden error in the flash.
+//
+// The project rule is asked HERE too, not only where the button is drawn. The
+// namespace is attacker-supplied path input, and every other mutating route was
+// closed against a hyphenated project in round 4; leaving the delete open would
+// mean the one write the console still performs inside a legacy project is the
+// destructive one. Refused before any API call, so nothing is deleted.
 func handleDeleteFunction(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	namespace := r.PathValue("namespace")
 	if !kube.ValidName(namespace) || !kube.ValidName(name) {
 		http.NotFound(w, r)
+		return
+	}
+	if !kube.ValidProjectName(namespace) {
+		w.Header().Set("X-Delete-Failed", "1")
+		fl := errorFlash("Project " + namespace + " is read-only in the console: " + kube.CheckProjectName(namespace).Error() + " — nothing was deleted.")
+		data, err := fetchFunctions(s, r, fl)
+		if err != nil {
+			data = functionsData{Flash: errorFlash("API error: " + err.Error())}
+		}
+		s.render(w, "svc-list", data)
 		return
 	}
 	fl := flash{Msg: "Deleted " + name + "."}
