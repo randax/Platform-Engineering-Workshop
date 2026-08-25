@@ -916,12 +916,18 @@ hosts_block_stale_for_tbx() {
 # view of hosts_loopback_scan, so "missing" and "stale" cannot disagree about
 # what counts as an entry (they did: a name appended to the `localhost` line was
 # reported missing while the machine resolved it perfectly well).
+# Both sides are lowercased, because the scan reports the name AS WRITTEN in the
+# file and DNS does not care: with `127.0.0.1 Gitea.CloudBox.k8s.test` the scan
+# (which lowercases before matching) counted the entry, and this function then
+# compared `Gitea.CloudBox.k8s.test` against the lowercase pin and reported the
+# name missing — the two views of one scan disagreeing again, which is the exact
+# bug the shared scan exists to prevent.
 hosts_missing_names() {
   local found
-  found="$(hosts_loopback_scan | cut -f2)"
+  found="$(hosts_loopback_scan | cut -f2 | tr '[:upper:]' '[:lower:]')"
   local n
   while IFS= read -r n; do
-    grep -qxF "${n}" <<<"${found}" || echo "${n}"
+    grep -qxF "$(tr '[:upper:]' '[:lower:]' <<<"${n}")" <<<"${found}" || echo "${n}"
   done < <(cloudbox_hostnames)
 }
 
@@ -1026,11 +1032,24 @@ remove_hosts_block() {
     fi
     return 1
   fi
+  # What is inside the block right now, so the postcondition below can be
+  # checked against the lines this call is supposed to have taken out.
+  # CR-stripped, so the comparison below speaks the same normalised dialect as
+  # hosts_file_lf on a CRLF file.
+  local doomed; doomed="$(hosts_marked_block | hosts_entry_lines | tr -d '\r')"
   local tmp; tmp="$(mktemp)"
   # shellcheck disable=SC2064  # see write_hosts_block
   trap "rm -f '${tmp}'" RETURN
+  # CR-stripped comparison, the same one hosts_marked_block and write_hosts_block
+  # use. With the raw `$0 == b` compare a CRLF hosts file (the WSL2 outcome)
+  # matched no marker at all: the awk copied the file through unchanged, tee
+  # rewrote it byte-identical, and this function printed "block removed" over a
+  # block that was still there. destroy-cluster.sh's residual scan then found
+  # those very lines and told the attendee they sat OUTSIDE the markers — the
+  # one place they were not.
   awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
-    '$0 == b { skip = 1 } !skip { print } $0 == e { skip = 0 }' \
+    '{ l = $0; sub(/\r$/, "", l) }
+     l == b { skip = 1 } !skip { print } l == e { skip = 0 }' \
     "${CLOUDBOX_HOSTS_FILE}" > "${tmp}"
   warn "Removing the CloudBox block from ${CLOUDBOX_HOSTS_FILE} — this needs sudo."
   # shellcheck disable=SC2024  # see write_hosts_block: the redirect reads our
@@ -1051,6 +1070,34 @@ remove_hosts_block() {
   fi
   rm -f "${tmp}"
   trap - RETURN   # see write_hosts_block
+  # Verify before claiming. "block removed" is the sentence destroy-cluster.sh's
+  # summary is built on, and it used to be printed by a function that had not
+  # looked at the file since it wrote it. The postcondition is exactly what the
+  # word means: neither marker survives, and none of the 127.0.0.1 lines that
+  # were inside the block are still in the file.
+  local residual=""
+  if hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" \
+     || hosts_file_lf | grep -qxF "${CLOUDBOX_HOSTS_END}"; then
+    residual="markers"
+  fi
+  local left; left=""
+  if [[ -n "${doomed}" ]]; then
+    local l
+    while IFS= read -r l; do
+      [[ -n "${l}" ]] || continue
+      if hosts_file_lf | grep -qxF "${l}"; then left+="${l}"$'\n'; fi
+    done <<<"${doomed}"
+  fi
+  if [[ -n "${residual}" || -n "${left}" ]]; then
+    fail "Rewrote ${CLOUDBOX_HOSTS_FILE} but the CloudBox block is still there — remove it by hand."
+    [[ -n "${residual}" ]] && warn "The ${CLOUDBOX_HOSTS_BEGIN} / ${CLOUDBOX_HOSTS_END} markers survived the rewrite."
+    if [[ -n "${left}" ]]; then
+      warn "These lines were inside the block and are still in the file:"
+      printf '   %s\n' "${left%$'\n'}"
+    fi
+    warn "(sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}) — on the tbx substrate they would override its resolver."
+    return 1
+  fi
   ok "${CLOUDBOX_HOSTS_FILE} block removed"
 }
 
