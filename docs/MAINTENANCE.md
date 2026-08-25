@@ -163,6 +163,35 @@ correct or current. The script prints both caveats on every run.
 Bumps that touch the cluster shape (Talos, Kubernetes, Cilium) deserve their own
 PR and their own rehearsal run. Batch the boring ones.
 
+### The `tbx` pin is a special case
+
+`TBX_VERSION` in `scripts/versions.env` pins the talos-box binary — the primary
+substrate's *entire* implementation. It is not installed by mise (no backend publishes
+it yet: upstream #95/#96/#101), so nothing enforces at runtime what an attendee actually
+has on PATH. Bumping it means all three of:
+
+1. **Bump the `mise.toml` comment in the same commit.** The pin lives as the commented
+   `# tbx = "…"` line next to the install note; `check-consistency.sh` check 10 compares
+   it to `TBX_VERSION` and fails if they drift. That comment is the only other copy —
+   do not add a third.
+2. **Re-read upstream before trusting the flags.** `scripts/substrate/tbx.sh` drives
+   `tbx up -f`, `tbx status -o json`, `tbx manifests <cluster> mirrors` and
+   `tbx cluster destroy <cluster> --force`, and `cloudbox-init.sh` drives
+   `tbx cache pull --talos-version`. Read upstream `internal/config/config.go` for
+   cluster-yaml schema changes (our `scripts/substrate/cloudbox.tbx.yaml.tmpl` is a
+   projection of it) and `internal/provision/inspection.go` for `tbx manifests` section
+   renames — `balloon` was already deprecated into an error once. A renamed section or a
+   changed JSON shape breaks the substrate silently at `create-cluster.sh` time, on a
+   laptop, at the venue.
+3. **Re-run a full tbx rehearsal.** There is **no CI for this substrate** —
+   `bootstrap-test.yaml` runs Docker on a GitHub runner and always will. A tbx pin that
+   passes `check-consistency.sh` has been proven to agree with itself and nothing more.
+
+Nothing vendored depends on the tbx version: talos-box supplies no manifests we keep
+(its curated `cni:` is deliberately *not* used — we install Cilium ourselves on both
+substrates, which check 10 also asserts). So there is nothing to re-vendor, and
+`check-upstream.sh` tracks the release via the `tbx` row in `scripts/upstream.list`.
+
 ## The first-party images
 
 `ghcr.io/randax/cloudbox-{portal,uploader,resizer,grafana}` are ours, so they do

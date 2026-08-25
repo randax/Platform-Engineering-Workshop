@@ -20,14 +20,16 @@ together, is the one thing a video or an AI assistant can't give you.
 
 ## What we're building
 
-A two-node Talos Linux Kubernetes cluster inside Docker on your laptop, with an
-in-cluster git server and a GitOps engine delivering the entire platform on top:
+A two-node Talos Linux Kubernetes cluster on your laptop — real VMs via
+[talos-box](https://github.com/randax/talos-box) where your machine supports it, Docker
+containers everywhere else — with an in-cluster git server and a GitOps engine delivering
+the entire platform on top:
 
 ```text
 your laptop
-└── Docker (≥10 GB allocated)
+└── talos-box VMs, or Docker (≥10 GB allocated)
     └── Talos v1.13.8 cluster (1 control plane + 1 worker)
-        ├── Cilium 1.19 (eBPF CNI)
+        ├── Cilium 1.20 (eBPF CNI + shared ingress)
         ├── Gitea (in-cluster git — this is your cloud's git server)
         ├── ArgoCD v3.5 ── app-of-apps w/ sync waves ──────┐
         ├── CloudNativePG + demo Postgres                  │ everything below
@@ -85,9 +87,15 @@ You build it in [module 08](lab/08-portal) and it comes fully alive in the
 ## Prerequisites — do this BEFORE the conference
 
 Conference WiFi carries keystrokes, not gigabytes. The setup downloads roughly 7.5 GB of
-container images (7.7 GB on x86-64). **Run all three steps at home, on a network you trust:**
+container images (7.7 GB on x86-64). **Run steps 1–3 at home, on a network you trust:**
 
 ```bash
+# 0. OPTIONAL, and only on Apple Silicon macOS or Linux with KVM: real Talos VMs.
+#    Skip it and you get the Docker substrate, which runs the same workshop.
+brew install randax/tap/tbx && sudo tbx system install && tbx doctor
+#    (Linux: the release tarball + `sudo tbx system install`. mise cannot install
+#     tbx yet — it is pinned in scripts/versions.env and mise.toml's comment.)
+
 git clone https://github.com/randax/Platform-Engineering-Workshop.git
 # (will be renamed to jz-2026-platform-engineering — the old URL will redirect)
 cd Platform-Engineering-Workshop
@@ -100,6 +108,13 @@ cd Platform-Engineering-Workshop
 If step 3 is all green, you're done. If it isn't, the output tells you what to fix — and
 if it can't be fixed, the [devcontainer lifeboat](#plan-b-devcontainer--codespaces) below
 has you covered. Bring your laptop and its power supply.
+
+**Docker is required either way.** The offline story is a local registry mirror running in
+a Docker container, on both substrates — tbx replaces the *nodes*, not the mirror. On the
+tbx path step 2 additionally warms the Talos disk image (`tbx cache pull`, 95 MB on arm64 /
+204 MB on amd64), and step 3 asserts a complete `disk.raw` is in `~/.talosbox/cache`.
+`install.sh --check` prints which substrate you will get, and — when it falls back to
+Docker — the `tbx doctor` line that decided it.
 
 ### Your `kubectl` gets a workshop-only kubeconfig
 
@@ -123,24 +138,32 @@ your cluster and your terminal are looking at two different files.
 
 ### Hardware — honest numbers
 
-| | Minimum | Recommended |
+| | tbx (real Talos VMs) | Docker (Talos-in-Docker) |
 |---|---|---|
-| RAM | **16 GB** (≥10 GB allocatable to Docker) | 32 GB |
-| CPU | 4 cores | more |
-| Free disk | 40 GB | more |
+| Minimum | 16 GB RAM, 4 cores, 40 GB free | 16 GB RAM with **≥10 GB and ≥4 CPUs to Docker**, 40 GB free |
+| Comfortable | 32 GB | 32 GB |
+| What you get | real `LoadBalancer` VIPs, a real L2 segment | the same labs, the same URLs, via published ports |
 
 The full platform idles at roughly 8 GB inside the cluster. On 16 GB machines it fits,
-but close your Electron zoo. macOS users: OrbStack or a Docker Desktop with a raised
-memory limit. WSL2 users: raise the limit in `.wslconfig`.
+but close your Electron zoo. On the Docker substrate: OrbStack, or a Docker Desktop with
+a raised memory limit; WSL2 users raise it in `.wslconfig`. On tbx the VM sizes are pins
+(`TBX_CP_MEMORY` / `TBX_WORKER_MEMORY` in `scripts/versions.env`) — a VM takes what it is
+given, so the RAM is gone from your host either way.
 
 ### Platform support matrix
 
-| Platform | Status |
-|---|---|
-| macOS (Apple Silicon) | ✅ Fully supported |
-| macOS (Intel) | ✅ Fully supported |
-| Linux | ✅ Fully supported (watch out for firewalld/nftables interference) |
-| Windows (WSL2) | ⚠️ Best effort — it should work, but it's our least-tested platform. If it fights you, pair up with a neighbor or use the devcontainer lifeboat. |
+| Platform | Substrate | Support |
+|---|---|---|
+| macOS, Apple Silicon | tbx (Docker if `tbx doctor` fails) | fully supported |
+| Linux, amd64/arm64 with KVM | tbx (Docker otherwise) | fully supported |
+| macOS, Intel | Docker | fully supported |
+| Windows via WSL2 | Docker | best-effort — pair up if it fights you |
+| GitHub Codespaces / devcontainer | Docker | the lifeboat, tested weekly in CI |
+
+Both substrates run **the same labs, the same `verify.sh` scripts and the same URLs**. The
+scripts pick for you and remember the choice in `~/.cloudbox/substrate`; override with
+`CLOUDBOX_SUBSTRATE=docker` or `=tbx`. On Linux, watch out for firewalld/nftables
+interference on either substrate.
 
 ## At the venue
 
@@ -149,14 +172,23 @@ workshop works offline once the images are pre-pulled and the Helm charts are ve
 they are, in `scripts/manifests/`):
 
 ```bash
-./scripts/create-cluster.sh     # Talos-in-Docker cluster + Cilium
+./scripts/create-cluster.sh     # Talos cluster (tbx VMs or Docker) + Cilium
 ./scripts/bootstrap-gitops.sh   # in-cluster Gitea + ArgoCD
 ./scripts/seed-gitea.sh         # seed your cloud's git with the platform tree
 ```
 
+**On the Docker substrate, `create-cluster.sh` asks for your password once.** It is the
+only sudo in the workshop: Docker has no resolver, so the workshop hostnames come from a
+marked `# cloudbox-begin` block in `/etc/hosts`, written via `sudo tee`. See exactly what
+goes in with `./scripts/install.sh --print-hosts` (WSL2: the same lines also belong in
+`C:\Windows\System32\drivers\etc\hosts`, edited as Administrator). Decline the
+password and every `*.cloudbox.k8s.test` URL fails on a perfectly healthy cluster.
+`./scripts/destroy-cluster.sh --purge-mirror` removes the block again. On the tbx
+substrate nothing touches `/etc/hosts` — talos-box's own resolver answers the names.
+
 Fell behind or broke something interesting? `./scripts/catch-up.sh <module>` force-pushes
 the canonical state for that module to your Gitea and lets ArgoCD converge — scripted
-state, not hope. If Talos-in-Docker won't cooperate on your machine,
+state, not hope. If neither substrate will cooperate on your machine,
 `./scripts/kind-fallback.sh` gives you a kind+Cilium cluster and you continue from
 module 2 onward.
 

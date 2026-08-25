@@ -21,7 +21,7 @@ the workshop needs **no image downloads at the venue**.
 ### At the venue
 
 ```bash
-./scripts/create-cluster.sh     # module 1: Talos-in-Docker cluster + Cilium
+./scripts/create-cluster.sh     # module 1: Talos cluster (tbx VMs or Docker) + Cilium
 ./scripts/bootstrap-gitops.sh   # module 2: Gitea + ArgoCD (the GitOps engine)
 ./scripts/seed-gitea.sh         # module 2: push this repo into your cloud
 ```
@@ -37,7 +37,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 ./scripts/catch-up.sh 3 --rebuild   # nuclear: destroy + recreate + bootstrap
                                     # + seed + catch up (~10 min, pre-pulled)
 ./scripts/destroy-cluster.sh        # tear down the cluster (mirror survives)
-./scripts/kind-fallback.sh          # plan B if Talos-in-Docker won't run
+./scripts/kind-fallback.sh          # plan B if neither substrate will run
 ```
 
 ## Script reference
@@ -47,9 +47,11 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `dev-setup.sh` | Install mise (with consent) + all pinned CLI tools, verify versions |
 | `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`; start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it |
 | `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
-| `create-cluster.sh` | `talosctl cluster create docker` (Talos v1.13.8, 1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm |
+| `create-cluster.sh` | Substrate **dispatcher**: resolves tbx-or-docker, sources the backend, then runs the shared path — Talos config gen/apply/bootstrap (1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm. Persists the choice in `~/.cloudbox/substrate` |
+| `substrate/docker.sh` | The **Docker backend**: `talosctl cluster create docker` (raised memory/CPU, published ports) and the marked `/etc/hosts` block that gives the hostname scheme somewhere to resolve |
+| `substrate/tbx.sh` | The **talos-box backend**: `tbx up -f ~/.cloudbox/cloudbox.tbx.yaml` (rendered from `substrate/cloudbox.tbx.yaml.tmpl` + the `TBX_*` pins), then *our* Talos config — same patches as docker — plus the Cilium `LoadBalancerIPPool`/L2 policy and the wait for the ingress VIP |
 | `destroy-cluster.sh` | `talosctl cluster destroy` + kubeconfig cleanup (this workshop's named entries, in both the pinned kubeconfig and `~/.kube/config`); `--purge-mirror` also removes the image mirror |
-| `bootstrap-gitops.sh` | local-path-provisioner + Gitea (single-pod SQLite, push-to-create) + ArgoCD (vendored manifest, NodePort 30080, Application health check) |
+| `bootstrap-gitops.sh` | local-path-provisioner + Gitea (single-pod SQLite, push-to-create) + ArgoCD (vendored manifest, Application health check), then applies the Gitea and ArgoCD `Ingress` objects so both are reachable at their `*.cloudbox.k8s.test` names on either substrate |
 | `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |
 | `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` + `gitops/components` state to Gitea, then run the module's post-steps; `--rebuild` for the full nuke-and-rebuild |
 | `kind-fallback.sh` | Same cluster shape on kind + Cilium (loses the Talos content, gains robustness) |
@@ -78,12 +80,33 @@ a stale mirror can never break the cluster, it just costs bandwidth.
 
 ## Endpoints (after bootstrap)
 
+One hostname scheme, both substrates — `*.cloudbox.k8s.test`:
+
 | What | URL | Credentials |
 |---|---|---|
 | Gitea | http://gitea.cloudbox.k8s.test | `gitea_admin` / `cloudbox123` |
 | ArgoCD | http://argocd.cloudbox.k8s.test | `admin` / see `bootstrap-gitops.sh` output |
+| Cloudbox Console | http://portal.cloudbox.k8s.test | (module 08) |
+| Grafana | http://grafana.cloudbox.k8s.test | (observability, on-demand) |
+| RustFS console | http://rustfs.cloudbox.k8s.test | see `versions.env` |
+| RustFS S3 endpoint | http://s3.cloudbox.k8s.test | see `versions.env` |
 | Zot registry | http://zot.cloudbox.k8s.test | (enabled in module S2) |
-| Knative | `http://<name>.<namespace>.kn.cloudbox.k8s.test` | (enabled in module S1) |
+| NATS monitoring | http://nats.cloudbox.k8s.test | (enabled in module S3) |
+| Backstage | http://backstage.cloudbox.k8s.test | (presenter demo) |
+| Knative services | `http://<name>.<namespace>.kn.cloudbox.k8s.test` | (enabled in module S1) |
+
+On the **tbx** substrate talos-box's own resolver answers every one of these at the
+cluster's ingress VIP (`172.30.<n>.200`). On the **Docker** substrate they come from a
+marked `/etc/hosts` block; `./scripts/install.sh --print-hosts` prints it, and
+`create-cluster.sh` writes it (one `sudo` prompt). The published-NodePort URLs on
+localhost still work there as a fallback, but they exist on the Docker substrate only —
+which is why no lab names them. Zot is the deliberate exception in the other direction:
+attendees reach it by hostname, while the kubelet pulls from Zot's NodePort on the node
+itself, which works the same way on both substrates.
+
+Which substrate you are on: `./scripts/install.sh --check`. To force one:
+`CLOUDBOX_SUBSTRATE=docker` (or `=tbx`); the answer is remembered in
+`~/.cloudbox/substrate` from the moment a cluster is created.
 
 ## Conventions
 

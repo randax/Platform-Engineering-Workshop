@@ -18,6 +18,18 @@ substantially engineered tool that solves several problems this workshop current
 around, and it is a credible substrate for a **future edition** or an **opt-in pro
 path**. Detail and a work list below.
 
+> **Decision, 2026-08-24 (Øyvind Randa):** proceed anyway, with the risks stated in this
+> document accepted rather than retired. talos-box becomes the primary substrate where
+> `tbx doctor` passes; Talos-in-Docker stays a first-class, CI-proven fallback with its own
+> users (Windows/WSL2, Codespaces, CI). The how is
+> [docs/superpowers/specs/2026-08-24-talos-box-substrate-design.md](superpowers/specs/2026-08-24-talos-box-substrate-design.md);
+> the work is
+> [docs/superpowers/plans/2026-08-24-talos-box-substrate.md](superpowers/plans/2026-08-24-talos-box-substrate.md).
+> **The gate stands:** if the full 00→10 rehearsal on tbx does not pass by Aug 31, the
+> dispatcher default flips to `docker` (one line: `CLOUDBOX_SUBSTRATE_DEFAULT` in
+> `scripts/versions.env`) and tbx remains available via `CLOUDBOX_SUBSTRATE=tbx`.
+> The analysis below is unedited; it is what the decision was made against.
+
 Disclosure, because it affects how this document should be read: both repositories are
 authored by the same person. talos-box's own wayfinder map already records the standing
 scoping decision — "Migrating the workshop onto talos-box (prior scoping decision

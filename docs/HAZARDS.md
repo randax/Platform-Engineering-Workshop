@@ -58,6 +58,118 @@ person needs the history ·
 
 ---
 
+The five entries below arrived with the **talos-box substrate** on 2026-08-24
+(`docs/talos-box-vs-docker.md`) and share one property: **no rehearsal has run on
+that substrate yet.** Everything above and below them was learned on
+Talos-in-Docker, which is still what CI and the lifeboat run.
+
+## LIVE — tbx VM memory is a hard ceiling, and it is unrehearsed
+
+New on **2026-08-24** with the talos-box substrate (`docs/talos-box-vs-docker.md`,
+decision note at the top). Everything the four rehearsals measured was measured on
+Talos-in-Docker, where a node's memory limit is *soft*: the container shares the host's
+page cache, and `--memory-workers` is a cgroup ceiling that the host quietly pads. A VM's
+`8GiB` is not soft. It is all the RAM that kernel will ever see.
+
+`TBX_CP_MEMORY="4GiB"` / `TBX_WORKER_MEMORY="8GiB"` (`scripts/versions.env:83-86`) are
+*guesses*, transcribed from the docker substrate's numbers, against a module-10 end state
+of 21 ArgoCD apps and 66–73 pods that has never been run inside a VM.
+
+**How you would notice.** Pods OOMKilled, or the kubelet evicting under pressure, on a
+laptop where the docker substrate sails through the same module — the giveaway is that
+`docker` works and `tbx` does not on the *same* machine. Watch modules 08–10, where the
+pod count peaks.
+
+**Retired by:** the tbx rehearsal measuring peak node RSS at the module-10 end state and
+the measured numbers landing in `scripts/versions.env` (up, or down). Until then treat
+these two pins as unproven, and note that raising them costs an attendee's host RAM
+1:1 — a VM takes what it is given whether it needs it or not.
+
+## LIVE — L2 failover on macOS takes 40-50 s
+
+Cilium announces the ingress VIP over L2 (`scripts/substrate/lb-objects.tbx.yaml.tmpl`,
+applied by `substrate_post_cni()` in `scripts/substrate/tbx.sh:337-355`). When the node
+holding the VIP goes away, the new announcer sends a gratuitous ARP — and **macOS ignores
+it through vmnet**, converging only when its own ARP cache revalidates. talos-box's own
+spec says so: "the slow-L2 failover caveat is macOS/vmnet-specific" (upstream
+`docs/SPEC.md` §5).
+
+**How you would notice.** Stop a node (module 05's fault work, or a `tbx` node restart)
+and every `*.cloudbox.k8s.test` URL hangs for the better part of a minute before the
+surviving node answers. Nothing logs an error; it just sits there.
+
+This is **not a bug in the workshop and not a bug in Cilium**, and it is emphatically not
+something to "fix" with BGP eight days before the event. If a demo needs a deterministic
+failover story, do it on the docker substrate, where there is no VIP to move.
+
+**Retired by:** nothing in 2026. It is an Apple networking behaviour; the honest move is
+to say the number out loud when it happens.
+
+## TRAP — a full-tunnel VPN blackholes 172.30.0.0/16 while `tbx doctor` stays green
+
+`tbx doctor` checks the host helper, the hypervisor, and host routing/forwarding — it does
+**not** check whether a corporate VPN client has claimed the RFC1918 space the tbx subnet
+lives in. A full-tunnel client that grabs `172.16.0.0/12` installs a route more specific
+than the one vmnet/KVM put there, and every host→VIP packet leaves through `utun*` and
+dies somewhere in a datacenter.
+
+**How you would notice.** The cluster is genuinely healthy — `kubectl get nodes` Ready,
+`tbx status` green, `install.sh --check` green — and every hostname times out. It reads
+like a broken ingress. It is a routing table.
+
+**Diagnosis, in one line:** `route get 172.30.0.200` (macOS) or `ip route get 172.30.0.200`
+(Linux) naming a `utun*`/`tun*` interface instead of the tbx bridge.
+
+**Fix:** disconnect the VPN, or split-tunnel `172.30.0.0/16`, or run the fallback —
+`CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh`, which needs no host route at all.
+Do not go looking in Cilium.
+
+## TRAP — /etc/hosts needs sudo, and it is the only sudo in the workshop
+
+The docker substrate has no resolver of its own, so the same hostname scheme both
+substrates serve has to come from somewhere: `create-cluster.sh:130-134` calls
+`write_hosts_block` (`scripts/lib.sh:302-392`), which replaces a block marked
+`# cloudbox-begin` / `# cloudbox-end` in `/etc/hosts` via a temp file and `sudo tee` —
+never an in-place `sudo sed`, because a half-written `/etc/hosts` breaks name resolution
+for the whole machine. Twelve names go in: the nine services plus `hello.demo.kn`,
+`uploader.pipeline.kn` and `resizer.pipeline.kn`, because `/etc/hosts` has no wildcards.
+The tbx substrate writes nothing — talos-box's resolver answers `*.cloudbox.k8s.test` —
+so this prompt appears on exactly half the room's laptops.
+
+**How you would notice** if the attendee declines the password (or has no sudo at all):
+every hostname fails while the cluster is perfectly healthy, which is the same symptom as
+the VPN trap above and reads like a broken ingress.
+
+**What handles it.** `install.sh --check` names the missing lines and how many
+(`scripts/install.sh:166-173`); `./scripts/install.sh --print-hosts` prints the block for
+hand-application, and on WSL2 also prints the note that the same lines belong in
+`C:\Windows\System32\drivers\etc\hosts`, edited as Administrator, for the Windows browser
+to resolve them (`scripts/install.sh:41-52`). `destroy-cluster.sh --purge-mirror` removes
+the block again (`scripts/destroy-cluster.sh:167`).
+
+**Retired by:** nothing — it is the price of one hostname scheme on a substrate with no
+resolver. Say it out loud before `create-cluster.sh` runs so nobody is surprised by a
+password prompt from a workshop script.
+
+## TRAP — `.200` resolves before anything owns it
+
+talos-box's resolver answers `*.<domain>` with the cluster's `172.30.<n>.200` for the
+cluster's whole lifetime — "tied to the cluster's existence, not its run-state" (upstream
+`docs/SPEC.md` §5). The address is a convention, not a claim: nothing owns it until
+Cilium's `cilium-ingress` Service is allocated it out of the `.200-.239` pool.
+
+**How you would notice.** Between `tbx up` and the ingress getting its VIP — and on any
+cluster that is up but has no Cilium yet — every hostname resolves instantly and every
+connection is refused. A name that resolves reads as "the service is there and broken",
+when the truth is that it does not exist yet.
+
+**Why the scripts are shaped the way they are.** `substrate_post_ready()`
+(`scripts/substrate/tbx.sh:362-380`) waits up to 180 s for `cilium-ingress` to actually
+carry a LoadBalancer address, and fails loudly there rather than letting module 02 discover
+it; it also warns if the VIP is *not* `.200`, because the resolver would then be pointing
+every hostname at whichever other Service took the address first. Delete that Service and
+re-run; do not repoint the resolver.
+
 ## RESOLVED — node containers were capped at 2.0 CPUs, whatever the laptop had
 
 **Fixed in `33c84f7`; proven decisively in rehearsal 2.** Kept in full, because the

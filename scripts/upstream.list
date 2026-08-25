@@ -50,6 +50,7 @@
 # --- Tooling (mise.toml + versions.env + the CI-pinned linters) --------------
 mise                     | github-release | jdx/mise                                        | env:MISE_VERSION                             |
 talos                    | github-release | siderolabs/talos                                | env:TALOS_VERSION                            |
+tbx                      | github-release | randax/talos-box                                | env:TBX_VERSION                              |
 helm                     | github-release | helm/helm                                       | mise:helm                                    |
 kind                     | github-release | kubernetes-sigs/kind                            | mise:kind                                    |
 kind-node-image          | registry-tag   | docker.io/kindest/node                          | image:docker.io/kindest/node                 |
