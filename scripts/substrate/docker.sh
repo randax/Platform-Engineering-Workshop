@@ -50,22 +50,18 @@ substrate_create() {
   # "Merging kubeconfig". destroy-cluster.sh now clears it; this catches a stale
   # context left by an older destroy, a hand-run `talosctl cluster destroy`, or a
   # create that died halfway.
-  talos_contexts() { # -> one context name per line, '*' marker stripped
-    talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'
-  }
-  if talos_contexts | grep -qx "${CLUSTER_NAME}"; then
+  #
+  # The matching and removal are lib.sh's pipe-free helpers, shared with
+  # destroy-cluster.sh and the tbx backend. They were pipelines here until the
+  # `grep -vx` in the middle of them aborted the whole create under pipefail on
+  # the one-context machine this branch exists for — see the comment above
+  # talos_contexts() in lib.sh.
+  if has_talos_context "${CLUSTER_NAME}"; then
     warn "Removing a stale talosconfig context '${CLUSTER_NAME}' (no such cluster is running)"
-    other="$(talos_contexts | grep -vx "${CLUSTER_NAME}" | head -1)"
-    if [[ -n "${other}" ]]; then
-      # `talosctl config remove` refuses to remove the SELECTED context (and
-      # exits 0 anyway), so select something else first.
-      talosctl config context "${other}" >/dev/null 2>&1 || true
-      talosctl config remove "${CLUSTER_NAME}" --noconfirm >/dev/null 2>&1 || true
-    else
-      rm -f "${TALOSCONFIG:-${HOME}/.talos/config}"
+    remove_talos_context "${CLUSTER_NAME}"
+    if has_talos_context "${CLUSTER_NAME}"; then
+      die "Could not remove the stale talosconfig context '${CLUSTER_NAME}' — remove it by hand (talosctl config remove ${CLUSTER_NAME}) and re-run."
     fi
-    talos_contexts | grep -qx "${CLUSTER_NAME}" \
-      && die "Could not remove the stale talosconfig context '${CLUSTER_NAME}' — remove it by hand (talosctl config remove ${CLUSTER_NAME}) and re-run."
   fi
 
   # Second half of the same problem: `talosctl cluster create` also keeps a

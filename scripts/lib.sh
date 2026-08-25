@@ -335,6 +335,76 @@ cloudbox_host_gateway() {
   fi
 }
 
+# --- talosconfig contexts ---------------------------------------------------
+# A leftover '${CLUSTER_NAME}' context is the same bug on every path: talosctl
+# refuses to reuse the name, so the NEW cluster's context becomes
+# '${CLUSTER_NAME}-1' and every `talosctl --context ${CLUSTER_NAME}` afterwards
+# dials the cluster that no longer exists. destroy-cluster.sh clears it, both
+# create backends re-check it (a hand-run destroy, an older destroy, or a create
+# that died halfway), so the helpers live HERE rather than three times over.
+#
+# Matched with pipe-free bash, NOT `talos_contexts | grep`. Under
+# `set -euo pipefail` the two greps this replaces were one live bug and one
+# latent one:
+#
+#   `other="$(talos_contexts | grep -vx "${CLUSTER_NAME}" | head -1)"` — when
+#   '${CLUSTER_NAME}' is the ONLY context, grep -vx matches nothing and exits 1.
+#   A bare assignment inherits its command substitution's status, so `set -e`
+#   killed the script HERE, before the single-context branch below — the branch
+#   that exists for precisely that case — could run. On the destroy path that
+#   broke `catch-up.sh --rebuild` for everyone whose machine had nothing else in
+#   ~/.talos/config, which is the normal attendee state; on the create path it
+#   turned a stale context into a create that dies with no diagnosis at all.
+#   Caught by the CI recovery-path job, which is a fresh runner and therefore
+#   always the one-context case.
+#
+#   `talos_contexts | grep -qx "${CLUSTER_NAME}"` — LATENT, not observed: grep
+#   -q exits at the first match, and if awk is still writing it takes EPIPE,
+#   which pipefail turns into a non-zero pipeline — i.e. a context that IS
+#   present reads as absent and the removal is skipped, silently. Measured, it
+#   needs ~5000 contexts before awk's output stops fitting in one pipe buffer,
+#   so nobody was ever going to hit it. Rewritten anyway: the fix for the live
+#   bug above is a pipe-free matcher, and leaving one grep behind would keep
+#   the class alive for the next person who copies the line.
+talos_contexts() { # -> one context name per line, '*' marker stripped
+  talosctl config contexts 2>/dev/null | awk 'NR > 1 { print ($1 == "*") ? $2 : $1 }'
+}
+
+has_talos_context() { # $1 = context name
+  local c
+  while IFS= read -r c; do
+    [[ "${c}" == "$1" ]] && return 0
+  done <<<"$(talos_contexts)"
+  return 1
+}
+
+first_other_talos_context() { # $1 = context to exclude; prints nothing if none
+  local c
+  while IFS= read -r c; do
+    if [[ -n "${c}" && "${c}" != "$1" ]]; then printf '%s\n' "${c}"; return 0; fi
+  done <<<"$(talos_contexts)"
+  return 0   # no other context is a normal outcome, not a failure — see above
+}
+
+# remove_talos_context <name> — best effort, and idempotent. `talosctl config
+# remove` SKIPS the context that is currently SELECTED and still exits 0 while
+# saying so ("skipping removal of current context ..., please change it to
+# another before removing"), so the bare call removed nothing, undetectably.
+# Switch away first. When there is nothing to switch to, the whole talosconfig
+# describes only the cluster being removed — delete the file; talosctl recreates
+# it on the next cluster create. Callers verify with has_talos_context.
+remove_talos_context() {
+  local name="$1" other
+  has_talos_context "${name}" || return 0
+  other="$(first_other_talos_context "${name}")"
+  if [[ -n "${other}" ]]; then
+    talosctl config context "${other}" >/dev/null 2>&1 || true
+    talosctl config remove "${name}" --noconfirm >/dev/null 2>&1 || true
+  else
+    rm -f "${TALOSCONFIG:-${HOME}/.talos/config}"
+  fi
+}
+
 # --- The /etc/hosts block (docker substrate only) -------------------------------
 # On tbx, talos-box's own resolver answers *.${CLOUDBOX_DOMAIN} with the
 # cluster's ingress VIP and there is nothing to write. On docker there is no
