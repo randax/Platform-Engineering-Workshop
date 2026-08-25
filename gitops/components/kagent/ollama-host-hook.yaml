@@ -43,12 +43,17 @@ metadata:
   name: kagent-ollama-host
   namespace: kagent
 rules:
-  # One verb on one object. The ConfigMap needs no rule at all: it arrives as a
-  # kubelet-mounted volume, which does not go through this ServiceAccount.
+  # Two verbs on one object. `get` is not decoration: `kubectl patch <type>
+  # <name>` resolves the target through the resource builder, which GETs the
+  # object BEFORE it sends the PATCH — with `patch` alone the GET returns 403
+  # and the patch is never issued (reproduced against a fake apiserver:
+  # GET .../modelconfigs/default-model-config -> 403, no PATCH request at all).
+  # The ConfigMap needs no rule of any kind: it arrives as a kubelet-mounted
+  # volume, which does not go through this ServiceAccount.
   - apiGroups: ["kagent.dev"]
     resources: ["modelconfigs"]
     resourceNames: ["default-model-config"]
-    verbs: ["patch"]
+    verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

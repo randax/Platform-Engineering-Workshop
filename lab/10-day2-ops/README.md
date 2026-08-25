@@ -347,7 +347,8 @@ kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.ollam
 
 That should be your host's address, not necessarily the `host.docker.internal` that git
 carries. If it is not — the hook's log says why
-(`kubectl -n kagent logs job/kagent-ollama-host`) — the same patch by hand:
+(`kubectl -n kagent logs job/kagent-ollama-host -c render-patch`, the container that
+makes the decision) — the same patch by hand:
 
 ```bash
 kubectl -n kagent patch modelconfig default-model-config --type merge \
