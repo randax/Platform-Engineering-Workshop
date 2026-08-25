@@ -40,6 +40,22 @@ substrate_preflight() {
   if [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" ]]; then
     die "A '${CLUSTER_NAME}' cluster already exists. Run ./scripts/destroy-cluster.sh first."
   fi
+  # The MIRROR image of the tbx preflight's /etc/hosts guard: a '${CLUSTER_NAME}'
+  # that already exists on the OTHER substrate is just as fatal, and much
+  # quieter. The tbx VMs are alive, they hold the cluster name, the talosconfig
+  # context and (on the tbx side) the resolver entries — and none of that is
+  # visible to `docker ps`. Creating over it produces two clusters called
+  # cloudbox, a talosconfig renamed to `cloudbox-1`, and a destroy that removes
+  # whichever one the persisted substrate now says.
+  #
+  # `have tbx` first: a machine without talos-box cannot be in this state, and
+  # this must not become a reason to require the binary on the docker path.
+  if have tbx && tbx status "${CLUSTER_NAME}" >/dev/null 2>&1; then
+    fail "A '${CLUSTER_NAME}' cluster already exists on the tbx substrate — its VMs are running."
+    warn "Creating a docker cluster of the same name would leave two, with one talosconfig"
+    warn "context between them and a destroy that can only find one."
+    die "Destroy it first: CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh"
+  fi
 }
 
 substrate_create() {
@@ -288,6 +304,14 @@ substrate_post_ready() { :; }
 
 substrate_destroy() {
   step "Destroying Talos cluster '${CLUSTER_NAME}'"
+  # A stopped daemon makes `docker ps -aq --filter …` print NOTHING and exit 0 —
+  # indistinguishable from "there is no such cluster". The destroy would then
+  # report "nothing to destroy", and destroy-cluster.sh would go on to remove
+  # ~/.cloudbox/substrate and the state directory — erasing the record of a
+  # cluster whose containers are all still there, waiting for Docker to come
+  # back. The next create then trips over containers nothing remembers.
+  docker_running \
+    || die "Docker daemon is not reachable, so this cannot tell 'no cluster' from 'cannot look'. Start Docker and re-run — nothing has been removed."
   if [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" ]]; then
     talosctl cluster destroy --name "${CLUSTER_NAME}" --force
     ok "Cluster destroyed"

@@ -81,6 +81,11 @@ fi
 # shellcheck source=substrate/docker.sh
 source "${SCRIPT_DIR}/substrate/${SUBSTRATE}.sh"
 substrate_destroy
+# Reached ONLY after a successful destroy or a proven absence: both backends now
+# die rather than return when they cannot tell those two apart from "cannot
+# look" (a stopped Docker daemon, a tbxd that will not answer). Forgetting which
+# substrate a still-running cluster belongs to is unrecoverable from a script —
+# every later destroy would look for the wrong kind of thing.
 rm -f "${CLOUDBOX_SUBSTRATE_FILE}"
 
 # --- Clean up kubeconfig / talosconfig contexts (best effort) -----------------
@@ -169,6 +174,15 @@ fi
 # A no-op on tbx (nothing was ever written) and when the block is absent.
 if [[ "${SUBSTRATE}" == "docker" ]]; then
   remove_hosts_block
+fi
+# The attendee's own extra Knative names (install.sh --add-hosts) are a
+# PREFERENCE, not cluster state: the block is gone either way, and someone who
+# rebuilds the same cluster to keep working on `my-app` should not have to
+# re-add it. So they survive an ordinary destroy and are cleared only by the
+# same flag that throws away the 7 GB mirror — the "start over completely" one.
+if [[ "${PURGE_MIRROR}" == "true" && -f "${CLOUDBOX_EXTRA_HOSTS_FILE}" ]]; then
+  rm -f "${CLOUDBOX_EXTRA_HOSTS_FILE}"
+  ok "Extra hostnames forgotten (${CLOUDBOX_EXTRA_HOSTS_FILE})"
 fi
 
 # --- Mirror ---------------------------------------------------------------------
