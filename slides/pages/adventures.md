@@ -27,7 +27,8 @@ Point at the helpers: each briefing has a "Known traps" section, and the helpers
 </div>
 
 <div v-click class="mt-4 text-lg opacity-85 text-center">
-<code>adventures/</code> in the repo · behind? <code>./scripts/catch-up.sh &lt;module&gt;</code> teleports you
+<code>adventures/</code> in the repo · unsure? <strong>door 0</strong> · behind? <code>catch-up.sh &lt;module&gt;</code> teleports you<br>
+<span class="text-sm opacity-75">each door has a named helper · hard stop 10 min before the end — we close together</span>
 </div>
 
 <!--
@@ -39,7 +40,11 @@ Walk each door in one breath, selling the *feeling*, not the tech list:
 - Door 3: the most visceral one — you break a working pipeline with one policy and watch Hubble name every flow you severed. DNS first when earning it back (it's in the traps, and half the room will hit it anyway — that's the lesson).
 - Door 4: for the people who spent all day wondering about the layer below. Zero new images.
 
+Pitch discipline (researched — decision paralysis is the #1 failure mode of multi-track endings): ≤1 minute per door, sell the feeling not the tech list, and give the explicit default — "if you're unsure, take door 0; it's excellent and you can switch any time". Name the helper who owns each door as you pitch it (assign ownership before the workshop; write it on the front wall).
+
 Logistics, said once: prerequisites per door are module numbers; catch-up.sh gets anyone anywhere in ~2 minutes; briefings live in adventures/ in the repo they already have. Nothing needs the venue network except Gateway API CRDs on door 4 (flagged in its traps).
+
+THE HARD STOP: announce it here and honor it — 10 minutes before the end, one signal, everyone back for the close. An open-ended hour that fizzles into people drifting out is remembered as a fizzle (peak-end rule); the before/after replay in the closing section is what makes four hours land as an achievement. Every door's warm-up delivers a visible win inside ~15 minutes precisely so nobody hits the stop empty-handed.
 
 Then let them go. Instructors and helpers circulate by door.
 -->

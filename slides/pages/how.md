@@ -47,9 +47,16 @@ This is how every single module works, so learn it once:
 1. Each lab README says "make your cluster reach state X" and roughly where to look. It deliberately does NOT hand you 12 commands to paste — pasting teaches nothing.
 2. Hints escalate from a guiding question to the exact command, in collapsed blocks. Open as many as you need; nobody is counting and there's no penalty. The last hint is always the full solution — using it is fine, understanding it is required.
 3. verify.sh is the finish line: it runs many small checks against your RUNNING cluster (never against your files), prints a green check per pass and an actionable FAIL per miss, exits 0 when the outcome is true.
-4. catch-up.sh N force-pushes the canonical end-state for module N to your in-cluster Gitea and lets ArgoCD converge — scripted state, not hope. Broke something interesting? That's fine, catch-up exists precisely so you can experiment fearlessly.
+4. catch-up.sh N force-pushes the canonical end-state for module N to your in-cluster Gitea and lets ArgoCD converge — scripted state, not hope. Broke something interesting? That's fine, catch-up exists precisely so you can experiment fearlessly. Say the destigmatizing line out loud and mean it: "catch-up is not failure — it's how the workshop is designed to absorb variance."
 
 Also mention explain-backs: at each module boundary, two minutes, tell your neighbor WHY it works. A fix you can't explain isn't done yet.
+
+THE LAB-LAUNCH RITUAL (same every module — presenter discipline, researched not vibes):
+- The GO slide STAYS PROJECTED for the entire lab. It carries the outcome, the literal first command, the verify command, and the timebox — a room of 40 self-paced people re-orients from it constantly. Never advance past it to "peek at the next section" while people work.
+- Before releasing the room, say the first two minutes aloud — the literal first command to type. Lab-start confusion is almost always "what's my first action?", not "what's the goal?".
+- Run a countdown timer next to the deck (external — stagetimer.io or similar) that changes color near the end, and ALSO call "two minutes" verbally: a silent timer fails silently.
+- State every timebox as a soft target: "we walk the solution at :35 regardless" — slower attendees relax because catch-up exists, and the walk-through is announced, not sprung.
+- One call-back signal, announced now, used identically all day (we use: timer hits zero + both speakers stand front-center). Never try to talk over 40 keyboards.
 -->
 
 ---
@@ -59,6 +66,7 @@ Also mention explain-backs: at each module boundary, two minutes, tell your neig
 - <span class="svgi i-sticky-note" style="color:var(--jz-run)"></span> green sticky — "I'm fine"
 - <span class="svgi i-sticky-note" style="color:#e5484d"></span> red sticky — "come by, please"
 - Helpers roam; no hand-raising needed
+- Recurring questions land on the front wall — answered for everyone at each re-sync
 - Pairing is encouraged — arguably better
 - Laptop says no? Devcontainer lifeboat
 
@@ -68,6 +76,8 @@ Point out the helpers by name and location. The sticky-note protocol means nobod
 Pairing: the whole workshop works as a pair on one machine — you'll talk through more and type less. If your pre-flight fails, pair up or use the devcontainer: the repo ships a .devcontainer that runs identical content in GitHub Codespaces (4 cores / 16 GB machine). Acknowledge the irony out loud — the lifeboat for the sovereignty workshop is Microsoft's cloud, which is exactly why it's the lifeboat and not the boat.
 
 When the room drifts apart, we'll walk the solution on screen to re-sync. That's normal, not falling behind.
+
+The question backlog, explained to the room: when a helper answers the same question twice, it goes on a sticky on the front wall; at each walk-the-solution the lead triages them aloud — "three of you hit X, here's the answer for everyone". It turns 1:1 helper answers into whole-room teaching. Helpers: docs/HELPERS.md has your side of this (zones, patrol pattern, sticky-count checkpoints).
 -->
 
 ---

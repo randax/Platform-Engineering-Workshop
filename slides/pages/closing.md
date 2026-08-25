@@ -5,7 +5,7 @@ layout: section
 # What you built today
 
 <!--
-Closing section — bring the energy back to the front of the room for the last ten minutes (the 30 minutes of tinkering happen around it).
+Closing section — HARD-SCHEDULED: the last 10 minutes belong to this, protected even from the adventure hour. Peak-end rule: the room's memory of four hours is disproportionately set by its final minutes — an ending where people drift out mid-hack is remembered as a fizzle, this before/after replay is remembered as an achievement. Call the one signal 10 minutes before the end, wait for keyboards to actually stop, then run: the replay (next slide), the take-home path, and a 60-second close — ask the room for one word each on what they're taking home, or simply "look at what you built this morning vs now". End on accomplishment, not fatigue.
 -->
 
 ---
