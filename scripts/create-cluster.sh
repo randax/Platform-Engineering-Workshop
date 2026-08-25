@@ -30,9 +30,10 @@ case "${1:-}" in
   -h|--help)
     echo "Usage: $0 [--refresh-endpoint]"
     echo "  (no flags)          create the CloudBox cluster"
-    echo "  --refresh-endpoint  re-read the running cluster's API address, point the"
-    echo "                      kubeconfig and the talosconfig context at it, and — once"
-    echo "                      both clients answer there — \${HOME}/.cloudbox/api-endpoint."
+    echo "  --refresh-endpoint  re-read the running cluster's API address, check that both"
+    echo "                      clients answer there BEFORE writing anything, then point the"
+    echo "                      kubeconfig and the talosconfig context at it and record"
+    echo "                      \${HOME}/.cloudbox/api-endpoint. A failed probe changes nothing."
     echo "                      Creates nothing. Run it after 'tbx cluster start' or a reboot,"
     echo "                      when the VM's DHCP lease has moved."
     exit 0 ;;
@@ -65,9 +66,10 @@ source "${SCRIPT_DIR}/substrate/${SUBSTRATE}.sh"
 # the control plane up on a different address than the one in the kubeconfig and
 # in ${CLOUDBOX_API_ENDPOINT_FILE}. Nothing else here can repair that: the
 # kubeconfig points at a dead address, and the context guard (correctly) refuses
-# an address it has no record of. This re-reads `tbx status`, rewrites the
-# kubeconfig cluster entry, the talosconfig context and — only once BOTH clients
-# have answered at the new address — ${CLOUDBOX_API_ENDPOINT_FILE}. It does
+# an address it has no record of. This re-reads `tbx status`, PROVES both clients
+# answer at the new address before it writes anything, then rewrites the
+# kubeconfig cluster entry and the talosconfig context, re-proves them through
+# those files, and only then records ${CLOUDBOX_API_ENDPOINT_FILE}. It does
 # NOTHING else: no create, no helm, no /etc/hosts.
 #
 # What it does NOT touch: the machine config's own `cluster.controlPlane.endpoint`
@@ -97,6 +99,32 @@ if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
     -o jsonpath="{.contexts[?(@.name=='admin@${CLUSTER_NAME}')].context.cluster}" 2>/dev/null || true)"
   [[ -n "${cluster_key}" ]] \
     || die "No 'admin@${CLUSTER_NAME}' context in $(kubeconfig_in_use) — nothing was changed. That file is not the one this cluster's kubeconfig was merged into: check KUBECONFIG (mise.toml pins it to ${CLOUDBOX_KUBECONFIG} for this repo), or re-create with ./scripts/create-cluster.sh if the cluster was never created on this machine."
+
+  # PROBE FIRST, with the new address passed on the command line, and only then
+  # rewrite anything. The order used to be the other way round: kubeconfig and
+  # talosconfig were repointed and the probes ran afterwards, so an address that
+  # answers nothing (the lease moved again between `tbx status` and here; the
+  # VMs are half-started) left BOTH client files pointing at it and died. The
+  # attendee was then worse off than before running the repair — and the one
+  # command that repairs it is this one, which they had just watched fail.
+  # Nothing below the probes can be reached without a working address, so
+  # failing here leaves every file exactly as it was.
+  #
+  # `--server` overrides only the URL; the CA and the client certs still come
+  # from the context, so this is the same TLS handshake the rewritten file would
+  # perform. `--kubeconfig` and `--context` are explicit because the probe must
+  # ask about THIS cluster in THIS file, not about whatever context happens to
+  # be selected.
+  kubectl --kubeconfig "$(kubeconfig_in_use)" --context "admin@${CLUSTER_NAME}" \
+    --server="${endpoint}" --request-timeout=10s get --raw /readyz >/dev/null 2>&1 \
+    || die "Nothing answered /readyz at ${endpoint}, so nothing was changed: your kubeconfig, talosconfig and ${CLOUDBOX_API_ENDPOINT_FILE} are exactly as they were. Is the cluster running ('tbx status ${CLUSTER_NAME}')? Start it with 'tbx cluster start ${CLUSTER_NAME}' and re-run this."
+  if has_talos_context "${CLUSTER_NAME}"; then
+    talosctl --context "${CLUSTER_NAME}" --endpoints "${cp_ip}" --nodes "${cp_ip}" \
+      version --short >/dev/null 2>&1 \
+      || die "The Talos API did not answer at ${cp_ip}, so nothing was changed. Check 'tbx status ${CLUSTER_NAME}' — the control plane may still be booting — and re-run this."
+  fi
+  ok "Both clients answer at ${cp_ip} — writing the three files"
+
   kubectl config set-cluster "${cluster_key}" --server="${endpoint}" >/dev/null \
     || die "Could not point the kubeconfig cluster '${cluster_key}' at ${endpoint} — is $(kubeconfig_in_use) the file with your workshop cluster in it?"
 
@@ -118,17 +146,18 @@ if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
     warn "  kubectl is fine; 'talosctl --context ${CLUSTER_NAME} …' will not work until the cluster is re-created."
   fi
 
-  # Both clients have to answer at the new address BEFORE it is recorded. The
-  # endpoint file is what the context guard trusts; writing an address that
-  # nothing responds at converts "kubectl cannot reach the cluster" into
-  # "everything says it is fine and nothing works".
+  # The same two questions again, now with NO explicit arguments: this is the
+  # postcondition on the rewrite, not the decision to make it (the probes above
+  # were that). It proves the files themselves carry the working address, which
+  # is what every later command reads — and only then is the endpoint recorded,
+  # because the endpoint file is what the context guard trusts.
   kubectl --request-timeout=10s get --raw /readyz >/dev/null 2>&1 \
-    || die "The kubeconfig now points at ${endpoint}, but the API server there did not answer /readyz. ${CLOUDBOX_API_ENDPOINT_FILE} was NOT updated. Is the cluster running ('tbx status ${CLUSTER_NAME}')? Start it with 'tbx cluster start ${CLUSTER_NAME}' and re-run this."
+    || die "The address ${endpoint} answered a moment ago, but the rewritten kubeconfig does not reach it. ${CLOUDBOX_API_ENDPOINT_FILE} was NOT updated. Check $(kubeconfig_in_use) and 'tbx status ${CLUSTER_NAME}'."
   if has_talos_context "${CLUSTER_NAME}"; then
     talosctl --context "${CLUSTER_NAME}" version --short >/dev/null 2>&1 \
-      || die "The talosconfig context '${CLUSTER_NAME}' now points at ${cp_ip}, but the Talos API there did not answer. ${CLOUDBOX_API_ENDPOINT_FILE} was NOT updated. Check 'tbx status ${CLUSTER_NAME}' and 'talosctl --context ${CLUSTER_NAME} version'."
+      || die "The Talos API answered at ${cp_ip} a moment ago, but the rewritten talosconfig context '${CLUSTER_NAME}' does not reach it. ${CLOUDBOX_API_ENDPOINT_FILE} was NOT updated. Check '$(talos_config_target)'."
   fi
-  ok "kubectl and talosctl both answer at ${cp_ip}"
+  ok "kubectl and talosctl both answer at ${cp_ip} through their own config files"
 
   api_endpoint_persist "${endpoint}"
   if [[ "${previous}" == "${endpoint}" ]]; then
