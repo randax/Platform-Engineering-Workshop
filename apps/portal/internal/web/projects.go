@@ -111,7 +111,16 @@ func HandleDeleteProject(s *Server, w http.ResponseWriter, r *http.Request) {
 		s.render(w, "project-bar", s.barData(r, errorFlash("Delete failed: "+err.Error())))
 		return
 	}
-	if s.activeProject(r) == name {
+	// The RAW cookie, not activeProject: that one normalises a rejected value
+	// (a LEGACY hyphenated project) to the default before returning, so deleting
+	// `my-proj` compared "demo" against "my-proj", found them different, and left
+	// the cookie naming a namespace that no longer exists. Reads then silently
+	// fell back to `demo` while every write route kept refusing — mutableProject
+	// rejects that cookie by design — so the console stayed read-only for the
+	// rest of the session with nothing on screen to explain it, and no project
+	// left to switch away from. Deleting the project the cookie names resets it,
+	// whether or not the name is one we would switch INTO.
+	if c, err := r.Cookie("project"); err == nil && c.Value == name {
 		setProjectCookie(w, kube.XRNamespace)
 	}
 	reload(w, r)
