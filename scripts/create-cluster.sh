@@ -33,9 +33,12 @@ case "${1:-}" in
     echo "  --refresh-endpoint  re-read the running cluster's API address, check that both"
     echo "                      clients answer there BEFORE writing anything, then point the"
     echo "                      kubeconfig and the talosconfig context at it and record"
-    echo "                      \${HOME}/.cloudbox/api-endpoint. A failed probe changes nothing."
-    echo "                      Creates nothing. Run it after 'tbx cluster start' or a reboot,"
-    echo "                      when the VM's DHCP lease has moved."
+    echo "                      \${HOME}/.cloudbox/api-endpoint. The probes retry for up to 180s"
+    echo "                      (a restarted cluster answers apid long before Kubernetes);"
+    echo "                      a probe that never succeeds changes nothing."
+    echo "                      Creates nothing. Run it after a reboot, or after bringing the"
+    echo "                      cluster back with 'tbx cluster resume' (if you suspended it)"
+    echo "                      or 'tbx cluster start', when the VM's DHCP lease has moved."
     exit 0 ;;
   *) die "Unknown argument: ${1} (see --help)" ;;
 esac
@@ -62,8 +65,8 @@ export CLOUDBOX_SUBSTRATE="${SUBSTRATE}"
 source "${SCRIPT_DIR}/substrate/${SUBSTRATE}.sh"
 
 # --refresh-endpoint: the cluster already exists and has MOVED. On tbx a node's
-# address is a vmnet DHCP lease, so `tbx cluster start` after a reboot can bring
-# the control plane up on a different address than the one in the kubeconfig and
+# address is a vmnet DHCP lease, so a `tbx cluster start|resume` after a reboot
+# can bring the control plane up on a different address than the one in the kubeconfig and
 # in ${CLOUDBOX_API_ENDPOINT_FILE}. Nothing else here can repair that: the
 # kubeconfig points at a dead address, and the context guard (correctly) refuses
 # an address it has no record of. This re-reads `tbx status`, PROVES both clients
@@ -81,9 +84,19 @@ if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
   if [[ "${SUBSTRATE}" != "tbx" ]]; then
     die "--refresh-endpoint is tbx-only: on the docker substrate the API server is published on 127.0.0.1 and cannot move. If kubectl cannot reach the cluster there, the containers are stopped (docker start) or gone (./scripts/create-cluster.sh)."
   fi
+  # Which verb brings this cluster back, asked of the cluster rather than
+  # assumed: `start` on a SUSPENDED cluster cold-boots it and throws the saved
+  # memory away, so every message below that tells an attendee to restart says
+  # `resume` when that is what their cluster needs. tbx.sh is sourced above
+  # (this branch is tbx-only), so the helper is defined here.
+  refresh_verb="$(tbx_restart_verb)"
+  # How long the pre-write probes below may wait for a booting control plane,
+  # and how often they ask. Overridable for tests; nothing else sets it.
+  REFRESH_PROBE_TIMEOUT="${CLOUDBOX_REFRESH_PROBE_TIMEOUT:-180}"
+  REFRESH_PROBE_INTERVAL="${CLOUDBOX_REFRESH_PROBE_INTERVAL:-5}"
   cp_ip="$(tbx_node_ip control-plane)"
   [[ -n "${cp_ip}" ]] \
-    || die "Could not read the control plane's address from 'tbx status ${CLUSTER_NAME} -o json'. Is the cluster running? Start it with 'tbx cluster start ${CLUSTER_NAME}'."
+    || die "Could not read the control plane's address from 'tbx status ${CLUSTER_NAME} -o json'. Is the cluster running? Bring it back with 'tbx cluster ${refresh_verb} ${CLUSTER_NAME}'."
   endpoint="https://${cp_ip}:6443"
   previous="$(api_endpoint_current)"
   # The kubeconfig's CLUSTER entry, read from the context rather than assumed:
@@ -115,13 +128,50 @@ if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
   # perform. `--kubeconfig` and `--context` are explicit because the probe must
   # ask about THIS cluster in THIS file, not about whatever context happens to
   # be selected.
-  kubectl --kubeconfig "$(kubeconfig_in_use)" --context "admin@${CLUSTER_NAME}" \
-    --server="${endpoint}" --request-timeout=10s get --raw /readyz >/dev/null 2>&1 \
-    || die "Nothing answered /readyz at ${endpoint}, so nothing was changed: your kubeconfig, talosconfig and ${CLOUDBOX_API_ENDPOINT_FILE} are exactly as they were. Is the cluster running ('tbx status ${CLUSTER_NAME}')? Start it with 'tbx cluster start ${CLUSTER_NAME}' and re-run this."
+  #
+  # BOUNDED RETRY, not a single shot. This command's documented caller is
+  # `lab/01-cluster/solve.sh`, which runs `tbx cluster start|resume` and then
+  # calls it — and neither verb promises a Kubernetes API. `cluster.resume` does
+  # not go through the daemon's provisioning dispatch at all (talos-box
+  # internal/daemon/server.go:468 routes only create/start/up there), so it
+  # returns as soon as the VMs are resumed. `cluster.start` does wait
+  # (waitForStartedClusterReady, internal/daemon/nodeboot.go:154), but the
+  # Kubernetes half of that wait is bounded at 90 s and gives up SILENTLY
+  # (waitForKubernetesReady, ibid. :183-215) — and it probes through the
+  # kubeconfig in talos-box's own state dir, which still holds the address the
+  # lease just moved away from, so on exactly the morning this repair exists for
+  # it can never succeed. Either way the first /readyz here can land before
+  # kube-apiserver is listening, and a single-shot probe then dies on a cluster
+  # that is merely still booting — telling the attendee nothing was changed and
+  # sending them to re-run the one command that would have worked a minute
+  # later. The die at the end of the budget is unchanged: still fail-closed,
+  # still nothing written.
+  refresh_probe() { # <what> <cmd...>
+    local what="$1"; shift
+    local deadline=$(( SECONDS + REFRESH_PROBE_TIMEOUT )) waited=0
+    while :; do
+      if "$@" >/dev/null 2>&1; then
+        [[ "${waited}" == 1 ]] && { echo; ok "${what} answered at ${cp_ip}"; }
+        return 0
+      fi
+      (( SECONDS >= deadline )) && { [[ "${waited}" == 1 ]] && echo; return 1; }
+      if [[ "${waited}" == 0 ]]; then
+        waited=1
+        info "Waiting for ${what} at ${cp_ip} (up to ${REFRESH_PROBE_TIMEOUT}s — 'tbx cluster start|resume' returns before Kubernetes answers)"
+      fi
+      printf '.'
+      sleep "${REFRESH_PROBE_INTERVAL}"
+    done
+  }
+  refresh_probe "the Kubernetes API" \
+    kubectl --kubeconfig "$(kubeconfig_in_use)" --context "admin@${CLUSTER_NAME}" \
+    --server="${endpoint}" --request-timeout=10s get --raw /readyz \
+    || die "Nothing answered /readyz at ${endpoint} within ${REFRESH_PROBE_TIMEOUT}s, so nothing was changed: your kubeconfig, talosconfig and ${CLOUDBOX_API_ENDPOINT_FILE} are exactly as they were. Is the cluster running ('tbx status ${CLUSTER_NAME}')? Start it with 'tbx cluster ${refresh_verb} ${CLUSTER_NAME}' and re-run this."
   if has_talos_context "${CLUSTER_NAME}"; then
-    talosctl --context "${CLUSTER_NAME}" --endpoints "${cp_ip}" --nodes "${cp_ip}" \
-      version --short >/dev/null 2>&1 \
-      || die "The Talos API did not answer at ${cp_ip}, so nothing was changed. Check 'tbx status ${CLUSTER_NAME}' — the control plane may still be booting — and re-run this."
+    refresh_probe "the Talos API" \
+      talosctl --context "${CLUSTER_NAME}" --endpoints "${cp_ip}" --nodes "${cp_ip}" \
+      version --short \
+      || die "The Talos API did not answer at ${cp_ip} within ${REFRESH_PROBE_TIMEOUT}s, so nothing was changed. Check 'tbx status ${CLUSTER_NAME}' — the control plane may still be booting — and re-run this."
   fi
   ok "Both clients answer at ${cp_ip} — writing the three files"
 
@@ -146,12 +196,22 @@ if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
     warn "  kubectl is fine; 'talosctl --context ${CLUSTER_NAME} …' will not work until the cluster is re-created."
   fi
 
-  # The same two questions again, now with NO explicit arguments: this is the
+  # The same two questions again, now with NO `--server`: this is the
   # postcondition on the rewrite, not the decision to make it (the probes above
   # were that). It proves the files themselves carry the working address, which
   # is what every later command reads — and only then is the endpoint recorded,
   # because the endpoint file is what the context guard trusts.
-  kubectl --request-timeout=10s get --raw /readyz >/dev/null 2>&1 \
+  #
+  # `--kubeconfig` and `--context` ARE pinned, for the same reason the probe
+  # above pins them: the address just written went into `admin@${CLUSTER_NAME}`
+  # in $(kubeconfig_in_use), and a bare `kubectl` asks whatever context happens
+  # to be current instead. That is a different cluster's kubeconfig on any
+  # machine where the attendee has switched context since the create — this
+  # command deliberately does not select a context — so the bare form could
+  # both PASS on someone else's healthy cluster and FAIL on a rewrite that
+  # worked. Only --server is dropped: the address must come from the file.
+  kubectl --kubeconfig "$(kubeconfig_in_use)" --context "admin@${CLUSTER_NAME}" \
+    --request-timeout=10s get --raw /readyz >/dev/null 2>&1 \
     || die "The address ${endpoint} answered a moment ago, but the rewritten kubeconfig does not reach it. ${CLOUDBOX_API_ENDPOINT_FILE} was NOT updated. Check $(kubeconfig_in_use) and 'tbx status ${CLUSTER_NAME}'."
   if has_talos_context "${CLUSTER_NAME}"; then
     talosctl --context "${CLUSTER_NAME}" version --short >/dev/null 2>&1 \

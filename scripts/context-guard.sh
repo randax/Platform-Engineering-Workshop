@@ -212,9 +212,9 @@ api_endpoint_hint() { # <server-url>
   # this, and a hint about the endpoint file would send the reader the wrong way.
   [ "$1" = "${recorded}" ] && return 0
   if [ -z "${recorded}" ]; then
-    echo "That is a talos-box address, but ${CLOUDBOX_API_ENDPOINT_FILE} does not exist, so nothing here knows it is YOUR cluster. ./scripts/create-cluster.sh writes it; after 'tbx cluster start ${CLUSTER_NAME}' refresh it with ./scripts/create-cluster.sh --refresh-endpoint"
+    echo "That is a talos-box address, but ${CLOUDBOX_API_ENDPOINT_FILE} does not exist, so nothing here knows it is YOUR cluster. ./scripts/create-cluster.sh writes it; after bringing the cluster back ('tbx cluster resume ${CLUSTER_NAME}' if you suspended it, otherwise 'tbx cluster start ${CLUSTER_NAME}') refresh it with ./scripts/create-cluster.sh --refresh-endpoint"
   else
-    echo "This machine's workshop cluster was recorded at ${recorded} (${CLOUDBOX_API_ENDPOINT_FILE}). If the VM's DHCP lease moved — after a reboot or 'tbx cluster start' — run ./scripts/create-cluster.sh --refresh-endpoint"
+    echo "This machine's workshop cluster was recorded at ${recorded} (${CLOUDBOX_API_ENDPOINT_FILE}). If the VM's DHCP lease moved — after a reboot, or a 'tbx cluster resume'/'tbx cluster start' — run ./scripts/create-cluster.sh --refresh-endpoint"
   fi
 }
 
