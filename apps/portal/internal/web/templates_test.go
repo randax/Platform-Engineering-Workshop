@@ -269,3 +269,38 @@ func TestTemplatesRender(t *testing.T) {
 		}
 	}
 }
+
+// TestProjectNameFormMatchesServerRule pins the project-name form control to
+// the SERVER's rule (kube.ValidProjectName / kube.ValidName).
+//
+// The form carried pattern="[a-z0-9]+" with no length cap at all, while
+// kube.ValidName's regexp caps a name at 40 characters. A 41-character project
+// name therefore passed browser validation, was POSTed, and came back as a
+// server-side error the form gives no hint about. The two halves of one rule
+// have to be written down twice (HTML cannot ask Go), so this asserts they
+// still agree — and that the numbers in the pattern are the ones the server
+// actually enforces.
+func TestProjectNameFormMatchesServerRule(t *testing.T) {
+	src, err := templateFS.ReadFile("templates/project-bar.html")
+	if err != nil {
+		t.Fatalf("reading project-bar.html: %v", err)
+	}
+	html := string(src)
+	for _, want := range []string{`pattern="[a-z0-9]{1,40}"`, `maxlength="40"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("project-bar.html is missing %s — the form must carry the server's own length cap", want)
+		}
+	}
+
+	// And the numbers are right: 40 accepted, 41 refused, by the SERVER.
+	if !kube.ValidProjectName(strings.Repeat("a", 40)) {
+		t.Errorf("kube.ValidProjectName(40 chars) = false; the form's {1,40} would let it through")
+	}
+	if kube.ValidProjectName(strings.Repeat("a", 41)) {
+		t.Errorf("kube.ValidProjectName(41 chars) = true; the form's {1,40} is stricter than the server")
+	}
+	// The hyphen half of the same rule, still asserted from both sides.
+	if kube.ValidProjectName("team-a") {
+		t.Errorf("kube.ValidProjectName(%q) = true; the form's [a-z0-9] excludes it", "team-a")
+	}
+}

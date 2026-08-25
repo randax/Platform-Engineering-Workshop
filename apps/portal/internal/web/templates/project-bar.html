@@ -43,9 +43,16 @@
     <form hx-post="/projects" hx-target="#project-bar" hx-swap="innerHTML">
       <!-- No hyphens: an app's hostname is "<app>-<project>" in one DNS label,
            so a hyphenated project makes two different apps able to claim the
-           same URL. The server enforces it too (kube.CreateProject). -->
-      <label>Name <input name="name" required pattern="[a-z0-9]+" placeholder="teama"
-        title="Lowercase letters and digits, no hyphens — an app's URL is <app>-<project>.kn.cloudbox.k8s.test"></label>
+           same URL. The server enforces it too (kube.CreateProject).
+           The {1,40} and the maxlength are the OTHER half of the server rule:
+           kube.ValidName's regexp is ^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$, i.e.
+           40 characters. `[a-z0-9]+` let the browser accept any length, so a
+           long name passed client validation, POSTed, and came back as a
+           server-side error the form gives no hint about — and the character
+           budget matters here beyond tidiness: the project namespace shares one
+           63-character DNS label with the app name (ValidKnativeHost). -->
+      <label>Name <input name="name" required pattern="[a-z0-9]{1,40}" maxlength="40" placeholder="teama"
+        title="Lowercase letters and digits, no hyphens, at most 40 characters — an app's URL is <app>-<project>.kn.cloudbox.k8s.test"></label>
       <div class="modal-actions">
         <label for="proj-modal" class="btn ghost">Cancel</label>
         <button type="submit">Create project</button>
