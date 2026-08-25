@@ -347,6 +347,21 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
   # Service sits in <pending>, which is the correct state for a cluster with no
   # LB-IPAM.
   cilium_values+=(--set ingressController.service.type=LoadBalancer)
+  # tbx ONLY, and taken verbatim from talos-box's own curated Cilium values
+  # (internal/manifests/manifests.go:137-138, `bpf: hostLegacyRouting: true`).
+  # It routes pod traffic through the host stack instead of short-cutting out of
+  # BPF, which is what makes the ingress VIP reachable FROM THE HOST across
+  # vmnet — the whole point of the LoadBalancer above, since on this substrate
+  # the attendee's browser is outside the cluster's L2 segment and reaches it
+  # through the vmnet interface. Chart key verified in the vendored 1.20.0
+  # values.yaml (:716) and in `helm template … --set bpf.hostLegacyRouting=true`,
+  # which renders `enable-host-legacy-routing: "true"` into the ConfigMap.
+  #
+  # Deliberately NOT set on docker: that path is CI-proven as it stands, the
+  # host reaches the ingress through a published port rather than a VIP, and the
+  # flag costs the BPF fast path. See docs/HAZARDS.md — rehearsal step 3 (VIP
+  # reachability from the host) is what retires the "unproven" mark on it.
+  cilium_values+=(--set bpf.hostLegacyRouting=true)
 else
   # No LB implementation in a docker cluster. The controlplane container
   # publishes host 80 -> this NodePort, so the hostnames work port-free there too.
