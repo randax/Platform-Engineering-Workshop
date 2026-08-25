@@ -89,6 +89,12 @@ info "Substrate: ${SUBSTRATE}"
 if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then
   info "  (tbx not used: $(substrate_doctor_reason))"
 fi
+# The pin this laptop will actually run. check-consistency.sh check 10 only
+# proves versions.env and mise.toml agree with each other — mise has no tbx
+# backend to install from, so the binary on PATH is unasserted until here.
+if [[ "${SUBSTRATE}" == "tbx" ]] && have tbx; then
+  tbx_version_check check_fail
+fi
 
 # --- Docker ---------------------------------------------------------------------
 if ! have docker; then
@@ -136,22 +142,27 @@ else
 fi
 
 # --- Host ports --------------------------------------------------------------------
-step "Workshop NodePorts free on the host"
-if have docker && [[ -n "$(docker ps -q --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
+# DOCKER ONLY. Every port in this list is a host port because the docker
+# backend PUBLISHES it off the controlplane container. On tbx nothing is
+# published: the NodePorts live inside the VMs, reached at the node addresses,
+# and the ingress is a LoadBalancer VIP on the cluster's own L2 segment. So a
+# busy 30300 on a tbx laptop is somebody else's business entirely — failing
+# preflight on it would send an attendee hunting for a listener that cannot
+# affect them, and (worse) a machine that is FINE reads as not ready.
+step "Workshop host ports"
+if [[ "${SUBSTRATE}" != "docker" ]]; then
+  ok "tbx substrate — the workshop publishes no host ports at all"
+  info "  (NodePorts live inside the VMs; the ingress is a LoadBalancer VIP on the cluster's own segment)"
+elif have docker && [[ -n "$(docker ps -q --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
   ok "Cluster '${CLUSTER_NAME}' is already running — its ports are expected to be bound"
 else
   # Every NODEPORT_* in versions.env, or preflight passes and the module that
-  # needs the missed port fails at the venue instead.
+  # needs the missed port fails at the venue instead. Plus port 80, which the
+  # controlplane container publishes to NODEPORT_INGRESS — the only privileged
+  # port the workshop binds, and what makes the hostnames work port-free here.
   ports=("${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
          "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
-         "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}")
-  # Port 80 only on docker, where the controlplane container publishes it to
-  # NODEPORT_INGRESS. On tbx the ingress lives on a LoadBalancer VIP inside the
-  # cluster network and the host's port 80 is nobody's business. SUBSTRATE was
-  # resolved once in the platform section above.
-  if [[ "${SUBSTRATE}" == "docker" ]]; then
-    ports+=(80)
-  fi
+         "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}" 80)
   for port in "${ports[@]}"; do
     if (echo > "/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
       check_fail "Port ${port} is already in use — the cluster needs it; free it first (lsof -i :${port})"

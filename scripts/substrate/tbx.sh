@@ -34,9 +34,79 @@ substrate_preflight() {
   if ! tbx doctor; then
     die "'tbx doctor' reports problems (above). Fix them, or run the fallback substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
   fi
+  tbx_version_check die
   if tbx status "${CLUSTER_NAME}" >/dev/null 2>&1; then
     die "A '${CLUSTER_NAME}' tbx cluster already exists. Run ./scripts/destroy-cluster.sh first."
   fi
+  # A leftover docker-substrate /etc/hosts block is fatal HERE, before any VM
+  # exists. It maps every *.${CLOUDBOX_DOMAIN} name to 127.0.0.1, and /etc/hosts
+  # is consulted before talos-box's resolver — so the cluster would come up
+  # perfectly and every single workshop URL would still hit the attendee's own
+  # loopback. destroy-cluster.sh removes the block on the docker path now; this
+  # catches the machine whose docker cluster was destroyed by hand, or before
+  # that change existed.
+  if [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] \
+     && grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}"; then
+    fail "${CLOUDBOX_HOSTS_FILE} still carries the docker-substrate CloudBox block."
+    warn "On tbx those 127.0.0.1 lines OVERRIDE talos-box's resolver, so every"
+    warn "*.${CLOUDBOX_DOMAIN} URL would reach your laptop instead of the cluster."
+    warn "See exactly which lines: ./scripts/install.sh --print-hosts"
+    warn "Remove them: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}  # delete ${CLOUDBOX_HOSTS_BEGIN} … ${CLOUDBOX_HOSTS_END}"
+    warn "  (or, if the docker cluster is still around: ./scripts/destroy-cluster.sh)"
+    die "Remove the block and re-run."
+  fi
+}
+
+
+# tbx_host_memory_mib — the host's physical RAM in MiB, or nothing when this
+# platform has no probe we trust. Deliberately the SAME sources tbxd reads, so
+# our arithmetic and its overcommit gate cannot disagree about the host:
+#   macOS  sysctl hw.memsize (bytes)   — internal/balloon/hostmem_darwin.go:17-23
+#   Linux  /proc/meminfo MemTotal (kB) — tbxd has no Linux probe at all
+#          (internal/balloon/hostmem_stub.go), so nothing to disagree with.
+# Prints nothing rather than dying: it runs inside $( ), and the caller treats
+# an unreadable host as "keep the pinned ceiling".
+tbx_host_memory_mib() {
+  local raw
+  case "$(uname -s)" in
+    Darwin)
+      raw="$(sysctl -n hw.memsize 2>/dev/null || true)"
+      [[ "${raw}" =~ ^[0-9]+$ ]] && echo $((raw / 1024 / 1024))
+      ;;
+    Linux)
+      raw="$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || true)"
+      [[ "${raw}" =~ ^[0-9]+$ ]] && echo $((raw / 1024))
+      ;;
+  esac
+  return 0
+}
+
+# tbx_worker_memory — the worker VM's memory as a GiB string for the cluster
+# yaml. See the TBX_HOST_RESERVE_GIB block in versions.env for why this is
+# derived and not simply the pin: `tbx up` ERRORS when planned VM memory
+# exceeds host RAM minus its 6 GiB balloon reserve, which the flat 4+8 pair
+# does on every 16 GB machine.
+tbx_worker_memory() {
+  local host_mib
+  host_mib="$(tbx_host_memory_mib)"
+  if [[ ! "${host_mib}" =~ ^[0-9]+$ ]]; then
+    warn "Could not read this host's RAM — using the pinned ceiling ${TBX_WORKER_MEMORY} for the worker VM." >&2
+    warn "If 'tbx up' then refuses on overcommit, lower TBX_WORKER_MEMORY in scripts/versions.env." >&2
+    echo "${TBX_WORKER_MEMORY}"
+    return 0
+  fi
+  # Clamped in awk, not with `(( … )) && …`: an arithmetic test that evaluates
+  # to 0 exits non-zero, and the AND-list form of that is one `set -e` rewrite
+  # away from being the last statement of a function.
+  awk -v host="${host_mib}" -v cp="${TBX_CP_MEMORY%GiB}" \
+      -v reserve="${TBX_HOST_RESERVE_GIB}" \
+      -v floor="${TBX_WORKER_MEMORY_FLOOR%GiB}" -v cap="${TBX_WORKER_MEMORY%GiB}" \
+    'BEGIN {
+       g = int(host / 1024) - reserve - cp
+       if (g > cap) g = cap
+       if (g < floor) g = floor
+       printf "%dGiB", g
+     }'
 }
 
 # render_tbx_cluster_file() — write ${TBX_CLUSTER_FILE} from
@@ -53,17 +123,22 @@ render_tbx_cluster_file() {
   # controlplane VM. Mirrors the same host-scaling idea as docker.sh's
   # NODE_CPUS, but floored instead of raised to the host count — the tbx
   # daemon (not the kernel) enforces the cap talos-box assigns the VM.
-  local ncpu workers_cpus
+  local ncpu workers_cpus workers_memory
   ncpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 0)"
   workers_cpus="$(awk -v n="${ncpu}" -v floor="${TBX_WORKER_CPUS}" \
     'BEGIN { c = int(n) - 2; if (c < floor) c = floor; printf "%d", c }')"
+  # ...and worker MEMORY shrinks to the host in the same place, for the
+  # opposite reason: too many vCPUs only oversubscribes, too much VM memory
+  # makes `tbx up` refuse outright. See tbx_worker_memory() above.
+  workers_memory="$(tbx_worker_memory)"
+  info "Worker VM: ${workers_memory} / ${workers_cpus} vCPU · control plane: ${TBX_CP_MEMORY} / ${TBX_CP_CPUS} vCPU"
   sed \
     -e "s|__TALOS_VERSION__|${TALOS_VERSION}|g" \
     -e "s|__CLUSTER_NAME__|${CLUSTER_NAME}|g" \
     -e "s|__CLOUDBOX_DOMAIN__|${CLOUDBOX_DOMAIN}|g" \
     -e "s|__TBX_CP_MEMORY__|${TBX_CP_MEMORY}|g" \
     -e "s|__TBX_CP_CPUS__|${TBX_CP_CPUS}|g" \
-    -e "s|__TBX_WORKER_MEMORY__|${TBX_WORKER_MEMORY}|g" \
+    -e "s|__TBX_WORKER_MEMORY__|${workers_memory}|g" \
     -e "s|__TBX_WORKER_CPUS__|${workers_cpus}|g" \
     -e "s|__TBX_DISK_SIZE__|${TBX_DISK_SIZE}|g" \
     "${tmpl}" > "${TBX_CLUSTER_FILE}"
@@ -162,7 +237,7 @@ substrate_create() {
   # docker backend. One copy would be nicer; two identical heredocs is what
   # keeps each backend readable in isolation, and check-consistency.sh asserts
   # they stay byte-identical.
-  local cni_patch balloon_patch mirror_patch tbx_mirror_patch endpoint reg
+  local cni_patch balloon_patch mirror_patch endpoint reg
   cni_patch="$(cat <<'EOF'
 cluster:
   network:
@@ -198,19 +273,57 @@ EOF
   )"
   local patches=(--config-patch "${cni_patch}" --config-patch "${balloon_patch}")
 
-  # Two mirror layers, and they do not conflict:
-  #   * OUR eight explicit registries -> the crane mirror on the host, reached
-  #     at the cluster gateway (host.docker.internal does not resolve inside a
-  #     VM, which is why this is not mirror_host_endpoint()). skipFallback:false,
-  #     exactly as on docker: a miss falls through to the real registry.
-  #   * tbx's own catch-all "*" -> its pull-through mirror, which
-  #     `tbx manifests <cluster> mirrors` renders. Explicit entries win over "*"
-  #     in containerd, so this only covers registries our list does not name.
-  #     Adopting tbx's mirror as the STORE is a non-goal; taking its catch-all
-  #     costs nothing.
+  # ONE mirror layer: our eight explicit registries -> the crane mirror on the
+  # host, reached at the cluster gateway (host.docker.internal does not resolve
+  # inside a VM, which is why this is not mirror_host_endpoint()).
+  # skipFallback:false, exactly as on docker: a miss falls through to the real
+  # registry.
+  #
+  # DELIBERATELY NOT tbx's own catch-all. `tbx manifests <cluster> mirrors`
+  # renders a RegistryMirrorConfig for `"*"` with `skipFallback: true`
+  # (upstream internal/manifests/manifests.go:218-231), and containerd applies
+  # `"*"` to every registry the config does not name EXPLICITLY — including
+  # `localhost:30500`, which is how the kubelet pulls the images lab 07-09 and
+  # the portal build into the in-cluster Zot. tbx's mirror refuses to proxy a
+  # loopback or private authority (403 from validateResolvedAuthority /
+  # namespaceIPBlocked, internal/mirror/manager.go:313-327 and 667-680), and
+  # `skipFallback: true` forbids the direct pull that would otherwise rescue it
+  # — so every first-party image would land in ImagePullBackOff. Our eight
+  # explicit entries already cover everything in scripts/images.txt; the
+  # catch-all bought nothing and cost module 07 onward.
   if mirror_running; then
     endpoint="http://${CLOUDBOX_HOST_GATEWAY}:${MIRROR_PORT}"
     info "Image mirror detected — nodes will pull via ${endpoint}"
+    # ...and PROVE it, before that endpoint is baked into a machine config.
+    # "the mirror container is running" and "the VMs can reach it" are different
+    # claims, and only the second one matters here: the VMs reach the host at
+    # its vmnet address 172.30.<n>.1, not at loopback, so a registry published
+    # on 127.0.0.1 only (Colima and Lima default some port forwards that way,
+    # and `docker run -p 127.0.0.1:5001:5000` does it explicitly) is up, healthy,
+    # and completely unreachable from the nodes. Curling it from the HOST at the
+    # gateway address is the same question the VM will ask: the gateway IS one
+    # of this host's addresses, so a loopback-only bind fails here too.
+    #
+    # Fatal, not a warning: the whole point of the mirror is the venue, where
+    # falling through to the real registries is exactly what does not work — and
+    # the symptom lands 40 minutes later as ImagePullBackOff in module 02.
+    # /v2/ is the registry API's cheapest liveness endpoint.
+    if ! have curl; then
+      warn "curl not found — cannot prove the mirror is reachable from ${CLOUDBOX_HOST_GATEWAY}."
+      warn "If images fail to pull, check that it is bound to 0.0.0.0: docker port ${MIRROR_NAME}"
+    elif ! curl -fsS --max-time 5 "${endpoint}/v2/" >/dev/null 2>&1; then
+      fail "The image mirror is running but NOT reachable at ${endpoint}/v2/."
+      warn "The Talos VMs reach this host at ${CLOUDBOX_HOST_GATEWAY} — a mirror bound to"
+      warn "127.0.0.1 only is invisible to them, however healthy it looks locally."
+      warn "  Colima/Lima: publish on 0.0.0.0 (colima start --network-address, and make sure"
+      warn "  the container's port mapping is 0.0.0.0:${MIRROR_PORT}, not 127.0.0.1:${MIRROR_PORT})"
+      warn "  Check what it is bound to: docker port ${MIRROR_NAME}"
+      warn "  Then re-create the mirror: ./scripts/cloudbox-init.sh"
+      warn "Or accept internet pulls for this run: docker rm -f ${MIRROR_NAME} (NOT at the venue)."
+      die "Refusing to bake an unreachable mirror into the machine config."
+    else
+      ok "Mirror answers at ${endpoint}/v2/ from the cluster gateway address"
+    fi
     # Built in ONE command substitution: appending several $( ) pieces would
     # silently join the lines, since command substitution eats trailing
     # newlines. The result is byte-identical to docker.sh's MIRROR_PATCH.
@@ -227,15 +340,6 @@ EOF
     warn "cloudbox-mirror registry is not running — nodes will pull from the internet."
     warn "Fine at home; at the venue run ./scripts/cloudbox-init.sh first."
   fi
-  # Best-effort: a tbx with no mirror listener for this cluster renders nothing,
-  # and that is not a reason to fail the create.
-  tbx_mirror_patch="$(tbx manifests "${CLUSTER_NAME}" mirrors 2>/dev/null || true)"
-  if [[ -n "${tbx_mirror_patch}" ]]; then
-    patches+=(--config-patch "${tbx_mirror_patch}")
-  else
-    warn "'tbx manifests ${CLUSTER_NAME} mirrors' rendered nothing — skipping tbx's catch-all mirror"
-  fi
-
   talosctl gen config "${CLUSTER_NAME}" "${CLOUDBOX_API_ENDPOINT}" \
     --kubernetes-version "${KUBERNETES_VERSION}" \
     --output-dir "${workdir}" \
@@ -294,7 +398,30 @@ EOF
   # Keep the talosconfig where `talosctl --context cloudbox dashboard` finds it:
   # unset TALOSCONFIG first, or the merge target is the file being merged.
   unset TALOSCONFIG
+  # Same stale-context reaper the docker backend runs, for the same reason and
+  # against the same file: `talosctl config merge` will not overwrite an
+  # existing context, it RENAMES the incoming one to '${CLUSTER_NAME}-1'. Every
+  # `talosctl --context ${CLUSTER_NAME} dashboard` the labs and lab/01's verify
+  # print would then dial the dead cluster's endpoint — silently, because a
+  # renamed context is not an error. tbx clusters make this MORE likely than
+  # docker ones did: the VM addresses are vmnet DHCP leases, so the stale
+  # context's endpoint is not merely dead, it can be a DIFFERENT live machine.
+  # Placed after the `unset TALOSCONFIG` above on purpose — that is what makes
+  # ${TALOSCONFIG:-${HOME}/.talos/config} inside the helper name the merge
+  # target rather than our own throwaway workdir copy.
+  if has_talos_context "${CLUSTER_NAME}"; then
+    warn "Removing a stale talosconfig context '${CLUSTER_NAME}' (it describes a cluster that no longer exists)"
+    remove_talos_context "${CLUSTER_NAME}"
+    if has_talos_context "${CLUSTER_NAME}"; then
+      die "Could not remove the stale talosconfig context '${CLUSTER_NAME}' — remove it by hand (talosctl config remove ${CLUSTER_NAME}) and re-run."
+    fi
+  fi
   talosctl config merge "${workdir}/talosconfig"
+  # Merge does not SELECT what it merged. Without this, `talosctl --context` is
+  # fine but a bare `talosctl dashboard` still talks to whatever was selected
+  # before — which on a re-create is the context we just reaped's replacement.
+  talosctl config context "${CLUSTER_NAME}" >/dev/null 2>&1 \
+    || warn "Could not select the '${CLUSTER_NAME}' talosconfig context — pass --context ${CLUSTER_NAME} to talosctl"
   # ...and put the caller's environment back the way we found it.
   if [[ -n "${orig_talosconfig_set}" ]]; then
     export TALOSCONFIG="${orig_talosconfig}"
@@ -374,9 +501,25 @@ substrate_post_ready() {
   done
   [[ -n "${vip}" ]] \
     || die "cilium-ingress never got a LoadBalancer address after ${waited}s — kubectl -n kube-system describe svc cilium-ingress; kubectl get ciliumloadbalancerippools"
+  # Not a warning. talos-box's resolver answers 172.30.<n>.200 for every
+  # *.${CLOUDBOX_DOMAIN} name UNCONDITIONALLY (docs/SPEC.md:213-216) — it does
+  # not look up which Service holds the address. So a cilium-ingress that landed
+  # anywhere else in the .200-.239 pool means every hostname in the workshop
+  # resolves to an address nothing is listening on, and the cluster otherwise
+  # looks perfect: nodes Ready, Cilium green, the Service has "a VIP".
+  # Continuing here would hand the attendee a cluster whose every URL is dead
+  # and no error anywhere to explain it, and the diagnosis costs a module.
+  # The cause is always another LoadBalancer Service that took .200 first.
+  if [[ "${vip}" != "172.30.${idx}.200" ]]; then
+    fail "cilium-ingress got ${vip}, not 172.30.${idx}.200."
+    warn "talos-box's resolver answers 172.30.${idx}.200 for EVERY *.${CLOUDBOX_DOMAIN} name"
+    warn "regardless of which Service holds it — so no workshop hostname would reach the ingress."
+    warn "Something else took .200 first. Find it:"
+    warn "  kubectl get svc -A --field-selector spec.type=LoadBalancer"
+    warn "Delete that Service, then: ./scripts/destroy-cluster.sh && ./scripts/create-cluster.sh"
+    die "Refusing to hand you a cluster whose hostnames all point at nothing."
+  fi
   ok "Ingress VIP: ${vip} — every *.${CLOUDBOX_DOMAIN} name resolves here"
-  [[ "${vip}" == "172.30.${idx}.200" ]] \
-    || warn "VIP is ${vip}, not the conventional .200 — talos-box's resolver answers .200 for *.${CLOUDBOX_DOMAIN}, so the hostnames will NOT reach this Service. Delete the other LoadBalancer Service holding .200 and re-run."
 }
 
 substrate_destroy() {

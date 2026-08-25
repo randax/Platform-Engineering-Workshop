@@ -132,11 +132,20 @@ fi
 ING_TYPE="$(kubectl -n kube-system get svc cilium-ingress -o jsonpath='{.spec.type}' 2>/dev/null || true)"
 if [ "$SUBSTRATE" = tbx ]; then
   VIP="$(kubectl -n kube-system get svc cilium-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
-  if [ -n "$VIP" ]; then
-    ok "shared ingress has the LoadBalancer VIP ${VIP} (every *.cloudbox.k8s.test name lands here)"
-  else
-    fail "cilium-ingress has no LoadBalancer address (type ${ING_TYPE:-missing}) — kubectl get ciliumloadbalancerippools; kubectl -n kube-system describe svc cilium-ingress"
-  fi
+  # Not just "has a VIP" — has the RIGHT one. talos-box's resolver answers
+  # 172.30.<n>.200 for every *.cloudbox.k8s.test name unconditionally, without
+  # consulting which Service holds that address, so an ingress anywhere else in
+  # the .200-.239 pool means every workshop URL resolves to nothing while the
+  # cluster looks entirely healthy. Matched on the .200 suffix: <n> is the
+  # cluster's own subnet index and this check does not need to know it.
+  case "$VIP" in
+    "")
+      fail "cilium-ingress has no LoadBalancer address (type ${ING_TYPE:-missing}) — kubectl get ciliumloadbalancerippools; kubectl -n kube-system describe svc cilium-ingress" ;;
+    172.30.*.200)
+      ok "shared ingress holds the VIP ${VIP} (every *.cloudbox.k8s.test name resolves here)" ;;
+    *)
+      fail "cilium-ingress holds ${VIP}, but talos-box's resolver answers .200 for every *.cloudbox.k8s.test name — no hostname reaches the ingress. Another LoadBalancer Service took .200: kubectl get svc -A --field-selector spec.type=LoadBalancer" ;;
+  esac
 else
   if [ "$ING_TYPE" = NodePort ]; then
     ok "shared ingress is a NodePort, published on host port 80"

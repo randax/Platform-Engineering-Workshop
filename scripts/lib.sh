@@ -252,6 +252,42 @@ substrate_resolve() {
   substrate_detect
 }
 
+# tbx_version_check <reporter> — assert the tbx on PATH is the PINNED one,
+# reporting a mismatch through <reporter> (`die` on the create path,
+# check_fail in install.sh --check). Lives in lib.sh, not in substrate/tbx.sh,
+# so --check can make the assertion without sourcing a create backend.
+#
+# Nothing asserted this before: check 10 in check-consistency.sh keeps
+# versions.env and mise.toml agreeing with EACH OTHER, and says in its own
+# comment that asserting the actual binary is the preflight's job — because tbx
+# has no mise backend yet (upstream #95/#96/#101), so mise installs and enforces
+# nothing. An attendee who ran `brew upgrade` gets whatever the tap has today,
+# and the cluster-yaml schema and the `tbx manifests` sections we render are
+# exactly the parts that move between versions.
+#
+# `tbx version` prints "tbx v0.1.1 (<commit>, <date>)"; take field 2 and accept
+# a bare "0.1.1" too. An unreadable answer is a mismatch, not a pass.
+# CLOUDBOX_ALLOW_TBX_DRIFT=1 is the documented escape hatch for whoever is
+# deliberately testing a newer tbx before the pin moves.
+tbx_version_check() {
+  local report="$1" found
+  # Field 2 of "tbx v0.1.1 (<commit>, <date>)". The field-1 fallback covers a
+  # future `tbx version` that prints the bare version, so a cosmetic upstream
+  # change reads as drift-to-investigate rather than "unreadable" on every run.
+  found="$(tbx version 2>/dev/null \
+    | awk 'NR == 1 { if ($2 ~ /^v?[0-9]/) print $2; else if ($1 ~ /^v?[0-9]/) print $1 }' || true)"
+  [[ -n "${found}" && "${found}" != v* ]] && found="v${found}"
+  if [[ "${found}" == "${TBX_VERSION}" ]]; then
+    ok "tbx ${TBX_VERSION} (the pinned version)"
+    return 0
+  fi
+  if [[ "${CLOUDBOX_ALLOW_TBX_DRIFT:-}" == "1" ]]; then
+    warn "tbx is ${found:-unreadable}, pinned is ${TBX_VERSION} — allowed by CLOUDBOX_ALLOW_TBX_DRIFT=1"
+    return 0
+  fi
+  "${report}" "tbx version drift: this machine has ${found:-an unreadable version}, the workshop is pinned to ${TBX_VERSION} (scripts/versions.env). Install the pin (brew install randax/tap/tbx, or the matching release tarball), set CLOUDBOX_ALLOW_TBX_DRIFT=1 to proceed unpinned, or use the docker substrate: CLOUDBOX_SUBSTRATE=docker"
+}
+
 # cloudbox_host_gateway — the HOST as workloads INSIDE the cluster see it.
 # ONE definition, used by both backends and by bootstrap-gitops.sh (kagent's
 # Ollama endpoint), catch-up.sh and the labs — each of which runs in its own

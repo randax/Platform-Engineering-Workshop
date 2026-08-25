@@ -413,8 +413,10 @@ if [[ -z "${tbx_mise}" ]]; then
   # #101), so mise.toml may carry it as a commented pin next to the install note.
   # In this form mise installs and enforces nothing — this check only keeps
   # versions.env and the mise.toml comment line in agreement with each other;
-  # it cannot assert what binary is actually on PATH. That assertion is the
-  # tbx backend preflight's job (Task 5, substrate_preflight in tbx.sh).
+  # it cannot assert what binary is actually on PATH. That assertion is
+  # tbx_version_check() in lib.sh, called by `install.sh --check` (as a FAIL)
+  # and by substrate_preflight in tbx.sh (as a die), with
+  # CLOUDBOX_ALLOW_TBX_DRIFT=1 as the escape hatch.
   tbx_mise="$(sed -nE 's|^#[[:space:]]*tbx[[:space:]]*=[[:space:]]*"([^"]+)".*|\1|p' mise.toml | head -1)"
 fi
 if [[ -z "${tbx_mise}" ]]; then
