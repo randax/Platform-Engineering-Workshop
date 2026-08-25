@@ -69,16 +69,26 @@ else
   fail "ksvc hello not Ready — kubectl -n demo describe ksvc hello (look at the conditions)"
 fi
 
-# --- Cold start / serving through Kourier ---------------------------------------
+# --- Cold start / serving through the ingress -----------------------------------
+# Two accepted paths, because /etc/hosts has no wildcards. Preferred: the ksvc's
+# own URL, browsable with no Host header and no port — that works on tbx for
+# every name, and on docker for the names install.sh --print-hosts lists.
+# Fallback: the Host-header form against the shared ingress on port 80, which
+# works for any ksvc on either substrate. Both prove the same thing.
 # Strip the scheme in pure bash — BSD sed has no \? in basic regex.
 URL="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' 2>/dev/null || true)"
 HOST="${URL#http://}"; HOST="${HOST#https://}"
 if [ -n "$HOST" ]; then
-  BODY="$(curl -fsS --max-time 30 "${URL}/" 2>/dev/null || true)"
+  BODY="$(curl -fsS --max-time 30 "http://${HOST}/" 2>/dev/null || true)"
+  VIA="its own URL (http://${HOST}/)"
+  if ! echo "$BODY" | grep -qi hello; then
+    BODY="$(curl -fsS --max-time 30 -H "Host: ${HOST}" http://localhost/ 2>/dev/null || true)"
+    VIA="the shared ingress with a Host header"
+  fi
   if echo "$BODY" | grep -qi hello; then
-    ok "curl via the Cilium ingress (${URL}) answered: $(echo "$BODY" | head -1)"
+    ok "curl via ${VIA} answered: $(echo "$BODY" | head -1)"
   else
-    fail "no answer through the Cilium ingress — kubectl get ingress -A; try: curl -v ${URL}/"
+    fail "no answer for ${HOST} — try: curl -v -H 'Host: ${HOST}' http://localhost/ ; if that works, the name is missing from /etc/hosts (./scripts/install.sh --print-hosts). If neither works: kubectl -n kourier-system get svc kourier; kubectl get ingress -A"
   fi
 else
   fail "cannot determine ksvc URL — fix the ksvc checks above first"

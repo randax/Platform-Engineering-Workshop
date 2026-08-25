@@ -8,11 +8,30 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # Idempotent: solve.sh's contract is "produce the module's end state", and it
 # may already exist (re-runs, CI, catch-up) — create-cluster.sh itself refuses
 # to run against an existing cluster. Found by rehearsal-in-CI run 5.
-# -aq (not -q): match stopped containers too, so we agree with
-# create-cluster.sh's own "already exists" check (it uses -aq) — otherwise a
-# stopped cluster would slip past this guard and make create-cluster.sh die.
-if [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=cloudbox" 2>/dev/null)" ]]; then
-  echo "cloudbox cluster already exists — skipping creation."
+# Substrate-aware for the same reason verify.sh is: "does a cluster already
+# exist" is a question about containers on docker and about VMs on tbx. Each
+# branch asks it exactly the way that substrate's own backend guard does
+# (scripts/substrate/{docker,tbx}.sh), so this guard and create-cluster.sh can
+# never disagree. Resolved inline rather than by sourcing scripts/lib.sh, which
+# would also drag in the ordering this file deliberately controls below.
+# docker: -aq (not -q) matches stopped containers too — otherwise a stopped
+# cluster would slip past this guard and make create-cluster.sh die.
+SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
+if [[ -z "$SUBSTRATE" && -r "$HOME/.cloudbox/substrate" ]]; then
+  SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
+fi
+case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac
+
+cluster_exists() {
+  if [[ "$SUBSTRATE" == tbx ]]; then
+    tbx status cloudbox >/dev/null 2>&1
+  else
+    [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=cloudbox" 2>/dev/null)" ]]
+  fi
+}
+
+if cluster_exists; then
+  echo "cloudbox cluster already exists (${SUBSTRATE}) — skipping creation."
 else
   "$REPO_ROOT/scripts/create-cluster.sh"
 fi

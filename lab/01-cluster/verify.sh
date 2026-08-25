@@ -6,14 +6,42 @@ FAILED=0
 ok()   { echo "✅ $1"; }
 fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 
-# --- Docker containers -----------------------------------------------------
-# Filter on the talosctl-applied label — a name prefix would also match the
-# cloudbox-mirror registry container.
-CONTAINERS="$(docker ps -q --filter "label=talos.cluster.name=cloudbox" 2>/dev/null | wc -l | tr -d ' ')"
-if [ "${CONTAINERS:-0}" -ge 2 ]; then
-  ok "cloudbox Talos node containers are running (${CONTAINERS})"
+# --- Nodes exist at the substrate level -------------------------------------
+# The one check in this file that cannot be substrate-blind: on docker the nodes
+# are containers Talos labels talos.cluster.name=cloudbox; on tbx they are VMs
+# only `tbx status` can see. Everything below this is plain kubectl and is
+# identical on both — which is the whole point of the substrate contract.
+SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
+if [ -z "$SUBSTRATE" ] && [ -r "$HOME/.cloudbox/substrate" ]; then
+  SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
+fi
+case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac
+
+if [ "$SUBSTRATE" = tbx ]; then
+  # `tbx status <cluster> -o json` prints a JSON ARRAY of ClusterStatus even for
+  # one named cluster, so normalise before reading .nodes[].
+  TBX_JSON="$(tbx status cloudbox -o json 2>/dev/null || true)"
+  NODES="$(printf '%s' "$TBX_JSON" | jq -r '(if type == "array" then ((map(select(.name == "cloudbox")) | first) // {}) else . end) | [(.nodes // [])[] | select(.phase == "configured")] | length' 2>/dev/null || echo 0)"
+  case "$NODES" in ''|*[!0-9]*) NODES=0 ;; esac
+  if [ "$NODES" -ge 2 ]; then
+    ok "cloudbox Talos VMs are running and configured (${NODES})"
+  else
+    PHASES="$(printf '%s' "$TBX_JSON" | jq -r '(if type == "array" then ((map(select(.name == "cloudbox")) | first) // {}) else . end) | [(.nodes // [])[] | "\(.role):\(.phase)"] | join(", ")' 2>/dev/null || true)"
+    fail "expected 2 configured Talos VMs, found ${NODES}${PHASES:+ (saw ${PHASES})} — 'tbx status cloudbox', then ./scripts/create-cluster.sh"
+  fi
 else
-  fail "expected 2 running Talos node containers, found ${CONTAINERS:-0} — run ./scripts/create-cluster.sh"
+  # Filter on the talosctl-applied label — a name prefix would also match the
+  # cloudbox-mirror registry container.
+  # `|| CONTAINERS=0`: with `set -o pipefail` a stopped Docker daemon makes the
+  # whole substitution non-zero, and `set -e` would kill this script BEFORE it
+  # could print a single FAIL line — the attendee would get silence and exit 1.
+  CONTAINERS="$(docker ps -q --filter "label=talos.cluster.name=cloudbox" 2>/dev/null | wc -l | tr -d ' ')" || CONTAINERS=0
+  case "$CONTAINERS" in ''|*[!0-9]*) CONTAINERS=0 ;; esac
+  if [ "${CONTAINERS:-0}" -ge 2 ]; then
+    ok "cloudbox Talos node containers are running (${CONTAINERS})"
+  else
+    fail "expected 2 running Talos node containers, found ${CONTAINERS:-0} — run ./scripts/create-cluster.sh"
+  fi
 fi
 
 # --- Workshop-context guard ------------------------------------------------
@@ -38,8 +66,10 @@ else
   # the machine config's cluster.controlPlane.endpoint (https://10.5.0.2:6443),
   # which only routes on native Linux — on macOS/Windows it replaces a working
   # kubeconfig with one that hangs on TCP connect. create-cluster.sh repoints the
-  # context at the controlplane container's published port; re-running it is the fix.
-  fail "kubectl cannot reach the cluster — did create-cluster.sh finish? Re-run ./scripts/create-cluster.sh (it repoints kubeconfig at https://127.0.0.1:\$(docker port cloudbox-controlplane-1 6443/tcp))"
+  # context at whatever the substrate actually publishes — the controlplane
+  # container's port on docker, the control-plane VM's own address on tbx —
+  # so re-running it is the fix on both.
+  fail "kubectl cannot reach the cluster — did create-cluster.sh finish? Re-run ./scripts/create-cluster.sh (it points the kubeconfig at the API server your substrate publishes: https://127.0.0.1:\$(docker port cloudbox-controlplane-1 6443/tcp) on docker, the control-plane VM's own https://172.30.<n>.2:6443 on tbx)"
   echo; echo "❌ Cannot check further without API access."; exit 1
 fi
 
@@ -93,6 +123,26 @@ if kubectl -n kube-system wait --for=condition=Available deploy/coredns --timeou
   ok "CoreDNS Available (pod networking + Services work end to end)"
 else
   fail "CoreDNS not Available — usually a CNI problem; kubectl -n kube-system get pods and look at coredns events"
+fi
+
+# --- Shared ingress ---------------------------------------------------------
+# "There is one endpoint every *.cloudbox.k8s.test name lands on" is part of what
+# module 01 delivers — but WHAT that endpoint is differs: a LoadBalancer VIP that
+# Cilium hands out on tbx, a NodePort published on host port 80 on docker.
+ING_TYPE="$(kubectl -n kube-system get svc cilium-ingress -o jsonpath='{.spec.type}' 2>/dev/null || true)"
+if [ "$SUBSTRATE" = tbx ]; then
+  VIP="$(kubectl -n kube-system get svc cilium-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+  if [ -n "$VIP" ]; then
+    ok "shared ingress has the LoadBalancer VIP ${VIP} (every *.cloudbox.k8s.test name lands here)"
+  else
+    fail "cilium-ingress has no LoadBalancer address (type ${ING_TYPE:-missing}) — kubectl get ciliumloadbalancerippools; kubectl -n kube-system describe svc cilium-ingress"
+  fi
+else
+  if [ "$ING_TYPE" = NodePort ]; then
+    ok "shared ingress is a NodePort, published on host port 80"
+  else
+    fail "cilium-ingress is '${ING_TYPE:-missing}', want NodePort on the docker substrate — was the cluster made by ./scripts/create-cluster.sh?"
+  fi
 fi
 
 echo
