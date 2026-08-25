@@ -288,6 +288,46 @@ port_in_use() { # <port>
   (echo > "/dev/tcp/127.0.0.1/$1") 2>/dev/null
 }
 
+# cloudbox_host_ports — every port a cluster on this HOST publishes: the nine
+# workshop NodePorts plus 80 (mapped to the ingress NodePort — the only
+# privileged port the workshop binds, and what makes the hostnames work without
+# a port). One list, because three callers ask the same question:
+# install.sh --check, kind-fallback.sh's preflight, and the docker substrate's.
+cloudbox_host_ports() {
+  printf '%s\n' "${NODEPORT_GITEA}" "${NODEPORT_ARGOCD}" "${NODEPORT_ZOT}" \
+                 "${NODEPORT_PORTAL}" "${NODEPORT_BACKSTAGE}" "${NODEPORT_RUSTFS_S3}" \
+                 "${NODEPORT_GRAFANA}" "${NODEPORT_KOURIER}" "${NODEPORT_NATS}" 80
+}
+
+# assert_host_ports_free — 0 when every one of those ports is free; otherwise it
+# NAMES the holders and returns 1. The caller supplies the die() line, because
+# what the doomed create would have left behind differs per substrate.
+#
+# This exists because both container substrates publish their ports AFTER the
+# nodes are created: `talosctl cluster create` and `kind create cluster` each
+# build the containers, then fail on "bind: address already in use" — leaving a
+# half-made cluster whose cleanup is a separate command. kind-fallback.sh has
+# had this refusal since round 8; the docker substrate, which binds the same ten
+# ports, had none.
+assert_host_ports_free() {
+  local taken=() p holder
+  while IFS= read -r p; do
+    port_in_use "${p}" && taken+=("${p}")
+  done < <(cloudbox_host_ports)
+  [[ "${#taken[@]}" -eq 0 ]] && return 0
+  fail "These host ports are already in use: ${taken[*]}"
+  for p in "${taken[@]}"; do
+    if [[ "${p}" == "80" ]]; then
+      warn "  port 80 (the ingress; every *.${CLOUDBOX_DOMAIN} URL needs it):"
+      port80_listeners
+    else
+      holder="$(port_listeners "${p}")"
+      [[ -n "${holder}" ]] && printf '   %s\n' "${holder}"
+    fi
+  done
+  return 1
+}
+
 # port80_listeners — print who is holding host port 80, or say we could not
 # tell. Best-effort and never fatal: it runs only on a create that has already
 # failed, purely to turn "bind: address already in use" into a name.
@@ -369,7 +409,7 @@ substrate_doctor_reason() {
 # detection itself are in substrate-decide.sh. These two names are kept as the
 # in-tree spelling every caller already uses.
 substrate_detect_into() { substrate_decide_detect_into "$1"; } # <varname>
-substrate_detect() { local __s; substrate_detect_into __s; echo "${__s}"; }
+substrate_detect() { local __sd_answer; substrate_detect_into __sd_answer; echo "${__sd_answer}"; }
 
 # substrate_persist <tbx|docker> — record the substrate the cluster was CREATED
 # on. Everything downstream reads this rather than re-detecting: a laptop that
@@ -403,6 +443,18 @@ api_endpoint_forget() { rm -f "${CLOUDBOX_API_ENDPOINT_FILE}"; }
 # string). Never detects; never writes.
 substrate_current() {
   local value
+  # An existing file we cannot READ is not an absent file. substrate_persisted_raw
+  # returns nothing in both cases (it must: it is the pure helper lab 00 uses),
+  # and "no answer" here means "no cluster was ever created" — the one conclusion
+  # a 000-mode or root-owned ~/.cloudbox/substrate does not license. Everything
+  # downstream then acts on a guess: destroy-cluster.sh falls back to docker, and
+  # require_identity_match() below waves every transition through. Say so, and
+  # return 1 — the same status a corrupt value gets, for the same reason.
+  if [[ -e "${CLOUDBOX_SUBSTRATE_FILE}" && ! -r "${CLOUDBOX_SUBSTRATE_FILE}" ]]; then
+    warn "${CLOUDBOX_SUBSTRATE_FILE} exists but cannot be read — this machine's recorded substrate is unknown" >&2
+    warn "  (ls -l ${CLOUDBOX_SUBSTRATE_FILE}; fix its ownership/mode, or delete it if no cluster is running)" >&2
+    return 1
+  fi
   value="$(substrate_persisted_raw)"
   [[ -n "${value}" ]] || return 0
   if substrate_valid "${value}"; then
@@ -435,15 +487,19 @@ substrate_current() {
 # implementation, shared with lab/00-setup/verify.sh. What this wrapper adds is
 # the speaking: an invalid override named on stderr, and the corrupt-state-file
 # warning (substrate_current is asked for its voice, not for its answer).
+# RESERVED variable name for callers: __sr_result_ref. `local __var="$1"` used to
+# stand here, which SHADOWS a caller variable of that name — `substrate_resolve_into
+# __var` would have set this function's local and left the caller's own empty,
+# silently. Same hazard, same fix as substrate_decide_into (substrate-decide.sh).
 substrate_resolve_into() { # <varname> — substrate_resolve without the subshell
-  local __var="$1"
+  local __sr_result_ref="$1"
   if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
     substrate_valid "${CLOUDBOX_SUBSTRATE}" \
       || { fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx', 'docker' or 'kind'" >&2; return 1; }
   else
     substrate_current >/dev/null || true
   fi
-  substrate_decide_into "${__var}"
+  substrate_decide_into "${__sr_result_ref}"
 }
 
 # The `$( )` form, for the places that read the answer inline. Prefer
@@ -454,9 +510,69 @@ substrate_resolve_into() { # <varname> — substrate_resolve without the subshel
 # for a second full probe of the helper, DNS, routes and mirror. Seconds, twice,
 # on a path the attendee is already waiting on.
 substrate_resolve() {
-  local __s
-  substrate_resolve_into __s || return 1
-  echo "${__s}"
+  local __sr_answer
+  substrate_resolve_into __sr_answer || return 1
+  echo "${__sr_answer}"
+}
+
+# --- Recorded identity vs desired substrate ----------------------------------
+# substrate_teardown_command <identity> — the ONE command that removes what that
+# identity records. Named here so every refusal below quotes the same recipe.
+substrate_teardown_command() { # <tbx|docker|kind>
+  case "${1:-}" in
+    kind)   echo "./scripts/kind-fallback.sh --delete" ;;
+    tbx)    echo "CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh" ;;
+    docker) echo "CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh" ;;
+    *)      return 1 ;;
+  esac
+}
+
+# require_identity_match <desired> — die unless the substrate this machine has
+# RECORDED is the one about to be acted on.
+#
+# CLOUDBOX_SUBSTRATE is an override for the DECISION ("which substrate should
+# this machine use"), and substrate_resolve() rightly lets it win. It was also
+# winning over the RECORD ("which substrate this machine's cluster was actually
+# built on"), which is not a preference — it is a fact about state that exists,
+# and every mutating path read it as permission:
+#
+#   * `CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh` on a machine that
+#     records `kind` ran the docker teardown and then removed the lifeboat's
+#     /etc/hosts block, on a cluster that is still running;
+#   * `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh` on a kind machine
+#     persisted `docker` over `kind`, after which --delete could no longer prove
+#     the block was its own;
+#   * `CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh` on a tbx machine
+#     erased ${CLOUDBOX_SUBSTRATE_FILE} — the only record that VMs exist — while
+#     the VMs kept running, unreachable by any script;
+#   * `CLOUDBOX_SUBSTRATE=docker ./scripts/install.sh --write-hosts` on a tbx
+#     machine wrote the 127.0.0.1 block that overrides talos-box's resolver.
+#
+# So: env-first for the DESIRED value, record-first for whether we may act. A
+# transition is a two-step operation (tear the old one down, then create the new
+# one), and this says so instead of doing half of it. Callers must run this
+# BEFORE sourcing a backend and before touching any state.
+#
+# Silent on a machine with no record at all (a clean laptop, and CI: no
+# ~/.cloudbox/substrate, CLOUDBOX_SUBSTRATE=docker) and on a match. An
+# unreadable record is refused by substrate_current(), which warns in its own
+# voice; here that is "no answer", because an unreadable file is not evidence of
+# a MISmatch and the run's own preflight will find whatever is really there.
+#
+# CLOUDBOX_IGNORE_TBX does NOT relax this. That flag exists for one thing — "tbx
+# is installed but cannot be inspected" — and identity is not an inspection
+# result: it is something this repo wrote down itself.
+require_identity_match() { # <desired>
+  local desired="$1" recorded teardown
+  recorded="$(substrate_current || true)"
+  [[ -n "${recorded}" ]] || return 0
+  [[ "${recorded}" != "${desired}" ]] || return 0
+  teardown="$(substrate_teardown_command "${recorded}")"
+  fail "This machine records the '${recorded}' substrate (${CLOUDBOX_SUBSTRATE_FILE}), and this would act on '${desired}'."
+  warn "Nothing has been changed. A substrate change is a teardown followed by a create:"
+  warn "  ${teardown}"
+  warn "  CLOUDBOX_SUBSTRATE=${desired} <this command>"
+  die "Destroy the '${recorded}' cluster first, then re-run with CLOUDBOX_SUBSTRATE=${desired}."
 }
 
 # tbx_version_check <reporter> — assert the tbx on PATH is the PINNED one,
@@ -657,10 +773,33 @@ kind_cluster_exists() { # [name]
 # kind_nodes_running — are its node containers actually up? kind names them
 # <cluster>-control-plane and <cluster>-worker, which is also how
 # kind-fallback.sh reaches into them to write the containerd mirror config.
+# BOTH of them, counted — not "the control plane is up". kind publishes every
+# host port from the WORKER (kind-fallback.sh's extraPortMappings live under
+# `role: worker`), so a machine whose worker container is stopped answers no
+# workshop URL at all — while this returned 0 and install.sh --check reported
+# "its ports are expected to be bound" on a cluster that could not serve one.
+# `docker ps` filters of the same key are OR-ed, so one filter per node and a
+# count of 2 is the shape that proves both.
 kind_nodes_running() { # [name]
-  local name="${1:-${CLUSTER_NAME}}"
+  local name="${1:-${CLUSTER_NAME}}" up
   docker_running || return 1
-  [[ -n "$(docker ps -q --filter "name=^${name}-control-plane$" 2>/dev/null)" ]]
+  up="$(docker ps -q \
+          --filter "name=^${name}-control-plane$" \
+          --filter "name=^${name}-worker$" 2>/dev/null | grep -c . || true)"
+  [[ "${up}" == "2" ]]
+}
+
+# kind_nodes_missing — the node containers that are NOT running, space-separated,
+# for the message. Empty when both are up (or docker cannot be asked).
+kind_nodes_missing() { # [name]
+  local name="${1:-${CLUSTER_NAME}}" node
+  local down=()
+  docker_running || return 0
+  for node in "${name}-control-plane" "${name}-worker"; do
+    [[ -n "$(docker ps -q --filter "name=^${node}$" 2>/dev/null)" ]] || down+=("${node}")
+  done
+  [[ "${#down[@]}" -gt 0 ]] && printf '%s\n' "${down[*]}"
+  return 0
 }
 
 cloudbox_host_gateway() {

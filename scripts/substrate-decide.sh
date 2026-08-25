@@ -150,7 +150,7 @@ substrate_decide_detect_into() { # <varname>
 }
 
 substrate_decide_detect() {
-  local __s; substrate_decide_detect_into __s; echo "${__s}"
+  local __sd_detected; substrate_decide_detect_into __sd_detected; echo "${__sd_detected}"
 }
 
 # --- The whole decision -------------------------------------------------------
@@ -168,27 +168,34 @@ substrate_decide_detect() {
 # that is not one of the accepted values; the caller says so in its own voice. A state
 # file with junk in it is treated as no answer (also the caller's to report),
 # because a machine is not stopped by a corrupt note about the past.
+#
+# RESERVED variable names for callers of the _into forms: __sd_result_ref and
+# __sd_persisted. A `local` here SHADOWS a caller variable of the same name, so
+# `substrate_decide_into __var` used to set THIS function's local `__var` and
+# leave the caller's own untouched — no error, no warning, an empty answer that
+# every caller then read as "docker". The names are deliberately unlikely; the
+# rule is that nothing outside this file may pass one of them as <varname>.
 substrate_decide_into() { # <varname>
-  local __var="$1" __persisted
+  local __sd_result_ref="$1" __sd_persisted
   if [ -n "${CLOUDBOX_SUBSTRATE:-}" ]; then
     substrate_valid "${CLOUDBOX_SUBSTRATE}" || return 1
-    printf -v "${__var}" '%s' "${CLOUDBOX_SUBSTRATE}"
+    printf -v "${__sd_result_ref}" '%s' "${CLOUDBOX_SUBSTRATE}"
     return 0
   fi
-  __persisted="$(substrate_persisted_raw)"
-  if substrate_valid "${__persisted}"; then
-    printf -v "${__var}" '%s' "${__persisted}"
+  __sd_persisted="$(substrate_persisted_raw)"
+  if substrate_valid "${__sd_persisted}"; then
+    printf -v "${__sd_result_ref}" '%s' "${__sd_persisted}"
     return 0
   fi
   if [ "${CLOUDBOX_SUBSTRATE_DEFAULT:-tbx}" = "docker" ]; then
-    printf -v "${__var}" '%s' "docker"
+    printf -v "${__sd_result_ref}" '%s' "docker"
     return 0
   fi
-  substrate_decide_detect_into "${__var}"
+  substrate_decide_detect_into "${__sd_result_ref}"
 }
 
 substrate_decide() {
-  local __s
-  substrate_decide_into __s || return 1
-  echo "${__s}"
+  local __sd_answer
+  substrate_decide_into __sd_answer || return 1
+  echo "${__sd_answer}"
 }
