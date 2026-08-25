@@ -335,19 +335,24 @@ after ~3 minutes, then read the logs.
 Linux Docker, and the cluster gateway `172.30.<n>.1` inside a talos-box VM — the same
 host-vs-container addressing problem `cloudbox-mirror` solved for you in module 00 (see
 `mirror_host_endpoint()` and `cloudbox_host_gateway()` in `scripts/lib.sh`), showing up a
-second time for a second reason. `bootstrap-gitops.sh` already resolved it for your
-machine: it recorded the answer in a ConfigMap and patched the `ModelConfig` (the kagent
-Application `ignoreDifferences` that one field, so ArgoCD's selfHeal leaves the patch
-alone). Check what it decided:
+second time for a second reason. It is already handled, in two halves:
+`bootstrap-gitops.sh` resolved the address for your machine back in module 00 and recorded
+it in configmap `kagent/cloudbox-host`, and the `kagent-ollama-host` PostSync hook you just
+synced patched the `ModelConfig` with it the moment ArgoCD created it. The kagent
+Application `ignoreDifferences` that one field, so selfHeal leaves the patch alone. Verify:
 
 ```bash
 kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.ollama.host}{"\n"}'
-kubectl -n kagent get configmap cloudbox-host -o jsonpath='{.data.ollama}{"\n"}'
 ```
 
-The two should agree. If the `ModelConfig` still says `host.docker.internal` on Linux or
-talos-box, kagent was enabled after that patch ran — re-run `./scripts/bootstrap-gitops.sh`
-(it is idempotent) or patch it yourself from the ConfigMap.
+That should be your host's address, not necessarily the `host.docker.internal` that git
+carries. If it is not — the hook's log says why
+(`kubectl -n kagent logs job/kagent-ollama-host`) — the same patch by hand:
+
+```bash
+kubectl -n kagent patch modelconfig default-model-config --type merge \
+  -p "{\"spec\":{\"ollama\":{\"host\":\"$(kubectl -n kagent get cm cloudbox-host -o jsonpath='{.data.ollama}')\"}}}"
+```
 
 **Ollama must listen on that address, not only on loopback.** macOS/WSL2 is the one case
 that needs nothing: those runtimes proxy `host.docker.internal` through to the host's

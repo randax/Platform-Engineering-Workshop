@@ -4,7 +4,27 @@
 |---|---|
 | Source charts | `oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds` and `oci://ghcr.io/kagent-dev/kagent/helm/kagent` |
 | Version | **0.9.12** (2026-07-20; pin this stable release: kagent does not mark its `v0.10.0-beta*` / `v0.10.0-rc*` GitHub releases as prereleases, so `/releases/latest` resolves to a beta — re-confirmed 2026-08-11, when `/releases/latest` reported `v0.10.0-rc1`) |
-| Files | `kagent-crds.yaml` (rendered, 8 CRDs) + `kagent.yaml` (rendered workshop profile) |
+| Files | `kagent-crds.yaml` (rendered, 8 CRDs) + `kagent.yaml` (rendered workshop profile); `namespace.yaml`, `networkpolicy.yaml` and `ollama-host-hook.yaml` are hand-written and have no upstream to diff against |
+
+## `ollama-host-hook.yaml` — hand-written
+
+An ArgoCD **PostSync hook** (Job + ServiceAccount + Role/RoleBinding, all named
+`kagent-ollama-host`) that points the default `ModelConfig` at *this machine's*
+host address. It exists because of an ordering fact: `bootstrap-gitops.sh`
+resolves `cloudbox_host_gateway()` while the cluster is being built, but kagent
+is a catalog capability the attendee enables in module 10 — there is no
+`ModelConfig` to patch at bootstrap time. Bootstrap therefore only records the
+answer in configmap `kagent/cloudbox-host`, and this hook applies it right after
+ArgoCD creates the object.
+
+| | |
+|---|---|
+| Image | `quay.io/argoproj/argocd:v3.5.1` — already on `scripts/images.txt`, and it ships `kubectl`. No new image enters the offline bundle for a one-field patch. |
+| RBAC | namespaced and `resourceNames`-scoped: `configmaps` `get` on `cloudbox-host` only, `modelconfigs` `get`+`patch` on `default-model-config` only. Nothing else, nowhere else — it reads one address and writes one field. |
+| Hook policy | `argocd.argoproj.io/hook: PostSync` runs it after ArgoCD has created the ModelConfig; `argocd.argoproj.io/hook-delete-policy: BeforeHookCreation` keeps the last run's pod until the next sync, so `kubectl -n kagent logs job/kagent-ollama-host` still says what it decided. |
+| Resources | one `kubectl` call and exit: requests `10m` CPU / `32Mi` memory, limit `128Mi` — small enough to be invisible in the workshop RAM budget, generous enough that the patch is never OOM-killed halfway. |
+| Idempotent | Reads the current `/spec/ollama/host` first and exits 0 when it already matches; exits 0 when the ConfigMap is absent (docker/CI, where git's default is already right). |
+| Why it is not reverted | The kagent Application `ignoreDifferences` `/spec/ollama/host` with `RespectIgnoreDifferences=true` (`gitops/catalog/kagent.yaml`). |
 
 ## Re-vendor
 
@@ -40,11 +60,11 @@ recipe, re-apply the curation below, then
   (the value carried here) is right only on macOS/WSL2 docker — native Linux
   docker needs `10.5.0.1` (`TALOS_SUBNET_GATEWAY`) and a tbx VM needs its
   cluster gateway `172.30.<n>.1`. Nobody hand-edits it any more:
-  `scripts/bootstrap-gitops.sh` resolves `cloudbox_host_gateway()` once, records
-  it in configmap `kagent/cloudbox-host` and patches the `ModelConfig` if kagent
-  is already enabled; the kagent Application `ignoreDifferences` on
-  `/spec/ollama/host` (plus `RespectIgnoreDifferences=true`) keeps selfHeal from
-  reverting the patch.
+  `scripts/bootstrap-gitops.sh` resolves `cloudbox_host_gateway()` once and
+  records it in configmap `kagent/cloudbox-host`; `ollama-host-hook.yaml`
+  (above) patches the `ModelConfig` with it at enable-time, and the kagent
+  Application `ignoreDifferences` on `/spec/ollama/host` (plus
+  `RespectIgnoreDifferences=true`) keeps selfHeal from reverting that patch.
 - **Bundled Postgres stays** — this slice keeps upstream's dev-mode database
   and workshop-grade database/user/password credentials
   `kagent`/`kagent`/`kagent`. It is intentionally not wired to the separately
@@ -90,10 +110,11 @@ crane 2026-08-11):
 
 `scripts/check-vendor-drift.sh` re-runs both renders — charts, version, flags
 and the whole workshop values document — and diffs them against the vendored
-files. All of kagent's *workshop* curation is in the values, so the renders
-carry no post-hoc edits; the only `allow` lines are inert helm-4 whitespace
-(these files were rendered with helm 3, and helm 4 lays out blank lines
-differently). Any other hunk means the chart moved under a value we set, or
+files. Almost all of kagent's *workshop* curation is in the
+values, so the renders are near-pristine: the `allow` lines are inert helm-4
+whitespace (these files were rendered with helm 3, and helm 4 lays out blank
+lines differently) plus one post-hoc COMMENT above `spec.ollama.host`, which
+changes no manifest field. Any other hunk means the chart moved under a value we set, or
 someone hand-edited a rendered file.
 
 ```curation
@@ -172,11 +193,12 @@ values
       # only the DEFAULT: native Linux docker has no host.docker.internal
       # (10.5.0.1 = TALOS_SUBNET_GATEWAY) and a tbx VM resolves neither (its
       # cluster gateway is 172.30.<n>.1). scripts/bootstrap-gitops.sh decides
-      # which of the three applies from cloudbox_host_gateway(), writes it to
-      # configmap kagent/cloudbox-host and patches the ModelConfig; the kagent
+      # which of the three applies from cloudbox_host_gateway() and writes it to
+      # configmap kagent/cloudbox-host; ollama-host-hook.yaml (PostSync) patches
+      # the ModelConfig with it when the attendee enables kagent; the kagent
       # Application ignoreDifferences /spec/ollama/host so selfHeal leaves that
       # patch alone. Nothing hand-edits this line — the rendered file carries a
-      # comment saying so (allow hunk c871d641 below).
+      # comment saying so (allow hunk 90618629 below).
       config:
         host: host.docker.internal:11434
         # Measured on 2026-08-18 against this cluster's module 10 end state.
@@ -235,7 +257,7 @@ values
 # --- accepted curation: one line per diff hunk (id, then why) ---
 allow  kagent-crds.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm (4.2.4)
 allow  kagent.yaml  39cdd0de  helm 4 emits a blank line before each `---`; this file was rendered with helm 3. Inert whitespace, no manifest changes — it disappears the next time the file is re-vendored with the pinned helm (4.2.4)
-allow  kagent.yaml  c871d641  a post-render comment above `spec.ollama.host`, saying that bootstrap-gitops.sh patches that field from cloudbox_host_gateway() and that the kagent Application ignoreDifferences it — the one place a reader meets the hardcoded default is the one place that has to say it is not the whole story. Comment only; no manifest change
+allow  kagent.yaml  90618629  a post-render comment above `spec.ollama.host`, saying that ollama-host-hook.yaml patches that field from configmap kagent/cloudbox-host at enable-time and that the kagent Application ignoreDifferences it — the one place a reader meets the hardcoded default is the one place that has to say it is not the whole story. Comment only; no manifest change
 allow  kagent.yaml  c0b80476  helm 4 keeps two whitespace-only lines in the config ConfigMap that helm 3 stripped — inert, same fix as above
 allow  kagent.yaml  277cc02f  helm 4 keeps a single-space line that helm 3 stripped — inert, same fix as above
 allow  kagent.yaml  0972f4d7  helm 4.2.4 (the "vanishing empty lines" fix) keeps TWO blank lines before one `---` — after the `kagent-tools` Service — where 4.2.3 kept one. Same helm-3-era artifact as `39cdd0de`, one hunk with its own content id; inert whitespace, no manifest changes

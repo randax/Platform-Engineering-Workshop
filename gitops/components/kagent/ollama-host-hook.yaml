@@ -1,0 +1,117 @@
+---
+# Hand-written (no upstream render to diff against) — see VENDOR.md.
+#
+# kagent's ModelConfig points at a host-side Ollama, and "the host" has three
+# different addresses: host.docker.internal (macOS/WSL2 docker), 10.5.0.1
+# (native Linux docker, TALOS_SUBNET_GATEWAY) and 172.30.<n>.1 (the cluster
+# gateway inside a talos-box VM). Git can only carry one of them, so
+# scripts/bootstrap-gitops.sh resolves cloudbox_host_gateway() while the
+# cluster is being built and writes the answer to configmap
+# kagent/cloudbox-host. That happens LONG BEFORE kagent exists: kagent is a
+# catalog capability the attendee enables in module 10, so bootstrap has no
+# ModelConfig to patch and the git default would otherwise reach the cluster
+# untouched on two substrates out of three.
+#
+# This PostSync hook closes that gap at the only moment that works — right
+# after ArgoCD has created the ModelConfig. It reads the ConfigMap and patches
+# the live object; the kagent Application ignoreDifferences /spec/ollama/host
+# (with RespectIgnoreDifferences=true), so selfHeal leaves the patch alone.
+# On docker/CI, where the ConfigMap may be absent, it exits 0 and changes
+# nothing — the git default is already correct there.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kagent-ollama-host
+  namespace: kagent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kagent-ollama-host
+  namespace: kagent
+rules:
+  # Read the address bootstrap-gitops.sh recorded.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["cloudbox-host"]
+    verbs: ["get"]
+  # Read the current value (so a re-run is a no-op) and set it. No create, no
+  # delete, no other kind: this hook edits one field of one object.
+  - apiGroups: ["kagent.dev"]
+    resources: ["modelconfigs"]
+    resourceNames: ["default-model-config"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kagent-ollama-host
+  namespace: kagent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kagent-ollama-host
+subjects:
+  - kind: ServiceAccount
+    name: kagent-ollama-host
+    namespace: kagent
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kagent-ollama-host
+  namespace: kagent
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    # BeforeHookCreation, not HookSucceeded: the previous run's pod stays
+    # around until the next sync, so `kubectl -n kagent logs job/...` can still
+    # say what address it decided on.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kagent
+        app.kubernetes.io/component: ollama-host-hook
+    spec:
+      serviceAccountName: kagent-ollama-host
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+      containers:
+        - name: patch
+          # The ArgoCD image is already on the pre-pull list (scripts/images.txt,
+          # "ArgoCD v3.5.1") and ships kubectl — no new image, no extra bytes in
+          # the offline bundle.
+          image: quay.io/argoproj/argocd:v3.5.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              host="$(kubectl -n kagent get configmap cloudbox-host \
+                -o jsonpath='{.data.ollama}' 2>/dev/null || true)"
+              if [ -z "${host}" ]; then
+                echo "no configmap kagent/cloudbox-host — keeping the ModelConfig's git default"
+                exit 0
+              fi
+              current="$(kubectl -n kagent get modelconfig default-model-config \
+                -o jsonpath='{.spec.ollama.host}' 2>/dev/null || true)"
+              if [ "${current}" = "${host}" ]; then
+                echo "ModelConfig already points at ${host}"
+                exit 0
+              fi
+              kubectl -n kagent patch modelconfig default-model-config --type merge \
+                -p "{\"spec\":{\"ollama\":{\"host\":\"${host}\"}}}"
+              echo "ModelConfig Ollama host: ${current:-<unset>} -> ${host}"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

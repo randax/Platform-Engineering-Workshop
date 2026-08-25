@@ -209,9 +209,13 @@ kubectl apply -f "${REPO_ROOT}/gitops/components/argocd/ingress.yaml"
 # hardcoded to host.docker.internal — which native-Linux attendees had to
 # hand-edit (lab/10-day2-ops/README.md) and which no tbx VM can resolve at all.
 # Record the right answer once, here, where the substrate is known. The
-# ModelConfig may not exist yet (kagent is a stretch catalog item enabled later),
-# so this writes a ConfigMap the module-10 lab reads and applies the patch
-# opportunistically — never failing the bootstrap over an optional component.
+# ModelConfig almost never exists yet — kagent is a catalog capability the
+# attendee enables in module 10 — so the ConfigMap written here is the real
+# handoff: gitops/components/kagent/ollama-host-hook.yaml is a PostSync hook
+# that reads it and patches the ModelConfig the moment ArgoCD creates it. The
+# patch below only covers the other order (a re-bootstrap against a cluster
+# that already runs kagent) and never fails the bootstrap over an optional
+# component.
 # That last promise is why the lookup itself is guarded: on tbx
 # cloudbox_host_gateway() needs jq and a live `tbx status`, and a bootstrap must
 # not die because an optional day-2 capability could not be pre-addressed.
@@ -227,7 +231,7 @@ if gateway="$(cloudbox_host_gateway)"; then
       -p "{\"spec\":{\"ollama\":{\"host\":\"${gateway}:11434\"}}}"
     ok "kagent ModelConfig points at ${gateway}:11434"
   else
-    info "kagent is not enabled yet — its Ollama host (${gateway}:11434) is recorded in configmap kagent/cloudbox-host"
+    info "kagent is not enabled yet — its Ollama host (${gateway}:11434) is recorded in configmap kagent/cloudbox-host; its PostSync hook applies it when module 10 enables kagent"
   fi
 else
   warn "could not determine the host gateway — kagent (module 10, optional) keeps the git default host.docker.internal:11434; lab/10-day2-ops/README.md says how to check it"
