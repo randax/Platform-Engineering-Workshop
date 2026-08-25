@@ -30,6 +30,14 @@ kind: Ingress
 metadata:
   name: kourier
   namespace: kourier-system
+  annotations:
+    # A scale-from-zero ksvc can take longer than Envoy's 15 s default route
+    # timeout to answer its first request — and every hostname now passes
+    # through Envoy. This one rule fronts every function in the workshop, so a
+    # 504 here reads as "my function is broken". "0s" disables the timeout; see
+    # the same annotation on gitops/components/gitea/ingress.yaml for the
+    # citation.
+    ingress.cilium.io/request-timeout: "0s"
 spec:
   ingressClassName: cilium
   rules:

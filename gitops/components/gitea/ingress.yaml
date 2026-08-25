@@ -24,6 +24,15 @@ kind: Ingress
 metadata:
   name: gitea
   namespace: gitea
+  annotations:
+    # Envoy's default route timeout is 15 s, and every hostname now goes through
+    # Cilium's Envoy. `seed-gitea.sh` pushes a ~40 MiB pack through this
+    # hostname, and attendees push through it all day. "0s" means NO timeout
+    # (operator/pkg/ingress/annotations/annotations.go:88-101 parses it into a
+    # non-nil zero duration, and Envoy reads route timeout 0 as disabled).
+    # create-cluster.sh also sets a long global default on the Cilium operator;
+    # this is the belt to that pair of braces.
+    ingress.cilium.io/request-timeout: "0s"
 spec:
   ingressClassName: cilium
   rules:

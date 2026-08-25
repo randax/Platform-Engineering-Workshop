@@ -20,6 +20,12 @@ kind: Ingress
 metadata:
   name: argocd-server
   namespace: argocd
+  annotations:
+    # The ArgoCD UI holds gRPC-web watch streams open for as long as the tab is,
+    # and Envoy's default route timeout — which every hostname now passes
+    # through — is 15 s. "0s" disables it for this Ingress; see the same
+    # annotation on gitops/components/gitea/ingress.yaml for the citation.
+    ingress.cilium.io/request-timeout: "0s"
 spec:
   ingressClassName: cilium
   rules:

@@ -108,6 +108,28 @@ cilium_values=(
   # same values so `ingressClassName: cilium` means the same thing in both.
   --set ingressController.enabled=true
   --set ingressController.loadbalancerMode=shared
+  # EVERY hostname now goes through Cilium's Envoy, and Envoy's default route
+  # timeout is 15 s. The NodePorts this replaced had no proxy in the path at
+  # all, so nothing in the workshop was ever timed: the 40 MiB seed-gitea push,
+  # the Console's SSE agent-ask stream and ArgoCD's gRPC-web watches would all
+  # start returning 504 at 15 seconds.
+  #
+  # Cilium leaves the route timeout UNSET when neither a backend nor a request
+  # timeout is configured (operator/pkg/model/translation/envoy_virtual_host.go
+  # :495-503 — it only sets MaxStreamDuration=0 there), and unset is Envoy's
+  # 15 s. The operator flag below is the global default for every Ingress,
+  # including the ones attendees create themselves.
+  #
+  # It is 24h and NOT 0: `--ingress-default-request-timeout` defaults to 0 and
+  # the ingestion code skips it precisely when it is 0
+  # (operator/pkg/model/ingestion/ingress.go:44-48, `if defaultRequestTimeout
+  # != 0`), so setting 0 is a no-op that reads like a fix. A duration long
+  # enough that nothing in a 4-hour workshop reaches it is the only value the
+  # flag can express. Per-Ingress, `ingress.cilium.io/request-timeout: "0s"`
+  # DOES mean "no timeout" (the annotation is parsed into a non-nil pointer,
+  # ibid. :49-58, and Envoy reads timeout 0 as disabled) — our four long-lived
+  # ingresses carry it. Verified against cilium v1.20.0 sources.
+  --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h"
   # L2 announcements are what make a LoadBalancer VIP answer ARP on the shared
   # L2 segment. Enabled on BOTH substrates deliberately: on docker there is no
   # LB-IPAM pool so nothing is announced, and keeping the flag identical means

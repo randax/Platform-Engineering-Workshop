@@ -396,6 +396,52 @@ says to check `docker ps --filter publish=80` too.
 LoadBalancer costs exactly one privileged port. Rehearsal 5 step 13 runs the
 docker path on the same Mac and, if Colima is available, under Colima.
 
+## RESOLVED — NodePorts had no proxy in the path; hostnames have Envoy, and Envoy times out at 15 s
+
+The substrate split moved every browser-facing URL from a NodePort to a
+hostname served by Cilium's ingress. A NodePort is kube-proxy/eBPF: no L7 proxy,
+no request timeout, a `git push` can take a minute. A Cilium Ingress is an
+**Envoy** route — and Envoy's default route timeout is **15 seconds**.
+
+Cilium does not set the route timeout unless something asks for one:
+`operator/pkg/model/translation/envoy_virtual_host.go:495-503` sets only
+`MaxStreamDuration: 0` when neither a backend nor a request timeout is
+configured, leaving `route.Timeout` unset — i.e. Envoy's default. Nothing in the
+chart's values sets one either (grep `cilium-1.20.0.tgz` for
+`request-timeout`: the only `ingress-default-*` keys in `cilium-configmap.yaml`
+are lb-mode, xff hops and the default secret).
+
+**What would have broken, at 15 s exactly:** `seed-gitea.sh`'s ~40 MiB push over
+`gitea.cloudbox.k8s.test`, every attendee push after it, the Console's SSE
+`agent-ask` stream (module 10 answers routinely run longer), ArgoCD's gRPC-web
+watches, and a scale-from-zero ksvc's first request. All as a **504 from a
+healthy platform** — the failure shape nothing in the room diagnoses.
+
+**What handles it.** Two layers:
+
+1. `create-cluster.sh` passes
+   `--set "operator.extraArgs[0]=--ingress-default-request-timeout=24h"` to the
+   Cilium chart — the global default for every Ingress, including ones
+   attendees create. Verified to render:
+   `helm template … | grep ingress-default-request-timeout`.
+2. The four long-lived ingresses (gitea, argocd, portal, kourier) carry
+   `ingress.cilium.io/request-timeout: "0s"`.
+
+**The trap inside the fix — do not "simplify" the 24h to 0.** The flag's own
+default is `0` and the ingestion code skips it exactly when it is zero:
+`operator/pkg/model/ingestion/ingress.go:46` is `if defaultRequestTimeout != 0`.
+Setting `0` on the operator is a **no-op that reads like a fix**. The flag cannot
+express "no timeout" at all; only a duration long enough to never be reached.
+The *annotation* is different: `:49-58` takes any parsable value including `0s`
+into a non-nil pointer, and Envoy reads route timeout 0 as disabled — which is
+why the per-Ingress form is the exact one and the global form is a big number.
+
+**Retired by:** nothing; it is a permanent property of putting an L7 proxy in
+front of everything. Re-check both citations on any Cilium bump — the flag name
+(`--ingress-default-request-timeout`) and the annotation
+(`ingress.cilium.io/request-timeout`) are both operator surfaces, and the
+zero-is-unset semantics are the kind of thing that changes quietly.
+
 ## WATCH — `bootstrap-gitops.sh` creates namespace `kagent` before ArgoCD owns it
 
 `bootstrap-gitops.sh:227` creates the `kagent` namespace imperatively
