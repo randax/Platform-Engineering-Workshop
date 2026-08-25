@@ -82,7 +82,11 @@ func handleDatabasesList(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleCreateDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	size := r.FormValue("size")
-	ns := s.activeProject(r)
+	ns, err := s.mutableProject(r)
+	if err != nil {
+		s.render(w, "db-list", databasesData{Namespace: kube.XRNamespace, Flash: errorFlash(err.Error())})
+		return
+	}
 
 	fl := flash{Msg: "Created " + name + " — Crossplane is composing a Postgres cluster and a bucket. Watch it turn Ready below."}
 	if err := s.Kube.CreateWorkshopDatabase(r.Context(), ns, name, size); err != nil {
@@ -103,7 +107,12 @@ func handleCreateDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 // list; on failure the error lands in the detail page's #delete-result slot.
 func handleDeleteDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	if err := s.Kube.DeleteWorkshopDatabase(r.Context(), s.activeProject(r), name); err != nil {
+	ns, err := s.mutableProject(r)
+	if err != nil {
+		s.render(w, "flash", errorFlash(err.Error()))
+		return
+	}
+	if err := s.Kube.DeleteWorkshopDatabase(r.Context(), ns, name); err != nil {
 		s.render(w, "flash", errorFlash("Delete failed: "+err.Error()))
 		return
 	}
@@ -117,7 +126,12 @@ func handleDeleteDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleResizeDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	size := r.FormValue("size")
-	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), s.activeProject(r), name, size); err != nil {
+	ns, err := s.mutableProject(r)
+	if err != nil {
+		s.render(w, "flash", errorFlash(err.Error()))
+		return
+	}
+	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), ns, name, size); err != nil {
 		s.render(w, "flash", errorFlash("Resize failed: "+err.Error()))
 		return
 	}

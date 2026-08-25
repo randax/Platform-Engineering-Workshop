@@ -117,10 +117,12 @@ func TestActiveProjectScopesNamespace(t *testing.T) {
 		_, _ = w.Write([]byte(`{"items":[]}`))
 	})
 	req := httptest.NewRequest(http.MethodGet, "/applications/list", nil)
-	req.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
+	// "teama", not "team-a": a project name is hyphen-free
+	// (kube.ValidProjectName), and the cookie is held to the same rule.
+	req.AddCookie(&http.Cookie{Name: "project", Value: "teama"})
 	handleApplicationsList(srv, httptest.NewRecorder(), req)
 
-	if !strings.Contains(gotPath, "/namespaces/team-a/") {
-		t.Errorf("API path = %q, want it scoped to the cookie's namespace team-a", gotPath)
+	if !strings.Contains(gotPath, "/namespaces/teama/") {
+		t.Errorf("API path = %q, want it scoped to the cookie's namespace teama", gotPath)
 	}
 }

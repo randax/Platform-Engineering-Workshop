@@ -118,7 +118,11 @@ func handleApplicationsList(s *Server, w http.ResponseWriter, r *http.Request) {
 // row turns Ready as they converge. Answers with the refreshed list fragment.
 func handleCreateApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
-	ns := s.activeProject(r)
+	ns, perr := s.mutableProject(r)
+	if perr != nil {
+		s.render(w, "app-list", applicationsData{Flash: errorFlash(perr.Error())})
+		return
+	}
 	fl := deployApplication(s, r, ns, name, parseAppOpts(r))
 	data, err := fetchApplications(r.Context(), s, ns, fl)
 	if err != nil {
@@ -206,7 +210,11 @@ func newBuildTag() string { return "b" + strconv.FormatInt(time.Now().UnixNano()
 // push new code, hit Redeploy, the running app rolls forward.
 func handleRedeployApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	ns := s.activeProject(r)
+	ns, perr := s.mutableProject(r)
+	if perr != nil {
+		s.render(w, "flash", errorFlash(perr.Error()))
+		return
+	}
 	fl := redeployApplication(s, r, ns, name)
 	// Redeploy lives on the detail page now, so answer with just the flash
 	// (swapped into the detail's #redeploy-flash slot). The rebuild is async and
@@ -239,7 +247,11 @@ func redeployApplication(s *Server, r *http.Request, ns, name string) flash {
 
 func handleDeleteApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	ns := s.activeProject(r)
+	ns, perr := s.mutableProject(r)
+	if perr != nil {
+		s.render(w, "app-list", applicationsData{Flash: errorFlash(perr.Error())})
+		return
+	}
 	fl := flash{Msg: "Deleted " + name + " — its composed workload, database and bucket are being removed."}
 	if err := s.Kube.DeleteApplication(r.Context(), ns, name); err != nil {
 		fl = errorFlash("Delete failed: " + err.Error())

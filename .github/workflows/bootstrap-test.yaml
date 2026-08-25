@@ -814,7 +814,7 @@ jobs:
           # in the console — namespace create + the `bind` escalation guard.
           kubectl apply -f lab/08-portal/portal-projects-access.yaml
           base=http://localhost:30600
-          proj=team-e2e
+          proj=teame2e  # hyphen-free: the console refuses a hyphenated project (see kube.ValidProjectName)
           # Create the project from the console.
           # A non-htmx client gets a 303 (POST-redirect-GET) on success; a
           # failed create renders the bar fragment with a flash (200). Accept

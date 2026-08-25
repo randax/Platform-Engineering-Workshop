@@ -5,6 +5,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -130,10 +131,29 @@ func (s *Server) renderError(w http.ResponseWriter, err error) {
 // activeProject is the project (namespace) the self-service pages list and
 // create in — read from the `project` cookie, defaulting to the built-in demo
 // project. Projects map 1:1 to namespaces (PRD-0011); the top-bar selector sets
-// this cookie (Projects P2). Validated as a DNS label so it's safe in a path.
+// this cookie (Projects P2).
+//
+// The cookie is checked against kube.ValidProjectName, not merely ValidName:
+// safe in a URL path AND hyphen-free. A hyphenated value can only come from a
+// hand-set cookie or a namespace that predates the rule, and honouring it would
+// let the console deploy into a project whose Knative hostnames can collide —
+// the very thing CreateProject refuses. Such a cookie falls back to the default
+// here, and mutableProject below turns it into a visible error rather than a
+// silent write into `demo`.
 func (s *Server) activeProject(r *http.Request) string {
-	if c, err := r.Cookie("project"); err == nil && kube.ValidName(c.Value) {
+	if c, err := r.Cookie("project"); err == nil && kube.ValidProjectName(c.Value) {
 		return c.Value
 	}
 	return kube.XRNamespace
+}
+
+// mutableProject is activeProject for the routes that CHANGE something. It
+// refuses outright when the request carries a project cookie the rule rejects,
+// so a legacy hyphenated project is read-only in the console instead of the
+// write being silently redirected into the default project.
+func (s *Server) mutableProject(r *http.Request) (string, error) {
+	if c, err := r.Cookie("project"); err == nil && c.Value != "" && !kube.ValidProjectName(c.Value) {
+		return "", fmt.Errorf("project %q is read-only in the console: %w — switch to a hyphen-free project to create or deploy", c.Value, kube.CheckProjectName(c.Value))
+	}
+	return s.activeProject(r), nil
 }

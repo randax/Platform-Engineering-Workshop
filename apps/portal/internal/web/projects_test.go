@@ -22,9 +22,18 @@ func TestActiveProject(t *testing.T) {
 	}
 
 	// A valid project cookie is honoured.
-	r.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
-	if got := s.activeProject(r); got != "team-a" {
-		t.Errorf("cookie team-a: got %q", got)
+	r.AddCookie(&http.Cookie{Name: "project", Value: "teama"})
+	if got := s.activeProject(r); got != "teama" {
+		t.Errorf("cookie teama: got %q", got)
+	}
+
+	// A HYPHENATED cookie is not: it is a DNS label, so the old ValidName check
+	// let it through, but a project namespace with a '-' can compose the same
+	// Knative host as another (name, namespace) pair. Falls back to the default.
+	legacy, _ := http.NewRequest("GET", "/", nil)
+	legacy.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
+	if got := s.activeProject(legacy); got != kube.XRNamespace {
+		t.Errorf("hyphenated cookie must fall back to the default, got %q", got)
 	}
 
 	// A non-DNS value falls back to the default — never trusted in a path.
@@ -44,7 +53,9 @@ func TestProjectBarRender(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 	var buf bytes.Buffer
-	data := projectBarData{Active: "team-a", Default: "demo", Projects: []string{"demo", "team-a"}}
+	// team-a here is deliberately a LEGACY project: the bar still lists and
+	// offers to delete one, it just cannot be switched into or deployed to.
+	data := projectBarData{Active: "teama", Default: "demo", Projects: []string{"demo", "team-a"}}
 	if err := tmpl.ExecuteTemplate(&buf, "project-bar", data); err != nil {
 		t.Fatalf("render project-bar: %v", err)
 	}

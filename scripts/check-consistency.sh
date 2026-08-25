@@ -565,6 +565,35 @@ else
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] || true
 
+# --- 13. CI project fixtures obey the console's own project-name rule --------
+# The console refuses a project name containing '-' (kube.ValidProjectName /
+# CheckProjectName: the Knative host is "<app>-<project>" in ONE DNS label, so a
+# hyphen there makes two apps able to claim one URL). The e2e workflow drives
+# the console over HTTP, so a hyphenated fixture is not a lint failure — it is a
+# red CI run at the very end of a 40-minute job. That is exactly how `team-e2e`
+# got in. Both halves are asserted: the Go rule still forbids the hyphen, and
+# every project fixture in the workflow passes it.
+before_fail=${FAILURES}
+proj_rule="apps/portal/internal/kube/projects.go"
+if ! grep -q 'strings.Contains(name, "-")' "${proj_rule}"; then
+  bad "${proj_rule} no longer refuses a hyphenated project name — this check (and the fixtures below) are keyed to that rule"
+else
+  bad_fixtures=""
+  while IFS= read -r line; do
+    val="${line#*proj=}"
+    val="${val%%[[:space:]#]*}"
+    [[ -n "${val}" ]] || continue
+    [[ "${val}" =~ ^[a-z0-9]([a-z0-9]{0,38}[a-z0-9])?$ ]] || bad_fixtures+="${line}"$'\n'
+  done < <(grep -nE '^[[:space:]]*proj=' .github/workflows/*.yaml 2>/dev/null || true)
+  if [[ -n "${bad_fixtures}" ]]; then
+    bad "CI project fixture rejected by the console's project-name rule (hyphen-free DNS label) — the console would refuse it and the job would fail at the create step:"
+    printf '   %s\n' "${bad_fixtures}"
+  else
+    ok "CI project fixtures pass the console's project-name rule"
+  fi
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then
   printf '❌ %d consistency failure(s) — fix the drift before merging.\n' "${FAILURES}"

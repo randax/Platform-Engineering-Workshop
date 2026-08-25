@@ -210,3 +210,74 @@ func TestHandleCreateProjectRefusesHyphen(t *testing.T) {
 		t.Errorf("expected the error flash in the fragment, got:\n%s", body)
 	}
 }
+
+// A legacy hyphenated project is READ-ONLY: the console lists it, but neither
+// the switch route nor any mutating route may act on it. Before round 4 the
+// hyphen rule lived at creation only, so a namespace made by hand (or before
+// the rule) could be switched into and deployed to — re-opening the
+// "<app>-<project>" host collision that creation exists to prevent.
+func TestLegacyHyphenatedProjectIsReadOnly(t *testing.T) {
+	t.Run("switch is refused", func(t *testing.T) {
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("switch must not touch the API server (%s %s)", r.Method, r.URL.Path)
+		})
+		req := httptest.NewRequest(http.MethodGet, "/project?set=team-a", nil)
+		rec := httptest.NewRecorder()
+
+		HandleProjectSwitch(srv, rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400", rec.Code)
+		}
+		if sc := rec.Header().Get("Set-Cookie"); strings.Contains(sc, "team-a") {
+			t.Errorf("a refused switch must not set the cookie: %q", sc)
+		}
+	})
+
+	t.Run("create-application is refused", func(t *testing.T) {
+		var posts int
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				posts++
+			}
+			_, _ = w.Write([]byte(`{"items":[]}`))
+		})
+		req := formReq(http.MethodPost, "/applications", url.Values{
+			"name": {"myapp"}, "source": {"image"}, "image": {"ghcr.io/x/y:v1"},
+			"min": {"0"}, "max": {"3"},
+		})
+		req.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
+		rec := httptest.NewRecorder()
+
+		handleCreateApplication(srv, rec, req)
+
+		if posts != 0 {
+			t.Errorf("a hyphenated project cookie still deployed (%d POSTs)", posts)
+		}
+		if body := rec.Body.String(); !strings.Contains(body, "read-only") {
+			t.Errorf("expected the read-only explanation in the fragment, got:\n%s", body)
+		}
+	})
+
+	t.Run("create-database is refused, not redirected to demo", func(t *testing.T) {
+		var posts int
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				posts++
+			}
+			_, _ = w.Write([]byte(`{"items":[]}`))
+		})
+		req := formReq(http.MethodPost, "/databases", url.Values{"name": {"db1"}, "size": {"small"}})
+		req.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
+		rec := httptest.NewRecorder()
+
+		handleCreateDatabase(srv, rec, req)
+
+		if posts != 0 {
+			t.Errorf("a hyphenated project cookie still created a database (%d POSTs) — a silent write into the default project is the bug too", posts)
+		}
+		if body := rec.Body.String(); !strings.Contains(body, "read-only") {
+			t.Errorf("expected the read-only explanation in the fragment, got:\n%s", body)
+		}
+	})
+}

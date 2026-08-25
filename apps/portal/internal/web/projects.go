@@ -54,8 +54,12 @@ func HandleProjectBar(s *Server, w http.ResponseWriter, r *http.Request) {
 // without htmx: HX-Refresh for htmx, a plain redirect for a bare link click.
 func HandleProjectSwitch(s *Server, w http.ResponseWriter, r *http.Request) {
 	p := r.URL.Query().Get("set")
-	if !kube.ValidName(p) {
-		http.Error(w, "invalid project", http.StatusBadRequest)
+	// The same rule creation enforces: a hyphenated project cannot be switched
+	// INTO either, or the console would deploy into a namespace whose Knative
+	// hostnames can collide (kube.ValidProjectName). Legacy hyphenated projects
+	// stay listed and deletable; they are read-only.
+	if err := kube.CheckProjectName(p); err != nil {
+		http.Error(w, "invalid project: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	setProjectCookie(w, p)

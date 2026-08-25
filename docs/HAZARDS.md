@@ -430,7 +430,22 @@ project namespaces are created: `kube.CreateProject`
 (`apps/portal/internal/kube/projects.go`) refuses a name containing `-` and says
 why, the New-project form's pattern and placeholder match
 (`[a-z0-9]+`, `teama`), and `TestCreateProjectRejectsHyphen` covers both doors.
-Deleting a hyphenated project still works — the rule is on the way in. The
+Deleting a hyphenated project still works — the rule is on the way in.
+
+Creation was, for one round, the *only* door that asked. A namespace made by
+hand (or before the rule) with the project label was listed by the selector,
+could be switched into with `?set=team-a`, and every mutating route trusted the
+`project` cookie after a mere `ValidName` check — so the console would happily
+deploy into it and re-open the collision above. The rule is now one predicate,
+`kube.ValidProjectName`, asked at creation, at `/project?set=`, when the cookie
+is consumed (`activeProject`) and again at every mutating route
+(`mutableProject`, which refuses rather than silently redirecting the write into
+`demo`). A legacy hyphenated project stays **listed and deletable, and is
+read-only**: no switch, no create, no deploy.
+`TestLegacyHyphenatedProjectIsReadOnly` covers the three doors. CI fixtures are
+held to the same rule by check 13 in `check-consistency.sh` — a hyphenated
+`proj=` in the e2e workflow is a red run 40 minutes in, which is how `team-e2e`
+got there in the first place. The
 `Application` composition creates no namespace of its own (it composes into the
 XR's), so a hand-created namespace is the only remaining way in; lab 04 and lab
 08 state the rule for that case.

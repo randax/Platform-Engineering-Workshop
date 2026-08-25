@@ -204,10 +204,16 @@ func parseFnOpts(r *http.Request) kube.FnOpts {
 // createFunction submits the two objects and returns the flash describing the
 // outcome. Split out so the handler stays about rendering.
 func createFunction(s *Server, r *http.Request, name string, sample fnSample) flash {
+	// Resolve the project FIRST: a read-only (hyphenated) project must not even
+	// start a build it can never deploy.
+	ns, perr := s.mutableProject(r)
+	if perr != nil {
+		return errorFlash(perr.Error())
+	}
 	if err := s.Kube.CreateFunctionWorkflow(r.Context(), name, sample.Repo, sample.Path); err != nil {
 		return errorFlash("Couldn't start the build: " + err.Error())
 	}
-	if err := s.Kube.CreateFunctionService(r.Context(), s.activeProject(r), name, parseFnOpts(r)); err != nil {
+	if err := s.Kube.CreateFunctionService(r.Context(), ns, name, parseFnOpts(r)); err != nil {
 		// The build is already running; only the deploy half failed. Say so —
 		// re-submitting after granting access will create the ksvc, and the
 		// finished image is waiting for it.
