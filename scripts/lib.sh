@@ -170,15 +170,31 @@ node_arch() { # [substrate]
 # fixes tbx before the venue, `tbx doctor` passes there, create-cluster.sh picks
 # tbx, and every mirrored image is amd64 for arm64 VMs. Offline, with "exec
 # format error" as the only clue (docs/HAZARDS.md, "a wrong-architecture mirror
-# serves happily"). An explicit CLOUDBOX_SUBSTRATE=docker still wins, because
-# that is an attendee saying which substrate they are on.
+# serves happily").
+#
+# The bet is off the moment this machine has ANSWERED the question, though: an
+# explicit CLOUDBOX_SUBSTRATE, or a ~/.cloudbox/substrate written by a create
+# that has already happened. A laptop with tbx installed that is running its
+# cluster on docker (a failed doctor at the venue, `CLOUDBOX_SUBSTRATE=docker`
+# once, the kind lifeboat) is not "heading towards tbx" — it is there — and
+# filling its mirror for arm64 VMs it does not have is the same
+# wrong-architecture failure in the other direction. `kind` counts as docker
+# here for the one reason that matters: kind's nodes are containers on this
+# host's Docker engine, so their arch is the DAEMON's.
 mirror_target_substrate() {
-  if [[ "${CLOUDBOX_SUBSTRATE:-}" != "docker" ]] && have tbx; then echo "tbx"; else echo "docker"; fi
+  local decided="${CLOUDBOX_SUBSTRATE:-}"
+  [[ -n "${decided}" ]] || decided="$(substrate_persisted_raw)"
+  case "${decided}" in
+    docker|kind) echo "${decided}"; return 0 ;;
+    tbx)         echo "tbx";        return 0 ;;
+  esac
+  if have tbx; then echo "tbx"; else echo "docker"; fi
 }
 
 # The tbx VMs are natively virtualised, so their arch is the CPU's —
 # host_cpu_arch, which sees through a Rosetta shell where `uname -m` does not.
-# Docker nodes ARE containers on the local daemon, so theirs is the daemon's.
+# Docker and kind nodes ARE containers on the local daemon, so theirs is the
+# daemon's.
 mirror_target_arch() {
   if [[ "$(mirror_target_substrate)" == "tbx" ]]; then host_cpu_arch; else docker_server_arch; fi
 }
@@ -393,7 +409,7 @@ substrate_current() {
     echo "${value}"
     return 0
   fi
-  warn "${CLOUDBOX_SUBSTRATE_FILE} contains '${value}', not 'tbx' or 'docker' — ignoring it" >&2
+  warn "${CLOUDBOX_SUBSTRATE_FILE} contains '${value}', not 'tbx', 'docker' or 'kind' — ignoring it" >&2
   return 1
 }
 
@@ -423,7 +439,7 @@ substrate_resolve_into() { # <varname> — substrate_resolve without the subshel
   local __var="$1"
   if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
     substrate_valid "${CLOUDBOX_SUBSTRATE}" \
-      || { fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker'" >&2; return 1; }
+      || { fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx', 'docker' or 'kind'" >&2; return 1; }
   else
     substrate_current >/dev/null || true
   fi
@@ -607,6 +623,46 @@ host_cpu_count() {
 # Callers must ASSIGN the result (`gw="$(cloudbox_host_gateway)"`), never compare
 # it inline: this function's failure is a non-zero status, which an assignment
 # propagates (and `set -e` acts on) and a `[[ "$(...)" == ... ]]` swallows.
+# kind_network_gateway — the host as a KIND node container sees it. Same shape
+# as mirror_host_endpoint's docker answer (host.docker.internal on macOS and
+# WSL2), but on native Linux the address is the gateway of kind's own bridge
+# network — NOT ${TALOS_SUBNET_GATEWAY}, which belongs to the docker substrate's
+# ${CLUSTER_NAME} network and does not exist on a lifeboat machine at all.
+#
+# Lived in kind-fallback.sh, where it addressed the image mirror; moved here
+# when `kind` became a persisted identity, because cloudbox_host_gateway() has
+# to answer the same question for kagent's Ollama host and two copies of it
+# would drift. 172.17.0.1 (docker0) is the fallback when the network cannot be
+# inspected — the same guess kind-fallback.sh has always made.
+kind_network_gateway() {
+  if [[ -n "${CLOUDBOX_MIRROR_HOST:-}" ]]; then
+    echo "${CLOUDBOX_MIRROR_HOST}"
+  elif [[ "$(uname -s)" == "Darwin" ]] || is_wsl2; then
+    echo "host.docker.internal"
+  else
+    local gw
+    gw="$(docker network inspect kind -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || true)"
+    echo "${gw:-172.17.0.1}"
+  fi
+}
+
+# kind_cluster_exists — is the lifeboat cluster of this name registered with
+# kind? Asked of `kind` itself rather than of docker labels: kind owns that
+# answer and prints it for exactly this purpose.
+kind_cluster_exists() { # [name]
+  local name="${1:-${CLUSTER_NAME}}"
+  have kind && kind get clusters 2>/dev/null | grep -qx "${name}"
+}
+
+# kind_nodes_running — are its node containers actually up? kind names them
+# <cluster>-control-plane and <cluster>-worker, which is also how
+# kind-fallback.sh reaches into them to write the containerd mirror config.
+kind_nodes_running() { # [name]
+  local name="${1:-${CLUSTER_NAME}}"
+  docker_running || return 1
+  [[ -n "$(docker ps -q --filter "name=^${name}-control-plane$" 2>/dev/null)" ]]
+}
+
 cloudbox_host_gateway() {
   if [[ -n "${CLOUDBOX_HOST_GATEWAY:-}" ]]; then echo "${CLOUDBOX_HOST_GATEWAY}"; return 0; fi
   local substrate
@@ -633,6 +689,13 @@ cloudbox_host_gateway() {
       return 1
     fi
     echo "${subnet%.*}.1"
+  elif [[ "${substrate}" == "kind" ]]; then
+    # The lifeboat's nodes are containers on kind's OWN docker network, not on
+    # the ${CLUSTER_NAME} one the docker substrate creates — so the native-Linux
+    # gateway below (TALOS_SUBNET_GATEWAY) is an address that does not exist
+    # here, and anything addressed with it (kagent's Ollama host) reaches
+    # nothing. CLOUDBOX_MIRROR_HOST still wins, as everywhere.
+    kind_network_gateway
   elif [[ -n "${CLOUDBOX_MIRROR_HOST:-}" ]]; then
     echo "${CLOUDBOX_MIRROR_HOST}"
   elif [[ "$(uname -s)" == "Darwin" ]] || is_wsl2; then

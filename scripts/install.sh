@@ -78,7 +78,12 @@ case "${1:-}" in
     # attendee was told `--write-hosts` is tbx-only when the real problem was a
     # typo in their own override.
     write_substrate="$(substrate_resolve)"
-    if [[ "${write_substrate}" != "docker" ]]; then
+    # docker OR kind: the lifeboat maps host port 80 to the ingress NodePort and
+    # is written against the same block (kind-fallback.sh calls this same
+    # writer). Refusing there would leave the one documented repair —
+    # "the names stopped resolving" — with no command on the machine that needs
+    # it most.
+    if [[ "${write_substrate}" != "docker" && "${write_substrate}" != "kind" ]]; then
       die "--write-hosts is docker-substrate only. On tbx, talos-box's resolver answers every *.${CLOUDBOX_DOMAIN} name — 127.0.0.1 lines would override it and send every URL to your own loopback."
     fi
     write_hosts_block
@@ -97,7 +102,10 @@ case "${1:-}" in
     shift
     [[ $# -gt 0 ]] || { usage; die "--add-hosts needs at least one name, e.g. --add-hosts my-app-demo"; }
     add_substrate="$(substrate_resolve)"
-    if [[ "${add_substrate}" != "docker" ]]; then
+    # docker OR kind, for the same reason --write-hosts accepts both: /etc/hosts
+    # has no wildcards on either, and module 08's Knative names are exactly as
+    # unresolvable on the lifeboat as they are on the docker substrate.
+    if [[ "${add_substrate}" != "docker" && "${add_substrate}" != "kind" ]]; then
       die "--add-hosts is docker-substrate only. On tbx, talos-box's resolver already answers every *.${KNATIVE_DOMAIN} name — adding 127.0.0.1 lines would override it and send every URL to your own loopback."
     fi
     # ALL of them validated before ANY of them is persisted. Persisting as we go
@@ -184,6 +192,13 @@ substrate_resolve_into SUBSTRATE
 info "Substrate: ${SUBSTRATE}"
 if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then
   info "  (tbx not used: $(substrate_doctor_reason))"
+fi
+# The lifeboat is graded with DOCKER semantics throughout this file — its nodes
+# are containers on this host's Docker engine, it publishes the same host ports
+# and it needs the same /etc/hosts block — and with none of the tbx ones. Said
+# once, here, because every branch below reads as a docker branch after this.
+if [[ "${SUBSTRATE}" == "kind" ]]; then
+  info "  (the kind lifeboat: checked like the docker substrate — same host ports, same ${CLOUDBOX_HOSTS_FILE} block. Create and destroy it with ./scripts/kind-fallback.sh [--delete]; ./scripts/create-cluster.sh and ./scripts/destroy-cluster.sh refuse here.)"
 fi
 # Everything tbx-specific, in one place, and NONE of it silently skipped.
 #
@@ -280,7 +295,9 @@ else
   # mirror is a registry serving blobs, which needs neither 4 CPUs nor 10 GB.
   # Failing a perfectly good tbx laptop over a small Docker VM would send an
   # attendee to raise a limit that changes nothing they will use.
-  if [[ "${SUBSTRATE}" == "docker" ]]; then
+  # kind counts as docker here: its nodes are containers on this daemon too, and
+  # they run the same workshop.
+  if [[ "${SUBSTRATE}" == "docker" || "${SUBSTRATE}" == "kind" ]]; then
     # CPUs available to Docker
     ncpu="$(docker info -f '{{.NCPU}}' 2>/dev/null || echo 0)"
     if [[ "${ncpu}" -ge "${MIN_CPUS}" ]]; then
@@ -325,9 +342,27 @@ fi
 # preflight on it would send an attendee hunting for a listener that cannot
 # affect them, and (worse) a machine that is FINE reads as not ready.
 step "Workshop host ports"
-if [[ "${SUBSTRATE}" != "docker" ]]; then
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
   ok "tbx substrate — the workshop publishes no host ports at all"
   info "  (NodePorts live inside the VMs; the ingress is a LoadBalancer VIP on the cluster's own segment)"
+elif [[ "${SUBSTRATE}" == "kind" ]]; then
+  # The lifeboat publishes exactly what the docker substrate does — the nine
+  # NodePorts plus host 80 → the ingress NodePort — from the worker container.
+  # So with its cluster up these ports are SUPPOSED to be bound, and scanning
+  # them would report ten failures on a healthy machine.
+  if ! have kind; then
+    check_fail "${CLOUDBOX_SUBSTRATE_FILE} says 'kind' but the 'kind' binary is not on PATH — run ./scripts/dev-setup.sh (mise pins it), or remove that file if you are done with the lifeboat"
+  elif kind_cluster_exists; then
+    if kind_nodes_running; then
+      ok "kind lifeboat '${CLUSTER_NAME}' is running — its ports are expected to be bound"
+    else
+      check_fail "the kind lifeboat '${CLUSTER_NAME}' exists but its node containers are STOPPED"
+      echo "     Bring it back:  docker start ${CLUSTER_NAME}-control-plane ${CLUSTER_NAME}-worker"
+      echo "     Or start over:  ./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh"
+    fi
+  else
+    check_fail "${CLOUDBOX_SUBSTRATE_FILE} says 'kind' but no kind cluster '${CLUSTER_NAME}' exists — create it with ./scripts/kind-fallback.sh, or remove that file if you are done with the lifeboat"
+  fi
 elif have docker && [[ -n "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
   # `-aq`, the same filter substrate_preflight uses (substrate/docker.sh), not
   # `-q`. With the node containers STOPPED — a laptop that was rebooted, a

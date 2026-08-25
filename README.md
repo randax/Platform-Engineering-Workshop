@@ -227,10 +227,22 @@ mapped to the ingress, and the same marked `/etc/hosts` block — so every
 `*.cloudbox.k8s.test` hostname works and **modules 02 onward are identical**. You
 lose only the Talos content of module 1.
 
-kind is not one of the two substrates, so `destroy-cluster.sh` will never find that
-cluster. Tear it down with `./scripts/kind-fallback.sh --delete`, which deletes the
-kind cluster **and** removes the `/etc/hosts` block it wrote (one sudo prompt, and
-you may decline it — it then names the lines to delete by hand).
+kind is not one of the two substrates — but it *is* a recorded identity. The script
+writes `kind` into `~/.cloudbox/substrate`, which is what tells `install.sh --check`
+to grade this machine with Docker semantics, fills the image mirror for the right
+architecture, and makes `create-cluster.sh` and `destroy-cluster.sh` **refuse**
+rather than build a second cluster over the lifeboat or delete its hostnames.
+Tear it down with `./scripts/kind-fallback.sh --delete`, which deletes the kind
+cluster, removes the `/etc/hosts` block it wrote (one sudo prompt, and you may
+decline it — it then names the lines to delete by hand) and clears the identity.
+It removes that block only when the identity says `kind`, so running it on a
+Docker-substrate machine cannot take out a live cluster's names. If the file is
+missing — a lifeboat taken before this existed — say so for the session:
+`CLOUDBOX_SUBSTRATE=kind ./scripts/install.sh --check`.
+
+The one thing you give up is **module 01**: `lab/01-cluster/verify.sh` checks a Talos
+cluster, so on the lifeboat it prints "not gradeable here" and exits 0 rather than
+failing a cluster that is working as documented.
 
 ## Lab overview
 

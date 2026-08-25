@@ -81,10 +81,30 @@ tbx_doctor_run() {
   [ "${TBX_DOCTOR_RC}" = "0" ]
 }
 
-# --- The identities -----------------------------------------------------------
-# The values this repo accepts, in one place: the state file, the environment
-# override and every caller's validation all ask this.
+# --- The three identities -----------------------------------------------------
+# tbx and docker are the two SUBSTRATES: create-cluster.sh builds on one of
+# them and destroy-cluster.sh tears down whichever the state file names.
+#
+# `kind` is the third, and it is not a substrate — it is the lifeboat
+# (scripts/kind-fallback.sh), which meets the docker substrate's ingress and
+# /etc/hosts contract on a cluster neither create-cluster.sh nor
+# destroy-cluster.sh can touch. It became a PERSISTED identity because the
+# alternative was worse: with nothing in this file, every helper that keys on it
+# — install.sh --check, the mirror architecture, the host gateway, lab 00 —
+# silently graded a lifeboat machine as "docker" and gave it Talos-in-Docker
+# answers, and `destroy-cluster.sh` fell back to docker and started removing the
+# /etc/hosts block of a cluster that was still running.
+#
+# Detection never yields it (substrate_decide_detect_into below): nothing about
+# a machine says "this one should use the lifeboat". It is a decision a person
+# makes, and kind-fallback.sh records it after the cluster exists.
 substrate_valid() { # <value>
+  case "${1:-}" in tbx|docker|kind) return 0 ;; *) return 1 ;; esac
+}
+
+# The two the machine may be judged to be. Kept separate from substrate_valid so
+# that "kind is persisted but never detected" is a rule with a name.
+substrate_detectable() { # <value>
   case "${1:-}" in tbx|docker) return 0 ;; *) return 1 ;; esac
 }
 
@@ -119,7 +139,8 @@ substrate_platform_supported() {
 # with no persisted answer and no override. tbx needs its daemon+helper
 # installed and healthy, so `tbx doctor` (which exits non-zero on any FAIL —
 # cmd/tbx/doctor.go:345-347) is the gate, not the mere presence of the binary.
-# Always sets the variable; always returns 0.
+# Always sets the variable; always returns 0. Only ever `tbx` or `docker` —
+# substrate_detectable is the rule, and `kind` is deliberately not in it.
 substrate_decide_detect_into() { # <varname>
   printf -v "$1" '%s' "docker"
   command -v tbx >/dev/null 2>&1 || return 0
@@ -136,8 +157,10 @@ substrate_decide_detect() {
 # substrate_decide_into <varname> — the identity to USE right now, in precedence
 # order:
 #   1. an explicit CLOUDBOX_SUBSTRATE in the environment (the documented escape
-#      hatch, e.g. CLOUDBOX_SUBSTRATE=tbx on a machine that failed detection)
-#   2. the persisted answer from a previous create
+#      hatch, e.g. CLOUDBOX_SUBSTRATE=tbx on a machine that failed detection —
+#      and CLOUDBOX_SUBSTRATE=kind for a lifeboat session whose state file was
+#      lost, since nothing detects the lifeboat)
+#   2. the persisted answer from a previous create, or from kind-fallback.sh
 #   3. detection, floored by CLOUDBOX_SUBSTRATE_DEFAULT: when the default is
 #      "docker" (the go-live gate having flipped it), detection never upgrades.
 #

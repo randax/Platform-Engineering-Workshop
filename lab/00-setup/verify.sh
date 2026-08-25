@@ -39,10 +39,19 @@ if ! substrate_decide_into SUBSTRATE; then
   # The one case substrate_decide refuses to answer: a typo in the attendee's
   # own override. lib.sh fails the same way; saying so here beats silently
   # grading the machine as something create-cluster.sh will not build.
-  fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx' or 'docker' — unset it or fix the spelling; checking as docker meanwhile"
+  fail "CLOUDBOX_SUBSTRATE='${CLOUDBOX_SUBSTRATE}' is not 'tbx', 'docker' or 'kind' — unset it or fix the spelling; checking as docker meanwhile"
   SUBSTRATE=docker
 fi
 ok "substrate: $SUBSTRATE"
+if [ "$SUBSTRATE" = kind ]; then
+  # The lifeboat (scripts/kind-fallback.sh) records itself in
+  # ~/.cloudbox/substrate. Everything this checklist asks is a DOCKER question
+  # there — the nodes are containers on this daemon, the ports are published on
+  # this host, the names come from the same /etc/hosts block — so the branches
+  # below take the docker path and nothing asks for tbx. What you lose is
+  # module 01's Talos content, and only that.
+  ok "kind lifeboat — checked like the docker substrate (module 01 is the one thing it cannot give you)"
+fi
 
 # --- Docker daemon ---------------------------------------------------------
 # Unconditional on both substrates: the crane image mirror is a Docker
@@ -55,7 +64,9 @@ if docker info >/dev/null 2>&1; then
   ok "Docker daemon is running"
 else
   fail "Docker daemon not reachable — start Docker Desktop / the docker service, then re-run (the image mirror is a container on both substrates)"
-  if [ "$SUBSTRATE" = docker ]; then
+  # Anything but tbx: on docker AND on the kind lifeboat the nodes themselves
+  # are containers, so there is nothing further to check without a daemon.
+  if [ "$SUBSTRATE" != tbx ]; then
     echo "Cannot continue without Docker."
     exit 1
   fi
@@ -65,7 +76,7 @@ fi
 # The one resource question that cannot be substrate-blind: on docker what
 # matters is the slice Docker itself was given, on tbx it is the HOST's memory,
 # because the VMs take theirs from the host directly.
-if [ "$SUBSTRATE" = docker ]; then
+if [ "$SUBSTRATE" != tbx ]; then
   # --- Docker memory -------------------------------------------------------
   MEM_BYTES="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
   MEM_GB=$((MEM_BYTES / 1024 / 1024 / 1024))
@@ -134,6 +145,9 @@ fi
 # demanding it on the docker substrate would fail every Windows/WSL2 attendee.
 TOOLS="talosctl kubectl helm cilium jq git curl"
 if [ "$SUBSTRATE" = tbx ]; then TOOLS="$TOOLS tbx"; fi
+# The lifeboat is created and deleted with kind, and only there — mise pins it
+# (mise.toml), so it is one `./scripts/dev-setup.sh` away on any machine.
+if [ "$SUBSTRATE" = kind ]; then TOOLS="$TOOLS kind"; fi
 # Deliberately unquoted: TOOLS is a space-separated word list, not one word.
 # shellcheck disable=SC2086
 for tool in $TOOLS; do

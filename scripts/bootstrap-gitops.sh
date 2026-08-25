@@ -256,8 +256,12 @@ echo
 # The hosts-file advice is docker-only: on tbx the names come from talos-box's
 # resolver and the NodePorts are inside the VM, not on this host — telling a tbx
 # attendee to try the Docker-only Gitea NodePort sends them chasing a dead port.
+# The kind lifeboat gets the docker answer: it publishes the same NodePorts on
+# the host and resolves the same names through the same /etc/hosts block. It got
+# the tbx one before it was a persisted identity — sending a lifeboat attendee
+# to `tbx status` on a machine with no tbx at all.
 BOOTSTRAP_SUBSTRATE="$(substrate_resolve)"
-if [[ "${BOOTSTRAP_SUBSTRATE}" == "docker" ]]; then
+if [[ "${BOOTSTRAP_SUBSTRATE}" == "docker" || "${BOOTSTRAP_SUBSTRATE}" == "kind" ]]; then
   info "Name not resolving? On the docker substrate these need the ${CLOUDBOX_HOSTS_FILE} block:"
   echo "   ./scripts/install.sh --print-hosts        # shows the exact lines"
   echo "   The NodePort URLs still work: http://localhost:${NODEPORT_GITEA} and http://localhost:${NODEPORT_ARGOCD}"

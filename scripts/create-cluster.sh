@@ -49,6 +49,15 @@ esac
 SUBSTRATE=""
 substrate_resolve_into SUBSTRATE
 info "Substrate: ${SUBSTRATE}"
+# The lifeboat is not one of the two backends this script can build, and there
+# is no scripts/substrate/kind.sh for `source` to find. Refuse in words rather
+# than on a missing file: this machine is running kind-fallback.sh's cluster
+# (that is what wrote 'kind' into ${CLOUDBOX_SUBSTRATE_FILE}), and building a
+# second cluster over it would take the same ports, the same hostnames and the
+# same /etc/hosts block.
+if [[ "${SUBSTRATE}" == "kind" ]]; then
+  die "this machine runs the kind lifeboat — use ./scripts/kind-fallback.sh [--delete]"
+fi
 if [[ "${SUBSTRATE}" == "docker" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current)" ]]; then
   info "  (tbx not used: $(substrate_doctor_reason))"
 fi

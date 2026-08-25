@@ -69,6 +69,16 @@ else
     warn "If this machine ran the cluster on tbx: CLOUDBOX_SUBSTRATE=tbx $0 ${1:-}"
   fi
 fi
+# The lifeboat, before anything is removed. `kind` is a persisted identity, not
+# a substrate: there is no scripts/substrate/kind.sh, the cluster is not made of
+# Talos containers or VMs, and — this is the part that mattered — the
+# /etc/hosts block below belongs to a cluster that is STILL RUNNING. Falling
+# through to the docker branch used to delete that block and the kubeconfig
+# entries out from under a healthy lifeboat, then erase the identity that said
+# what to do about it.
+if [[ "${SUBSTRATE}" == "kind" ]]; then
+  die "this machine runs the kind lifeboat — use ./scripts/kind-fallback.sh [--delete]"
+fi
 # `need docker` only where the backend actually needs it — a tbx machine has no
 # reason to have the docker CLI. Written as an `if` for readability, not because
 # `[[ … ]] && need docker` would trip `set -e`: it would not. In an AND-list only

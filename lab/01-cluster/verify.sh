@@ -15,7 +15,25 @@ SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
 if [ -z "$SUBSTRATE" ] && [ -r "$HOME/.cloudbox/substrate" ]; then
   SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
 fi
-case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac
+case "$SUBSTRATE" in tbx|docker|kind) ;; *) SUBSTRATE=docker ;; esac
+
+# The kind lifeboat (scripts/kind-fallback.sh) is the one identity this module
+# cannot grade. Everything below asserts a TALOS cluster — two nodes Talos
+# labelled or two VMs tbx knows about, a Cilium install create-cluster.sh made,
+# an ingress shaped by the substrate — and none of that is what kind built. The
+# lifeboat's own promise is narrower and deliberate: modules 02 onward are
+# identical, and module 01's Talos content is the whole price of taking it.
+#
+# So this exits 0 rather than failing: there is nothing here for an attendee on
+# the lifeboat to fix, and a red module 01 they cannot clear would send them
+# rebuilding a cluster that is working exactly as documented.
+if [ "$SUBSTRATE" = kind ]; then
+  echo "🛟 kind lifeboat: module 01 is not gradeable here — it checks a Talos cluster, and"
+  echo "   this one is kind. That is the documented trade-off (README, lab/01 'If it goes"
+  echo "   wrong'): you lose module 01's Talos content, and modules 02 onward are identical."
+  echo "   Your cluster: kubectl get nodes   ·   teardown: ./scripts/kind-fallback.sh --delete"
+  exit 0
+fi
 
 if [ "$SUBSTRATE" = tbx ]; then
   # `tbx status <cluster> -o json` prints a JSON ARRAY of ClusterStatus even for

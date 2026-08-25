@@ -837,16 +837,56 @@ same `nodeport` shape — and `write_hosts_block` after Ready, non-fatal, exactl
 as the create path does it. check-consistency 11b asserts both callers still
 share that function and that neither grew a private `--set ingressController.*`.
 
-**kind is deliberately not a substrate.** It writes no `~/.cloudbox/substrate`,
-because that file tells `destroy-cluster.sh` what to tear down and neither of its
-two answers is true here. The teardown is `./scripts/kind-fallback.sh --delete`,
-which deletes the cluster **and** removes the hosts block — otherwise the block
-outlives the lifeboat and a later tbx create dies on it
-(`hosts_block_stale_for_tbx`).
+The teardown is `./scripts/kind-fallback.sh --delete`, which deletes the cluster
+**and** removes the hosts block — otherwise the block outlives the lifeboat and a
+later tbx create dies on it (`hosts_block_stale_for_tbx`).
 
 **Still true of this file: nothing has ever run it end to end.** No CI job, no
 rehearsal. It is exercised only by someone already in trouble. Retired by a
 rehearsal that takes the lifeboat deliberately and runs modules 02→05 on it.
+
+## RESOLVED — "kind is not a substrate" made it invisible to everything
+
+Round 8. kind is not a substrate, and the first fix drew the conclusion that it
+should therefore write **nothing** into `~/.cloudbox/substrate`. That file is not
+a substrate flag, though — it is the answer to *"what is this machine running?"*,
+and leaving it empty on a lifeboat machine did not make the question go away. It
+made every helper answer it wrong, in the same direction:
+
+* `install.sh --check` graded a lifeboat as the docker substrate: it scanned the
+  ten host ports the lifeboat had just published (ten manufactured FAIL lines on
+  a healthy machine), or — with no cluster recorded — reported "no cluster yet".
+* `destroy-cluster.sh` read *no answer* as **docker** (deliberately: that is the
+  substrate whose leftovers can exist without a persisted answer), found no Talos
+  containers, and went on to remove the `/etc/hosts` block and the kubeconfig
+  entries **of a kind cluster that was still running**.
+* `mirror_target_substrate` fell back to `have tbx`, so a lifeboat on a Mac with
+  tbx installed filled its mirror for arm64 VMs it does not have.
+* `cloudbox_host_gateway()` answered `${TALOS_SUBNET_GATEWAY}` on native Linux —
+  the docker substrate's `cloudbox` network gateway, an address that does not
+  exist on a machine whose nodes are on kind's own bridge.
+* `bootstrap-gitops.sh` sent lifeboat attendees to `tbx status`.
+
+So `kind` is now a **third persisted identity**: `kind-fallback.sh` writes it
+right after the cluster is created (before Cilium, like `create-cluster.sh`
+persists before its create — the failures that leave a wreck behind are the ones
+that need the identity most) and `--delete` clears it.
+`substrate_persist/current/resolve` accept it from the file or from an explicit
+`CLOUDBOX_SUBSTRATE=kind`; **detection never returns it**, because nothing about
+a machine says "this one should use the lifeboat"
+(`substrate_detectable`, `scripts/substrate-decide.sh`). `create-cluster.sh` and
+`destroy-cluster.sh` refuse on it by name, and the destroy refuses **before**
+touching the hosts block. `--delete` removes that block only when the identity
+proves it is the lifeboat's.
+
+**The general shape: "X is not one of our two things" is a statement about
+taxonomy, not about state.** The machine is still in a state, something still has
+to name it, and a name nobody writes is a name every reader invents differently.
+
+The cost is written down where an attendee meets it: `lab/01-cluster/verify.sh`
+prints "kind lifeboat: module 01 is not gradeable here" and exits 0, because
+every check in that file asserts a Talos cluster and there is nothing on the
+lifeboat for the attendee to fix. The README and lab 01 both say so.
 
 ## TRAP — module 04's Crossplane Function is fetched by Crossplane, not by the mirror
 

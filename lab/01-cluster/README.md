@@ -167,5 +167,13 @@ always safe and takes ~5 minutes (images are already local). If Talos-in-Docker 
 your machine specifically, `./scripts/kind-fallback.sh` gives you a kind+Cilium cluster
 with the same ingress, the same hostnames and the same `/etc/hosts` block — you lose the
 Talos exploration but every later module works the same. Remove it afterwards with
-`./scripts/kind-fallback.sh --delete` (cluster **and** hosts block); `destroy-cluster.sh`
-knows only the two real substrates.
+`./scripts/kind-fallback.sh --delete` (cluster, hosts block **and** the recorded
+identity); `destroy-cluster.sh` refuses there — it tears down substrates, and kind is
+not one.
+
+**On the lifeboat this module is not gradeable.** `./verify.sh` checks a *Talos*
+cluster — Talos node containers or tbx VMs, and the ingress shape the substrate
+gives it — so it prints "kind lifeboat: module 01 is not gradeable here" and exits
+0 rather than failing a cluster that is working exactly as documented. That is the
+whole price of the lifeboat: module 02 onward is identical, and `verify.sh` in every
+later module grades you normally.
