@@ -179,6 +179,13 @@ substrate: `CLOUDBOX_SUBSTRATE=tbx ./scripts/create-cluster.sh` (add
 in `053aecb` — WARN with a sudo remediation — so this note retires with the first tbx
 release that contains it.
 
+**Half-installed tbx.** If `tbx` is on your PATH but its helper daemon is not running, the
+docker path cannot ask it whether a `cloudbox` cluster exists there. It continues anyway
+when this machine carries no trace of one (`~/.cloudbox/substrate`, `~/.cloudbox/cloudbox.tbx.yaml`
+and `~/.talosbox/clusters/cloudbox` all absent — nothing it ever created can be running).
+When a trace *is* present it stops rather than risk two clusters of the same name: fix tbx,
+or set `CLOUDBOX_IGNORE_TBX=1` if you know those VMs are down.
+
 **One catalog extra is amd64-only:** Backstage's CNOE image has no arm64 build, and a tbx
 VM emulates nothing, so on Apple Silicon that stretch item needs the Docker substrate.
 `install.sh --check` warns. Nothing on the core path is affected.

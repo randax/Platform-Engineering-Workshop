@@ -402,6 +402,31 @@ tbx_cluster_absent() {
   return 2
 }
 
+# tbx_local_evidence <name> — 0 when this machine carries any PERSISTED trace of
+# a tbx cluster of that name, 1 when it carries none. Purely filesystem; it
+# never asks tbxd, which is the point: it is the second question to ask when
+# `tbx status` could not answer the first one.
+#
+# The three traces, all of which a tbx create writes before its VMs exist:
+#   ~/.cloudbox/substrate            — "tbx", written by substrate_persist()
+#   ${TBX_CLUSTER_FILE}              — the rendered cluster yaml (tbx.sh:120-152)
+#   ~/.talosbox/clusters/<name>      — upstream's own state directory, one per
+#                                      cluster, holding cluster.json
+#                                      (internal/cluster/store.go:14-22, const
+#                                      stateFile = "cluster.json")
+# None of the three present means nothing this machine ever created with tbx can
+# be running, whatever tbxd says about itself.
+tbx_local_evidence() {
+  local name="${1:-${CLUSTER_NAME:-cloudbox}}" recorded=""
+  if [[ -r "${CLOUDBOX_SUBSTRATE_FILE}" ]]; then
+    recorded="$(tr -d '[:space:]' < "${CLOUDBOX_SUBSTRATE_FILE}")"
+  fi
+  [[ "${recorded}" == "tbx" ]] && return 0
+  [[ -f "${TBX_CLUSTER_FILE}" ]] && return 0
+  [[ -d "${HOME}/.talosbox/clusters/${name}" ]] && return 0
+  return 1
+}
+
 # tbx_host_memory_mib — the host's physical RAM in MiB, or nothing when this
 # platform has no probe we trust. Deliberately the SAME sources tbxd reads, so
 # our arithmetic and its overcommit gate cannot disagree about the host:

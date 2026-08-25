@@ -68,11 +68,33 @@ substrate_preflight() {
       warn "context between them and a destroy that can only find one."
       die "Destroy it first: CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh"
     elif [[ "${absent}" -eq 2 ]]; then
-      fail "tbx is installed but cannot be inspected, so whether a '${CLUSTER_NAME}' cluster"
-      fail "already exists on the tbx substrate is unknown:"
-      printf '   %s\n' "${TBX_CLUSTER_ABSENT_REASON}"
-      warn "If its VMs are running, a docker cluster of the same name would leave two."
-      die "Fix tbx ('tbx doctor'), or set CLOUDBOX_IGNORE_TBX=1 to proceed anyway."
+      # "Cannot inspect" is the state of a HALF-INSTALLED tbx: the binary is on
+      # PATH (brew put it there) and tbxd has never run. That is the single most
+      # likely reason someone falls back to docker in the first place, and
+      # dying here turned the fallback into a dead end — on a machine that has
+      # never created a tbx cluster at all.
+      #
+      # So ask the question tbxd cannot answer, of the filesystem, which does
+      # not need a daemon: if NONE of the three persisted traces of a tbx
+      # cluster is here (tbx_local_evidence in lib.sh), nothing this machine
+      # ever created with tbx can be running, and the collision this guard
+      # exists to prevent is impossible. Warn and continue. With any trace
+      # present the ambiguity is real and this still dies.
+      if ! tbx_local_evidence "${CLUSTER_NAME}"; then
+        warn "tbx is installed but cannot be inspected:"
+        printf '   %s\n' "${TBX_CLUSTER_ABSENT_REASON}"
+        warn "No tbx cluster was ever created from this machine (no ${CLOUDBOX_SUBSTRATE_FILE},"
+        warn "no ${TBX_CLUSTER_FILE}, no ~/.talosbox/clusters/${CLUSTER_NAME}), so there is nothing"
+        warn "of ours running there. Continuing on the docker substrate."
+      else
+        fail "tbx is installed but cannot be inspected, so whether a '${CLUSTER_NAME}' cluster"
+        fail "already exists on the tbx substrate is unknown:"
+        printf '   %s\n' "${TBX_CLUSTER_ABSENT_REASON}"
+        warn "This machine HAS created a tbx cluster before (${CLOUDBOX_SUBSTRATE_FILE},"
+        warn "${TBX_CLUSTER_FILE} or ~/.talosbox/clusters/${CLUSTER_NAME} is present)."
+        warn "If its VMs are running, a docker cluster of the same name would leave two."
+        die "Fix tbx ('tbx doctor'), or set CLOUDBOX_IGNORE_TBX=1 to proceed anyway."
+      fi
     fi
   fi
 }

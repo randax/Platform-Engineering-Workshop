@@ -81,6 +81,14 @@ says which of the two you are in.
 hostnames. Run `./scripts/install.sh --write-hosts` when you are ready — do **not** re-run
 `create-cluster.sh`, which will refuse to create over the cluster you already have.
 
+**"tbx is installed but cannot be inspected"?** That is a half-installed talos-box: the
+binary is on your PATH but its helper daemon has never run (`sudo tbx system install` not
+done, or the service is down). On the docker substrate the create continues by itself when
+this machine has never made a tbx cluster — there is nothing it could collide with. If you
+*have* used tbx here before, it stops instead, because two clusters called `cloudbox` is a
+mess you would meet an hour later: either fix tbx (`tbx doctor`), or, if you know its VMs
+are not running, re-run with `CLOUDBOX_IGNORE_TBX=1 ./scripts/create-cluster.sh`.
+
 ## Optional: sign up for OpenCode Zen (module 10 prep)
 
 Module 10 (stretch) has a second beat that swaps a flailing local AI model for a free
