@@ -170,7 +170,12 @@ fi
 # removes it on docker. One sudo prompt each way, and the mirror flag has
 # nothing to do with hostname resolution — coupling them was the bug.
 # Exactly reversible: only the lines between the two markers go, and the file
-# is left byte-identical to what it was before create-cluster.sh wrote them.
+# is left byte-identical to what it was before create-cluster.sh wrote them —
+# for a newline-terminated file, which /etc/hosts is on every platform we
+# support. The rewrite is an awk pipeline, and awk's `print` terminates the last
+# line it emits: a file that did NOT end in a newline comes back with one. That
+# is the only difference the round trip can produce, and it is invisible to
+# every consumer of the file.
 # A no-op on tbx (nothing was ever written) and when the block is absent.
 if [[ "${SUBSTRATE}" == "docker" ]]; then
   remove_hosts_block

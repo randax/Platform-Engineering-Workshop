@@ -99,7 +99,7 @@ floor**, and deflating on release (upstream `docs/SPEC.md:319-328` and the close
 at `:595-600`; the Linux host-free sampler is not implemented yet, so the policy is
 presently inactive there). We opt into it deliberately — `substrate_create()` patches
 `machine.kernel.modules: [virtio_balloon]` into the guests
-(`scripts/substrate/tbx.sh:188-198`), because without the module loaded the balloon device
+(`scripts/substrate/tbx.sh:255-266`), because without the module loaded the balloon device
 is inert and the overcommit story stops working.
 
 That makes the OOM hazard **worse on a busy laptop, not better**: a node can *lose* memory
@@ -126,7 +126,7 @@ nothing about what the balloon will do at the venue.
 ## LIVE — L2 failover on macOS takes 40-50 s
 
 Cilium announces the ingress VIP over L2 (`scripts/substrate/lb-objects.tbx.yaml.tmpl`,
-applied by `substrate_post_cni()` in `scripts/substrate/tbx.sh:337-355`). When the node
+applied by `substrate_post_cni()` in `scripts/substrate/tbx.sh:456-474`). When the node
 holding the VIP goes away, the new announcer sends a gratuitous ARP — and **macOS ignores
 it through vmnet**, converging only when its own ARP cache revalidates. talos-box's own
 spec says so: "the slow-L2 failover caveat is macOS/vmnet-specific" (upstream
@@ -186,8 +186,8 @@ that matters, and it is worth saying so from the front of the room.
 ## TRAP — /etc/hosts needs sudo, and it is the only sudo in the workshop
 
 The docker substrate has no resolver of its own, so the same hostname scheme both
-substrates serve has to come from somewhere: `create-cluster.sh:130-134` calls
-`write_hosts_block` (`scripts/lib.sh:302-430`), which replaces a block marked
+substrates serve has to come from somewhere: `create-cluster.sh` calls
+`write_hosts_block` (`scripts/lib.sh`), which replaces a block marked
 `# cloudbox-begin` / `# cloudbox-end` in `/etc/hosts` via a temp file and `sudo tee` —
 never an in-place `sudo sed`, because a half-written `/etc/hosts` breaks name resolution
 for the whole machine. Twelve names go in: the nine services plus `hello-demo.kn`,
@@ -198,21 +198,54 @@ so this prompt appears on exactly half the room's laptops.
 
 **How you would notice** if the attendee declines the password (or has no sudo at all):
 every hostname fails while the cluster is perfectly healthy, which is the same symptom as
-the VPN trap above and reads like a broken ingress. A declined `sudo tee` is now handled
-rather than left to `set -e`: `write_hosts_block` deletes its temp copy of `/etc/hosts`
-(it would otherwise sit in `$TMPDIR` forever) and dies naming
-`./scripts/install.sh --print-hosts`.
+the VPN trap above and reads like a broken ingress. A declined `sudo tee` is handled rather
+than left to `set -e`: `write_hosts_block` deletes its temp copy of `/etc/hosts` (it would
+otherwise sit in `$TMPDIR` forever).
 
-**What handles it.** `install.sh --check` names the missing lines and how many
-(`scripts/install.sh:167-183`); `./scripts/install.sh --print-hosts` prints the block for
-hand-application, and on WSL2 also prints the note that the same lines belong in
+**Where the prompt sits, and why that is load-bearing.** It is the LAST thing
+`create-cluster.sh` does — after `substrate_post_ready`, with the cluster proven healthy.
+It used to run between the Cilium install and the Ready wait, and `write_hosts_block`
+*died* on refusal: a declined password threw away a half-built cluster, and the one
+recovery an attendee would try — re-running `create-cluster.sh` — is refused by preflight,
+because the node containers that very run created are exactly what preflight looks for. There
+was no re-entrant writer at all (`--add-hosts` needs a name to add). So the writer now
+warns and returns non-zero, the create finishes and says so, and
+**`./scripts/install.sh --write-hosts`** is the zero-argument, idempotent, docker-only
+command that writes the block whenever the attendee is ready.
+
+**WSL2 deletes the block on every restart.** `generateHosts` defaults to true, so WSL
+regenerates `/etc/hosts` from the Windows hosts file at boot and the block written
+yesterday is gone this morning — with the containers still running, which makes it look
+like an ingress that broke overnight. `lab/00-setup` and the README give both fixes:
+`[network]\ngenerateHosts = false` in `/etc/wsl.conf`, or `--write-hosts` after each
+restart. `install.sh --check` detects it (WSL2 + a "This file was automatically generated"
+header + no block) and prints both.
+
+**What handles it.** `install.sh --check` names the missing lines and how many;
+`./scripts/install.sh --print-hosts` prints the block for hand-application, and on WSL2
+also prints the note that the same lines belong in
 `C:\Windows\System32\drivers\etc\hosts`, edited as Administrator, for the Windows browser
-to resolve them (`scripts/install.sh:41-51`). **Every** `destroy-cluster.sh` on the docker
+to resolve them. **Every** `destroy-cluster.sh` on the docker
 substrate removes the block again — not only `--purge-mirror`, which is how it used to be:
 a block left behind after a docker destroy points nine names at `127.0.0.1`, and
 `/etc/hosts` beats talos-box's resolver, so the *next* cluster created on tbx has every URL
 silently dead on a perfectly healthy cluster. `substrate_preflight` on the tbx backend now
-refuses to create over a leftover block for the same reason.
+refuses to create over leftover entries for the same reason.
+
+**"Leftover" means the ENTRIES, not the markers.** The tbx preflight and `--check` used to
+ask "is the begin marker there?", which is the narrowest possible version of the question:
+a `127.0.0.1 gitea.cloudbox.k8s.test` line whose marker comments someone deleted by hand
+breaks tbx exactly as hard, and passed. `hosts_block_stale_for_tbx` is true for any marker
+*or* any CloudBox name (pins **and** the attendee's `--add-hosts` extras) pointing at
+`127.0.0.1`, and both callers print the offending lines with their line numbers, because
+"remove the CloudBox lines" is advice only someone who already knows which lines those are
+can follow. `remove_hosts_block` prints the same list when it refuses an unpaired file.
+
+**And "correct" means the whole block.** `hosts_block_present` compares the marked block
+against what `cloudbox_hosts_block` would write today, rather than checking that every
+current name is listed. The old rule could only detect names that were *missing*: a name
+removed from `~/.cloudbox/extra-hosts` — the documented way to stop resolving one — left
+its `127.0.0.1` line in `/etc/hosts` forever and still reported "already correct".
 
 Both rewrites also refuse to run at all unless the markers form exactly one ordered pair
 (`assert_hosts_block_wellformed`). The awk they use skips from the begin marker to the end
@@ -237,7 +270,7 @@ connection is refused. A name that resolves reads as "the service is there and b
 when the truth is that it does not exist yet.
 
 **Why the scripts are shaped the way they are.** `substrate_post_ready()`
-(`scripts/substrate/tbx.sh:362-380`) waits up to 180 s for `cilium-ingress` to actually
+(`scripts/substrate/tbx.sh:481-515`) waits up to 180 s for `cilium-ingress` to actually
 carry a LoadBalancer address, and fails loudly there rather than letting module 02 discover
 it; it also **dies** if the VIP is not `.200` — the resolver answers `.200` unconditionally,
 without consulting who holds it, so an ingress anywhere else in the pool means every
@@ -702,6 +735,31 @@ Now uses the same vendored chart: **exit 0 in 49 s, both nodes Ready, offline.**
 **The general lesson: the paths that only run when someone is already in trouble
 are the least-tested code you ship, and the most expensive to get wrong.** Every
 blocker in five rehearsals came from recovery or setup, never from the platform.
+
+## TRAP — module 04's Crossplane Function is fetched by Crossplane, not by the mirror
+
+**Pre-existing, deliberate, and not on `images.txt` — recorded here because two
+independent reviews have now flagged it as a missing image.**
+`gitops/components/crossplane/config/functions.yaml` pins
+`ghcr.io/crossplane-contrib/function-patch-and-transform:v0.10.7`, and it is the one
+image in the workshop that the offline story does not cover: it is a **package**, pulled
+by Crossplane's own package manager from inside the cluster, not an image the kubelet
+pulls through the node's containerd registry mirror. Pre-pulling it onto the nodes (or
+into `cloudbox-mirror`) does not help the package fetch, so `--set` nothing and mirror
+nothing: the file's own header has said so since before this branch, and
+`git show main:gitops/components/crossplane/config/functions.yaml` is byte-identical to
+what is here.
+
+**How you would notice.** With the WiFi already off, enabling the crossplane Application
+leaves the `Function` un-Healthy, the XRD never becomes Established, and module 04 stops
+before its first XR. The honest instruction is the one the file gives: **enable crossplane
+while internet is still available**, then go offline.
+
+**What would retire it:** mirroring the package into the in-cluster Zot and pointing
+`spec.package` at `zot.zot.svc.cluster.local:5000` — rehearsal-validated seeding, tracked
+in issue #8. Rehearsal step 12 (offline) now names it explicitly as a thing to *observe*,
+because "the offline rehearsal passed" has so far meant "we enabled crossplane before
+turning the WiFi off" without anyone writing that down.
 
 ## TRAP — the lifeboat's browser is not on the lifeboat
 

@@ -1367,6 +1367,10 @@ jobs:
           # first create — two creates and two destroys later. Anything else
           # means the block is not exactly reversible: leftover names resolve to
           # 127.0.0.1 forever, which is invisible until the next cluster.
+          # (Byte-identical holds for a newline-terminated file, which the
+          # runner's /etc/hosts is; the awk rewrite terminates its last line, so
+          # a file without a trailing newline would gain one. That is the only
+          # difference the round trip can produce.)
           if ! cmp -s /tmp/hosts.before /etc/hosts; then
             echo "❌ /etc/hosts is not what it was before the first create:"
             diff -u /tmp/hosts.before /etc/hosts || true
@@ -1376,7 +1380,7 @@ jobs:
             && { echo "❌ a CloudBox marker survived the destroy"; exit 1; }
           grep -qE 'cloudbox\.k8s\.test' /etc/hosts \
             && { echo "❌ a *.cloudbox.k8s.test name survived the destroy"; exit 1; }
-          echo "✅ /etc/hosts is byte-identical to the pre-create snapshot — no markers, no names"
+          echo "✅ /etc/hosts is byte-identical to the pre-create snapshot (newline-terminated file) — no markers, no names"
 
       - name: Recovery-path summary
         if: always()

@@ -463,6 +463,11 @@ fi
 # localhost:30xxx URL works on exactly one of them, so it reads as a working
 # instruction and fails on half the room — the worst kind of stale text.
 #
+# `127.0.0.1` counts as `localhost`: it is the same host-published port, written
+# the other way, and half the shell snippets people paste from prefer the
+# numeric form. The sweep was blind to it, which made "no stale localhost URLs"
+# a claim about spelling rather than about reachability.
+#
 # Allowlisted exceptions, each for a reason a rewrite would break:
 #   * scripts/substrate/docker.sh — the docker backend's own port publishing.
 #   * localhost:30500 — Zot's NodePort as the NODE sees it. Only node-side
@@ -476,7 +481,7 @@ fi
 #   * serving-core.yaml historical comments — curation records, not attendee
 #     instructions; changing rendered source requires re-vendoring.
 before_fail=${FAILURES}
-stale="$(grep -rnE 'localhost:3[0-9]{4}' \
+stale="$(grep -rnE '(localhost|127\.0\.0\.1):3[0-9]{4}' \
   --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.go' \
   lab solutions gitops scripts slides apps .devcontainer .github README.md PLAN.md 2>/dev/null \
   | grep -v '^scripts/substrate/docker.sh:' \
@@ -484,10 +489,10 @@ stale="$(grep -rnE 'localhost:3[0-9]{4}' \
   | grep -v '^\.github/workflows/bootstrap-test.yaml:' \
   | grep -v '^docs/' || true)"
 if [[ -n "${stale}" ]]; then
-  bad "browser-facing localhost:3xxxx literals remain — they only work on the docker substrate:"
+  bad "browser-facing localhost/127.0.0.1:3xxxx literals remain — they only work on the docker substrate:"
   printf '   %s\n' "${stale}" | head -30
 else
-  ok "no stale localhost:3xxxx literals (the hostname scheme is the only browser URL)"
+  ok "no stale localhost/127.0.0.1:3xxxx literals (the hostname scheme is the only browser URL)"
 fi
 stale_sslip="$(grep -rn 'sslip\.io' \
   --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.go' \
@@ -511,7 +516,13 @@ before_fail=${FAILURES}
 # app an attendee deploys is reached on, and the one most likely to be written
 # down bare. A 30000-only pattern was blind to exactly the busiest NodePort in
 # the workshop.
-bare_nodeport="$(grep -rnE '(^|[^0-9.]):3[01][0-9]{3}([^0-9]|$)' \
+#
+# The `[^0-9.]` before the colon keeps the sweep off the middle of longer
+# numbers — and used to exclude the loopback-address form with them, since the
+# character before that colon is a digit. Written that way it is the same
+# instruction, so it gets its own branch rather than an exemption. (Check 12
+# above catches the URL spelling; this one is about bare prose.)
+bare_nodeport="$(grep -rnE '(^|[^0-9.]|127\.0\.0\.1):3[01][0-9]{3}([^0-9]|$)' \
   lab/*/README.md lab/*/verify.sh lab/*/solve.sh slides/pages 2>/dev/null \
   | grep -Eiv 'docker substrate|docker-only|NodePort|node[^[:alnum:]]*(pulls|side)|node.s[[:space:]]+kubelet|kubelet' || true)"
 if [[ -n "${bare_nodeport}" ]]; then

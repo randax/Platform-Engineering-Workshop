@@ -195,11 +195,20 @@ sees.
 **12. Offline.** Wi-Fi off: destroy, create and bootstrap must all succeed from the
 mirror and the cached disk image. This is the hard requirement, on a substrate
 that has never been asked.
+*Observe, do not fix:* enable the **crossplane** Application with the WiFi still ON, and
+write down that you did. `function-patch-and-transform` is fetched by Crossplane's package
+manager, not through the node's registry mirror, so it is the one component that cannot
+come up offline (HAZARDS — "module 04's Crossplane Function is fetched by Crossplane").
+Then turn the WiFi off and confirm everything *else* — including a fresh
+`catch-up.sh 04` — still converges.
 
 **13. The docker path, same Mac.** `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh`
-→ **one** sudo prompt; `grep -c cloudbox /etc/hosts`; `curl http://argocd.cloudbox.k8s.test`;
-`destroy-cluster.sh --purge-mirror` leaves `/etc/hosts` **byte-identical** to what
-it was before. Repeat under Colima if it is available on the machine.
+→ **one** sudo prompt, and it comes **last**, after the cluster is Ready; `grep -c cloudbox
+/etc/hosts`; `curl http://argocd.cloudbox.k8s.test`; any `destroy-cluster.sh` leaves
+`/etc/hosts` **byte-identical** to what it was before (for a newline-terminated file — the
+awk rewrite terminates its last line). Also **decline** the password once: the cluster must
+finish and stay up, and `./scripts/install.sh --write-hosts` must then write the block.
+Repeat under Colima if it is available on the machine.
 *Retires:* TRAP — /etc/hosts needs sudo · LIVE — host port 80 is the only
 privileged port the workshop binds.
 

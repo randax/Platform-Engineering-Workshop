@@ -59,6 +59,25 @@ below rather than burning workshop time.
 your *Windows* browser reads `C:\Windows\System32\drivers\etc\hosts` — paste the same lines
 there, as Administrator. Print them with `./scripts/install.sh --print-hosts`.
 
+**…and WSL2 throws that block away on every restart.** WSL regenerates `/etc/hosts` from
+the Windows hosts file at boot (`generateHosts` defaults to true), so a block written
+yesterday is simply gone this morning — the containers are still running, and every
+workshop URL stops resolving. Either turn the regeneration off once:
+
+```ini
+# /etc/wsl.conf   (then, from Windows: wsl --shutdown)
+[network]
+generateHosts = false
+```
+
+or re-run `./scripts/install.sh --write-hosts` after each restart. `install.sh --check`
+says which of the two you are in.
+
+**Declined the password?** Nothing is lost: the block is written at the very *end* of
+`create-cluster.sh`, after the cluster is up and healthy, and a refusal only costs you the
+hostnames. Run `./scripts/install.sh --write-hosts` when you are ready — do **not** re-run
+`create-cluster.sh`, which will refuse to create over the cluster you already have.
+
 ## Optional: sign up for OpenCode Zen (module 10 prep)
 
 Module 10 (stretch) has a second beat that swaps a flailing local AI model for a free

@@ -179,14 +179,20 @@ they are, in `scripts/manifests/`):
 ./scripts/seed-gitea.sh         # seed your cloud's git with the platform tree
 ```
 
-**On the Docker substrate, `create-cluster.sh` asks for your password once.** It is the
-only sudo in the workshop: Docker has no resolver, so the workshop hostnames come from a
-marked `# cloudbox-begin` block in `/etc/hosts`, written via `sudo tee`. See exactly what
-goes in with `./scripts/install.sh --print-hosts` (WSL2: the same lines also belong in
-`C:\Windows\System32\drivers\etc\hosts`, edited as Administrator). Decline the
-password and every `*.cloudbox.k8s.test` URL fails on a perfectly healthy cluster.
-`./scripts/destroy-cluster.sh --purge-mirror` removes the block again. On the tbx
-substrate nothing touches `/etc/hosts` — talos-box's own resolver answers the names.
+**On the Docker substrate, `create-cluster.sh` asks for your password once, at the very
+end.** It is the only sudo in the workshop: Docker has no resolver, so the workshop
+hostnames come from a marked `# cloudbox-begin` block in `/etc/hosts`, written via
+`sudo tee`. See exactly what goes in with `./scripts/install.sh --print-hosts` (WSL2: the
+same lines also belong in `C:\Windows\System32\drivers\etc\hosts`, edited as
+Administrator). Decline the password and every `*.cloudbox.k8s.test` URL fails on a
+perfectly healthy cluster — the cluster itself is fine and stays up, and
+`./scripts/install.sh --write-hosts` writes the block whenever you are ready.
+That is also the command to run if the names ever stop resolving: **WSL2 regenerates
+`/etc/hosts` on every restart** unless you tell it not to (see `lab/00-setup`).
+*Every* `./scripts/destroy-cluster.sh` on the Docker substrate removes the block again —
+not only `--purge-mirror`, which additionally forgets the extra names you added with
+`--add-hosts`. On the tbx substrate nothing touches `/etc/hosts` — talos-box's own
+resolver answers the names.
 
 Fell behind or broke something interesting? `./scripts/catch-up.sh <module>` force-pushes
 the canonical state for that module to your Gitea and lets ArgoCD converge — scripted

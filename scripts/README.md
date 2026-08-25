@@ -47,6 +47,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `dev-setup.sh` | Install mise (with consent) + all pinned CLI tools, verify versions |
 | `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`; start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it |
 | `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
+| `install.sh --write-hosts` | Docker only, mutating: (re)write the marked `/etc/hosts` block from the pins + `~/.cloudbox/extra-hosts`. The recovery path after a declined `sudo`, and the refresh path after WSL2 regenerates the file |
 | `create-cluster.sh` | Substrate **dispatcher**: resolves tbx-or-docker, sources the backend, then runs the shared path — Talos config gen/apply/bootstrap (1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm. Persists the choice in `~/.cloudbox/substrate` |
 | `substrate/docker.sh` | The **Docker backend**: `talosctl cluster create docker` (raised memory/CPU, published ports) and the marked `/etc/hosts` block that gives the hostname scheme somewhere to resolve |
 | `substrate/tbx.sh` | The **talos-box backend**: `tbx up -f ~/.cloudbox/cloudbox.tbx.yaml` (rendered from `substrate/cloudbox.tbx.yaml.tmpl` + the `TBX_*` pins), then *our* Talos config — same patches as docker — plus the Cilium `LoadBalancerIPPool`/L2 policy and the wait for the ingress VIP |
@@ -98,7 +99,11 @@ One hostname scheme, both substrates — `*.cloudbox.k8s.test`:
 On the **tbx** substrate talos-box's own resolver answers every one of these at the
 cluster's ingress VIP (`172.30.<n>.200`). On the **Docker** substrate they come from a
 marked `/etc/hosts` block; `./scripts/install.sh --print-hosts` prints it, and
-`create-cluster.sh` writes it (one `sudo` prompt). A file has no wildcards, so the block
+`create-cluster.sh` writes it at the very end of the run (the one `sudo` prompt).
+`./scripts/install.sh --write-hosts` (re)writes it any time: after a declined password,
+after WSL2 regenerates `/etc/hosts` on restart, or after you remove a name from
+`~/.cloudbox/extra-hosts`. It is idempotent — with a correct block it writes nothing and
+asks for nothing. A file has no wildcards, so the block
 lists the three Knative names the labs create — for one you invent yourself (anything the
 Console composes), `./scripts/install.sh --add-hosts <first label>` adds it and remembers
 it in `~/.cloudbox/extra-hosts`, so the next rewrite of the block keeps it.
