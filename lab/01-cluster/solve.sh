@@ -30,8 +30,33 @@ cluster_exists() {
   fi
 }
 
+# "Exists" is not one state on tbx. A cluster whose VMs are ALL stopped or
+# suspended — a reboot, a `tbx down`, a laptop closed at the end of the day — is
+# a cluster to START, and "skipping creation" there left this script waiting 300
+# seconds for nodes that were powered off, then failing. The preflight and
+# lab/01's verify.sh already know that state; this asks the same predicate
+# rather than a fourth copy of the jq: tbx_cluster_all_stopped (it lives in the
+# tbx backend, next to the create path that uses it), run in a sub-bash so
+# neither lib.sh's nor the backend's definitions land in this shell — the
+# substrate resolution above stays inline on purpose, and sourcing a create
+# backend here must not be able to change what this script does.
+tbx_all_stopped() {
+  bash -c 'source "$1/scripts/lib.sh" >/dev/null 2>&1
+           source "$1/scripts/substrate/tbx.sh" >/dev/null 2>&1
+           tbx_cluster_all_stopped' _ "$REPO_ROOT"
+}
+
 if cluster_exists; then
-  echo "cloudbox cluster already exists (${SUBSTRATE}) — skipping creation."
+  if [[ "$SUBSTRATE" == tbx ]] && tbx_all_stopped; then
+    echo "cloudbox VMs exist but are all stopped/suspended — starting them, not re-creating."
+    tbx cluster start cloudbox
+    # The VM addresses are vmnet DHCP leases and may have moved while the
+    # cluster was down; this repoints the kubeconfig, the talosconfig context
+    # and ~/.cloudbox/api-endpoint at where the control plane came back.
+    "$REPO_ROOT/scripts/create-cluster.sh" --refresh-endpoint
+  else
+    echo "cloudbox cluster already exists (${SUBSTRATE}) — skipping creation."
+  fi
 else
   "$REPO_ROOT/scripts/create-cluster.sh"
 fi

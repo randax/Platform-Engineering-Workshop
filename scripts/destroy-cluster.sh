@@ -199,6 +199,21 @@ hosts_left="false"
 if [[ "${SUBSTRATE}" == "docker" ]]; then
   remove_hosts_block || hosts_left="true"
 fi
+# The block is gone (or was never there) — and that is NOT the same as "no
+# CloudBox line resolves any more". An unmarked line survives every removal this
+# script performs, by design: a name appended to the `localhost` line, a
+# hand-pasted `install.sh --print-hosts` block whose comments someone deleted, a
+# half-removed block. remove_hosts_block returns 0 for all of them ("nothing of
+# mine here"), and the destroy used to end with a clean bill of health on a
+# machine where every workshop URL still points at loopback — which is exactly
+# what breaks the NEXT cluster if it is a tbx one.
+#
+# So: ask the scan, name the lines, and do NOT delete them. They are outside the
+# markers, which means they are the attendee's, not ours.
+hosts_stray=""
+if [[ "${hosts_left}" != "true" ]]; then
+  hosts_stray="$(hosts_loopback_lines)"
+fi
 # The attendee's own extra Knative names (install.sh --add-hosts) are a
 # PREFERENCE, not cluster state: the block is gone either way, and someone who
 # rebuilds the same cluster to keep working on `my-app` should not have to
@@ -233,6 +248,15 @@ else
 fi
 
 echo
+if [[ -n "${hosts_stray}" ]]; then
+  warn "The CloudBox block is gone, but these lines in ${CLOUDBOX_HOSTS_FILE} still point"
+  warn "CloudBox names at 127.0.0.1 (line: text) — they are OUTSIDE the markers, so this"
+  warn "script does not touch them:"
+  printf '   %s\n' "${hosts_stray}"
+  warn "Nothing listens there now, and on the tbx substrate they OVERRIDE talos-box's"
+  warn "resolver on a perfectly healthy cluster. Remove the names by hand:"
+  warn "  sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}"
+fi
 if [[ "${hosts_left}" == "true" ]]; then
   warn "One thing is left on this machine: the CloudBox lines in ${CLOUDBOX_HOSTS_FILE} (see above)."
   warn "They resolve names to 127.0.0.1 where nothing listens now, and on the tbx substrate"
