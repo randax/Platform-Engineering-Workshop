@@ -67,6 +67,10 @@ git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platfo
 cd ~/cloudbox-platform && mise trust   # the clone carries this repo's mise.toml; untrusted, every mise tool run from here fails
 ```
 
+Ignore the URL in Gitea's own clone box: it shows the in-cluster `ROOT_URL`
+(`gitea-http.gitea.svc…`), which only resolves inside the cluster — use the
+`gitea.cloudbox.k8s.test` URL above from your laptop.
+
 This is a *different remote* than github.com — it's the copy your cluster watches. Pushes
 to GitHub change nothing on your machine; pushes here change everything. (Alternative:
 `seed-gitea.sh` printed a `git remote add cloudbox …` line — you can push to your Gitea

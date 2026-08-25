@@ -104,6 +104,11 @@ which is why no lab names them. Zot is the deliberate exception in the other dir
 attendees reach it by hostname, while the kubelet pulls from Zot's NodePort on the node
 itself, which works the same way on both substrates.
 
+Gitea's clone box in the web UI shows the **in-cluster** `ROOT_URL`
+(`gitea-http.gitea.svc…`) — correct for ArgoCD, useless from your laptop. Clone from
+`http://gitea.cloudbox.k8s.test/cloudbox/platform.git` (`GITEA_HOST_URL` in
+`versions.env`) instead.
+
 Which substrate you are on: `./scripts/install.sh --check`. To force one:
 `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`); the answer is remembered in
 `~/.cloudbox/substrate` from the moment a cluster is created.

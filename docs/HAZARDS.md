@@ -63,27 +63,44 @@ The five entries below arrived with the **talos-box substrate** on 2026-08-24
 that substrate yet.** Everything above and below them was learned on
 Talos-in-Docker, which is still what CI and the lifeboat run.
 
-## LIVE — tbx VM memory is a hard ceiling, and it is unrehearsed
+## LIVE — tbx VM memory is a moving ceiling, and it is unrehearsed
 
 New on **2026-08-24** with the talos-box substrate (`docs/talos-box-vs-docker.md`,
 decision note at the top). Everything the four rehearsals measured was measured on
-Talos-in-Docker, where a node's memory limit is *soft*: the container shares the host's
-page cache, and `--memory-workers` is a cgroup ceiling that the host quietly pads. A VM's
-`8GiB` is not soft. It is all the RAM that kernel will ever see.
+Talos-in-Docker, where a node's memory limit is *soft* in the attendee's favour: the
+container shares the host's page cache, and `--memory-workers` is a cgroup ceiling the
+host quietly pads.
 
-`TBX_CP_MEMORY="4GiB"` / `TBX_WORKER_MEMORY="8GiB"` (`scripts/versions.env:83-86`) are
-*guesses*, transcribed from the docker substrate's numbers, against a module-10 end state
-of 21 ArgoCD apps and 66–73 pods that has never been run inside a VM.
+A VM's memory is soft in the *other* direction. `TBX_CP_MEMORY="4GiB"` /
+`TBX_WORKER_MEMORY="8GiB"` (`scripts/versions.env:83-86`) are the ceiling the guest kernel
+boots with, but `tbxd` runs an **active balloon manager**: on macOS it samples host memory
+pressure and inflates the guests' virtio balloons when host free memory drops below a
+**6 GiB reserve**, taking memory back from a running node down to a **1 GiB per-node
+floor**, and deflating on release (upstream `docs/SPEC.md:319-328` and the closed G3 gate
+at `:595-600`; the Linux host-free sampler is not implemented yet, so the policy is
+presently inactive there). We opt into it deliberately — `substrate_create()` patches
+`machine.kernel.modules: [virtio_balloon]` into the guests
+(`scripts/substrate/tbx.sh:188-198`), because without the module loaded the balloon device
+is inert and the overcommit story stops working.
 
-**How you would notice.** Pods OOMKilled, or the kubelet evicting under pressure, on a
-laptop where the docker substrate sails through the same module — the giveaway is that
-`docker` works and `tbx` does not on the *same* machine. Watch modules 08–10, where the
-pod count peaks.
+That makes the OOM hazard **worse on a busy laptop, not better**: a node can *lose* memory
+mid-module because Slack and Chrome got hungry, rather than merely starting out too small.
+And the starting sizes are guesses — the CP matches the docker substrate
+(`TALOS_MEMORY_CONTROLPLANE="4096"` ↔ `4GiB`) but the worker is **raised**
+(`TALOS_MEMORY_WORKER="6144"` → `8GiB`) on nothing but the expectation that a VM needs
+more slack than a container — against a module-10 end state of 21 ArgoCD apps and 66–73
+pods that has never been run inside a VM.
+
+**How you would notice.** Pods OOMKilled, or the kubelet evicting, on a laptop where the
+docker substrate sails through the same module — the giveaway is `docker` working and
+`tbx` not on the *same* machine. If it happens *mid-module* rather than at the start,
+suspect the balloon and check host pressure (`tbx doctor`'s `host-pressure` line prints
+the three numbers it decided on). Watch modules 08–10, where the pod count peaks.
 
 **Retired by:** the tbx rehearsal measuring peak node RSS at the module-10 end state and
-the measured numbers landing in `scripts/versions.env` (up, or down). Until then treat
-these two pins as unproven, and note that raising them costs an attendee's host RAM
-1:1 — a VM takes what it is given whether it needs it or not.
+the measured numbers landing in `scripts/versions.env` (up, or down) — ideally on a laptop
+with the usual conference-day tab collection open, since an idle-host measurement says
+nothing about what the balloon will do at the venue.
 
 ## LIVE — L2 failover on macOS takes 40-50 s
 
@@ -105,24 +122,45 @@ failover story, do it on the docker substrate, where there is no VIP to move.
 **Retired by:** nothing in 2026. It is an Apple networking behaviour; the honest move is
 to say the number out loud when it happens.
 
-## TRAP — a full-tunnel VPN blackholes 172.30.0.0/16 while `tbx doctor` stays green
+## TRAP — a full-tunnel VPN blackholes 172.30.0.0/16, and detection-time `tbx doctor` is green anyway
 
-`tbx doctor` checks the host helper, the hypervisor, and host routing/forwarding — it does
-**not** check whether a corporate VPN client has claimed the RFC1918 space the tbx subnet
-lives in. A full-tunnel client that grabs `172.16.0.0/12` installs a route more specific
-than the one vmnet/KVM put there, and every host→VIP packet leaves through `utun*` and
-dies somewhere in a datacenter.
+A full-tunnel VPN/ZTNA client that claims `172.16.0.0/12` installs a route more specific
+than the one vmnet put there, and every host→cluster packet leaves through `utun*` and
+dies in somebody's datacenter.
 
-**How you would notice.** The cluster is genuinely healthy — `kubectl get nodes` Ready,
-`tbx status` green, `install.sh --check` green — and every hostname times out. It reads
-like a broken ingress. It is a routing table.
+`tbx doctor` **does** check for this — but only once a cluster is *running*. Its `routes`
+check `route -n get`s each running cluster's gateway and first live node IP and fails if
+the interface is neither a bridge/vmnet interface nor `lo0`, with the detail "a VPN/ZTNA
+client has captured the cluster subnet" (`cmd/tbx/doctor_routes.go:35-84`,
+`cmd/tbx/doctor.go:302-317`; remediation in upstream `docs/macos.md:84`: "Disconnect or
+split-exclude the VPN/ZTNA client that captured `172.30.0.0/16`, then restart the
+cluster"). The trap is *when* we ask:
 
-**Diagnosis, in one line:** `route get 172.30.0.200` (macOS) or `ip route get 172.30.0.200`
-(Linux) naming a `utun*`/`tun*` interface instead of the tbx bridge.
+- **Detection runs doctor before any cluster exists.** `substrate_detect()`
+  (`scripts/lib.sh:190-200`) uses `tbx doctor`'s exit code to choose the substrate, and at
+  that moment `routes` is a `SKIP` — "no clusters exist" (`cmd/tbx/doctor.go:270-277`), as
+  it also is for a cluster that exists but is stopped (`:293-300`). So a VPN'd laptop
+  passes detection cleanly and gets sent down the tbx path.
+- **`routes` covers the gateway and node IPs, not the ingress VIP.** The workshop's
+  hostnames all resolve to `172.30.<n>.200`, which is in the same subnet — so in practice
+  a capture takes both — but a green `routes` is evidence about the nodes, not a promise
+  about the VIP.
 
-**Fix:** disconnect the VPN, or split-tunnel `172.30.0.0/16`, or run the fallback —
-`CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh`, which needs no host route at all.
-Do not go looking in Cilium.
+**How you would notice.** The cluster is genuinely healthy — nodes Ready, `tbx status`
+green — and every `*.cloudbox.k8s.test` URL times out. It reads like a broken ingress. It
+is a routing table.
+
+**First move: re-run `tbx doctor` now that the cluster is up.** It will FAIL on `routes`
+and name the fix. Confirm by hand with `route -n get 172.30.0.200` (macOS) naming a
+`utun*` interface instead of a bridge. Do not go looking in Cilium.
+
+**Fix:** disconnect the VPN, or split-exclude `172.30.0.0/16`, then restart the cluster —
+or run the fallback, `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh`, which needs
+no host route at all.
+
+**Retired by:** upstream teaching detection-time doctor to check the *configured* subnet
+before a cluster exists. Until then, `tbx doctor` after `create-cluster.sh` is the check
+that matters, and it is worth saying so from the front of the room.
 
 ## TRAP — /etc/hosts needs sudo, and it is the only sudo in the workshop
 
@@ -144,7 +182,7 @@ the VPN trap above and reads like a broken ingress.
 (`scripts/install.sh:166-173`); `./scripts/install.sh --print-hosts` prints the block for
 hand-application, and on WSL2 also prints the note that the same lines belong in
 `C:\Windows\System32\drivers\etc\hosts`, edited as Administrator, for the Windows browser
-to resolve them (`scripts/install.sh:41-52`). `destroy-cluster.sh --purge-mirror` removes
+to resolve them (`scripts/install.sh:41-51`). `destroy-cluster.sh --purge-mirror` removes
 the block again (`scripts/destroy-cluster.sh:167`).
 
 **Retired by:** nothing — it is the price of one hostname scheme on a substrate with no

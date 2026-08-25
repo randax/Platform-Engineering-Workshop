@@ -147,8 +147,10 @@ your cluster and your terminal are looking at two different files.
 The full platform idles at roughly 8 GB inside the cluster. On 16 GB machines it fits,
 but close your Electron zoo. On the Docker substrate: OrbStack, or a Docker Desktop with
 a raised memory limit; WSL2 users raise it in `.wslconfig`. On tbx the VM sizes are pins
-(`TBX_CP_MEMORY` / `TBX_WORKER_MEMORY` in `scripts/versions.env`) — a VM takes what it is
-given, so the RAM is gone from your host either way.
+(`TBX_CP_MEMORY` / `TBX_WORKER_MEMORY` in `scripts/versions.env`) — they are the ceiling
+each guest boots with, not a permanent reservation: talos-box balloons memory back out of
+a running node when the host comes under pressure. That keeps the laptop alive; it also
+means a hungry browser can shrink your cluster mid-module. Close the zoo anyway.
 
 ### Platform support matrix
 
