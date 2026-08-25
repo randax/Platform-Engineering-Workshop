@@ -288,6 +288,47 @@ tbx_version_check() {
   "${report}" "tbx version drift: this machine has ${found:-an unreadable version}, the workshop is pinned to ${TBX_VERSION} (scripts/versions.env). Install the pin (brew install randax/tap/tbx, or the matching release tarball), set CLOUDBOX_ALLOW_TBX_DRIFT=1 to proceed unpinned, or use the docker substrate: CLOUDBOX_SUBSTRATE=docker"
 }
 
+# tbx_cluster_absent <name> — is there a tbx cluster of this name?
+#   0  proven ABSENT   — tbxd answered, and the answer was "no such cluster"
+#   1  present         — `tbx status` succeeded
+#   2  cannot inspect  — anything else; the reason is left in
+#                        ${TBX_CLUSTER_ABSENT_REASON} for the caller to print
+#
+# The three-way answer is the whole point. `tbx status <cluster>` exits non-zero
+# for two completely different reasons, and folding them into one boolean is how
+# a destroy erases state it could not see:
+#   * the cluster does not exist — `cluster.Load` cannot read its state file
+#     (upstream internal/cluster/store.go:63-70, the ONLY site whose wrapper
+#     says "read cluster state"), reached from the daemon's status op
+#     (internal/daemon/operations.go:1445-1449). The message is
+#     "read cluster state: open <dir>/<state file>: no such file or directory".
+#   * tbxd is not reachable — the CLI dials a unix socket
+#     (cmd/tbx/client.go:268, wrapped in dialError), and a MISSING SOCKET reads
+#     "dial unix ~/.talosbox/tbxd.sock: connect: no such file or directory".
+#     Upstream's own test fixture is that exact string
+#     (cmd/tbx/doctor_platform_darwin_test.go:22).
+# BOTH contain "no such file or directory". Accepting that substring on its own
+# classifies a daemon that is merely DOWN as a cluster that does not EXIST — and
+# the caller then deletes the only record that the running VMs are tbx's. So
+# absence has to be proven by both halves of the narrow upstream wording, and
+# everything else is "cannot inspect", which is never a licence to remove
+# anything.
+TBX_CLUSTER_ABSENT_REASON=""
+tbx_cluster_absent() {
+  local name="$1" out rc=0
+  TBX_CLUSTER_ABSENT_REASON=""
+  out="$(tbx status "${name}" 2>&1)" || rc=$?
+  if [[ "${rc}" -eq 0 ]]; then
+    return 1
+  fi
+  if [[ "${out}" == *"read cluster state"* && "${out}" == *"no such file or directory"* ]]; then
+    return 0
+  fi
+  # shellcheck disable=SC2034  # read by the preflights/destroy in substrate/*.sh
+  TBX_CLUSTER_ABSENT_REASON="${out}"
+  return 2
+}
+
 # tbx_host_memory_mib — the host's physical RAM in MiB, or nothing when this
 # platform has no probe we trust. Deliberately the SAME sources tbxd reads, so
 # our arithmetic and its overcommit gate cannot disagree about the host:
@@ -464,16 +505,35 @@ CLOUDBOX_EXTRA_HOSTS_FILE="${HOME}/.cloudbox/extra-hosts"
 cloudbox_extra_hostnames() {
   [[ -r "${CLOUDBOX_EXTRA_HOSTS_FILE}" ]] || return 0
   local n
-  while IFS= read -r n; do
+  # `|| [[ -n "${n}" ]]`: `read` returns non-zero on a final line with no
+  # trailing newline, having already assigned it. A hand-edited file whose last
+  # line is the name that matters ("echo my-app-demo >> …" without a newline,
+  # an editor configured not to add one) would otherwise silently lose exactly
+  # that name — and a name that is not in the block is a URL that does not
+  # resolve on a cluster that is fine.
+  while IFS= read -r n || [[ -n "${n}" ]]; do
     n="${n%%#*}"                       # allow trailing comments
-    n="${n//[[:space:]]/}"
+    # Trim leading/trailing whitespace ONLY. Deleting every space (the previous
+    # `${n//[[:space:]]/}`) turned "my app" into the perfectly valid label
+    # "myapp" and wrote a name the attendee never asked for; inner whitespace
+    # must reach the validator below and be REFUSED, not repaired.
+    n="${n#"${n%%[![:space:]]*}"}"
+    n="${n%"${n##*[![:space:]]}"}"
     [[ -z "${n}" ]] && continue
-    if [[ ! "${n}" =~ ^[a-z0-9-]+$ ]]; then
-      warn "${CLOUDBOX_EXTRA_HOSTS_FILE}: ignoring '${n}' — not a DNS label ([a-z0-9-])" >&2
+    if ! cloudbox_valid_label "${n}"; then
+      warn "${CLOUDBOX_EXTRA_HOSTS_FILE}: ignoring '${n}' — not a DNS label (RFC 1123: a-z, 0-9 and '-', starting and ending alphanumeric, <= 63 chars)" >&2
       continue
     fi
     echo "${n}.${KNATIVE_DOMAIN}"
   done < "${CLOUDBOX_EXTRA_HOSTS_FILE}"
+}
+
+# cloudbox_valid_label <name> — RFC 1123's rule for ONE DNS label, which is what
+# a Knative service name has to be. `[a-z0-9-]+` (the previous rule) accepts
+# "-", "---" and a 200-character name: all of them go into /etc/hosts happily
+# and none of them can ever resolve.
+cloudbox_valid_label() {
+  [[ "$1" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]
 }
 
 # cloudbox_add_extra_host <name> — persist one short name, idempotently.
@@ -481,8 +541,8 @@ cloudbox_extra_hostnames() {
 # (today: install.sh --add-hosts) enforces the same rule.
 cloudbox_add_extra_host() {
   local name="$1"
-  [[ "${name}" =~ ^[a-z0-9-]+$ ]] \
-    || die "'${name}' is not a DNS label — Knative names are lowercase letters, digits and '-' (pass the FIRST label only, e.g. my-app-demo for my-app-demo.${KNATIVE_DOMAIN})"
+  cloudbox_valid_label "${name}" \
+    || die "'${name}' is not a DNS label — RFC 1123 allows lowercase letters, digits and '-', starting and ending alphanumeric, at most 63 characters (pass the FIRST label only, e.g. my-app-demo for my-app-demo.${KNATIVE_DOMAIN})"
   mkdir -p "$(dirname "${CLOUDBOX_EXTRA_HOSTS_FILE}")"
   touch "${CLOUDBOX_EXTRA_HOSTS_FILE}"
   grep -qxF "${name}" "${CLOUDBOX_EXTRA_HOSTS_FILE}" && return 0
@@ -525,7 +585,7 @@ cloudbox_hosts_block() {
   echo "${CLOUDBOX_HOSTS_BEGIN}"
   echo "# CloudBox workshop — the docker substrate has no resolver, so every"
   echo "# hostname is listed here. Written by ./scripts/create-cluster.sh (and"
-  echo "# by ./scripts/install.sh --add-hosts), removed by"
+  echo "# by ./scripts/install.sh --add-hosts / --write-hosts), removed by"
   echo "# ./scripts/destroy-cluster.sh. Safe to delete by hand: nothing outside"
   echo "# these two markers is ever touched."
   local n
@@ -593,24 +653,69 @@ assert_hosts_block_wellformed() {
   return 0
 }
 
-# hosts_block_present — 0 when the block exists, its markers are a PAIR, and it
-# lists every current name. A block that is merely present is not enough:
-# adding a hostname to cloudbox_hostnames must make this fail so the block gets
-# rewritten — and so must a begin marker with no end marker. That last one is
-# why the pairing check is here and not only in the writers: write_hosts_block
-# asks this first, and an unpaired block that happens to list every name used to
-# answer "already correct", which skipped the assertion entirely and left the
-# broken file in place for the NEXT writer (or a hand edit) to truncate.
+# hosts_marked_block — the block as it is in the file today, markers included.
+# Empty when there is none. The mirror image of cloudbox_hosts_block(), which is
+# the block as it SHOULD be.
+hosts_marked_block() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
+  awk -v b="${CLOUDBOX_HOSTS_BEGIN}" -v e="${CLOUDBOX_HOSTS_END}" \
+    '$0 == b { p = 1 } p { print } $0 == e { p = 0 }' \
+    "${CLOUDBOX_HOSTS_FILE}"
+}
+
+# hosts_block_present — 0 when the marked block in the file is EXACTLY the block
+# cloudbox_hosts_block() would write today (markers a pair included).
+#
+# "Lists every current name" was the old rule, and it is only half of correct:
+# it can only ever detect names that are MISSING. Remove a name from
+# ${CLOUDBOX_EXTRA_HOSTS_FILE} (the documented way to stop resolving one) and
+# the block still contains every name this function knows about, so it reported
+# "already correct" and the stale 127.0.0.1 line stayed in /etc/hosts forever —
+# pointing a name the attendee has retired at their own loopback. Comparing the
+# whole block makes both directions drift, and the rewrite is idempotent, so the
+# stricter predicate costs nothing on the happy path.
+#
+# The pairing check stays here and not only in the writers: write_hosts_block
+# asks this first, and an unpaired block that happened to match used to answer
+# "already correct", which skipped the assertion entirely and left the broken
+# file in place for the NEXT writer (or a hand edit) to truncate.
 hosts_block_present() {
   [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 1
   grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" || return 1
   hosts_markers_paired || return 1
+  diff -q <(hosts_marked_block) <(cloudbox_hosts_block) >/dev/null 2>&1
+}
+
+# hosts_loopback_lines — every "127.0.0.1 <a CloudBox name>" line in the file,
+# with line numbers, wherever it sits. Not "inside our block": the point is to
+# find the ones OUTSIDE it.
+hosts_loopback_lines() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 0
   local n
   while IFS= read -r n; do
-    grep -qE "^[[:space:]]*127\.0\.0\.1[[:space:]]+${n//./\\.}([[:space:]]|$)" \
-      "${CLOUDBOX_HOSTS_FILE}" || return 1
+    grep -nE "^[[:space:]]*127\.0\.0\.1[[:space:]]+${n//./\\.}([[:space:]]|$)" \
+      "${CLOUDBOX_HOSTS_FILE}" || true
   done < <(cloudbox_hostnames)
-  return 0
+}
+
+# hosts_block_stale_for_tbx — 0 when this file would break a tbx cluster.
+#
+# The tbx preflight used to ask "is the begin marker there?", which is the
+# question with the narrowest possible answer. What actually breaks tbx is ANY
+# 127.0.0.1 line for a CloudBox name, because /etc/hosts is consulted before
+# talos-box's resolver — and those lines outlive their markers routinely: an
+# attendee who deletes the marker comments by hand and leaves the entries, a
+# half-removed block, a copy-paste of `install.sh --print-hosts` output into a
+# file that never had markers. Every one of those passed the old check and then
+# sent every workshop URL to the attendee's own loopback on a healthy cluster.
+#
+# So: any marker (paired or not — an unpaired one is its own problem) OR any
+# CloudBox name (pins + the attendee's extras) pointing at 127.0.0.1.
+hosts_block_stale_for_tbx() {
+  [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] || return 1
+  grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}" && return 0
+  grep -qxF "${CLOUDBOX_HOSTS_END}" "${CLOUDBOX_HOSTS_FILE}" && return 0
+  [[ -n "$(hosts_loopback_lines)" ]]
 }
 
 # hosts_missing_names — the names NOT currently resolvable from the file, so a
@@ -626,12 +731,25 @@ hosts_missing_names() {
 # write_hosts_block — replace the marked block (or append it). Needs sudo, once.
 # Written via a temp file and `sudo tee`, never an in-place sudo sed: a
 # half-written /etc/hosts breaks name resolution for the whole machine.
+#
+# NEVER FATAL, deliberately: 0 on success, 1 on any refusal or failure, and the
+# reason is printed either way. It is called at the END of create-cluster.sh,
+# after the cluster is proven healthy, and a `die` there threw away a working
+# cluster over a name-resolution problem — worse, the ONE recovery an attendee
+# would try (re-run create-cluster.sh) is then refused by preflight, because the
+# node containers it just built are exactly what preflight looks for. There was
+# no re-entrant writer at all: `--add-hosts` needs a name to add.
+# `install.sh --write-hosts` is that writer, and it is what every failure below
+# names. Callers that want a hard stop check the status themselves.
 write_hosts_block() {
   # Pairing FIRST, before the "is it already correct?" shortcut: a file with a
   # begin marker and no end marker can still list every name, and taking the
   # shortcut there would report success on a file we have just refused to touch.
-  assert_hosts_block_wellformed \
-    || die "Not touching ${CLOUDBOX_HOSTS_FILE} (see above). The cluster is fine; only the hostnames are."
+  if ! assert_hosts_block_wellformed; then
+    warn "Not touching ${CLOUDBOX_HOSTS_FILE} (see above). The cluster is fine; only the hostnames are."
+    warn "Fix the markers by hand, then: ./scripts/install.sh --write-hosts"
+    return 1
+  fi
   hosts_block_present && { ok "${CLOUDBOX_HOSTS_FILE} block already correct"; return 0; }
   local tmp; tmp="$(mktemp)"
   # Set AFTER mktemp so an early `return 0` above never runs it with tmp unset.
@@ -656,13 +774,21 @@ write_hosts_block() {
   # paths; only an exit can escape it, so the exiting path cleans up itself.
   if ! sudo tee "${CLOUDBOX_HOSTS_FILE}" < "${tmp}" >/dev/null; then
     rm -f "${tmp}"
-    die "Could not write ${CLOUDBOX_HOSTS_FILE} (sudo declined or unavailable). Add the lines by hand: ./scripts/install.sh --print-hosts"
+    fail "Could not write ${CLOUDBOX_HOSTS_FILE} (sudo declined or unavailable)."
+    warn "Nothing else is affected — this is only name resolution. Two ways back:"
+    warn "  ./scripts/install.sh --write-hosts   # try again (asks for sudo)"
+    warn "  ./scripts/install.sh --print-hosts   # the lines, to add by hand"
+    return 1
   fi
   rm -f "${tmp}"
   # The temp file is gone; disarm the trap so the RETURN below is not a second
   # `rm -f` against a path $TMPDIR may by then have handed to someone else.
   trap - RETURN
-  hosts_block_present || die "Wrote ${CLOUDBOX_HOSTS_FILE} but the names still do not resolve — check it by hand"
+  if ! hosts_block_present; then
+    fail "Wrote ${CLOUDBOX_HOSTS_FILE} but the block is still not what it should be — check it by hand"
+    warn "  ./scripts/install.sh --print-hosts   # what belongs there"
+    return 1
+  fi
   ok "${CLOUDBOX_HOSTS_FILE} updated ($(cloudbox_hostnames | wc -l | tr -d ' ') names)"
 }
 
@@ -674,6 +800,16 @@ remove_hosts_block() {
   # does not need. The block stays; the message says how to remove it.
   if ! assert_hosts_block_wellformed; then
     warn "Leaving ${CLOUDBOX_HOSTS_FILE} alone — remove the CloudBox lines by hand."
+    # Name them. "Remove the CloudBox lines" is advice an attendee can only
+    # follow if they know which lines those are, and this is precisely the file
+    # where guessing is expensive. These are also the lines a later tbx create
+    # dies on (hosts_block_stale_for_tbx), so printing them here is the same
+    # list, one destroy earlier.
+    local stray; stray="$(hosts_loopback_lines)"
+    if [[ -n "${stray}" ]]; then
+      warn "These lines point CloudBox names at your loopback (line: text):"
+      printf '   %s\n' "${stray}"
+    fi
     return 0
   fi
   local tmp; tmp="$(mktemp)"

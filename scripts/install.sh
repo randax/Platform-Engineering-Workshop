@@ -3,13 +3,18 @@
 # install.sh — CloudBox pre-flight check (step 3, the go/no-go gate)
 #
 # Checks that this machine can run the workshop. --check and --print-hosts only
-# READ state — they install nothing, touch no cluster, pull no images. The one
-# mutating mode is --add-hosts, which is opt-in and says what it is doing.
+# READ state — they install nothing, touch no cluster, pull no images. The two
+# mutating modes are --write-hosts and --add-hosts; both are opt-in, docker-only
+# and say what they are doing.
 #
 # Usage:
 #   ./scripts/install.sh --check    # run the pre-flight check
 #   ./scripts/install.sh            # same check + usage text
 #   ./scripts/install.sh --print-hosts   # the /etc/hosts lines the docker substrate needs
+#   ./scripts/install.sh --write-hosts   # docker only: (re)write that block —
+#                                   the recovery path when create-cluster.sh's
+#                                   sudo was declined, and the refresh path
+#                                   after WSL2 regenerates /etc/hosts
 #   ./scripts/install.sh --add-hosts <name>...   # docker only: resolve extra
 #                                   Knative names (e.g. my-app-demo) — WRITES
 #                                   /etc/hosts, asks for sudo
@@ -53,13 +58,31 @@ case "${1:-}" in
       echo "# tbx substrate: not needed — talos-box's resolver answers ${CLOUDBOX_DOMAIN}."
     } >&2
     exit 0 ;;
-  # The ONE mutating mode in this script, and the reason it lives here rather
-  # than in create-cluster.sh: /etc/hosts has no wildcards, so on the docker
-  # substrate only the names create-cluster.sh enumerated resolve. The three
-  # ksvcs the labs create are knowable in advance; a Console-composed
-  # Application (module 08) or anything an attendee names themselves is not.
-  # This persists the short name in ${CLOUDBOX_EXTRA_HOSTS_FILE} — so the NEXT
-  # rewrite of the block keeps it — and rewrites the block now.
+  # The re-entrant writer. Everything else that writes the block needs something
+  # from the caller (a cluster to create, a name to add); this one takes nothing
+  # and rewrites the block from the pins plus ${CLOUDBOX_EXTRA_HOSTS_FILE}, so
+  # it is the answer to every "the names stopped resolving" state:
+  #   * create-cluster.sh's sudo was declined — the cluster is up and healthy,
+  #     and re-running the create is refused by preflight (its own containers);
+  #   * WSL2 regenerated /etc/hosts from the Windows file at restart and threw
+  #     the block away (see lab/00-setup: /etc/wsl.conf generateHosts = false);
+  #   * a name was removed from the extras file and its 127.0.0.1 line is still
+  #     in /etc/hosts.
+  # Idempotent: with a correct block it writes nothing and asks for no password.
+  --write-hosts)
+    shift
+    [[ $# -eq 0 ]] || { usage; die "--write-hosts takes no arguments (to add a name: --add-hosts <name>)"; }
+    if [[ "$(substrate_resolve)" != "docker" ]]; then
+      die "--write-hosts is docker-substrate only. On tbx, talos-box's resolver answers every *.${CLOUDBOX_DOMAIN} name — 127.0.0.1 lines would override it and send every URL to your own loopback."
+    fi
+    write_hosts_block
+    exit 0 ;;
+  # /etc/hosts has no wildcards, so on the docker substrate only the names
+  # create-cluster.sh enumerated resolve. The three ksvcs the labs create are
+  # knowable in advance; a Console-composed Application (module 08) or anything
+  # an attendee names themselves is not. This persists the short name in
+  # ${CLOUDBOX_EXTRA_HOSTS_FILE} — so the NEXT rewrite of the block keeps it —
+  # and rewrites the block now.
   #
   # tbx needs none of this: talos-box's resolver answers the whole
   # *.${KNATIVE_DOMAIN} wildcard, so the command refuses there rather than
@@ -71,12 +94,21 @@ case "${1:-}" in
     if [[ "${add_substrate}" != "docker" ]]; then
       die "--add-hosts is docker-substrate only. On tbx, talos-box's resolver already answers every *.${KNATIVE_DOMAIN} name — adding 127.0.0.1 lines would override it and send every URL to your own loopback."
     fi
+    # ALL of them validated before ANY of them is persisted. Persisting as we go
+    # made `--add-hosts good-name Bad_Name` write half the request and then die:
+    # the extras file kept the first name, /etc/hosts was never rewritten, and
+    # re-running the corrected command was the only way to find out which half
+    # had landed. Validation is free; a partially applied mutation is not.
+    for name in "$@"; do
+      cloudbox_valid_label "${name}" \
+        || die "'${name}' is not a DNS label — RFC 1123 allows lowercase letters, digits and '-', starting and ending alphanumeric, at most 63 characters (pass the FIRST label only, e.g. my-app-demo for my-app-demo.${KNATIVE_DOMAIN}). Nothing was changed."
+    done
     for name in "$@"; do
       cloudbox_add_extra_host "${name}"
       info "will resolve: ${name}.${KNATIVE_DOMAIN}"
     done
     write_hosts_block
-    info "Remove them again with: \$EDITOR ${CLOUDBOX_EXTRA_HOSTS_FILE}  # then re-run this"
+    info "Remove one again: \$EDITOR ${CLOUDBOX_EXTRA_HOSTS_FILE}   # then: ./scripts/install.sh --write-hosts"
     exit 0 ;;
   "") usage; echo ;;
   -h|--help) usage; exit 0 ;;
@@ -250,22 +282,28 @@ else
 fi
 
 # --- Hostname resolution --------------------------------------------------------
-# Verify only. The block is written on the create path (create-cluster.sh), which
-# is where the one sudo prompt of the workshop belongs; --check never mutates.
+# Verify only. The block is written on the create path (create-cluster.sh) or by
+# `--write-hosts`, which is where the sudo prompt belongs; --check never mutates.
 step "Workshop hostnames (*.${CLOUDBOX_DOMAIN})"
-if [[ "${SUBSTRATE}" == "tbx" ]] \
-   && [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] \
-   && grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}"; then
-  # "No entries needed" is true and useless when a docker-substrate block is
-  # still sitting there: /etc/hosts is consulted BEFORE talos-box's resolver, so
-  # those 127.0.0.1 lines win and every workshop URL reaches the attendee's own
+if [[ "${SUBSTRATE}" == "tbx" ]] && hosts_block_stale_for_tbx; then
+  # "No entries needed" is true and useless when docker-substrate lines are still
+  # sitting there: /etc/hosts is consulted BEFORE talos-box's resolver, so those
+  # 127.0.0.1 lines win and every workshop URL reaches the attendee's own
   # loopback on a perfectly healthy cluster. substrate_preflight in
   # substrate/tbx.sh dies on exactly this predicate — a go/no-go gate that says
   # "ready" and then a create that dies is the gate failing at its one job.
-  check_fail "${CLOUDBOX_HOSTS_FILE} still carries the docker-substrate CloudBox block, and on tbx those 127.0.0.1 lines OVERRIDE talos-box's resolver"
-  echo "     See the lines: ./scripts/install.sh --print-hosts"
+  # The predicate is markers OR bare loopback lines: the entries are what break
+  # tbx, and they routinely outlive the comments that marked them.
+  check_fail "${CLOUDBOX_HOSTS_FILE} still points CloudBox names at 127.0.0.1, and on tbx those lines OVERRIDE talos-box's resolver"
+  stale_lines="$(hosts_loopback_lines)"
+  if [[ -n "${stale_lines}" ]]; then
+    echo "     Delete these lines (line: text):"
+    printf '     %s\n' "${stale_lines}"
+  else
+    echo "     (a CloudBox marker is present with no entries under it — delete the marker too)"
+  fi
   echo "     Remove them:   ./scripts/destroy-cluster.sh   # if the docker cluster is still around"
-  echo "                    sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # otherwise: delete ${CLOUDBOX_HOSTS_BEGIN} … ${CLOUDBOX_HOSTS_END}"
+  echo "                    sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # otherwise, by hand, markers included"
 elif [[ "${SUBSTRATE}" == "tbx" ]]; then
   ok "tbx substrate — talos-box's resolver answers *.${CLOUDBOX_DOMAIN}; no ${CLOUDBOX_HOSTS_FILE} entries needed"
   info "  (verify after the cluster exists: tbx status ${CLUSTER_NAME})"
@@ -287,8 +325,34 @@ else
   # name, and calling it twice in one message re-reads the file for a count it
   # already had — and could report a count and a list from two different reads.
   missing_names="$(hosts_missing_names)"
-  check_fail "${CLOUDBOX_HOSTS_FILE} is missing $(printf '%s\n' "${missing_names}" | wc -l | tr -d ' ') CloudBox name(s): $(printf '%s\n' "${missing_names}" | tr '\n' ' ')"
-  echo "     Fix: ./scripts/install.sh --print-hosts   # then add them, or re-run create-cluster.sh"
+  if [[ -n "${missing_names}" ]]; then
+    check_fail "${CLOUDBOX_HOSTS_FILE} is missing $(printf '%s\n' "${missing_names}" | wc -l | tr -d ' ') CloudBox name(s): $(printf '%s\n' "${missing_names}" | tr '\n' ' ')"
+  else
+    # Every name resolves and the block is STILL not what it should be: it
+    # carries something extra — most often a name removed from
+    # ${CLOUDBOX_EXTRA_HOSTS_FILE} whose 127.0.0.1 line is still in the block.
+    # Only the whole-block comparison can see this direction of drift.
+    check_fail "${CLOUDBOX_HOSTS_FILE}'s CloudBox block is not what it should be — every current name resolves, so it carries lines that no longer belong (a removed --add-hosts name, or a hand edit)"
+  fi
+  echo "     Fix: ./scripts/install.sh --write-hosts   # rewrites the block (sudo)"
+  echo "     See: ./scripts/install.sh --print-hosts   # what belongs in it"
+fi
+
+# WSL2 throws /etc/hosts away. `generateHosts` defaults to true, so on every
+# restart WSL regenerates the file from the Windows hosts file plus its own
+# entries — and the CloudBox block, written on a previous boot, is simply gone.
+# The cluster containers survive a restart; the names do not, so this looks like
+# an ingress that broke overnight. Only worth saying on WSL2, and only when the
+# generated header is there and our block is not.
+if is_wsl2 \
+   && [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] \
+   && grep -qi 'automatically generated' "${CLOUDBOX_HOSTS_FILE}" \
+   && ! hosts_block_present; then
+  warn "This ${CLOUDBOX_HOSTS_FILE} is WSL-generated — WSL rewrites it from the Windows hosts file on every restart, which deletes the CloudBox block."
+  info "  Keep it: add to /etc/wsl.conf, then 'wsl --shutdown' from Windows —"
+  info "    [network]"
+  info "    generateHosts = false"
+  info "  Or re-run after each restart: ./scripts/install.sh --write-hosts"
 fi
 
 # --- Tools -----------------------------------------------------------------------

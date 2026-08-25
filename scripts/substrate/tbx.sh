@@ -38,22 +38,29 @@ substrate_preflight() {
   if tbx status "${CLUSTER_NAME}" >/dev/null 2>&1; then
     die "A '${CLUSTER_NAME}' tbx cluster already exists. Run ./scripts/destroy-cluster.sh first."
   fi
-  # A leftover docker-substrate /etc/hosts block is fatal HERE, before any VM
-  # exists. It maps every *.${CLOUDBOX_DOMAIN} name to 127.0.0.1, and /etc/hosts
-  # is consulted before talos-box's resolver — so the cluster would come up
+  # Leftover docker-substrate /etc/hosts entries are fatal HERE, before any VM
+  # exists. They map *.${CLOUDBOX_DOMAIN} names to 127.0.0.1, and /etc/hosts is
+  # consulted before talos-box's resolver — so the cluster would come up
   # perfectly and every single workshop URL would still hit the attendee's own
   # loopback. destroy-cluster.sh removes the block on the docker path now; this
   # catches the machine whose docker cluster was destroyed by hand, or before
-  # that change existed.
-  if [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] \
-     && grep -qxF "${CLOUDBOX_HOSTS_BEGIN}" "${CLOUDBOX_HOSTS_FILE}"; then
-    fail "${CLOUDBOX_HOSTS_FILE} still carries the docker-substrate CloudBox block."
-    warn "On tbx those 127.0.0.1 lines OVERRIDE talos-box's resolver, so every"
+  # that change existed — and, since the predicate is entries-or-markers rather
+  # than the begin marker alone, also the file whose markers were deleted by
+  # hand and whose 127.0.0.1 lines were left behind.
+  if hosts_block_stale_for_tbx; then
+    fail "${CLOUDBOX_HOSTS_FILE} still points CloudBox names at 127.0.0.1."
+    warn "On tbx those lines OVERRIDE talos-box's resolver, so every"
     warn "*.${CLOUDBOX_DOMAIN} URL would reach your laptop instead of the cluster."
-    warn "See exactly which lines: ./scripts/install.sh --print-hosts"
-    warn "Remove them: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}  # delete ${CLOUDBOX_HOSTS_BEGIN} … ${CLOUDBOX_HOSTS_END}"
+    local stray; stray="$(hosts_loopback_lines)"
+    if [[ -n "${stray}" ]]; then
+      warn "Delete these lines (line: text):"
+      printf '   %s\n' "${stray}"
+    else
+      warn "A CloudBox marker is present with no entries under it — delete the marker."
+    fi
+    warn "Remove them: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}  # markers ${CLOUDBOX_HOSTS_BEGIN} … ${CLOUDBOX_HOSTS_END} included"
     warn "  (or, if the docker cluster is still around: ./scripts/destroy-cluster.sh)"
-    die "Remove the block and re-run."
+    die "Remove them and re-run."
   fi
 }
 
@@ -502,35 +509,30 @@ substrate_post_ready() {
 substrate_destroy() {
   step "Destroying Talos VMs for '${CLUSTER_NAME}'"
   need tbx "The cluster was created on the tbx substrate, so only tbx can remove its VMs. Install talos-box again, or remove them by hand before deleting ${CLOUDBOX_SUBSTRATE_FILE}."
-  # `tbx status <cluster>` exits non-zero for TWO very different reasons, and
-  # treating them the same is how a destroy erases the record of a cluster that
-  # is still there:
-  #   * the cluster does not exist — `cluster.Load` fails to read its state file
-  #     (upstream internal/cluster/store.go:63-71, the ONLY site that says
-  #     "read cluster state"), reached from the daemon's status op
-  #     (internal/daemon/operations.go:1446-1449);
-  #   * anything else — tbxd not running, the socket refusing, a protocol
-  #     mismatch, a permission problem. The VMs are alive and we simply cannot
-  #     see them.
-  # Only the first is "nothing to destroy". The second must NOT continue: the
-  # caller deletes ~/.cloudbox/substrate right after this returns, and a machine
-  # with live VMs and no persisted substrate destroys as docker forever after.
-  local out rc=0
-  out="$(tbx status "${CLUSTER_NAME}" 2>&1)" || rc=$?
-  if [[ "${rc}" -eq 0 ]]; then
-    # `tbx down` only STOPS a cluster and has no --delete flag. Destroy is its
-    # own verb, and --force is its confirmation.
-    tbx cluster destroy "${CLUSTER_NAME}" --force
-    ok "Cluster destroyed"
-  elif [[ "${out}" == *"read cluster state"* || "${out}" == *"no such file or directory"* ]]; then
-    warn "No '${CLUSTER_NAME}' tbx cluster found — nothing to destroy"
-  else
-    fail "'tbx status ${CLUSTER_NAME}' failed for a reason that is NOT 'no such cluster':"
-    printf '   %s\n' "${out}"
-    warn "Nothing has been removed, and ${CLOUDBOX_SUBSTRATE_FILE} is left in place —"
-    warn "if the VMs are still running, this is the only record that they are tbx's."
-    die "Fix the above (is tbxd running? 'tbx doctor'), then re-run ./scripts/destroy-cluster.sh"
-  fi
+  # Three-way (tbx_cluster_absent in lib.sh), because "cannot look" is not
+  # "nothing there": the caller deletes ~/.cloudbox/substrate right after this
+  # returns, and a machine with live VMs and no persisted substrate destroys as
+  # docker forever after. The classifier is shared with both preflights so the
+  # gate and the teardown cannot disagree about what "no such cluster" means —
+  # and, in particular, so that a DOWN tbxd (whose dial error also ends in "no
+  # such file or directory") can never be read as an absent cluster again.
+  local absent=0
+  tbx_cluster_absent "${CLUSTER_NAME}" || absent=$?
+  case "${absent}" in
+    1)
+      # `tbx down` only STOPS a cluster and has no --delete flag. Destroy is its
+      # own verb, and --force is its confirmation.
+      tbx cluster destroy "${CLUSTER_NAME}" --force
+      ok "Cluster destroyed" ;;
+    0)
+      warn "No '${CLUSTER_NAME}' tbx cluster found — nothing to destroy" ;;
+    *)
+      fail "'tbx status ${CLUSTER_NAME}' failed for a reason that is NOT 'no such cluster':"
+      printf '   %s\n' "${TBX_CLUSTER_ABSENT_REASON}"
+      warn "Nothing has been removed, and ${CLOUDBOX_SUBSTRATE_FILE} is left in place —"
+      warn "if the VMs are still running, this is the only record that they are tbx's."
+      die "Fix the above (is tbxd running? 'tbx doctor'), then re-run ./scripts/destroy-cluster.sh" ;;
+  esac
   # Only after a successful destroy or a PROVEN absence.
   rm -f "${TBX_CLUSTER_FILE}"
 }

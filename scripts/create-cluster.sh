@@ -163,12 +163,6 @@ helm upgrade --install cilium \
 
 substrate_post_cni
 
-# docker has no resolver: the hostnames come from a marked /etc/hosts block.
-# This is the one sudo prompt in the whole workshop, and it is on the create
-# path only — install.sh --check verifies, never writes. On tbx the names are
-# answered by talos-box's resolver and nothing is written.
-[[ "${SUBSTRATE}" == "docker" ]] && write_hosts_block
-
 # --- 4. Wait for Ready -------------------------------------------------------------------
 step "Waiting for nodes to become Ready (Cilium rollout)"
 wait_rollout kube-system daemonset/cilium
@@ -181,8 +175,36 @@ kubectl get nodes -o wide
 # node rollout as an ingress problem.
 substrate_post_ready
 
+# docker has no resolver: the hostnames come from a marked /etc/hosts block.
+# This is the one sudo prompt in the whole workshop, and it is on the create
+# path only — install.sh --check verifies, never writes. On tbx the names are
+# answered by talos-box's resolver and nothing is written.
+#
+# LAST, after the cluster is proven healthy — it used to run before the Ready
+# wait, which put the one step an attendee can REFUSE in front of everything
+# that has to work. A declined sudo aborted the create with a cluster that was
+# already half-built, and the obvious recovery (run it again) is then refused by
+# preflight, because the node containers this run created are exactly what
+# preflight looks for. Nothing above needs the names: every kubectl and helm
+# call goes to the API endpoint, and the hostnames are for the attendee's
+# browser afterwards.
+#
+# `|| true`, for the same reason write_hosts_block no longer dies: a cluster
+# that is up must not be thrown away over name resolution. The failure is
+# printed, the recovery command is `./scripts/install.sh --write-hosts`, and the
+# summary below says so.
+hosts_ok="true"
+if [[ "${SUBSTRATE}" == "docker" ]]; then
+  write_hosts_block || hosts_ok="false"
+fi
+
 echo
 ok "Cluster '${CLUSTER_NAME}' is up — you now own a cloud. ☁️"
+if [[ "${hosts_ok}" != "true" ]]; then
+  warn "…but the ${CLOUDBOX_HOSTS_FILE} block was NOT written (see above), so every"
+  warn "*.${CLOUDBOX_DOMAIN} URL will fail on a perfectly healthy cluster."
+  warn "Fix it any time — the cluster keeps running: ./scripts/install.sh --write-hosts"
+fi
 info "Next steps:"
 echo "   ./scripts/bootstrap-gitops.sh   # module 2: Gitea + ArgoCD"
 echo "   ./scripts/seed-gitea.sh         # module 2: push this repo to your cloud"
