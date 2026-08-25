@@ -70,25 +70,46 @@ else
 fi
 
 # --- Cold start / serving through the ingress -----------------------------------
-# Two accepted paths, because /etc/hosts has no wildcards. Preferred: the ksvc's
-# own URL, browsable with no Host header and no port — that works on tbx for
-# every name, and on docker for the names install.sh --print-hosts lists.
-# Fallback: the Host-header form against the shared ingress on port 80, which
-# works for any ksvc on either substrate. Both prove the same thing.
+# Two accepted paths, because name resolution is the one thing the two substrates
+# do differently. Preferred: the ksvc's own URL, browsable with no Host header and
+# no port — that works on tbx for every name (its resolver answers the whole
+# *.${CLOUDBOX_DOMAIN} wildcard) and on docker only for the names
+# install.sh --print-hosts lists, since /etc/hosts has no wildcards.
+# Fallback: the same request with an explicit Host header, aimed at whatever the
+# shared ingress actually is on this substrate — localhost:80 on docker, the
+# LoadBalancer VIP on tbx. Both paths prove the same thing.
+# Where the fallback aims, and what a failure means, differ per substrate — the
+# only substrate-aware lines in this file. Resolved inline (sourcing
+# scripts/lib.sh would clobber the counting ok()/fail() above); no detection
+# needed, because by module 06 a cluster exists and its answer is persisted.
+SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
+if [ -z "$SUBSTRATE" ] && [ -r "$HOME/.cloudbox/substrate" ]; then
+  SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
+fi
+case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac
+if [ "$SUBSTRATE" = tbx ]; then
+  INGRESS_ADDR="$(kubectl -n kube-system get svc cilium-ingress \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+  NAME_HINT="on tbx the talos-box resolver answers *.${CLOUDBOX_DOMAIN} — 'tbx doctor' checks that wiring; kubectl -n kube-system get svc cilium-ingress shows the VIP it should point at"
+else
+  INGRESS_ADDR="localhost"
+  NAME_HINT="on docker each name needs a line in /etc/hosts (./scripts/install.sh --print-hosts)"
+fi
+
 # Strip the scheme in pure bash — BSD sed has no \? in basic regex.
 URL="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' 2>/dev/null || true)"
 HOST="${URL#http://}"; HOST="${HOST#https://}"
 if [ -n "$HOST" ]; then
   BODY="$(curl -fsS --max-time 30 "http://${HOST}/" 2>/dev/null || true)"
   VIA="its own URL (http://${HOST}/)"
-  if ! echo "$BODY" | grep -qi hello; then
-    BODY="$(curl -fsS --max-time 30 -H "Host: ${HOST}" http://localhost/ 2>/dev/null || true)"
-    VIA="the shared ingress with a Host header"
+  if ! echo "$BODY" | grep -qi hello && [ -n "$INGRESS_ADDR" ]; then
+    BODY="$(curl -fsS --max-time 30 -H "Host: ${HOST}" "http://${INGRESS_ADDR}/" 2>/dev/null || true)"
+    VIA="the shared ingress at ${INGRESS_ADDR} with a Host header"
   fi
   if echo "$BODY" | grep -qi hello; then
     ok "curl via ${VIA} answered: $(echo "$BODY" | head -1)"
   else
-    fail "no answer for ${HOST} — try: curl -v -H 'Host: ${HOST}' http://localhost/ ; if that works, the name is missing from /etc/hosts (./scripts/install.sh --print-hosts). If neither works: kubectl -n kourier-system get svc kourier; kubectl get ingress -A"
+    fail "no answer for ${HOST} — try: curl -v -H 'Host: ${HOST}' http://${INGRESS_ADDR:-<ingress-address>}/ ; if that works, only the NAME is broken: ${NAME_HINT}. If neither works: kubectl -n kourier-system get svc kourier; kubectl get ingress -A"
   fi
 else
   fail "cannot determine ksvc URL — fix the ksvc checks above first"

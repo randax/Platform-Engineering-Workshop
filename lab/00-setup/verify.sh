@@ -13,10 +13,36 @@ fail() { echo "❌ FAIL: $1"; FAILED=$((FAILED + 1)); }
 
 # --- Substrate -------------------------------------------------------------
 # Which substrate this laptop will use: real Talos VMs via talos-box (tbx) or
-# Talos-in-Docker. Read the persisted answer if a cluster already exists, else
-# ask tbx. Inlined rather than sourced: scripts/lib.sh defines its own
-# non-counting ok()/fail() and would silently clobber the counting ones above —
-# the same trap the comment in lab/01-cluster/verify.sh records.
+# Talos-in-Docker. This MUST agree with substrate_resolve() (scripts/lib.sh),
+# which install.sh --check and create-cluster.sh use — a lab 00 that demanded
+# tbx while create-cluster.sh built docker would fail an attendee who is
+# perfectly ready. So the precedence below is theirs, in order:
+#   1. CLOUDBOX_SUBSTRATE in the environment (the documented escape hatch)
+#   2. the persisted answer from a previous create (~/.cloudbox/substrate)
+#   3. CLOUDBOX_SUBSTRATE_DEFAULT=docker — the go-live gate's kill switch:
+#      when the pin says docker, detection never upgrades to tbx
+#   4. detection: `tbx doctor`
+# Inlined rather than sourced, deliberately: scripts/lib.sh defines its own
+# non-counting ok()/fail() (which would silently clobber the counting ones
+# above — the trap lab/01-cluster/verify.sh records) and its need()/die() exit
+# the process, which a checklist that must run every check may never do.
+# Whenever substrate_resolve() changes, change this with it.
+
+# `tbx doctor` is the slowest thing in this file (it probes the helper, DNS,
+# routes and the mirror), and both the detection above and the tbx branch below
+# want its answer — so run it at most once.
+TBX_DOCTOR_RC=""
+tbx_doctor_ok() {
+  if [ -z "$TBX_DOCTOR_RC" ]; then
+    if command -v tbx >/dev/null 2>&1 && tbx doctor >/dev/null 2>&1; then
+      TBX_DOCTOR_RC=0
+    else
+      TBX_DOCTOR_RC=1
+    fi
+  fi
+  return "$TBX_DOCTOR_RC"
+}
+
 SUBSTRATE="${CLOUDBOX_SUBSTRATE:-}"
 if [ -z "$SUBSTRATE" ] && [ -r "$HOME/.cloudbox/substrate" ]; then
   SUBSTRATE="$(tr -d '[:space:]' < "$HOME/.cloudbox/substrate")"
@@ -24,7 +50,9 @@ fi
 case "$SUBSTRATE" in
   tbx|docker) ;;
   *)
-    if command -v tbx >/dev/null 2>&1 && tbx doctor >/dev/null 2>&1; then
+    if [ "${CLOUDBOX_SUBSTRATE_DEFAULT:-tbx}" = docker ]; then
+      SUBSTRATE=docker
+    elif tbx_doctor_ok; then
       SUBSTRATE=tbx
     else
       SUBSTRATE=docker
@@ -84,7 +112,9 @@ else
   else
     fail "host memory: ${HOST_GB:-0} GB — the tbx substrate needs >= 16 GB. Use the docker substrate instead: CLOUDBOX_SUBSTRATE=docker"
   fi
-  if command -v tbx >/dev/null 2>&1 && tbx doctor >/dev/null 2>&1; then
+  # Memoised: on the detection path doctor has already run, and this reuses that
+  # exit code instead of paying for a second probe.
+  if tbx_doctor_ok; then
     ok "tbx doctor passes"
   else
     fail "tbx doctor reports problems — run 'tbx doctor' to see them (install with 'brew install randax/tap/tbx' + 'sudo tbx system install'), or use CLOUDBOX_SUBSTRATE=docker"
