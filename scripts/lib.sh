@@ -114,6 +114,25 @@ detect_arch() {
   esac
 }
 
+# host_cpu_arch — the arch of the MACHINE, not of this shell. On macOS the two
+# differ inside Rosetta: a terminal launched with "Open using Rosetta" (or any
+# shell under an x86_64 parent — some IDEs, older brew installs) reports
+# `uname -m` = x86_64 on an Apple Silicon Mac. The tbx VMs are virtualised
+# natively by that hardware and are arm64 regardless, so asking uname there
+# mirrored the whole image set for the wrong architecture — offline, at the
+# venue, with "exec format error" as the only clue.
+#
+# `sysctl -n hw.optional.arm64` is not translated: it describes the CPU, and
+# answers 1 under Rosetta as well as outside it. Absent (or 0) means a real
+# Intel Mac, where uname is right. Everything non-Darwin falls through to
+# detect_arch — Linux has no equivalent translation layer here.
+host_cpu_arch() {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    [[ "$(sysctl -n hw.optional.arm64 2>/dev/null || true)" == "1" ]] && { echo "arm64"; return 0; }
+  fi
+  detect_arch
+}
+
 # docker_server_arch — the Docker DAEMON's architecture (amd64/arm64), which is
 # what the cluster node containers run. Can differ from uname -m: an x86_64
 # Rosetta shell on Apple Silicon, or a context pointing at a remote daemon.
@@ -136,15 +155,16 @@ docker_server_arch() {
 #            daemon's arch is theirs; on an amd64 Colima VM on an arm64 Mac
 #            that is amd64, and uname -m would be wrong.
 #   tbx    — the nodes are VMs virtualised natively (vz/hvf on macOS, KVM on
-#            Linux); nothing is emulated, so they are the HOST's arch, and the
-#            Docker daemon — which here only ever runs the mirror — may not be
-#            the same one at all.
+#            Linux); nothing is emulated, so they are the HOST HARDWARE's arch
+#            (host_cpu_arch, which sees through a Rosetta shell — uname does
+#            not), and the Docker daemon, which here only ever runs the mirror,
+#            may not be the same one at all.
 # Callers that already know the substrate pass it in $1; otherwise this
 # resolves it (which can run `tbx doctor`).
 node_arch() { # [substrate]
   local s="${1:-}"
   [[ -n "${s}" ]] || substrate_resolve_into s || return 1
-  if [[ "${s}" == "tbx" ]]; then detect_arch; return; fi
+  if [[ "${s}" == "tbx" ]]; then host_cpu_arch; return; fi
   docker_server_arch
 }
 

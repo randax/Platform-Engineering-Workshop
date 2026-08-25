@@ -221,7 +221,9 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
   # Desktop/OrbStack emulation) merely runs it slowly. A warning, not a
   # check_fail: Backstage is a stretch catalog item and a presenter demo, and no
   # core module touches it.
-  if [[ "$(detect_arch 2>/dev/null || true)" == "arm64" ]]; then
+  # host_cpu_arch, not detect_arch: the VMs follow the hardware, and in a Rosetta
+  # shell on Apple Silicon uname says x86_64 while the nodes are still arm64.
+  if [[ "$(host_cpu_arch 2>/dev/null || true)" == "arm64" ]]; then
     warn "Backstage (${MIRROR_ARCH_EXEMPT}) is published for linux/amd64 only and your tbx nodes are arm64 VMs with no emulation — enabling gitops/catalog/backstage.yaml here ends in 'exec format error'. It is a stretch catalog item; to try it, run that cluster on the docker substrate (CLOUDBOX_SUBSTRATE=docker). Everything else in the workshop is multi-arch."
   fi
   # The memory budget that actually applies on this substrate. The VMs are sized
