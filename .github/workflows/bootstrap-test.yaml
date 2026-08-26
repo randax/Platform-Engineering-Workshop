@@ -1169,6 +1169,24 @@ jobs:
               > "/tmp/diag/logs-kourier-$n.txt" 2>&1 || true
           done
           kubectl -n kourier-system get svc -o wide > /tmp/diag/kourier-svc.txt 2>&1 || true
+
+          # --- module-09 event path: uploader -> broker-ingress -> IMC ->
+          # imc-dispatcher -> the trigger's subscriber (the resizer ksvc). The
+          # `-l app` loop above CANNOT see these: the data-plane deployments
+          # label their pods `eventing.knative.dev/brokerRole` /
+          # `app.kubernetes.io/component`, not `app` — only the three controllers
+          # (eventing-controller, eventing-webhook, mt-broker-controller) carry
+          # `app`, which is why a run that lost a CloudEvent had no ingress,
+          # filter or dispatcher log to explain it. Collect them by deployment.
+          for d in mt-broker-ingress mt-broker-filter imc-dispatcher imc-controller; do
+            kubectl -n knative-eventing logs "deploy/$d" --tail=400 --all-containers \
+              > "/tmp/diag/logs-knative-eventing-$d.txt" 2>&1 || true
+          done
+          kubectl -n pipeline get broker,trigger,subscriptions.messaging.knative.dev,inmemorychannels.messaging.knative.dev \
+            -o yaml > /tmp/diag/pipeline-eventing.yaml 2>&1 || true
+          # The mt-broker-controller logged a Reconcile error naming a "secret";
+          # list what is actually there (names only — never the contents).
+          kubectl -n knative-eventing get secret -o name > /tmp/diag/knative-eventing-secrets.txt 2>&1 || true
           kubectl -n pipeline get svc,endpoints,ksvc,trigger -o wide > /tmp/diag/pipeline-routing.txt 2>&1 || true
           kubectl -n pipeline get svc uploader -o yaml > /tmp/diag/pipeline-svc-uploader.yaml 2>&1 || true
           kubectl -n pipeline get ksvc -o yaml > /tmp/diag/pipeline-ksvc.yaml 2>&1 || true

@@ -2915,3 +2915,39 @@ Retired by: a green `bootstrap-test.yaml` on the docker substrate (modules 01–
 plus the recovery job) **and** step 6 of the tbx rehearsal, proving the override
 did not make a genuinely broken ingress read Healthy on the substrate that can
 tell the difference.
+
+## TRAP — the module 09 upload can beat the trigger's subscription
+
+Knative Eventing's InMemoryChannel is **at-most-once**. A CloudEvent that
+`broker-ingress` accepts before the Trigger's `Subscription` has been picked up
+by `imc-dispatcher` is acknowledged and then dropped: no redelivery, no error,
+no log line anywhere the attendee will look. The gallery simply stays empty.
+
+CI run 32951023324 lost one exactly this way on the docker substrate: the
+Subscription for `trigger/resize-on-upload` was created at 09:18:48.9, the
+portal's upload landed at 09:18:49.7 (HTTP 200, no error flash — the
+portal→uploader hop was fine), and the resizer never scaled from zero. By
+diagnostics time the Trigger read `Ready=True` with the right subscriber, so
+everything looked correct after the fact.
+
+`Trigger` going Ready is **not** the condition to wait on: it precedes the
+channel subscription being wired into the dispatcher. `lab/09-capstone/solve.sh`
+now waits for `broker/default` `IngressReady`/`FilterReady`/`TriggerChannelReady`
+and for the Trigger-owned Subscription to be Ready — and then, because the
+dispatcher's own view still lags the API server by a short unbounded moment,
+**retries the upload**: three attempts, 60 s of thumbnail-polling each. This
+mirrors what an attendee does in the browser when nothing appears — upload
+again — so the lab text needs no new step.
+
+The race pre-exists on `main` (same single-upload / 240 s-wait shape); this
+branch is where it was first observed, not where it was introduced. The
+diagnostics collector could not explain it either: the `-l app` namespace loop
+in `bootstrap-test.yaml` misses `mt-broker-ingress`, `mt-broker-filter` and
+`imc-dispatcher`, whose pods label with `eventing.knative.dev/brokerRole` and
+`app.kubernetes.io/component` rather than `app`, so only the three controllers
+were ever captured. They are now collected by deployment name, along with the
+namespace's broker/trigger/subscription/channel YAML.
+
+Retired by: a `bootstrap-test.yaml` run whose module 09 reports the thumbnail on
+attempt 1 — and, if one ever reports attempt 2 or 3, by the newly collected
+`broker-ingress`/`imc-dispatcher` logs saying what happened to the first event.
