@@ -60,10 +60,43 @@ TMP_PNG="$(mktemp).png"
 echo "$PNG_B64" | base64 -d > "$TMP_PNG" 2>/dev/null || echo "$PNG_B64" | base64 -D > "$TMP_PNG"
 
 echo "uploading test image through the portal (cold-starts the uploader)..."
-curl -fsS --max-time 120 -o /dev/null \
+# The portal's upload handler renders the gallery-grid FRAGMENT with HTTP 200 in
+# every branch — success and failure alike (apps/portal/internal/web/gallery.go).
+# So `-o /dev/null` would throw away the only evidence that the proxied POST to
+# the uploader failed, and the run would instead die 240s later on "no
+# thumbnail" with the real error text nowhere in any log. Keep the body and read
+# the flash: errorFlash() renders class="flash flash-error", the success flash
+# renders plain class="flash".
+UPLOAD_OUT="$(mktemp)"
+UPLOAD_CODE="$(curl -sS --max-time 120 -o "$UPLOAD_OUT" -w '%{http_code}' \
   -F "file=@${TMP_PNG};type=image/png;filename=solve-test.png" \
-  "${PORTAL_HOST_URL}/gallery/upload"
+  "${PORTAL_HOST_URL}/gallery/upload")" || UPLOAD_CODE="000 (curl transport error)"
 rm -f "$TMP_PNG"
+
+if [ "$UPLOAD_CODE" != "200" ] || grep -q 'flash-error' "$UPLOAD_OUT"; then
+  {
+    echo "❌ FAIL: the portal could not hand the upload to the uploader (HTTP ${UPLOAD_CODE})."
+    echo "portal said:"
+    # The flash carries the Go error verbatim ("dial tcp …", "lookup …") — print
+    # it stripped of markup first, then the whole fragment for context.
+    grep -o 'class="flash flash-error">[^<]*' "$UPLOAD_OUT" | sed 's/^[^>]*>/  /' || true
+    echo "--- response body ---"
+    cat "$UPLOAD_OUT"
+    echo "---------------------"
+    echo "the portal POSTs to \${UPLOADER_URL}/upload, default"
+    echo "  http://uploader.pipeline.svc.cluster.local/upload"
+    echo "(a Knative ExternalName -> kourier-internal.kourier-system). Probe it from inside"
+    echo "the cluster to tell DNS from connect — the portal image is FROM scratch, so use a"
+    echo "throwaway busybox rather than exec'ing into it:"
+    echo "  kubectl -n portal run probe-\$RANDOM --rm -i --restart=Never --image=docker.io/library/busybox:1.37.0 \\"
+    echo "    -- sh -c 'nslookup uploader.pipeline.svc.cluster.local; wget -qO- --timeout=5 http://uploader.pipeline.svc.cluster.local/healthz; echo rc=\$?'"
+    echo "  kubectl -n pipeline get svc uploader -o yaml   # the ExternalName target"
+    echo "  kubectl -n kourier-system get svc,pods -o wide"
+  } >&2
+  rm -f "$UPLOAD_OUT"
+  exit 1
+fi
+rm -f "$UPLOAD_OUT"
 
 # The resizer scales from zero to process the event — poll S3 for its output.
 s3() {

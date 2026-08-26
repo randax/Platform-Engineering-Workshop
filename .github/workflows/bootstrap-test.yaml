@@ -1142,7 +1142,7 @@ jobs:
           kubectl -n argocd get applications -o yaml > /tmp/diag/applications.yaml 2>&1 || true
           kubectl get clusters.postgresql.cnpg.io,workshopdatabases,ksvc,broker,trigger -A > /tmp/diag/custom-resources.txt 2>&1 || true
           for ns in argocd gitea cnpg-system rustfs crossplane-system demo \
-                    knative-serving knative-eventing zot argo builds portal pipeline nats \
+                    knative-serving knative-eventing kourier-system zot argo builds portal pipeline nats \
                     observability; do
             kubectl -n "$ns" get pods -o wide > "/tmp/diag/pods-$ns.txt" 2>&1 || true
             kubectl -n "$ns" logs --tail=200 -l app --prefix > "/tmp/diag/logs-$ns.txt" 2>&1 || true
@@ -1158,6 +1158,31 @@ jobs:
             kubectl -n observability logs "$p" --all-containers --previous --tail=150 >> "/tmp/diag/logs-$n.txt" 2>&1 || true
             kubectl -n observability describe "$p" > "/tmp/diag/describe-$n.txt" 2>&1 || true
           done
+
+          # --- module-09 upload path: portal -> uploader.pipeline.svc (ExternalName
+          # -> kourier-internal) -> Kourier/Envoy -> the uploader ksvc. When that dial
+          # fails the portal only renders it into an HTML flash, so the cluster-side
+          # evidence has to be captured here. Everything below is best-effort.
+          for p in $(kubectl -n kourier-system get pods -o name 2>/dev/null); do
+            n="${p##*/}"
+            kubectl -n kourier-system logs "$p" --all-containers --tail=200 \
+              > "/tmp/diag/logs-kourier-$n.txt" 2>&1 || true
+          done
+          kubectl -n kourier-system get svc -o wide > /tmp/diag/kourier-svc.txt 2>&1 || true
+          kubectl -n pipeline get svc,endpoints,ksvc,trigger -o wide > /tmp/diag/pipeline-routing.txt 2>&1 || true
+          kubectl -n pipeline get svc uploader -o yaml > /tmp/diag/pipeline-svc-uploader.yaml 2>&1 || true
+          kubectl -n pipeline get ksvc -o yaml > /tmp/diag/pipeline-ksvc.yaml 2>&1 || true
+          kubectl get ciliumenvoyconfigs,ciliumclusterwideenvoyconfigs -A -o name \
+            > /tmp/diag/cilium-envoy-configs.txt 2>&1 || true
+          kubectl -n kube-system logs -l k8s-app=cilium --all-containers --tail=200 --prefix 2>/dev/null \
+            | grep -Ei 'envoy|ingress|error|warn' > /tmp/diag/cilium-agent-envoy.txt 2>&1 || true
+          # In-cluster probe from the portal's namespace. The portal image is FROM
+          # scratch (no sh/wget), so `kubectl exec` into it is impossible — run a
+          # throwaway busybox (on scripts/images.txt, so it is already pulled) instead.
+          kubectl -n portal run "diag-probe-${RANDOM}" --rm -i --restart=Never --quiet \
+            --image=docker.io/library/busybox:1.37.0 --command -- \
+            sh -c 'nslookup uploader.pipeline.svc.cluster.local; echo "--- healthz"; wget -qO- --timeout=5 http://uploader.pipeline.svc.cluster.local/healthz; echo "rc=$?"; echo "--- root"; wget -qO- --timeout=5 http://uploader.pipeline.svc.cluster.local/; echo "rc=$?"' \
+            > /tmp/diag/probe-uploader-from-portal.txt 2>&1 || true
 
       - name: Upload diagnostics artifact
         if: always()
