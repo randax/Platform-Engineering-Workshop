@@ -161,42 +161,48 @@ node_arch() { # [substrate]
 # install.sh --check judges the mirror's content by it, and the two disagreeing
 # is a --check that goes red on a correctly warmed machine.
 #
-# Gated on the tbx BINARY, not on substrate_resolve()'s answer — the same bet
-# cloudbox-init.sh's Talos-disk warm makes, and for the same reason. Those two
-# differ exactly where it matters: `tbx doctor` fails at home (the helper is not
-# installed yet, the resolver is not wired up), detection says "docker", and the
-# mirror gets filled for the DOCKER DAEMON — which on an amd64 Colima VM on an
-# Apple Silicon Mac is the wrong answer by a whole architecture. The attendee
-# fixes tbx before the venue, `tbx doctor` passes there, create-cluster.sh picks
-# tbx, and every mirrored image is amd64 for arm64 VMs. Offline, with "exec
-# format error" as the only clue (docs/HAZARDS.md, "a wrong-architecture mirror
-# serves happily").
+# It answers with THE DECISION — substrate_resolve(), doctor and all — and not
+# with `have tbx`. That distinction cost a rewrite in both directions, so it is
+# worth being precise about:
 #
-# The bet is off the moment this machine has ANSWERED the question, though: an
-# explicit CLOUDBOX_SUBSTRATE, or a ~/.cloudbox/substrate written by a create
-# that has already happened. A laptop with tbx installed that is running its
-# cluster on docker (a failed doctor at the venue, `CLOUDBOX_SUBSTRATE=docker`
-# once, the kind lifeboat) is not "heading towards tbx" — it is there — and
-# filling its mirror for arm64 VMs it does not have is the same
-# wrong-architecture failure in the other direction. `kind` counts as docker
-# here for the one reason that matters: kind's nodes are containers on this
-# host's Docker engine, so their arch is the DAEMON's.
-mirror_target_substrate() {
-  local decided="${CLOUDBOX_SUBSTRATE:-}"
-  [[ -n "${decided}" ]] || decided="$(substrate_persisted_raw)"
-  case "${decided}" in
-    docker|kind) echo "${decided}"; return 0 ;;
-    tbx)         echo "tbx";        return 0 ;;
-  esac
-  if have tbx; then echo "tbx"; else echo "docker"; fi
+# Keying on the BINARY was a bet that a machine with tbx installed is *heading
+# towards* tbx even while `tbx doctor` fails at home, so warming the mirror for
+# the VMs' architecture saves an attendee who fixes tbx before the venue. The
+# bet loses in the far more common shape: `tbx doctor` fails, detection says
+# docker, `create-cluster.sh` BUILDS on docker — and the mirror is full of
+# host-arch images for nodes that are containers on an amd64 Colima daemon.
+# Worse, the mirror was FILLED by one rule and GRADED by the same one, so
+# `install.sh --check` cheerfully passed a machine whose every mirrored image
+# was the wrong architecture for the cluster it was about to create.
+#
+# So: fill and grade for what `substrate_resolve()` will actually create. That
+# is the same function create-cluster.sh dispatches on, which makes the mirror's
+# architecture correct BY CONSTRUCTION rather than by a bet about the future.
+# A machine that fixes tbx later re-runs cloudbox-init.sh (which now says so),
+# or names it once: CLOUDBOX_SUBSTRATE=tbx ./scripts/cloudbox-init.sh.
+#
+# `kind` is answered as itself and treated as docker by mirror_target_arch, for
+# the one reason that matters: kind's nodes are containers on this host's Docker
+# engine, so their arch is the DAEMON's.
+#
+# <substrate> may be passed by a caller that has already resolved it — both
+# callers have — which is not just a saving: `$( )` is a subshell, so the
+# `tbx doctor` memo cannot survive it and an unhinted call re-probes the helper,
+# DNS, routes and mirror.
+mirror_target_substrate() { # [substrate]
+  local decided="${1:-}"
+  [[ -n "${decided}" ]] || decided="$(substrate_resolve)" || return 1
+  echo "${decided}"
 }
 
 # The tbx VMs are natively virtualised, so their arch is the CPU's —
 # host_cpu_arch, which sees through a Rosetta shell where `uname -m` does not.
 # Docker and kind nodes ARE containers on the local daemon, so theirs is the
 # daemon's.
-mirror_target_arch() {
-  if [[ "$(mirror_target_substrate)" == "tbx" ]]; then host_cpu_arch; else docker_server_arch; fi
+mirror_target_arch() { # [substrate]
+  local target
+  target="$(mirror_target_substrate "${1:-}")" || return 1
+  if [[ "${target}" == "tbx" ]]; then host_cpu_arch; else docker_server_arch; fi
 }
 
 # --- Cilium ingress values ---------------------------------------------------
@@ -418,6 +424,11 @@ substrate_detect() { local __sd_answer; substrate_detect_into __sd_answer; echo 
 substrate_persist() {
   local value="$1"
   substrate_valid "${value}" || die "substrate_persist: unknown substrate '${value}'"
+  # The `mv` below replaces whatever is there, including a record this machine
+  # could not read — which is how an unreadable identity used to be destroyed by
+  # the very run that should have refused over it. Every mutating path asserts
+  # this at its top; this is the backstop for the one that forgets.
+  assert_identity_readable
   mkdir -p "$(dirname "${CLOUDBOX_SUBSTRATE_FILE}")"
   printf '%s\n' "${value}" > "${CLOUDBOX_SUBSTRATE_FILE}.tmp"
   mv "${CLOUDBOX_SUBSTRATE_FILE}.tmp" "${CLOUDBOX_SUBSTRATE_FILE}"
@@ -437,23 +448,30 @@ api_endpoint_persist() { # <https://host:port>
 
 api_endpoint_forget() { rm -f "${CLOUDBOX_API_ENDPOINT_FILE}"; }
 
-# substrate_current — the persisted answer, or empty when no cluster has been
-# created on this machine yet (or the persisted file holds anything other than
-# tbx/docker — corruption is treated as "no answer", not as that literal
-# string). Never detects; never writes.
+# substrate_current — the persisted answer, with THREE outcomes, because two
+# were one too few:
+#   rc 0, a value   — this machine records that identity
+#   rc 0, empty     — no record at all: no cluster was ever created here
+#   rc 2, empty     — a record EXISTS and cannot be used: an unreadable file, or
+#                     a value that is not one of the three identities. Warns in
+#                     its own voice, on stderr.
+# Never detects; never writes.
+#
+# The third outcome is the whole point. Every caller wrote
+# `s="$(substrate_current || true)"`, which squashes the status and leaves the
+# same empty string an absent file produces — so a 000-mode or root-owned
+# ~/.cloudbox/substrate read as "clean machine": require_identity_match() waved
+# every transition through, destroy-cluster.sh fell back to docker, and
+# substrate_persist() then `mv`-ed a new value over the file nobody could read.
+# The one conclusion an unreadable record does not license is that there is
+# nothing here to collide with. rc 2 is what MUTATING paths refuse on
+# (assert_identity_readable below); read-only paths carry on with the warning.
 substrate_current() {
   local value
-  # An existing file we cannot READ is not an absent file. substrate_persisted_raw
-  # returns nothing in both cases (it must: it is the pure helper lab 00 uses),
-  # and "no answer" here means "no cluster was ever created" — the one conclusion
-  # a 000-mode or root-owned ~/.cloudbox/substrate does not license. Everything
-  # downstream then acts on a guess: destroy-cluster.sh falls back to docker, and
-  # require_identity_match() below waves every transition through. Say so, and
-  # return 1 — the same status a corrupt value gets, for the same reason.
   if [[ -e "${CLOUDBOX_SUBSTRATE_FILE}" && ! -r "${CLOUDBOX_SUBSTRATE_FILE}" ]]; then
     warn "${CLOUDBOX_SUBSTRATE_FILE} exists but cannot be read — this machine's recorded substrate is unknown" >&2
     warn "  (ls -l ${CLOUDBOX_SUBSTRATE_FILE}; fix its ownership/mode, or delete it if no cluster is running)" >&2
-    return 1
+    return 2
   fi
   value="$(substrate_persisted_raw)"
   [[ -n "${value}" ]] || return 0
@@ -462,7 +480,36 @@ substrate_current() {
     return 0
   fi
   warn "${CLOUDBOX_SUBSTRATE_FILE} contains '${value}', not 'tbx', 'docker' or 'kind' — ignoring it" >&2
-  return 1
+  return 2
+}
+
+# assert_identity_readable — die when a record EXISTS but cannot be used. For
+# MUTATING paths only (create, destroy, --refresh-endpoint, the lifeboat's
+# create and --delete, install.sh --write-hosts/--add-hosts): each is about to
+# act on state whose owner is written down in exactly one place, and "I could
+# not read it" is not "there is none".
+#
+# Read-only paths (install.sh --check, the labs) deliberately do NOT call this:
+# they hear substrate_current's warning and carry on, because a preflight that
+# refuses to run is worse than one that says what it could not read.
+#
+# Called FIRST on those paths — before substrate_resolve_into(), which can shell
+# out to `tbx doctor` and spend seconds deciding a question this refuses to act
+# on either way.
+assert_identity_readable() {
+  local rc=0
+  substrate_current >/dev/null || rc=$?
+  [[ "${rc}" -eq 2 ]] || return 0
+  fail "This machine HAS a substrate record (${CLOUDBOX_SUBSTRATE_FILE}) and it cannot be used (see above)."
+  warn "Nothing has been changed. That file names the cluster this machine built — Talos"
+  warn "containers, tbx VMs or the kind lifeboat — and acting without it risks creating a"
+  warn "second cluster, or tearing down the wrong one."
+  warn "Fix it by hand, then re-run:"
+  warn "  ls -l ${CLOUDBOX_SUBSTRATE_FILE}"
+  warn "  sudo chown \"\$(id -un)\" ${CLOUDBOX_SUBSTRATE_FILE} && chmod 0644 ${CLOUDBOX_SUBSTRATE_FILE}   # unreadable file"
+  warn "  printf 'docker\\n' > ${CLOUDBOX_SUBSTRATE_FILE}   # junk content, and you know which identity it is (tbx|docker|kind)"
+  warn "  rm ${CLOUDBOX_SUBSTRATE_FILE}   # ONLY if no cluster of ours is running on this machine"
+  die "Refusing to act on a record this machine cannot read."
 }
 
 # substrate_resolve — the substrate to USE right now, in precedence order:
@@ -555,15 +602,17 @@ substrate_teardown_command() { # <tbx|docker|kind>
 #
 # Silent on a machine with no record at all (a clean laptop, and CI: no
 # ~/.cloudbox/substrate, CLOUDBOX_SUBSTRATE=docker) and on a match. An
-# unreadable record is refused by substrate_current(), which warns in its own
-# voice; here that is "no answer", because an unreadable file is not evidence of
-# a MISmatch and the run's own preflight will find whatever is really there.
+# UNREADABLE record is not "no answer" — it used to be, and that is the hole
+# assert_identity_readable() closes: it dies here, first, so that every mutating
+# caller of this function inherits the refusal even if it forgot to make the
+# assertion itself at the top.
 #
 # CLOUDBOX_IGNORE_TBX does NOT relax this. That flag exists for one thing — "tbx
 # is installed but cannot be inspected" — and identity is not an inspection
 # result: it is something this repo wrote down itself.
 require_identity_match() { # <desired>
   local desired="$1" recorded teardown
+  assert_identity_readable
   recorded="$(substrate_current || true)"
   [[ -n "${recorded}" ]] || return 0
   [[ "${recorded}" != "${desired}" ]] || return 0
@@ -678,6 +727,82 @@ tbx_local_evidence() {
   return 1
 }
 
+# tbx_cache_has_disk <version> <arch> — is the Talos RAW DISK IMAGE for that
+# version AND that architecture usable offline? 0 yes, 1 no. The answer's
+# provenance is left in TBX_CACHE_SOURCE, because the two sources differ in what
+# they can prove.
+#
+# FIRST source, and the one that actually answers the question: `tbx cache list
+# -o json` (upstream cmd/tbx/main.go:731-761 — `-o json` is a documented flag of
+# that verb, `usage: tbx cache list [-o json] [<image-ref>]`). It returns
+# CacheListResult.images[], each entry carrying schematic/version/architecture
+# and the `incomplete` marker upstream sets for a combination with leftovers but
+# no usable image (internal/daemon/operations.go:422-443). Matching on
+# architecture is the point: the cache is keyed schematic/version/ARCH, and the
+# old check globbed the version directory alone — so an amd64 disk pulled on a
+# Colima VM read as "cached" on an arm64 host whose VMs cannot boot it.
+#
+# FALLBACK, when that command cannot be asked (no tbx binary, no jq, or a daemon
+# that will not answer — `cache list` is an RPC to tbxd): the on-disk layout,
+# ${HOME}/.talosbox/cache/<schematic>/<version>/<arch>/disk.raw
+# (internal/imagecache/cache.go:172). Cache.Ensure MkdirAll's that directory
+# before downloading (cache.go:163-168), so the FILE is asserted, not the
+# directory; disk.raw is published by temp-file-plus-rename (cache.go:394-417),
+# so its presence means complete. The legacy <schematic>/<version>/disk.raw
+# layout (cache.go:181) carries no architecture at all — it is accepted, and
+# TBX_CACHE_SOURCE says the arch could not be verified.
+#
+# Neither source is asked about the SCHEMATIC. Ours is talos-box's own default,
+# and the id is only obtainable by composing it against the Image Factory
+# (internal/imagecache/schematic.go:32-48) — no CLI surface prints the recorded
+# one, and a preflight may not go to the network to find out.
+# shellcheck disable=SC2034  # read by install.sh --check, which sources this file
+TBX_CACHE_SOURCE=""
+tbx_cache_has_disk() { # <version> <arch>
+  local version="$1" arch="$2" json=""
+  TBX_CACHE_SOURCE=""
+  if have tbx && have jq && json="$(tbx cache list -o json 2>/dev/null)" \
+     && printf '%s' "${json}" | jq -e 'has("images")' >/dev/null 2>&1; then
+    TBX_CACHE_SOURCE="tbx cache list -o json"
+    printf '%s' "${json}" | jq -e --arg v "${version}" --arg a "${arch}" \
+      '[.images[]? | select(.version == $v and .architecture == $a and ((.incomplete // false) | not))] | length > 0' \
+      >/dev/null 2>&1
+    return
+  fi
+  if find "${HOME}/.talosbox/cache" -type f -path "*/${version}/${arch}/disk.raw" -size +0c 2>/dev/null | grep -q .; then
+    TBX_CACHE_SOURCE="the ${HOME}/.talosbox/cache layout ('tbx cache list' unavailable)"
+    return 0
+  fi
+  if find "${HOME}/.talosbox/cache" -type f -path "*/${version}/disk.raw" -size +0c 2>/dev/null | grep -q .; then
+    TBX_CACHE_SOURCE="the ${HOME}/.talosbox/cache legacy layout, architecture NOT verified ('tbx cache list' unavailable)"
+    return 0
+  fi
+  # shellcheck disable=SC2034  # read by install.sh --check, which sources this file
+  TBX_CACHE_SOURCE="the ${HOME}/.talosbox/cache layout ('tbx cache list' unavailable)"
+  return 1
+}
+
+# cloudbox_local_evidence — 0 when this machine carries any PERSISTED trace that
+# a CloudBox cluster was built here, whatever substrate it was built on. The
+# mirror image of tbx_local_evidence, and asked for the same reason: it is the
+# second question, for when the FIRST one (ask the Docker daemon what is
+# running) cannot be answered because the daemon is down.
+#
+#   ~/.cloudbox/substrate      — any identity record at all (readable or not:
+#                                its mere existence is the trace)
+#   ~/.cloudbox/api-endpoint   — the recorded API address of a cluster
+#   ~/.talos/clusters/<name>   — talosctl's own provisioner state directory,
+#                                written by `talosctl cluster create docker`
+# None of the three present means no cluster of ours was ever created here, so
+# there are no containers of ours to collide with, whatever docker says about
+# itself.
+cloudbox_local_evidence() {
+  [[ -e "${CLOUDBOX_SUBSTRATE_FILE}" ]] && return 0
+  [[ -e "${CLOUDBOX_API_ENDPOINT_FILE}" ]] && return 0
+  [[ -d "$(talos_cluster_state_dir)" ]] && return 0
+  return 1
+}
+
 # tbx_host_memory_mib — the host's physical RAM in MiB, or nothing when this
 # platform has no probe we trust. Deliberately the SAME sources tbxd reads, so
 # our arithmetic and its overcommit gate cannot disagree about the host:
@@ -768,6 +893,22 @@ kind_network_gateway() {
 kind_cluster_exists() { # [name]
   local name="${1:-${CLUSTER_NAME}}"
   have kind && kind get clusters 2>/dev/null | grep -qx "${name}"
+}
+
+# kind_container_ids — the ids of every container kind created for this cluster,
+# running or stopped (`-aq`), or nothing. The ONE place the label filter is
+# written down: substrate/docker.sh, substrate/tbx.sh, kind-fallback.sh --delete
+# and destroy-cluster.sh all ask this question, and they must ask it the same
+# way — it is what proves a lifeboat is (or is not) on this machine when the
+# `kind` binary is gone, when kind never registered the cluster, and when the
+# identity record was lost.
+#
+# Empty when Docker cannot be asked, so callers that treat empty as "no
+# lifeboat" must establish `docker_running` first.
+kind_container_ids() { # [name]
+  local name="${1:-${CLUSTER_NAME}}"
+  docker_running || return 0
+  docker ps -aq --filter "label=io.x-k8s.kind.cluster=${name}" 2>/dev/null || true
 }
 
 # kind_nodes_running — are its node containers actually up? kind names them
