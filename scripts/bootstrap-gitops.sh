@@ -130,6 +130,7 @@ kubectl apply --server-side --force-conflicts -n argocd \
 
 info "Restoring the Application-CRD health check (argocd-cm) so sync waves gate"
 info "  + treating metrics-less HPAs as Healthy (this lab has no metrics-server)"
+info "  + treating Cilium-class Ingresses as Healthy (NodePort publishes no LB address)"
 kubectl patch configmap argocd-cm -n argocd --type merge --patch-file /dev/stdin <<'EOF'
 data:
   resource.customizations.health.argoproj.io_Application: |
@@ -163,6 +164,42 @@ data:
           hs.message = "autoscaler idle — no metrics-server in this lab (workloads healthy)"
         end
       end
+    end
+    return hs
+  # ArgoCD's built-in health check for networking.k8s.io/Ingress (gitops-engine
+  # pkg/health/health_ingress.go) reports Progressing until
+  # `.status.loadBalancer.ingress` is non-empty, and Healthy the moment it is.
+  # That rule assumes the ingress controller is fronted by a LoadBalancer
+  # Service that gets an address written back.
+  #
+  # On the docker substrate the shared Cilium ingress Service is a NodePort
+  # published on host port 80 — there is no LB address to write, so Cilium
+  # never populates the status and every Ingress stays Progressing forever.
+  # Nine components on this branch ship an ingress.yaml, so every one of their
+  # ArgoCD Applications stayed Progressing, module 03's 420 s wait for 'rustfs'
+  # timed out (last: Synced Progressing) and the app-of-apps waves behind it
+  # never started (argo-workflows 'missing' after 10 min). CI run 32945328784.
+  #
+  # On tbx the LB VIP does populate the status, which is exactly why this only
+  # ever showed up on the docker substrate.
+  #
+  # So: an Ingress on OUR shared class is Healthy by definition — reachability
+  # is proven by the labs' own curl-the-hostname verifies, not by a field the
+  # substrate cannot fill in. Any other class keeps upstream's rule verbatim.
+  resource.customizations.health.networking.k8s.io_Ingress: |
+    hs = {}
+    if obj.spec ~= nil and obj.spec.ingressClassName == "cilium" then
+      hs.status = "Healthy"
+      hs.message = "served by the shared Cilium ingress; NodePort publishes no LB address on the docker substrate"
+      return hs
+    end
+    hs.status = "Progressing"
+    hs.message = "waiting for a load-balancer address"
+    if obj.status ~= nil and obj.status.loadBalancer ~= nil
+       and obj.status.loadBalancer.ingress ~= nil
+       and #obj.status.loadBalancer.ingress > 0 then
+      hs.status = "Healthy"
+      hs.message = ""
     end
     return hs
 EOF

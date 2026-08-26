@@ -2877,3 +2877,41 @@ architecture. The destroy now names the substrate it forgot and the
 `CLOUDBOX_SUBSTRATE=<it> ./scripts/create-cluster.sh` that keeps it, and
 `catch-up.sh --rebuild` captures the record before the destroy and passes it to
 the create.
+
+## TRAP — Ingress health on a substrate with no load-balancer address
+
+ArgoCD's built-in health check for `networking.k8s.io/Ingress` (gitops-engine
+`pkg/health/health_ingress.go`) holds an Ingress **Progressing** until
+`.status.loadBalancer.ingress` is non-empty. That is a sound rule when the
+ingress controller sits behind a LoadBalancer Service. On the docker substrate
+it is not: the shared Cilium ingress Service is a **NodePort** published on host
+port 80, so nothing ever writes an address back and the status stays empty
+forever.
+
+The hostname scheme gave nine components a `gitops/components/<x>/ingress.yaml`,
+so nine ArgoCD Applications inherited that never-finishing Progressing. The
+first live CI run of the branch (run 32945328784) failed exactly there: module
+03's `solve.sh` timed out after 420 s on `rustfs` (`last: Synced Progressing`)
+with every rustfs workload Running, and the recovery job then reported
+`argo-workflows` still `missing` after 10 minutes — the app-of-apps waves behind
+the stuck app had never started. Modules 01 and 02 passed, because Gitea's and
+ArgoCD's own ingresses are applied imperatively by `bootstrap-gitops.sh` and no
+Application grades them.
+
+**This reproduces on docker only.** On tbx the ingress VIP populates
+`.status.loadBalancer.ingress`, so the same manifests go Healthy in seconds —
+which is why a tbx rehearsal is not evidence that the docker path works.
+
+The fix is a third Lua health customization in the `argocd-cm` patch
+(`scripts/bootstrap-gitops.sh`): an Ingress on **our** class
+(`ingressClassName: cilium`) is Healthy by definition, because reachability here
+is proven by the labs' own curl-the-hostname verifies rather than by a field the
+substrate cannot fill in. Every other class keeps upstream's rule verbatim, so a
+future LoadBalancer-fronted ingress is still graded honestly. Check 15 in
+`check-consistency.sh` guards both the key and the class test — deleting the
+override looks harmless on tbx and breaks module 03 on every laptop in the room.
+
+Retired by: a green `bootstrap-test.yaml` on the docker substrate (modules 01–09
+plus the recovery job) **and** step 6 of the tbx rehearsal, proving the override
+did not make a genuinely broken ingress read Healthy on the substrate that can
+tell the difference.

@@ -689,6 +689,40 @@ done
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "one substrate decision (scripts/substrate-decide.sh), sourced by every caller"
 
+# --- 15. the argocd-cm health customizations the waves depend on --------------
+# Two of the three Lua health overrides in bootstrap-gitops.sh are load-bearing
+# for sync waves, and both were added AFTER a run had already failed without
+# them, so both read like optional polish to anyone tidying that heredoc:
+#
+#   argoproj.io_Application  — without it the app-of-apps never reports its
+#                              children's health and no wave ever gates.
+#   networking.k8s.io_Ingress — ArgoCD's built-in check holds an Ingress
+#                              Progressing until `.status.loadBalancer.ingress`
+#                              is non-empty. On the docker substrate the shared
+#                              Cilium ingress is a NodePort, so that field is
+#                              never written: nine components ship an
+#                              ingress.yaml, every one of their Applications
+#                              stuck Progressing, module 03's wait for 'rustfs'
+#                              timed out and the waves behind it never started
+#                              (CI run 32945328784). tbx populates the VIP, so
+#                              deleting this override fails on docker only.
+#
+# Anchored on the ConfigMap keys, and — for the Ingress one — on the class test
+# that is the whole point of it: an override that no longer special-cases our
+# own ingress class has been rewritten into upstream's rule.
+before_fail=${FAILURES}
+for key in \
+  'resource.customizations.health.argoproj.io_Application' \
+  'resource.customizations.health.autoscaling_HorizontalPodAutoscaler' \
+  'resource.customizations.health.networking.k8s.io_Ingress'; do
+  grep -qF "  ${key}: |" scripts/bootstrap-gitops.sh \
+    || bad "scripts/bootstrap-gitops.sh no longer patches argocd-cm with '${key}' — check 15 guards the health customizations the sync waves depend on; do not delete one because the cluster looks healthy without it"
+done
+grep -qE '^[[:space:]]*if obj\.spec ~= nil and obj\.spec\.ingressClassName == "cilium" then' scripts/bootstrap-gitops.sh \
+  || bad "the networking.k8s.io_Ingress health override in scripts/bootstrap-gitops.sh no longer tests 'ingressClassName == \"cilium\"' — without that arm it is upstream's rule again and every Cilium-served Ingress goes back to Progressing forever on the docker substrate (CI run 32945328784)"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "argocd-cm carries the Application, HPA and Cilium-Ingress health overrides"
+
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then
   printf '❌ %d consistency failure(s) — fix the drift before merging.\n' "${FAILURES}"
