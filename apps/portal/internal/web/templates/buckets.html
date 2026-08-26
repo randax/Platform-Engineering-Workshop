@@ -42,11 +42,6 @@ endpoint, valid 15 minutes, so files move straight to and from RustFS with zero 
     </form>
   </div>
 </div>
-
-<div id="bucket-objects">
-  {{if .Objects.Bucket}}{{template "bucket-objects" .Objects}}
-  {{else}}<p class="hint">Pick a bucket above to browse and upload its objects.</p>{{end}}
-</div>
 {{template "foot" .}}
 {{end}}
 
@@ -60,10 +55,7 @@ endpoint, valid 15 minutes, so files move straight to and from RustFS with zero 
     <tbody>
     {{range .Buckets}}
       <tr>
-        {{/* href keeps the selection bookmarkable + JS-free; hx-get swaps just
-             the object panel in place, so browsing buckets never reloads. */}}
-        <td><a href="/buckets?b={{.Name}}" hx-get="/buckets/objects?b={{.Name}}"
-               hx-target="#bucket-objects" hx-swap="innerHTML">{{.Name}}</a></td>
+        <td><a href="/buckets/{{.Name}}">{{.Name}}</a></td>
         <td>{{.Created.Format "2006-01-02 15:04"}}</td>
         <td class="actions"><button class="danger" hx-delete="/buckets/{{.Name}}"
             hx-target="#bucket-list" hx-swap="outerHTML"
@@ -77,13 +69,13 @@ endpoint, valid 15 minutes, so files move straight to and from RustFS with zero 
 </div>
 {{end}}
 
-{{/* The object list for one selected bucket, with an upload form and per-object
-     delete. Loaded on demand by htmx and also server-rendered on ?b= for a
-     bookmarkable, JS-free path — same markup either way. */}}
-{{define "bucket-objects"}}
+{{/* Dedicated bucket detail page. */}}
+{{define "bucket-detail"}}
+{{template "head" "buckets"}}
+<p><a href="/buckets">← all buckets</a></p>
 {{template "flash" .Flash}}
-<h2>{{.Bucket}} <small>(showing up to 200 objects)</small></h2>
-<form class="upload-form" hx-post="/buckets/{{.Bucket}}/upload" hx-target="#bucket-objects" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+<h1>{{.Bucket}} <small>(showing up to 200 objects)</small></h1>
+<form class="upload-form" hx-post="/buckets/{{.Bucket}}/upload" hx-target="body" hx-swap="outerHTML" hx-encoding="multipart/form-data">
   <input type="file" name="file" required>
   <button type="submit">Upload</button>
 </form>
@@ -98,7 +90,7 @@ endpoint, valid 15 minutes, so files move straight to and from RustFS with zero 
       <td class="actions">
         {{if .DownloadURL}}<a href="{{.DownloadURL}}" target="_blank" rel="noopener noreferrer">Download ↗</a>{{end}}
         <button class="danger" hx-delete="/buckets/{{$.Bucket}}/objects/{{.Key}}"
-          hx-target="#bucket-objects" hx-swap="innerHTML" hx-confirm="Delete {{.Key}}?">Delete</button>
+          hx-target="body" hx-swap="outerHTML" hx-confirm="Delete {{.Key}}?">Delete</button>
       </td>
     </tr>
   {{else}}
@@ -106,4 +98,5 @@ endpoint, valid 15 minutes, so files move straight to and from RustFS with zero 
   {{end}}
   </tbody>
 </table>
+{{template "foot" .}}
 {{end}}

@@ -102,7 +102,7 @@ shared with module 04), three resources:
 - **The bucket Job** is `backoffLimit: 6`, `restartPolicy: OnFailure`, the
   pinned `docker.io/peakcom/s5cmd:v2.3.0` image, `ls || mb`
   for idempotency, and `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
-  `AWS_REGION=us-east-1` (the client refuses to sign SigV4 without a region) —
+  `AWS_REGION=eu-north-1` (the client refuses to sign SigV4 without a region) —
   the same workshop-grade `cloudbox`/`cloudbox123` credentials the workload gets
   as `S3_ACCESS_KEY` / `S3_SECRET_KEY`. s5cmd **replaced
   `public.ecr.aws/aws-cli/aws-cli:2.36.24` on 2026-08-17** (docs/HAZARDS.md):

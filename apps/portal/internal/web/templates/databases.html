@@ -12,9 +12,16 @@ API from module 04 — a <code>WorkshopDatabase</code> composite resource. The f
 (small · 1 &nbsp;/&nbsp; medium · 2 &nbsp;/&nbsp; large · 3 instances) — you pick intent, the platform
 decides the rest.</p>
 <form hx-post="/databases" hx-target="#db-list" hx-swap="outerHTML">
-  <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-db"></label>
+  <label>Name <input name="name" id="db-name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="my-db" oninput="document.getElementById('db-yaml-name').innerText = this.value || 'my-db'"></label>
+  <label>Postgres Version
+    <select name="version" onchange="document.getElementById('db-yaml-version').innerText = this.value">
+      <option value="15">15</option>
+      <option value="16" selected>16 (default)</option>
+      <option value="17">17</option>
+    </select>
+  </label>
   <label>Size
-    <select name="size">
+    <select name="size" onchange="document.getElementById('db-yaml-size').innerText = this.value">
       <option value="small" selected>small — 1 instance · 1Gi</option>
       <option value="medium">medium — 2 instances · 5Gi</option>
       <option value="large">large — 3 instances (HA) · 10Gi</option>
@@ -22,6 +29,22 @@ decides the rest.</p>
   </label>
   <button type="submit">Create</button>
 </form>
+
+<details class="yaml-toggle" style="margin-top: 1rem; margin-bottom: 2rem;">
+  <summary style="cursor: pointer; color: var(--accent); font-weight: 500;">What is actually being created? (View YAML)</summary>
+  <div style="background: var(--surface); padding: 1rem; border: 1px solid var(--line); border-radius: var(--r-sm); margin-top: 0.5rem;">
+    <p class="hint" style="margin-top: 0;">The UI form is just sugar. It submits the following YAML to the Kubernetes API:</p>
+    <pre style="margin: 0;"><code>apiVersion: platform.cloudbox.io/v1alpha1
+kind: WorkshopDatabase
+metadata:
+  name: <span id="db-yaml-name">my-db</span>
+  namespace: {{.Namespace}}
+spec:
+  size: <span id="db-yaml-size">small</span>
+  version: <span id="db-yaml-version">16</span></code></pre>
+    <p class="hint" style="margin-bottom: 0; margin-top: 1rem;">CLI equivalent: <br><code>cat &lt;&lt;EOF | kubectl apply -f -</code></p>
+  </div>
+</details>
 {{template "foot" .}}
 {{end}}
 
@@ -34,7 +57,25 @@ decides the rest.</p>
 <div id="db-list" hx-get="/databases/list" hx-trigger="every 5s" hx-swap="outerHTML">
   {{template "flash" .Flash}}
 
-  <h2>WorkshopDatabases <small>(namespace {{.Namespace}} · auto-refreshes every 5 s)</small></h2>
+  {{if .Telemetry}}
+  <h2 style="margin-top: 1rem;">Monitoring <small>last 30 min · Project {{.Namespace}} pods</small></h2>
+  <div class="monitor">
+    <div class="metric">
+      <span class="metric-label">CPU <small>namespace {{.Namespace}}</small></span>
+      {{if .CPUSpark}}<span class="metric-spark">{{.CPUSpark}}</span><span class="metric-now">{{.CPUNow}}</span>
+      {{else}}<span class="nodata">no data yet</span>{{end}}
+    </div>
+    <div class="metric">
+      <span class="metric-label">Memory <small>namespace {{.Namespace}}</small></span>
+      {{if .MemSpark}}<span class="metric-spark">{{.MemSpark}}</span><span class="metric-now">{{.MemNow}}</span>
+      {{else}}<span class="nodata">no data yet</span>{{end}}
+    </div>
+  </div>
+  <p class="hint"><small>This shows the aggregate resource usage of all pods in this project namespace (including your databases and applications).</small></p>
+  {{end}}
+
+  <h2 style="margin-top: 1.5rem;">WorkshopDatabases <small>(namespace {{.Namespace}} · auto-refreshes every 5 s)</small></h2>
+  <p class="hint" style="margin-top: -0.5rem; margin-bottom: 1rem;">CLI equivalent: <code>kubectl -n {{.Namespace}} get workshopdatabase</code></p>
   <table>
     <thead><tr><th>Name</th><th>Size</th><th>Status</th></tr></thead>
     <tbody>

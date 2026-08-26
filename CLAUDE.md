@@ -34,6 +34,8 @@ gitops/      apps/       ArgoCD app-of-apps root — what is actually enabled
              components/ per-component manifests/values, sync-waved
 lab/         00-setup … 09-capstone — outcome + verify.sh + layered hints (+ faults/ in 05)
 solutions/   canonical end-state per module (what catch-up.sh force-pushes to Gitea)
+adventures/  open-ended endgame briefings (issue #193) — NO verify.sh by design; see
+             the adventures exemption in docs/PRINCIPLES.md before "fixing" that
 apps/        first-party Go apps: cloudbox-portal (Console, module 08), uploader +
              resizer (picture pipeline, module 09) — built to GHCR by build-images.yaml
 docs/        RESEARCH.md · PRINCIPLES.md · STACK.md · HELPERS.md · IDP-PRINCIPLES.md

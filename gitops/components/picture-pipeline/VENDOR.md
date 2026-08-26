@@ -78,7 +78,7 @@ honest by review.
   ArgoCD doesn't re-create it every reconcile. It needs
   `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (the same workshop creds, under
   the standard names s5cmd reads, exactly as the AWS CLI did) **and
-  `AWS_REGION=us-east-1`** — the client refuses to sign a SigV4 request
+  `AWS_REGION=eu-north-1`** — the client refuses to sign a SigV4 request
   without a region even though RustFS ignores it.
   Requests 50m/64Mi, limit 256Mi (unchanged from the aws-cli era; s5cmd is a
   single Go binary and uses far less, but the numbers were not re-measured).

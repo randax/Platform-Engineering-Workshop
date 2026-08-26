@@ -44,7 +44,7 @@ func init() {
 		// Mutating routes. No CSRF token — single-user disposable lab. These are
 		// pure S3 (minio-go → RustFS); no Kubernetes RBAC is involved.
 		Extra: []Route{
-			{"GET /buckets/objects", handleBucketObjects}, // htmx-loaded object list
+			{"GET /buckets/{name}", handleBucketDetail}, // htmx-loaded object list
 			{"POST /buckets", handleCreateBucket},
 			{"DELETE /buckets/{bucket}", handleDeleteBucket},
 			{"POST /buckets/{bucket}/upload", handleUploadObject},
@@ -86,12 +86,9 @@ type objectsData struct {
 	Flash   flash
 }
 
-// bucketsData backs the full page: the bucket list, plus the selected bucket's
-// objects when one is chosen (via ?b= on load). Objects.Bucket == "" means no
-// selection yet — the fragment slot shows a prompt instead.
+// bucketsData backs the full page: the bucket list.
 type bucketsData struct {
 	Buckets []store.BucketInfo
-	Objects objectsData
 	Flash   flash
 
 	// Monitoring — RustFS exposes no Prometheus metrics, so this is the generic
@@ -128,32 +125,19 @@ func bucketObjects(ctx context.Context, st bucketStore, bucket string, fl flash)
 	return objectsData{Bucket: bucket, Objects: rows, Flash: fl}, nil
 }
 
-// bucketsPage builds the full-page payload: always the bucket list, plus the
-// selected bucket's objects when ?b= names one (so the selection is
-// bookmarkable and works without JavaScript).
-func bucketsPage(ctx context.Context, st bucketStore, selected string) (bucketsData, error) {
+// bucketsPage builds the full-page payload.
+func bucketsPage(ctx context.Context, st bucketStore) (bucketsData, error) {
 	buckets, err := st.ListBuckets(ctx)
 	if err != nil {
 		return bucketsData{}, err
 	}
-	data := bucketsData{Buckets: buckets}
-	if selected != "" {
-		// A failure listing the selected bucket must not take down the whole
-		// page — keep the bucket list and show the error in the objects panel,
-		// matching the htmx fragment's degrade-in-place behaviour.
-		if objs, err := bucketObjects(ctx, st, selected, flash{}); err != nil {
-			data.Objects = objectsData{Bucket: selected, Flash: errorFlash("S3 error: " + err.Error())}
-		} else {
-			data.Objects = objs
-		}
-	}
-	return data, nil
+	return bucketsData{Buckets: buckets}, nil
 }
 
 func handleBuckets(s *Server, w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := s3Ctx(r)
 	defer cancel()
-	data, err := bucketsPage(ctx, s.Store, r.URL.Query().Get("b"))
+	data, err := bucketsPage(ctx, s.Store)
 	if err != nil {
 		s.renderError(w, err)
 		return
@@ -175,16 +159,12 @@ func handleBuckets(s *Server, w http.ResponseWriter, r *http.Request) {
 	s.render(w, "buckets", data)
 }
 
-// handleBucketObjects serves the object-list fragment htmx swaps in when a
-// bucket is clicked. Like the databases/gallery fragments, an error becomes a
-// flash inside the fragment rather than a full error page, so the surrounding
-// page stays intact.
-func handleBucketObjects(s *Server, w http.ResponseWriter, r *http.Request) {
-	bucket := r.URL.Query().Get("b")
+// handleBucketDetail replaces the inline objects viewer with a dedicated detail
+// page, keeping the UX consistent with Databases and Applications.
+func handleBucketDetail(s *Server, w http.ResponseWriter, r *http.Request) {
+	bucket := r.PathValue("name")
 	if bucket == "" {
-		// No bucket named — don't fire an S3 call with an empty name (which
-		// only errors and logs noise); ask for a selection instead.
-		s.render(w, "bucket-objects", objectsData{Flash: errorFlash("No bucket selected")})
+		http.Redirect(w, r, "/buckets", http.StatusFound)
 		return
 	}
 	ctx, cancel := s3Ctx(r)
@@ -192,10 +172,9 @@ func handleBucketObjects(s *Server, w http.ResponseWriter, r *http.Request) {
 	data, err := bucketObjects(ctx, s.Store, bucket, flash{})
 	if err != nil {
 		log.Printf("list objects in %s: %v", bucket, err)
-		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("S3 error: " + err.Error())})
-		return
+		data = objectsData{Bucket: bucket, Flash: errorFlash("S3 error: " + err.Error())}
 	}
-	s.render(w, "bucket-objects", data)
+	s.render(w, "bucket-detail", data)
 }
 
 // renderBucketList re-lists the buckets and renders the list fragment with a
@@ -247,12 +226,12 @@ const maxUpload = 32 << 20 // 32 MiB
 func handleUploadObject(s *Server, w http.ResponseWriter, r *http.Request) {
 	bucket := r.PathValue("bucket")
 	if err := r.ParseMultipartForm(maxUpload); err != nil {
-		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("Upload too large or malformed (max 32 MiB).")})
+		s.render(w, "bucket-detail", objectsData{Bucket: bucket, Flash: errorFlash("Upload too large or malformed (max 32 MiB).")})
 		return
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("Pick a file to upload.")})
+		s.render(w, "bucket-detail", objectsData{Bucket: bucket, Flash: errorFlash("Pick a file to upload.")})
 		return
 	}
 	defer file.Close()
@@ -286,8 +265,8 @@ func handleDeleteObject(s *Server, w http.ResponseWriter, r *http.Request) {
 func (s *Server) renderBucketObjectsAfter(ctx context.Context, w http.ResponseWriter, bucket string, fl flash) {
 	data, err := bucketObjects(ctx, s.Store, bucket, fl)
 	if err != nil {
-		s.render(w, "bucket-objects", objectsData{Bucket: bucket, Flash: errorFlash("S3 error: " + err.Error())})
+		s.render(w, "bucket-detail", objectsData{Bucket: bucket, Flash: errorFlash("S3 error: " + err.Error())})
 		return
 	}
-	s.render(w, "bucket-objects", data)
+	s.render(w, "bucket-detail", data)
 }

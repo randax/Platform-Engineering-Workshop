@@ -59,9 +59,13 @@ solution to re-sync.
 | S2 | Argo Workflows — in-cluster image build → Zot → deploy | stretch | presenter demo + self-paced lab | pipeline goes green |
 | S3 | Bespoke Cloudbox Console (hands-on) + Backstage (presenter demo) | stretch | self-paced + demo | create a database from a portal form; read the whole portal's source |
 | S4 | Capstone — picture pipeline: Knative Eventing + portal gallery | stretch | self-paced finale | upload → resizer scales from zero → thumbnail + trace in Grafana |
+| A | **Adventure block — five doors** (issue #193): marked trail (=06–09) · app dev · platform · security · infra | ~45–60 | open-ended finale | attendee picks a door; briefings in `adventures/`, scoped "start here, finish at home" |
 | — | Observability | on-demand | Victoria stack + OTel Collector enabled from the catalog, not wave-0; the module-09 capstone "now observe what you built" moment | |
 
-Core = 155 min + module 0 ⇒ fits with slack; stretch material absorbs the fast 20%.
+Core = 155 min + module 0 (+ the expanded platform-intro/Nav slides) ⇒ ~180–195 min;
+the remaining ~45–60 min is the adventure block (issue #193): five open-ended doors,
+with the original stretch modules 06–09 surviving intact as door 0, the marked trail.
+Fast finishers walk the trail AND pick a door; `catch-up.sh` teleports anyone anywhere.
 
 ## 3. Target architecture (what the repo must contain)
 
@@ -121,12 +125,16 @@ docs/             RESEARCH.md · PRINCIPLES.md
 - [x] Rename repo — done 2026-07-14, as `Platform-Engineering-Workshop` (year-neutral; old URLs redirect). ⚠️ Went public BEFORE the image publish — issue #7 sequence now urgent
 
 ### Phase 1 — Spike the unknowns (July → rehearsal; the full matrix is issue #8)
-- [ ] One-evening RustFS spike (standalone chart, presigned URLs) — else flip to SeaweedFS now
-- [ ] BuildKit-rootless on Talos (PSA-privileged namespace) — the unrehearsed combo
-- [ ] Knative + Kourier on Talos+Cilium smoke test
+- [x] One-evening RustFS spike (standalone chart, presigned URLs) — shipped as the module 03
+      component; presigned-URL flow green in the weekly bootstrap rehearsals (e.g. Aug 3 run)
+- [x] BuildKit-rootless on Talos (PSA-privileged namespace) — module 07 ships it and the
+      weekly bootstrap-test rehearses it in CI (first green full run Aug 3)
+- [x] Knative + Kourier on Talos+Cilium — modules 06/09 run it end to end in the weekly CI
+      rehearsal (scale-from-zero + eventing both exercised)
 - [ ] Assemble the full stack once; measure real idle RAM; fix the published spec if needed
 - [ ] WSL2 end-to-end run (least-verified platform)
-- [ ] Gitea seed + force-push catch-up mechanism prototype
+- [x] Gitea seed + force-push catch-up mechanism — shipped (`seed-gitea.sh`, `catch-up.sh`),
+      asserted by the CI recovery-path job since Aug 18
 
 ### Phase 2 — Platform tree + prereqs final (early August)
 - [x] `gitops/` app-of-apps with sync waves, Application health check in argocd-cm,
@@ -152,6 +160,13 @@ docs/             RESEARCH.md · PRINCIPLES.md
       one leg over phone hotspot); cut scope by timing data
 - [ ] Offline test: airplane-mode laptop, everything from pre-pulled images
 - [ ] Pre-record demo videos as last-resort fallback; final version pins; tag `javazone-2026`
+- [ ] Merge PR #194 (tutor-mode CLAUDE.md/AGENTS.md swap) ~Aug 30 — two days ahead, after
+      content freeze
+- [ ] Adventure rehearsals (issue #193): cert-manager add, Kafka-with-heap-cap (go/no-go for
+      the 32 GB tier), the security netpol arc against a live capstone, lab-01 manual-Cilium
+      flow on a real laptop (CI covers it since Aug 24, a human hasn't)
+- [ ] Final prework refresh announced (re-run `cloudbox-init.sh`) once issue #7 + the
+      adventure images are published — the venue counts on it
 
 ## 5. Risks (updated)
 

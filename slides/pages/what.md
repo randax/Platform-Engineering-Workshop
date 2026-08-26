@@ -102,7 +102,7 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 <tr><td>Serverless</td><td>Lambda · Cloud Run · Functions</td><td><Logo name="knative" label/></td></tr>
 <tr><td>Messaging / queues</td><td>SQS · SNS · Pub/Sub · EventBridge</td><td><Logo name="nats" label="NATS JetStream"/></td></tr>
 <tr><td>CI / image builds</td><td>CodeBuild · Cloud Build</td><td><Logo name="argo-workflows" label="Argo Workflows"/> <Logo name="buildkit" label/></td></tr>
-<tr><td>Container registry</td><td>ECR · Artifact Registry · ACR</td><td><Logo name="zot" text="Zot"/></td></tr>
+<tr><td>Container registry</td><td>ECR · Artifact Registry · ACR</td><td><Logo name="zot" label/></td></tr>
 <tr><td>Cloud console</td><td><Logo name="aws" dim/> <Logo name="azure" dim/> <Logo name="gcp" dim/></td><td><Logo name="cloudbox" label/></td></tr>
 </tbody>
 </table>
@@ -126,22 +126,22 @@ Say the tiering honestly: "Core is 00–05 and it's a complete cloud on its own.
 # It runs on *practices*, not just tools
 
 <div class="grid grid-cols-2 gap-4 mt-2">
-  <div class="practice">
+  <div v-click class="practice">
     <strong>GitOps</strong><br>
     Git is the only way anything changes — every change a reviewable commit.
     <div class="mod">module 02 · the loop you'll use all day</div>
   </div>
-  <div class="practice">
+  <div v-click class="practice">
     <strong>Immutable infrastructure</strong><br>
     No SSH, no drift. The whole machine is one declarative document.
     <div class="mod">module 01 · Talos + Cilium</div>
   </div>
-  <div class="practice">
+  <div v-click class="practice">
     <strong>Self-service</strong><br>
     Declare what you want; the platform makes it real. Nobody files a ticket.
     <div class="mod">module 04 · Crossplane</div>
   </div>
-  <div class="practice">
+  <div v-click class="practice">
     <strong>Operators as control loops</strong><br>
     The "managed service" is just software that reconciles toward your intent.
     <div class="mod">module 03 · CloudNativePG</div>

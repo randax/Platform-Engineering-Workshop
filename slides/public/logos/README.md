@@ -36,10 +36,16 @@ each project's own brand assets or a permissive icon set.
 | `amazonwebservices.svg` | AWS (rent column, dimmed) | devicon (amazonwebservices wordmark) |
 | `microsoftazure.svg` | Azure (rent column, dimmed) | devicon (azure-original) |
 | `googlecloud.svg` | Google Cloud (rent column, dimmed) | Simple Icons |
+| `zot.svg` | Zot | CNCF artwork (color icon) |
+| `backstage.svg` | Backstage | CNCF artwork (color icon) |
+| `cert-manager.svg` | cert-manager (adventure door 2) | CNCF artwork (color icon) |
+| `strimzi.svg` | Strimzi / Kafka operator (adventure door 2) | CNCF artwork (color icon) |
+| `kafka.svg` | Apache Kafka (adventure door 2) | Simple Icons |
 
-Not vendored: **Zot** (no clean official SVG at build time) → rendered as a text
-chip via `<Logo name="zot" text="zot" />`. **RustFS** likewise falls back to a
-text chip. Re-vendor if/when an official mark is published.
+Not vendored: **RustFS** falls back to a text chip via
+`<Logo name="rustfs" text="RustFS" />` — no clean official SVG published yet
+(checked 2026-08-24: nothing in rustfs/rustfs or the docs site). Re-vendor when
+one appears. Zot was in this list until 2026-08-24; CNCF artwork now has it.
 
 ## Re-vendoring
 Logos are fetched once and committed. If a source URL rots, refetch from the

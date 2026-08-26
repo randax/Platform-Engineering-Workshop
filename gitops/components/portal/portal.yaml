@@ -29,6 +29,9 @@ metadata:
   name: portal-read
 rules:
   - apiGroups: [argoproj.io]
+    resources: [applications, workflows]
+    verbs: [get, list, watch]
+  - apiGroups: [platform.cloudbox.io]
     resources: [applications]
     verbs: [get, list, watch]
   - apiGroups: [postgresql.cnpg.io]
@@ -38,7 +41,7 @@ rules:
     resources: [services]
     verbs: [get, list, watch]
   - apiGroups: [""]
-    resources: [pods, namespaces, nodes, events]
+    resources: [pods, namespaces, nodes, events, secrets]
     verbs: [get, list, watch]
   # Workload readiness for the /components status page and /workshop checklist.
   - apiGroups: [apps]
@@ -80,7 +83,8 @@ spec:
           # pre-pull list (scripts/images.txt). The tag is rewritten by
           # release-please in the release PR — keep the annotations.
           # x-release-please-start-version
-          image: ghcr.io/randax/cloudbox-portal:v0.2.2
+          image: localhost:30500/cloudbox-portal:dev
+          imagePullPolicy: Always
           # x-release-please-end-version
           env:
             # The uploader is a cluster-local Knative Service in the

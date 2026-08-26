@@ -58,6 +58,15 @@ spec:
                     shared_buffers: 64MB
             patches:
               - type: FromCompositeFieldPath
+                fromFieldPath: spec.version
+                toFieldPath: spec.imageName
+                transforms:
+                  - type: map
+                    map:
+                      "15": ghcr.io/cloudnative-pg/postgresql:15.8
+                      "16": ghcr.io/cloudnative-pg/postgresql:16.4
+                      "17": ghcr.io/cloudnative-pg/postgresql:17.0
+              - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: metadata.name
                 transforms:
@@ -156,7 +165,7 @@ spec:
                           - name: AWS_SECRET_ACCESS_KEY
                             value: cloudbox123
                           - name: AWS_REGION
-                            value: us-east-1
+                            value: eu-north-1
                           - name: BUCKET
                             value: patched # patched from metadata.name
             patches:

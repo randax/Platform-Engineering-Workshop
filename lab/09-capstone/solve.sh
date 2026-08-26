@@ -146,13 +146,13 @@ upload_once() { # <filename> — POST through the portal; fatal on a portal-side
 # The resizer scales from zero to process the event — poll S3 for its output.
 s3() {
   if command -v s5cmd >/dev/null 2>&1; then
-    AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1 \
+    AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1 \
       s5cmd --endpoint-url "${RUSTFS_S3_HOST_URL}" "$@" 2>/dev/null
   else
     kubectl -n pipeline run "solve-s3-$$-${RANDOM}" --rm -i --restart=Never --quiet \
       --image=docker.io/peakcom/s5cmd:v2.3.0 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
-      --env AWS_REGION=us-east-1 \
+      --env AWS_REGION=eu-north-1 \
       -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 "$@" 2>/dev/null
   fi
 }

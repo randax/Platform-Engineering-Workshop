@@ -17,6 +17,40 @@ When you reach a red note: **don't take the keyboard first.** Ask "what did the
 last command say?" — the labs are built so the error text usually names the
 problem. Reading it together is the lesson.
 
+## Zones, patrol, and the question backlog
+
+These three mechanics are borrowed from Carpentries practice (see Wilson,
+*Ten Quick Tips for Delivering Programming Lessons*) — they're what makes
+1 helper per 8–10 people actually work:
+
+- **You own a zone.** Before the workshop starts, each helper takes a fixed
+  block of ~6–8 seats and keeps it all day. Nobody outside a zone means nobody
+  is unwatched; you'll also learn your people's pace, which makes stuck-ness
+  visible earlier.
+- **Patrol, don't perch.** Circulate continuously through your zone watching
+  *screens*, not stickies — a red sticky is a request, but a terminal that
+  hasn't changed in five minutes is a fact. Intervene early; waiting for the
+  sticky means catching people after the frustration, not before it.
+- **Count greens at each checkpoint.** When the lead calls a mid-lab
+  checkpoint ("hands up if verify passes"), report your zone's green count —
+  that's how the walk-the-solution timing gets decided from data instead of
+  front-of-room vibes.
+- **Feed the question backlog.** The second time you answer the same question,
+  write it on a sticky and put it on the front wall. The lead triages the wall
+  aloud at every walk-the-solution — your 1:1 answer becomes whole-room
+  teaching, and you stop answering it a third time.
+
+## The adventure hour: door ownership
+
+Each `adventures/` door has a **named owner** (assigned before the workshop,
+written on the front wall during the pitch). If you own a door: read your
+briefing's *Known traps* section in advance — it was written as your
+cheat-sheet — and treat the warm-up as sacred: it's the ~15-minute visible win
+that guarantees nobody hits the closing hard-stop empty-handed. Helpers without
+a door float across zones as usual. When the hard-stop signal comes (10 minutes
+before the end), help the room actually stop — the close is part of the
+workshop, not an optional outro.
+
 ## The shape of the day
 
 Core path everyone should finish: **modules 00–05**. Stretch (fast folks / take-home): **06–09**.

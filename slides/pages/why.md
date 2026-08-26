@@ -39,12 +39,12 @@ The tagline to plant: "Today, you are Bruktby's platform team. Your job for the 
 # Three bills came due
 
 <div class="grid grid-cols-1 gap-3 mt-2">
-  <div class="story"><span class="tag">PRICE</span> &nbsp;Every listing photo is stored, then re-served on every browse. Storage + egress became Bruktby's biggest line item — and the renewal email wanted more.</div>
-  <div class="story"><span class="tag">JURISDICTION</span> &nbsp;A big B2B partner asked one question: <em>can you prove our users' data never leaves Norway?</em> Post-Schrems II, "EU region" wasn't an answer.</div>
-  <div class="story"><span class="tag">ROADMAP</span> &nbsp;The managed object-store they built on got <strong>relicensed</strong> out from under them. The floor moved. (You'll meet this one for real in module 03.)</div>
+  <div v-click class="story"><span class="tag">PRICE</span> &nbsp;Every listing photo is stored, then re-served on every browse. Storage + egress became Bruktby's biggest line item — and the renewal email wanted more.</div>
+  <div v-click class="story"><span class="tag">JURISDICTION</span> &nbsp;A big B2B partner asked one question: <em>can you prove our users' data never leaves Norway?</em> Post-Schrems II, "EU region" wasn't an answer.</div>
+  <div v-click class="story"><span class="tag">ROADMAP</span> &nbsp;The managed object-store they built on got <strong>relicensed</strong> out from under them. The floor moved. (You'll meet this one for real in module 03.)</div>
 </div>
 
-<div class="mt-6 text-xl opacity-80">
+<div v-click class="mt-6 text-xl opacity-80">
 Price. Jurisdiction. Roadmap. None hypothetical — all three hit Bruktby, and none of them were theirs to control.
 </div>
 

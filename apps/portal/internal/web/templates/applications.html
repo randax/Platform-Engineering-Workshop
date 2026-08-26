@@ -30,7 +30,7 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
       </div>
       <div class="src-image">
         <!-- x-release-please-start-version -->
-        <label>Image <input name="image" placeholder="ghcr.io/randax/cloudbox-uploader:v0.2.2"></label>
+        <label>Image <input name="image" placeholder="ghcr.io/knative/helloworld-go" value="ghcr.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba"></label>
         <!-- x-release-please-end-version -->
       </div>
       <div class="src-repo">
@@ -60,6 +60,27 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
       <label class="check"><input type="checkbox" name="database" value="1" checked> Attach a Postgres database <small>— injects <code>DATABASE_URL</code></small></label>
       <label class="check"><input type="checkbox" name="bucket" value="1" checked> Attach an S3 bucket <small>— injects <code>S3_*</code></small></label>
       <p class="hint"><small>v1: the database and bucket are always provisioned regardless of these toggles (a composition limitation — see the component VENDOR.md).</small></p>
+      
+      <details class="yaml-toggle" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+        <summary style="cursor: pointer; color: var(--accent); font-weight: 500;">What is actually being created? (View YAML)</summary>
+        <div style="background: var(--surface); padding: 1rem; border: 1px solid var(--line); border-radius: var(--r-sm); margin-top: 0.5rem; max-height: 250px; overflow-y: auto;">
+          <p class="hint" style="margin-top: 0;">The UI form is just sugar. It submits the following YAML to the Kubernetes API:</p>
+          <pre style="margin: 0; font-size: 0.85em;"><code>apiVersion: platform.cloudbox.io/v1alpha1
+kind: Application
+metadata:
+  name: &lt;name&gt;
+  namespace: demo
+spec:
+  image: &lt;image&gt;
+  replicas:
+    min: 0
+    max: 3
+  database: true
+  bucket: true</code></pre>
+          <p class="hint" style="margin-bottom: 0; margin-top: 1rem;">(If you build from a repo, it also submits an Argo <code>Workflow</code> first.)</p>
+        </div>
+      </details>
+
       <div class="modal-actions">
         <label for="app-modal" class="btn ghost">Cancel</label>
         <button type="submit">Deploy</button>
@@ -75,6 +96,7 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
 {{define "app-list"}}
 <div id="app-list" hx-get="/applications/list" hx-trigger="every 5s" hx-swap="outerHTML">
   {{template "flash" .Flash}}
+  <p class="hint" style="margin-top: 1rem; margin-bottom: 1rem;">CLI equivalent: <code>kubectl get applications.platform.cloudbox.io -A</code></p>
   <table>
     <thead><tr><th>Name</th><th>Image</th><th>Scale</th><th>Wired</th><th>Ready</th><th>URL</th><th></th></tr></thead>
     <tbody>
@@ -141,31 +163,18 @@ provision one thing; this provisions an app <em>and its dependencies</em> from a
   {{end}}
 </tbody></table>
 
-{{if .SourceBuilt}}
-<h2>Source <small>deploy-from-source</small></h2>
-<p>Built from <code>{{.Repo}}</code> <small>(branch {{.Branch}})</small>. Change the code, push, then roll it forward:</p>
-<button hx-post="/applications/{{.Name}}/redeploy" hx-target="#redeploy-flash" hx-swap="innerHTML"
-  hx-confirm="Rebuild {{.Name}} from its repo and roll it forward?">Redeploy</button>
-<div id="redeploy-flash"></div>
-{{end}}
-
-<h2>Monitoring <small>last 30 min · the workload</small></h2>
-{{if .Telemetry}}
-<div class="monitor">
-  <div class="metric"><span class="metric-label">Request rate</span>
-    {{if .ReqSpark}}<span class="metric-spark">{{.ReqSpark}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
-  <div class="metric"><span class="metric-label">Avg latency</span>
-    {{if .LatSpark}}<span class="metric-spark">{{.LatSpark}}</span><span class="metric-now">{{.LatNow}}</span>{{else}}<span class="nodata">no data yet</span>{{end}}</div>
+<h2>Actions</h2>
+<div class="fn-actions">
+  {{if .SourceBuilt}}
+  <button hx-post="/applications/{{.Name}}/redeploy" hx-target="#redeploy-flash" hx-swap="innerHTML" hx-confirm="Rebuild {{.Name}} from its repo and roll it forward?">Redeploy</button>
+  {{end}}
+  {{if .Telemetry}}
+  <a class="btn ghost" href="{{.MetricsURL}}" target="_blank">View traces &amp; logs ↗</a>
+  {{end}}
+  <button class="danger" hx-delete="/applications/{{.Name}}" hx-on::after-request="if(event.detail.successful) window.location='/applications'" hx-confirm="Delete {{.Name}}? This removes the workload, its database and bucket.">Delete</button>
 </div>
-<p><a href="{{.MetricsURL}}" target="_blank">Explore traces in Grafana →</a></p>
-{{else}}
-<p class="hint">{{icon "lock"}} Enable the observability stack to light up the workload's metrics.</p>
-{{end}}
+<div id="redeploy-flash"></div>
 
-<h2>Danger zone</h2>
-<button class="danger" hx-delete="/applications/{{.Name}}"
-  hx-on::after-request="if(event.detail.successful) window.location='/applications'"
-  hx-confirm="Delete {{.Name}}? This removes the workload, its database and bucket.">Delete application</button>
 {{template "foot" .}}
 {{end}}
 {{end}}

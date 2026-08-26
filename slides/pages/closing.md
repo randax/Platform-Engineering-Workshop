@@ -5,7 +5,7 @@ layout: section
 # What you built today
 
 <!--
-Closing section — bring the energy back to the front of the room for the last ten minutes (the 30 minutes of tinkering happen around it).
+Closing section — HARD-SCHEDULED: the last 10 minutes belong to this, protected even from the adventure hour. Peak-end rule: the room's memory of four hours is disproportionately set by its final minutes — an ending where people drift out mid-hack is remembered as a fizzle, this before/after replay is remembered as an achievement. Call the one signal 10 minutes before the end, wait for keyboards to actually stop, then run: the replay (next slide), the take-home path, and a 60-second close — ask the room for one word each on what they're taking home, or simply "look at what you built this morning vs now". End on accomplishment, not fatigue.
 -->
 
 ---
@@ -55,7 +55,7 @@ The mental model is the real takeaway: cloud products are software plus an API, 
 <tr><td>Managed Postgres</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudnativepg" label size="1.5rem"/></td></tr>
 <tr><td>Object storage (S3)</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="rustfs" text="RustFS" size="1.5rem"/></td></tr>
 <tr><td>Self-service infra</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="crossplane" label size="1.5rem"/></td></tr>
-<tr><td>Serverless · CI · registry</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="knative" label size="1.5rem"/> <Logo name="argo-workflows" label="Argo Workflows" size="1.5rem"/> <Logo name="zot" text="Zot" size="1.5rem"/></td></tr>
+<tr><td>Serverless · CI · registry</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="knative" label size="1.5rem"/> <Logo name="argo-workflows" label="Argo Workflows" size="1.5rem"/> <Logo name="zot" label size="1.5rem"/></td></tr>
 <tr><td>Cloud console</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudbox" label size="1.5rem"/></td></tr>
 </tbody>
 </table>
@@ -109,6 +109,7 @@ The sentence to land: "The complete outcome of today isn't 'you learned Kubernet
 - Everything is public, pinned, Apache-2.0
 - `catch-up.sh <module>` — resume from anywhere
 - Skipped the stretch? It's all still there
+- Your adventure briefing keeps going — `adventures/` was written for the couch
 - `git tag javazone-2026` = today, forever
 - Broken prereqs at home? Open an issue
 

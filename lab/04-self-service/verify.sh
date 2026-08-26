@@ -110,13 +110,13 @@ fi
 # code is read below, so the stderr/stdout folding kubectl does is irrelevant.
 s3ls() {
   if command -v s5cmd >/dev/null 2>&1; then
-    AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1 \
+    AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1 \
       s5cmd --endpoint-url "${RUSTFS_S3_HOST_URL}" ls s3://my-db-assets 2>/dev/null
   else
     kubectl -n demo run "verify-s3-$$" --rm -i --restart=Never --quiet \
       --image=docker.io/peakcom/s5cmd:v2.3.0 \
       --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
-      --env AWS_REGION=us-east-1 \
+      --env AWS_REGION=eu-north-1 \
       -- --endpoint-url http://rustfs-svc.rustfs.svc.cluster.local:9000 \
       ls s3://my-db-assets 2>/dev/null
   fi

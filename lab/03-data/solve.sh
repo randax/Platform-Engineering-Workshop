@@ -38,7 +38,7 @@ kubectl -n demo exec app-db-1 -- psql -U postgres -d app -tAc 'SELECT 1;'
 # 3. Bucket + object + presigned URL. Uses a local s5cmd when present,
 #    otherwise an in-cluster s5cmd pod.
 if command -v s5cmd >/dev/null 2>&1; then
-  export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=us-east-1
+  export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1
   s5cmd --endpoint-url "${RUSTFS_S3_HOST_URL}" ls s3://app-assets >/dev/null 2>&1 \
     || s5cmd --endpoint-url "${RUSTFS_S3_HOST_URL}" mb s3://app-assets
   echo "hello from my own cloud" > /tmp/cloudbox-hello.txt
@@ -49,7 +49,7 @@ else
   kubectl -n demo run solve-s3 --rm -i --restart=Never --quiet \
     --image=docker.io/peakcom/s5cmd:v2.3.0 \
     --env AWS_ACCESS_KEY_ID=cloudbox --env AWS_SECRET_ACCESS_KEY=cloudbox123 \
-    --env AWS_REGION=us-east-1 \
+    --env AWS_REGION=eu-north-1 \
     --command -- /bin/sh -c '
       set -e
       EP=http://rustfs-svc.rustfs.svc.cluster.local:9000

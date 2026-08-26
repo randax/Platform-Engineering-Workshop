@@ -265,28 +265,31 @@ func ValidKnativeHost(ksvcName, ns string) error {
 	return nil
 }
 
-// BuildWorkshopDatabase constructs the XR document by hand. This is the whole
+// BuildWorkshopDatabase serializes the user's intent into the XR. This is the
 // trick behind "self-service platform APIs": creating a database is one POST
 // of ~10 lines of JSON, which Crossplane then expands into a CNPG Postgres
 // cluster and an S3 bucket (see lab/04's Composition).
-func BuildWorkshopDatabase(ns, name, size string) ([]byte, error) {
+func BuildWorkshopDatabase(ns, name, size, version string) ([]byte, error) {
 	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
 	if size != "small" && size != "medium" && size != "large" {
 		return nil, fmt.Errorf("size must be small, medium or large, got %q", size)
 	}
+	if version == "" {
+		version = "16"
+	}
 	xr := map[string]any{
 		"apiVersion": xrAPI,
 		"kind":       xrKind,
 		"metadata":   map[string]any{"name": name, "namespace": ns},
-		"spec":       map[string]any{"size": size},
+		"spec":       map[string]any{"size": size, "version": version},
 	}
 	return json.Marshal(xr)
 }
 
-func (k *Client) CreateWorkshopDatabase(ctx context.Context, ns, name, size string) error {
-	body, err := BuildWorkshopDatabase(ns, name, size)
+func (k *Client) CreateWorkshopDatabase(ctx context.Context, ns, name, size, version string) error {
+	body, err := BuildWorkshopDatabase(ns, name, size, version)
 	if err != nil {
 		return err
 	}
@@ -307,20 +310,20 @@ func (k *Client) DeleteWorkshopDatabase(ctx context.Context, ns, name string) er
 	return nil
 }
 
-// ResizeWorkshopDatabase changes an existing database's T-shirt size — a merge
-// patch on the ONE knob (spec.size). Crossplane re-composes: the size decides
-// storage, HA instances and memory, so bumping small→large is the whole "resize
-// my database" self-service action in one field. Shrinking is the user's call;
-// CNPG won't shrink a PVC, so a smaller size may leave storage as-is (noted in
-// the UI). Validates like BuildWorkshopDatabase so a bad value fails friendly.
-func (k *Client) ResizeWorkshopDatabase(ctx context.Context, ns, name, size string) error {
+// ResizeWorkshopDatabase changes an existing database's T-shirt size or version
+// via a merge patch. Crossplane re-composes: the size decides storage, HA instances
+// and memory, while version updates the CNPG postgres image tag.
+func (k *Client) ResizeWorkshopDatabase(ctx context.Context, ns, name, size, version string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("invalid name %q", name)
 	}
 	if size != "small" && size != "medium" && size != "large" {
 		return fmt.Errorf("size must be small, medium or large, got %q", size)
 	}
-	body, err := json.Marshal(map[string]any{"spec": map[string]any{"size": size}})
+	if version == "" {
+		version = "16"
+	}
+	body, err := json.Marshal(map[string]any{"spec": map[string]any{"size": size, "version": version}})
 	if err != nil {
 		return err
 	}
@@ -329,8 +332,7 @@ func (k *Client) ResizeWorkshopDatabase(ctx context.Context, ns, name, size stri
 
 // ------------------------------------------------- Argo Workflows (CI)
 
-// A Workflow is one Argo Workflows run — the in-cluster CI object from module
-// 07. Nothing new happens here: a Workflow is an argoproj.io CRD just like an
+// A Workflow is one Argo Workflows run — the in-cluster CI object from module 07. Nothing new happens here: a Workflow is an argoproj.io CRD just like an
 // Application, so listing runs is the exact same authenticated GET-a-list the
 // portal already does everywhere else, with the same token and the same helper.
 const (
@@ -457,4 +459,15 @@ func (k *Client) SelfRules(ctx context.Context, ns string) (SelfRules, error) {
 		ResourceRules: out.Status.ResourceRules,
 		Incomplete:    out.Status.Incomplete,
 	}, nil
+}
+
+type Secret struct {
+	Metadata ObjMeta           `json:"metadata"`
+	Data     map[string][]byte `json:"data"` // base64 encoded!
+}
+
+func (k *Client) GetSecret(ctx context.Context, ns, name string) (Secret, error) {
+	var s Secret
+	err := k.get(ctx, "/api/v1/namespaces/"+ns+"/secrets/"+name, &s)
+	return s, err
 }

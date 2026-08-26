@@ -21,16 +21,32 @@ for you (`talos-box` VMs, or Talos-in-Docker); everything below is the same on b
 
 ## The task
 
-1. Create the cluster:
+1. Create the cluster — **without a network**:
 
    ```bash
-   ./scripts/create-cluster.sh
+   ./scripts/create-cluster.sh --skip-cilium
    ```
 
-   While it runs (~3–5 min), read the script. It is short on purpose — everything it does,
+   While it runs (~2–3 min), read the script. It is short on purpose — everything it does,
    you could type.
 
-2. Now **prove to yourself what you just built**. Find answers to these, using `talosctl`
+2. Look at what you own: `kubectl get nodes`. Both nodes are **NotReady** — and they will
+   stay that way forever, because this cluster has **no CNI**. Convince yourself of why
+   before fixing it: `kubectl describe node` one of them and find the complaint;
+   `kubectl -n kube-system get pods` and explain the `Pending` ones; find the
+   `cluster.network.cni: none` decision in the Talos machine config (hint 2). A cloud
+   provider made this choice for you on every cluster you've ever used. Today it's yours.
+
+3. **Give your cluster a network.** Install Cilium with Helm from the vendored chart at
+   `scripts/manifests/` — no internet needed. The values are Talos-specific and matter;
+   hint 3 builds up to the exact command. Keep `kubectl get nodes -w` running in a second
+   terminal and watch NotReady become Ready the moment the CNI lands. That transition is
+   the whole lesson.
+
+   (Behind, or rebuilding? Plain `./scripts/create-cluster.sh` without the flag does this
+   step for you — that's what catch-up uses.)
+
+4. Now **prove to yourself what you just built**. Find answers to these, using `talosctl`
    and `kubectl` (hints below if you want them):
 
    - There is no SSH. What *is* the management plane? Show the machine's config document
@@ -41,7 +57,7 @@ for you (`talos-box` VMs, or Talos-in-Docker); everything below is the same on b
      Cilium is healthy — and show that **kube-proxy does not exist** in this cluster.
      Who answers Service traffic then?
 
-3. Run `./verify.sh`.
+5. Run `./verify.sh`.
 
 ## Hints
 
@@ -70,7 +86,42 @@ it rather than type it). `kubectl get nodes -o wide` shows the same addresses.
 </details>
 
 <details>
-<summary>Hint 3: Proving the Cilium / no-kube-proxy story</summary>
+<summary>Hint 3: Installing Cilium — from goal to the exact command</summary>
+
+- **Goal:** one `helm upgrade --install` against the vendored chart
+  (`scripts/manifests/cilium-<version>.tgz`, version pinned in `scripts/versions.env`),
+  namespace `kube-system`, with values that (a) use Kubernetes for IPAM, (b) replace
+  kube-proxy, and (c) point Cilium at the API server via **KubePrism** —
+  Talos' node-local API balancer on `localhost:7445`.
+- **Why the odd values?** Talos mounts cgroups itself (`cgroup.autoMount.enabled=false`,
+  `hostRoot=/sys/fs/cgroup`) and its default PodSecurity needs the agent's capability
+  list spelled out. This is the documented Talos+Cilium recipe, not workshop magic:
+  https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium
+- **The command**, exactly as the script would run it — `create-cluster.sh` step 3 *is*
+  the reference solution, and it's meant to be read:
+
+```bash
+source scripts/versions.env
+helm upgrade --install cilium \
+  --server-side=false \
+  "scripts/manifests/cilium-${CILIUM_VERSION}.tgz" \
+  --namespace kube-system \
+  --set ipam.mode=kubernetes \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=localhost \
+  --set k8sServicePort=7445 \
+  --set cgroup.autoMount.enabled=false \
+  --set cgroup.hostRoot=/sys/fs/cgroup \
+  --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
+  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+```
+
+- Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
+  `kubectl get nodes -w` terminal.
+</details>
+
+<details>
+<summary>Hint 4: Proving the Cilium / no-kube-proxy story</summary>
 
 - Cilium health, without any extra tools:
   `kubectl -n kube-system get pods -l k8s-app=cilium` and
@@ -89,7 +140,19 @@ it rather than type it). `kubectl get nodes -o wide` shows the same addresses.
 <summary>Full solution</summary>
 
 ```bash
-./scripts/create-cluster.sh
+./scripts/create-cluster.sh --skip-cilium
+kubectl get nodes                # NotReady — no CNI, by your own choice
+
+# Give it a network yourself (hint 3 has the full command with values):
+source scripts/versions.env
+helm upgrade --install cilium --server-side=false \
+  "scripts/manifests/cilium-${CILIUM_VERSION}.tgz" -n kube-system \
+  --set ipam.mode=kubernetes --set kubeProxyReplacement=true \
+  --set k8sServiceHost=localhost --set k8sServicePort=7445 \
+  --set cgroup.autoMount.enabled=false --set cgroup.hostRoot=/sys/fs/cgroup \
+  --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
+  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+kubectl get nodes -w             # NotReady -> Ready, live
 
 # The management plane is an API, not SSH:
 talosctl config info                     # which node/endpoint this context talks to

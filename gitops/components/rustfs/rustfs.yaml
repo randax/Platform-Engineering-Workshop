@@ -47,7 +47,7 @@ data:
   # re-measured before removing the workaround — see VENDOR.md.
   RUSTFS_OBS_LOGGER_LEVEL: "info"
   RUSTFS_OBS_ENVIRONMENT: "development"
-  RUSTFS_REGION: "us-east-1"
+  RUSTFS_REGION: "eu-north-1"
   RUSTFS_VOLUMES: "/data"
 ---
 # Source: rustfs/templates/pvc.yaml

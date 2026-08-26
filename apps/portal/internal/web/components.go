@@ -51,7 +51,6 @@ var componentCatalog = []component{
 	{"Kourier", "kourier-system", "Knative's ingress gateway", "knative-serving.yaml"},
 	{"Knative Eventing", "knative-eventing", "the CloudEvent broker wiring the capstone", "knative-eventing.yaml"},
 	{"Argo Workflows", "argo", "runs the in-cluster CI pipelines", "argo-workflows.yaml"},
-	{"Builds", "builds", "rootless BuildKit — where module 07's images are built", "argo-workflows.yaml"},
 	{"Cloudbox Console", "portal", "this portal", "portal.yaml"},
 	{"Picture pipeline", "pipeline", "uploader + resizer + broker (capstone)", "picture-pipeline.yaml"},
 	{"Backstage", "backstage", "the presenter's portal demo — heavyweight, enable last", "backstage.yaml"},

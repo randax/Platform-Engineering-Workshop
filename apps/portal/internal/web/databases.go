@@ -6,9 +6,14 @@ package web
 
 import (
 	"context"
+	"fmt"
+	"html/template"
 	"net/http"
+	"database/sql"
+	_ "github.com/lib/pq"
 
 	"cloudbox.io/portal/internal/kube"
+	"cloudbox.io/portal/internal/metrics"
 )
 
 func init() {
@@ -29,6 +34,7 @@ func init() {
 			{"GET /databases/list", handleDatabasesList}, // polled by htmx
 			{"GET /databases/{name}", handleDatabaseDetail},
 			{"POST /databases", handleCreateDatabase},
+			{"POST /databases/{name}/query", handleDatabaseQuery},
 			{"POST /databases/{name}/resize", handleResizeDatabase},
 			{"DELETE /databases/{name}", handleDeleteDatabase},
 		},
@@ -40,6 +46,11 @@ type databasesData struct {
 	Databases []kube.WorkshopDB
 	Namespace string
 	Flash     flash
+	Telemetry bool
+	CPUSpark  template.HTML
+	CPUNow    string
+	MemSpark  template.HTML
+	MemNow    string
 }
 
 func fetchDatabases(ctx context.Context, s *Server, ns string, fl flash) (databasesData, error) {
@@ -51,7 +62,20 @@ func fetchDatabases(ctx context.Context, s *Server, ns string, fl flash) (databa
 	if err != nil {
 		return databasesData{}, err
 	}
-	return databasesData{Clusters: clusters, Databases: dbs, Namespace: ns, Flash: fl}, nil
+	
+	data := databasesData{Clusters: clusters, Databases: dbs, Namespace: ns, Flash: fl}
+	if health, err := s.Kube.NamespaceWorkloads(ctx); err == nil && health["observability"].Ready > 0 && s.Prom != nil {
+		data.Telemetry = true
+		if vals, err := s.Prom.QueryRange(ctx, metrics.NamespaceCPUQuery(ns)); err == nil && len(vals) > 0 {
+			data.CPUSpark = metrics.Sparkline(vals, "cpu usage")
+			data.CPUNow = fmt.Sprintf("%.2f cores", vals[len(vals)-1])
+		}
+		if vals, err := s.Prom.QueryRange(ctx, metrics.NamespaceMemQuery(ns)); err == nil && len(vals) > 0 {
+			data.MemSpark = metrics.Sparkline(vals, "memory usage")
+			data.MemNow = humanBytes(vals[len(vals)-1])
+		}
+	}
+	return data, nil
 }
 
 func handleDatabases(s *Server, w http.ResponseWriter, r *http.Request) {
@@ -82,6 +106,7 @@ func handleDatabasesList(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleCreateDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	size := r.FormValue("size")
+	version := r.FormValue("version")
 	ns, err := s.mutableProject(r)
 	if err != nil {
 		s.render(w, "db-list", databasesData{Namespace: kube.XRNamespace, Flash: errorFlash(err.Error())})
@@ -89,7 +114,7 @@ func handleCreateDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	}
 
 	fl := flash{Msg: "Created " + name + " — Crossplane is composing a Postgres cluster and a bucket. Watch it turn Ready below."}
-	if err := s.Kube.CreateWorkshopDatabase(r.Context(), ns, name, size); err != nil {
+	if err := s.Kube.CreateWorkshopDatabase(r.Context(), ns, name, size, version); err != nil {
 		fl = errorFlash("Create failed: " + err.Error())
 	}
 	// Always answer with the fragment htmx targeted — a full 500 error page
@@ -126,16 +151,99 @@ func handleDeleteDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 func handleResizeDatabase(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	size := r.FormValue("size")
+	version := r.FormValue("version")
 	ns, err := s.mutableProject(r)
 	if err != nil {
 		s.render(w, "flash", errorFlash(err.Error()))
 		return
 	}
-	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), ns, name, size); err != nil {
+	if err := s.Kube.ResizeWorkshopDatabase(r.Context(), ns, name, size, version); err != nil {
 		s.render(w, "flash", errorFlash("Resize failed: "+err.Error()))
 		return
 	}
 	// Reload the detail page: Crossplane is re-composing, and the page's live
 	// conditions + size now reflect the new T-shirt.
 	w.Header().Set("HX-Redirect", "/databases/"+name)
+}
+
+func handleDatabaseQuery(s *Server, w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	query := r.FormValue("query")
+	ns := s.activeProject(r)
+
+	if query == "" {
+		s.render(w, "query-result", map[string]any{"Error": "Query is empty"})
+		return
+	}
+
+	cluster, clusterName, err := s.Kube.GetCNPGCluster(r.Context(), ns, name)
+	if err != nil || cluster == nil || clusterName == "" {
+		s.render(w, "query-result", map[string]any{"Error": "Database not found or not composed yet"})
+		return
+	}
+
+	sec, err := s.Kube.GetSecret(r.Context(), ns, clusterName+"-app")
+	if err != nil {
+		s.render(w, "query-result", map[string]any{"Error": "Failed to read credentials: " + err.Error()})
+		return
+	}
+
+	user := string(sec.Data["user"])
+	pass := string(sec.Data["password"])
+	dbname := string(sec.Data["dbname"])
+	host := clusterName + "-rw." + ns + ".svc.cluster.local"
+
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=require", user, pass, host, dbname)
+	
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		s.render(w, "query-result", map[string]any{"Error": "Failed to open connection: " + err.Error()})
+		return
+	}
+	defer db.Close()
+
+	rows, err := db.QueryContext(r.Context(), query)
+	if err != nil {
+		s.render(w, "query-result", map[string]any{"Error": "Query error: " + err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		s.render(w, "query-result", map[string]any{"Error": "Failed to read columns: " + err.Error()})
+		return
+	}
+
+	var results [][]string
+	for rows.Next() {
+		columns := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i := range columns {
+			columnPointers[i] = &columns[i]
+		}
+
+		if err := rows.Scan(columnPointers...); err != nil {
+			continue
+		}
+
+		rowStrs := make([]string, len(cols))
+		for i, val := range columns {
+			if val == nil {
+				rowStrs[i] = "NULL"
+			} else {
+				if b, ok := val.([]byte); ok {
+					rowStrs[i] = string(b)
+				} else {
+					rowStrs[i] = fmt.Sprintf("%v", val)
+				}
+			}
+		}
+		results = append(results, rowStrs)
+	}
+
+	s.render(w, "query-result", map[string]any{
+		"Columns": cols,
+		"Rows":    results,
+	})
 }

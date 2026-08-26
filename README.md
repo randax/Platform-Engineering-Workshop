@@ -311,6 +311,17 @@ One warning shot: module 05 includes a fault where the obvious AI diagnosis is p
 and wrong. Verifying what an agent tells you against the live system is the 2026 skill,
 and we'll practice it.
 
+**The house style: your assistant is a tutor, not a chauffeur.** This repo ships
+instructions (`CLAUDE.md` / `AGENTS.md`) that ask coding agents to *coach* during the
+workshop — explain, point at the next hint layer, debug your environment with you — and
+to decline to simply do the labs for you. Two honest notes about that. First, it's
+advisory: you can delete the file or talk your agent past it, and nothing will stop you —
+except that the only thing you'd take home from a workshop your agent did is a warm
+laptop. Second, it has a deliberate carve-out: **environment and tooling failures are not
+the lesson.** Docker won't start, a mise shim misbehaves, a download died halfway —
+sic your agent on those with everything it has; yak-shaving is nobody's learning
+objective. The platform concepts are.
+
 ## Plan B: devcontainer / Codespaces
 
 If `./scripts/install.sh --check` won't go green on your machine, don't burn workshop
