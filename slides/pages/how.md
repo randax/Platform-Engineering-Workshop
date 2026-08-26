@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 # How today works

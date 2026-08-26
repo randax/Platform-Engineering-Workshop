@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 <span class="badge">Module 03 · 35 min · core</span>

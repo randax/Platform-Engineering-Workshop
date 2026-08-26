@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 <span class="badge">Module 00 · 15 min · gate</span>

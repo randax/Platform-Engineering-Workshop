@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 # So what *is* a cloud, anyway?

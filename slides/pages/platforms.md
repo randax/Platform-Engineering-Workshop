@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 # A cloud is not yet a platform

@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 <span class="badge">Module 09 · capstone · self-paced finale</span>

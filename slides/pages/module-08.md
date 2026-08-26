@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 <span class="badge">Module 08 · stretch · self-paced + demo</span>

@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 # The stack — and *why*

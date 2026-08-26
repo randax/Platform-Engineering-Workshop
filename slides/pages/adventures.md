@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 # The last hour is **yours**
