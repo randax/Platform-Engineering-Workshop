@@ -201,7 +201,18 @@ fi
 
 echo
 if [ "$FAILED" -gt 0 ]; then
-  echo "❌ $FAILED check(s) failed. Worst case is always fine: ./scripts/destroy-cluster.sh && ./scripts/create-cluster.sh"
+  # The rebuild, named for THIS machine's identity. "destroy && create" is not
+  # universally safe advice: on the kind lifeboat both of those scripts refuse
+  # (kind is not a substrate), and on a machine that chose docker deliberately
+  # the destroy erases the record, so the create re-detects and can come back on
+  # tbx — a different cluster from the one that just failed.
+  echo "❌ $FAILED check(s) failed."
+  if [ "$SUBSTRATE" = kind ]; then
+    echo "   Rebuild the lifeboat: ./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh"
+  else
+    echo "   Rebuild this cluster on the same substrate:"
+    echo "     CLOUDBOX_SUBSTRATE=${SUBSTRATE} ./scripts/destroy-cluster.sh && CLOUDBOX_SUBSTRATE=${SUBSTRATE} ./scripts/create-cluster.sh"
+  fi
   exit 1
 fi
 echo "✅ Module 01 complete — you own a cloud. Two-minute explain-back, then on to GitOps."

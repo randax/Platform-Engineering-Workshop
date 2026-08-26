@@ -47,7 +47,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `dev-setup.sh` | Install mise (with consent) + all pinned CLI tools, verify versions |
 | `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`; start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it |
 | `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
-| `install.sh --write-hosts` | Docker only, mutating: (re)write the marked `/etc/hosts` block from the pins + `~/.cloudbox/extra-hosts`. The recovery path after a declined `sudo`, and the refresh path after WSL2 regenerates the file |
+| `install.sh --write-hosts` | Mutating, and only on the **docker and kind identities** (on tbx those 127.0.0.1 lines would override talos-box's resolver): (re)write the marked `/etc/hosts` block from the pins + `~/.cloudbox/extra-hosts`. Refuses unless `~/.cloudbox/substrate` records one of those two. The recovery path after a declined `sudo`, and the refresh path after WSL2 regenerates the file |
 | `create-cluster.sh` | Substrate **dispatcher**: resolves tbx-or-docker, sources the backend, then runs the shared path — Talos config gen/apply/bootstrap (1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm. Persists the choice in `~/.cloudbox/substrate` |
 | `create-cluster.sh --refresh-endpoint` | tbx only, creates nothing: re-reads `tbx status`, **probes** the control plane's current address with both clients (explicit `--server` / `--endpoints`, so nothing is written yet), then points the kubeconfig **and** the `cloudbox` talosconfig context at it, re-checks them through those files, and only then records it in `~/.cloudbox/api-endpoint`. The probes RETRY for up to 180s: `tbx cluster start` returns when apid answers and `tbx cluster resume` waits for nothing at all, so kube-apiserver is routinely still coming up. A probe that never succeeds leaves all three files untouched. Does not touch the machine config's own `controlPlane.endpoint`. The one command for "the cluster is running again after `tbx cluster resume`/`tbx cluster start`, and its vmnet DHCP lease moved" |
 | `substrate/docker.sh` | The **Docker backend**: `talosctl cluster create docker` (raised memory/CPU, published ports) and the marked `/etc/hosts` block that gives the hostname scheme somewhere to resolve |
@@ -57,7 +57,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |
 | `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` + `gitops/components` state to Gitea, then run the module's post-steps; `--rebuild` for the full nuke-and-rebuild |
 | `kind-fallback.sh` | Plan B when neither substrate runs: same cluster shape on kind + Cilium, the **same** `cilium_ingress_values` (lib.sh) as the docker substrate, host port 80 → the ingress NodePort and the same marked `/etc/hosts` block — so modules 02 onward are identical. Loses the Talos content (lab 01 says so and exits 0), gains robustness. Records `kind` in `~/.cloudbox/substrate` — a third **identity**, not a substrate: everything keyed on that file grades this machine with Docker semantics, and `create-cluster.sh`/`destroy-cluster.sh` refuse on it |
-| `kind-fallback.sh --delete` | Deletes that cluster, removes the `/etc/hosts` block (only when the recorded identity is `kind`) and clears the identity — but only once the cluster is gone **and** the block is removed or proven absent, so a declined sudo leaves a retry possible instead of an unowned block. With no identity file, `CLOUDBOX_SUBSTRATE=kind` is honoured only against proof (kind lists the cluster, or the marked block is present). `destroy-cluster.sh` cannot — it builds and tears down substrates, and kind is not one |
+| `kind-fallback.sh --delete` | Deletes that cluster, removes the `/etc/hosts` block (only when the recorded identity is `kind`) and clears the identity — but only once the cluster is gone **and** the block is removed or proven absent, so a declined sudo leaves a retry possible instead of an unowned block, and it **exits 1** whenever either is unfinished. Needs neither `kind` nor `kubectl` (it asks Docker for the node containers), but does need a reachable Docker daemon — every question it asks is asked there. With no identity file, `CLOUDBOX_SUBSTRATE=kind` is honoured only against kind-specific proof: `kind get clusters` listing it, or containers labelled `io.x-k8s.kind.cluster=cloudbox`. The `/etc/hosts` block is deliberately **not** proof — the docker substrate writes an identical one, and it may belong to a live cluster. `destroy-cluster.sh` cannot — it builds and tears down substrates, and kind is not one |
 | `check-consistency.sh` | Drift detection between everything that must agree: solutions↔catalog copies, deployed images ⊆ `images.txt`, `versions.env`↔`mise.toml`, devcontainer pins, `upstream.list` pin-sources, and that every `lab/`, `scripts/` and `solutions/` script touching a cluster passes the workshop-context guard. Offline; runs in CI on every push |
 | `check-upstream.sh` | **Maintainer only, needs internet** — reports which pins have fallen *behind* upstream (`ok`/`patch`/`minor`/`major`). Reads `upstream.list`; never edits a pin. `--strict`, `--json`, `--only <name>` |
 | `lib.sh` | Shared logging/helpers — sourced by every script |
@@ -123,7 +123,13 @@ Gitea's clone box in the web UI shows the **in-cluster** `ROOT_URL`
 
 Which substrate you are on: `./scripts/install.sh --check`. To force one:
 `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`); the answer is remembered in
-`~/.cloudbox/substrate` from the moment a cluster is created.
+`~/.cloudbox/substrate` from the moment a cluster is created — and forgotten by
+`destroy-cluster.sh`, which removes that file with the cluster it described. The next
+`create-cluster.sh` therefore *decides again*, not "does the same thing": the destroy
+prints the substrate it forgot and the `CLOUDBOX_SUBSTRATE=<it> ./scripts/create-cluster.sh`
+that keeps it, and `catch-up.sh <module> --rebuild` carries it across on your behalf.
+A record that exists but cannot be read (wrong owner, mode 000, junk content) stops every
+mutating script with the hand-fix; only the read-only ones (`--check`, the labs) carry on.
 
 ## Conventions
 

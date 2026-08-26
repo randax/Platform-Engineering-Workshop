@@ -677,6 +677,14 @@ grep -q '^substrate_decide_into()' scripts/substrate-decide.sh \
 for f in lab/00-setup/verify.sh lab/01-cluster/verify.sh lab/01-cluster/solve.sh lab/06-serverless/verify.sh; do
   grep -q 'substrate-decide.sh' "${f}" \
     || bad "${f} no longer sources scripts/substrate-decide.sh — it is one of the four files the shared decision was extracted FROM"
+  # …and still CALLS it. Sourcing a file proves nothing about using it: delete
+  # the `substrate_decide_into SUBSTRATE` line and leave the `.` line behind —
+  # which is exactly the shape a "simplification" takes — and this check stayed
+  # green while the verifier fell back to whatever SUBSTRATE happened to be.
+  # Anchored to the real invocation: not a comment (`^[^#]*`), the function name
+  # followed by the variable it sets.
+  grep -qE '^[^#]*\bsubstrate_decide_into[[:space:]]+[A-Za-z_][A-Za-z0-9_]*' "${f}" \
+    || bad "${f} sources scripts/substrate-decide.sh but never calls substrate_decide_into <var> — the decision is imported and unused"
 done
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "one substrate decision (scripts/substrate-decide.sh), sourced by every caller"

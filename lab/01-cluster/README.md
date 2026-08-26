@@ -162,8 +162,19 @@ changed what").
 
 ## If it goes wrong
 
-The cluster is cattle: `./scripts/destroy-cluster.sh && ./scripts/create-cluster.sh` is
-always safe and takes ~5 minutes (images are already local). If Talos-in-Docker fights
+The cluster is cattle: destroying and recreating it takes ~5 minutes (images are already
+local). Name the substrate on both halves —
+
+```bash
+CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh && \
+CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh     # or =tbx, whichever you are on
+```
+
+— because the destroy removes `~/.cloudbox/substrate` with the cluster, and a bare
+`create-cluster.sh` then decides again from scratch rather than rebuilding what you had.
+`./scripts/install.sh --check` prints which one you are on. On the kind lifeboat neither
+script applies: rebuild with `./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh`.
+If Talos-in-Docker fights
 your machine specifically, `./scripts/kind-fallback.sh` gives you a kind+Cilium cluster
 with the same ingress, the same hostnames and the same `/etc/hosts` block — you lose the
 Talos exploration but every later module works the same. Remove it afterwards with

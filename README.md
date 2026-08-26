@@ -167,6 +167,13 @@ scripts pick for you and remember the choice in `~/.cloudbox/substrate`; overrid
 `CLOUDBOX_SUBSTRATE=docker` or `=tbx`. On Linux, watch out for firewalld/nftables
 interference on either substrate.
 
+The memory lasts as long as the cluster does: `destroy-cluster.sh` removes that file
+along with the cluster it described, and the next `create-cluster.sh` decides again from
+scratch. It prints the substrate it just forgot and the command that keeps it
+(`CLOUDBOX_SUBSTRATE=<what it was> ./scripts/create-cluster.sh`) — worth using if you
+chose that substrate deliberately, because detection will not know you did.
+`catch-up.sh <module> --rebuild` carries it across for you.
+
 **The override picks; it does not overrule what is already there.** Once a cluster has
 been created, `~/.cloudbox/substrate` is a *record*, not a preference — and `create-cluster.sh`,
 `destroy-cluster.sh`, `kind-fallback.sh`, `--refresh-endpoint` and
@@ -257,9 +264,15 @@ declined sudo leaves you able to retry rather than stranded with a block no comm
 own. If the file is missing — a lifeboat taken before this existed — say so for the
 session: `CLOUDBOX_SUBSTRATE=kind ./scripts/install.sh --check`. The same override works
 for the teardown, `CLOUDBOX_SUBSTRATE=kind ./scripts/kind-fallback.sh --delete`, but there
-it is honoured only against proof: `kind` must list a `cloudbox` cluster, or the marked
-`/etc/hosts` block must still be there. An environment variable is a claim, and the script
-will not delete a block it cannot show is its own.
+it is honoured only against **kind-specific** proof: `kind get clusters` must list
+`cloudbox`, or Docker must still hold containers labelled
+`io.x-k8s.kind.cluster=cloudbox`. The `/etc/hosts` block is *not* proof — the docker
+substrate writes an identical one, so accepting it would let an environment variable
+delete a live Talos cluster's hostnames. Once the claim is proved, `kind` is written back
+into `~/.cloudbox/substrate` immediately, so a retry after a declined sudo needs no
+override at all. The teardown exits non-zero whenever anything is left, and it needs
+Docker running (it asks the daemon for the containers) but neither `kind` nor `kubectl`
+on `PATH`.
 
 The one thing you give up is **module 01**: `lab/01-cluster/verify.sh` checks a Talos
 cluster, so on the lifeboat it prints "not gradeable here" and exits 0 rather than

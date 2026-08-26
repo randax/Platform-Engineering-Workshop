@@ -2776,3 +2776,104 @@ that is *semantically* a prerelease and not in the known word list
 (`-m1`, `-milestone2`, `-devel`, `-eap`) would be read as release-grade and
 could under-report. **No pin here uses one.** Fix the word list if one ever
 appears; do not "fix" the flavor-stripping.
+
+## RESOLVED — an unreadable `~/.cloudbox/substrate` read as "no cluster was ever created"
+
+`substrate_current()` had two outcomes and needed three. An **absent** record and
+a record that exists but **cannot be used** — mode 000, owned by root after a
+`sudo` mishap, or holding junk — both came back as the empty string, and every
+caller wrote `s="$(substrate_current || true)"`, which threw away the status
+that told them apart. Everything downstream then acted on the most dangerous
+possible reading of "nothing here": `require_identity_match()` waved every
+transition through, `destroy-cluster.sh` assumed docker and tore down whatever
+it found, and `substrate_persist()` `mv`-ed a new value over the file nobody
+could read — destroying the only record of what this machine actually built.
+
+**Now:** `substrate_current()` returns rc 2 (with a warning on stderr) for a
+record that exists and cannot be used, and rc 0 with an empty answer only when
+there is genuinely none. `assert_identity_readable()` turns rc 2 into a refusal
+with the hand-fix, and it is called by every **mutating** path — create,
+destroy, `--refresh-endpoint`, the lifeboat's create and `--delete`,
+`install.sh --write-hosts`/`--add-hosts` — plus `substrate_persist()` itself as
+a backstop. It runs BEFORE `substrate_resolve_into()`, so a machine that is
+going to be refused does not first spend seconds in `tbx doctor`.
+
+**Read-only paths deliberately do not refuse.** `install.sh --check` and the labs
+hear the warning and carry on: a preflight that will not run is worse than one
+that says what it could not read.
+
+## TRAP — the `/etc/hosts` block is not proof of a kind lifeboat
+
+`kind-fallback.sh --delete` accepts `CLOUDBOX_SUBSTRATE=kind` on a machine with
+no identity record — the documented lost-state recipe — but only against proof.
+The marked CloudBox block used to count as proof, and it is not: **the docker
+substrate writes an identical block**. On a machine whose Talos-in-Docker cluster
+is up and whose record was deleted, `CLOUDBOX_SUBSTRATE=kind … --delete` then
+removed a live cluster's hostnames on the say-so of an environment variable.
+
+Proof is now kind-specific and nothing else: `kind get clusters` listing the
+cluster, or containers labelled `io.x-k8s.kind.cluster=<name>`. Accepted proof is
+written straight back into `~/.cloudbox/substrate`, so the retry after a declined
+sudo needs no override — the proof it would have needed is the thing the first
+run deleted.
+
+Two related rules the same teardown now follows: it asks **Docker**, not `kind`,
+whether the cluster is gone (so it works on a machine where kind was uninstalled,
+and catches a `kind delete cluster` that exits 0 having removed nothing), and it
+**exits non-zero** whenever the cluster or the block is still there.
+
+## RESOLVED — the mirror was filled for a substrate the machine was not going to use
+
+`mirror_target_substrate()` keyed on the presence of the `tbx` **binary**, on the
+bet that a machine with tbx installed is heading towards tbx even while `tbx
+doctor` fails at home — so the mirror was filled for the VMs' architecture and
+the Talos disk image was warmed. The bet loses in the ordinary shape: doctor
+fails, `create-cluster.sh` **builds on docker**, and the nodes are containers on a
+Docker daemon that may be a whole architecture away (an amd64 Colima VM on an
+Apple Silicon Mac). Worse, the mirror was *graded* by the same rule it was
+*filled* by, so `install.sh --check` passed a machine whose every mirrored image
+was wrong for the cluster it was about to create.
+
+**Now:** filling (`cloudbox-init.sh`) and grading (`install.sh --check`) both
+follow `substrate_resolve()` — the same decision `create-cluster.sh` dispatches
+on — so the architecture is right by construction rather than by a prediction.
+The cost is named where it lands: on a machine that resolves to docker only
+because `tbx doctor` is failing, `cloudbox-init.sh` says so and prints
+`CLOUDBOX_SUBSTRATE=tbx ./scripts/cloudbox-init.sh` for anyone who intends to fix
+tbx before the venue.
+
+`install.sh --check` also stopped taking the cached Talos disk on trust: it asks
+`tbx cache list -o json` (upstream `cmd/tbx/main.go`, `usage: tbx cache list [-o
+json] [<image-ref>]`) for an entry matching **this** `TALOS_VERSION` **and** the
+host CPU's architecture and not marked `incomplete`, falling back to the
+`~/.talosbox/cache/<schematic>/<version>/<arch>/disk.raw` layout when tbxd cannot
+be reached — and saying which source answered. The old check globbed the version
+directory alone, so an amd64 disk on an arm64 host read as cached.
+
+## RESOLVED — the tbx preflight never looked at the Docker daemon for a Talos cluster
+
+`substrate/tbx.sh`'s preflight refused over kind's containers but never over
+Talos's own (`label=talos.cluster.name=<name>`). The migration case is the one
+that mattered: a machine created on the docker substrate before the identity
+record existed has a running cluster, an `/etc/hosts` block and a kubeconfig
+context, and `create-cluster.sh` on tbx built a **second** cloudbox beside it.
+Both labels are now scanned.
+
+When Docker is installed but not running, that scan cannot be made. The preflight
+then dies — unless nothing on this machine says a CloudBox cluster was ever built
+here (`cloudbox_local_evidence()`: no `~/.cloudbox/substrate`, no
+`~/.cloudbox/api-endpoint`, no `~/.talos/clusters/<name>`), in which case it warns
+and continues. tbx needs a running Docker daemon in any case: the image mirror
+its VMs pull from is a Docker container.
+
+## TRAP — `destroy-cluster.sh` forgets which substrate this machine was on
+
+It removes `~/.cloudbox/substrate` along with the cluster, which is right — the
+record describes a cluster that no longer exists. The consequence is easy to
+miss: the next bare `./scripts/create-cluster.sh` **decides again** rather than
+rebuilding what was there, so an attendee who deliberately ran on docker can be
+put back on tbx the moment detection likes it, with a mirror filled for the other
+architecture. The destroy now names the substrate it forgot and the
+`CLOUDBOX_SUBSTRATE=<it> ./scripts/create-cluster.sh` that keeps it, and
+`catch-up.sh --rebuild` captures the record before the destroy and passes it to
+the create.
