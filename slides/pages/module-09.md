@@ -111,5 +111,5 @@ Readiness check before the moment: kubectl -n pipeline get broker,trigger,ksvc a
 
 Then stage the two terminals, upload at portal.cloudbox.k8s.test/gallery, and work through the three proofs from the previous slide. verify.sh seals it.
 
-Anyone finishing this has run the full arc: platform built by git commits, storage and databases self-hosted, a self-service API, a portal, and an event-driven serverless pipeline traced end to end. Send them off victorious — and remind them the hard stop brings everyone back for the close.
+This is door 0's finale, and the trail is longer than the block — plenty of people will be mid-capstone when the hard stop lands, which is what "start here, finish at home" means in practice. Anyone who does finish has run the full arc: platform built by git commits, storage and databases self-hosted, a self-service API, a portal, and an event-driven serverless pipeline traced end to end. Send them off victorious — and remind them the hard stop brings everyone back for the close.
 -->

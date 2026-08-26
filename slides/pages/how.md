@@ -21,12 +21,12 @@ Five minutes on mechanics, then hands on keyboards. This section is the contract
 | 03 | Data — Postgres + S3 | 30 min |
 | 04 | Self-service — Crossplane v2 | 25 min |
 | 05 | Debug it (with or without AI) | 20 min |
-| — | **Five doors** — door 0 is the marked trail (06–10) | the last 45 |
+| — | **Five doors** — start with door 0: the marked trail (06–10) | the last 45 |
 
 <!--
 THIS TABLE IS THE DAY'S ONLY TIMELINE — every other slide's timebox is derived from it, so if a number moves, move it here first.
 
-Core is 01–05: 135 minutes of guided content, one 10-minute break (after 03), and module 00 running underneath the intro rather than in a slot of its own. There is no second break: the room goes self-paced at the pivot, so coffee is whenever you want it from there. That leaves the last 45 for the finale, which is not a sixth module but a choice of five doors — door 0 being the marked trail: the five door-0 modules 06–10 (serverless, in-cluster CI, the Console, the capstone picture pipeline, day-2 AI ops).
+Core is 01–05: 135 minutes of guided content, one 10-minute break (after 03), and module 00 running underneath the intro rather than in a slot of its own. There is no second break: the room goes self-paced at the pivot, so coffee is whenever you want it from there. That leaves the last 45 for the finale, which is not a sixth module but a choice of five doors. Door 0 is the one to recommend out loud: the marked trail through modules 06–10 in order — serverless, in-cluster CI, the Console, the picture-pipeline capstone, day-2 AI ops — rehearsed, hinted and verified, and written to finish at home.
 
 Expectations management, said out loud: "We planned half of what fits. If you only finish the core, you've built a real platform. The doors are for the final block — and for your couch afterwards; nothing depends on them and everything is public."
 
