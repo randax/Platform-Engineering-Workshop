@@ -63,8 +63,28 @@ if [[ "${REBUILD}" == "true" ]]; then
   step "REBUILD requested — destroying and recreating the whole platform"
   warn "This takes ~10 minutes with pre-pulled images."
   confirm "Destroy cluster '${CLUSTER_NAME}' and rebuild to module ${MODULE}?" || die "Aborted."
+  # The substrate, captured BEFORE the destroy that erases it. destroy-cluster.sh
+  # removes ${CLOUDBOX_SUBSTRATE_FILE} — correctly: it is a record of a cluster
+  # that no longer exists — and the create that follows then re-DETECTS. That is
+  # a different question: an attendee running on docker because `tbx doctor`
+  # failed at the venue would be rebuilt onto tbx by this recovery command, on
+  # the substrate whose doctor is failing, with a mirror filled for the other
+  # architecture. This is the ONE place the answer is knowable, so it is carried
+  # across by hand.
+  REBUILD_SUBSTRATE="$(substrate_current || true)"
+  if [[ "${REBUILD_SUBSTRATE}" == "kind" ]]; then
+    fail "This machine runs the kind lifeboat, which --rebuild cannot rebuild: destroy-cluster.sh and create-cluster.sh both refuse there."
+    warn "Rebuild it with the lifeboat's own two commands, then re-run this without --rebuild:"
+    warn "  ./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh"
+    die "Aborted before destroying anything."
+  fi
   "${SCRIPT_DIR}/destroy-cluster.sh"
-  "${SCRIPT_DIR}/create-cluster.sh"
+  if [[ -n "${REBUILD_SUBSTRATE}" ]]; then
+    info "Recreating on '${REBUILD_SUBSTRATE}' — the substrate this cluster was on (CLOUDBOX_SUBSTRATE=${REBUILD_SUBSTRATE})."
+    CLOUDBOX_SUBSTRATE="${REBUILD_SUBSTRATE}" "${SCRIPT_DIR}/create-cluster.sh"
+  else
+    "${SCRIPT_DIR}/create-cluster.sh"
+  fi
   "${SCRIPT_DIR}/bootstrap-gitops.sh"
   "${SCRIPT_DIR}/seed-gitea.sh"
 fi

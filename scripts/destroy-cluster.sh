@@ -22,7 +22,11 @@ source "${SCRIPT_DIR}/lib.sh"
 PURGE_MIRROR="false"
 [[ "${1:-}" == "--purge-mirror" ]] && PURGE_MIRROR="true"
 
-need talosctl
+# `need talosctl` is NOT here: it moved below the identity refusals. A machine
+# running the kind lifeboat has no reason to have talosctl installed, and
+# asserting it first meant the one thing this script has to say there — "use
+# ./scripts/kind-fallback.sh --delete" — was replaced by an install instruction
+# for a tool that would not have helped.
 
 # DELIBERATELY NOT guarded — the one script in scripts/ that must keep working
 # when kubectl points at the wrong cluster, because that is the state it exists
@@ -52,6 +56,12 @@ need talosctl
 # teardown has no business doing. So: the env override still wins, then the
 # persisted answer, and the floor is docker — the substrate whose leftovers are
 # the ones that can exist without a persisted answer.
+# Before the substrate is decided at all: a record that exists and cannot be
+# read is not a machine with no record (lib.sh, assert_identity_readable). The
+# "assuming docker" fallback below is only safe when there is provably nothing
+# written down; on an unreadable file it would tear down the wrong thing and
+# then delete the file that said what the right thing was.
+assert_identity_readable
 if [[ -n "${CLOUDBOX_SUBSTRATE:-}" ]]; then
   # Assigned, never compared inline: substrate_resolve() validates the override
   # and die()s on a bad value, and only an ASSIGNMENT propagates that exit
@@ -63,6 +73,20 @@ else
   if [[ -n "${SUBSTRATE}" ]]; then
     info "Substrate: ${SUBSTRATE} (from ${CLOUDBOX_SUBSTRATE_FILE})"
   else
+    # …but "assume docker" is only safe where the leftovers CAN be docker's. A
+    # machine whose record was lost while the kind lifeboat is still running has
+    # exactly the containers this branch is about to walk past, plus the
+    # /etc/hosts block it would then remove from a cluster that is up — the same
+    # damage the recorded-kind refusal below prevents, reached by deleting one
+    # file. The containers are the fact; ask Docker directly, since `kind` may
+    # not be installed.
+    if [[ -n "$(kind_container_ids)" ]]; then
+      fail "No substrate is recorded in ${CLOUDBOX_SUBSTRATE_FILE}, but this machine's Docker daemon holds containers labelled io.x-k8s.kind.cluster=${CLUSTER_NAME}."
+      warn "That is the kind lifeboat, which this script cannot tear down: it builds and"
+      warn "destroys substrates, and kind is not one. Assuming 'docker' here would remove"
+      warn "the ${CLOUDBOX_HOSTS_FILE} block of a cluster that is still running."
+      die "Use the lifeboat's own teardown: ./scripts/kind-fallback.sh --delete"
+    fi
     SUBSTRATE="docker"
     warn "No substrate recorded in ${CLOUDBOX_SUBSTRATE_FILE} — assuming docker rather than"
     warn "detecting one, so any leftover Talos-in-Docker containers actually get destroyed."
@@ -88,6 +112,8 @@ require_identity_match "${SUBSTRATE}"
 if [[ "${SUBSTRATE}" == "kind" ]]; then
   die "this machine runs the kind lifeboat — use ./scripts/kind-fallback.sh [--delete]"
 fi
+# Only now: both backends drive talosctl, and neither of the refusals above did.
+need talosctl
 # `need docker` only where the backend actually needs it — a tbx machine has no
 # reason to have the docker CLI. Written as an `if` for readability, not because
 # `[[ … ]] && need docker` would trip `set -e`: it would not. In an AND-list only
@@ -283,4 +309,14 @@ if [[ "${hosts_left}" == "true" ]]; then
   warn "  sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}          # delete the marked block"
   warn "A later ./scripts/create-cluster.sh on docker rewrites the block and is unaffected."
 fi
-ok "Done. Recreate with: ./scripts/create-cluster.sh"
+# The record is gone, and with it the ONLY thing that said which substrate this
+# machine was on. `./scripts/create-cluster.sh` on its own now re-DETECTS, which
+# is a different question with a different answer: an attendee who deliberately
+# ran on docker (a tbx doctor that failed at the venue, an amd64 image they
+# needed) gets tbx back the moment detection likes it, offline, with a mirror
+# filled for the other architecture. So name what was forgotten and the one
+# command that keeps it.
+ok "Done."
+info "This machine no longer records a substrate — it was '${SUBSTRATE}', and ${CLOUDBOX_SUBSTRATE_FILE} is gone."
+info "Recreate on the same one:  CLOUDBOX_SUBSTRATE=${SUBSTRATE} ./scripts/create-cluster.sh"
+info "Or let it decide again:    ./scripts/create-cluster.sh"
