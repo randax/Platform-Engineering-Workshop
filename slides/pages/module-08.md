@@ -3,7 +3,7 @@ layout: section
 transition: view-transition
 ---
 
-<span class="badge">Module 08 · stretch · self-paced + demo</span>
+<span class="badge">Module 08 · door 0 · self-paced + demo</span>
 
 # The Cloudbox Console: a portal you can read
 
@@ -12,6 +12,8 @@ transition: view-transition
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their platform team gets a front door — a console they can read every line of, not a product they log into.</div>
 
 <!--
+Door-0 reference — never presented as a section; the room reaches this through the pivot, and these slides serve door-0 walkers and the published deck.
+
 The portal module — and the second honest-ecosystem interlude of the day (build vs. buy). Everything built so far is APIs and YAML: perfect for platform engineers, invisible to everyone else. A portal is how a platform gets adopted.
 -->
 
@@ -195,7 +197,7 @@ Next slide: we look at Backstage live, so this isn't a straw man.
 
 # Interlude: Backstage, live
 
-<div class="callout mt-2 mb-4">Presenter demo · ~5 min · watch the projector</div>
+<div class="callout mt-2 mb-4">Projector demo · ~5 min · opt-in, inside the door block</div>
 
 - Catalog → template → new Gitea repo
 - → ArgoCD app → running pods
@@ -203,7 +205,7 @@ Next slide: we look at Backstage live, so this isn't a straw man.
 - `backstage.yaml` stays in the catalog — try at home
 
 <!--
-Presenter demo, ~5 minutes, on the projector cluster (backstage.yaml was pre-enabled during the second break — first boot is slow: ~2 GB CNOE image plus a CNPG database, which is precisely why this is a demo and not the hands-on).
+Projector demo, ~5 minutes, announced at the pivot for ~3:35 and opt-in like the module-07 one. backstage.yaml was pre-enabled during the break after module 03 — first boot is slow (~2 GB CNOE image plus a CNPG database), which is precisely why this is a demo and not the hands-on.
 
 The loop to show: guest sign-in at http://backstage.cloudbox.k8s.test → catalog entities fed from Gitea → run a software template → chase the result through Gitea (http://gitea.cloudbox.k8s.test, a new repo appeared) → ArgoCD (http://argocd.cloudbox.k8s.test, a new Application) → pods running.
 

@@ -57,11 +57,15 @@ Welcome! While people trickle in, this slide does the most important job of the 
 - Repo URL is at the bottom — it's public, everything (labs, solutions, slides) lives there, and it will keep working after today.
 - Helpers: point them out, explain the sticky notes briefly (more on that in a few slides).
 
-Timing: keep the cover + "why" section to ~15 minutes total. Hands on keyboards within the first 10 minutes is the goal — module 00 is running in the background for anyone who skipped the prework.
+Timing: ~10 minutes for the cover + "why", then module 00's GO slide puts hands on keyboards at minute 10. The pre-flight runs in the background while the concept sections play; we triage it just before module 01.
 -->
 
 ---
 src: ./pages/why.md
+---
+
+---
+src: ./pages/module-00.md
 ---
 
 ---
@@ -78,10 +82,6 @@ src: ./pages/stack.md
 
 ---
 src: ./pages/how.md
----
-
----
-src: ./pages/module-00.md
 ---
 
 ---

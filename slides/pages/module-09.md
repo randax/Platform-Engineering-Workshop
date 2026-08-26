@@ -3,7 +3,7 @@ layout: section
 transition: view-transition
 ---
 
-<span class="badge">Module 09 · capstone · self-paced finale</span>
+<span class="badge">Module 09 · door 0 · capstone</span>
 
 # The picture pipeline: everything, wired together
 
@@ -12,7 +12,9 @@ transition: view-transition
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their listing-photo pipeline goes live — upload → resize → gallery, event-driven and traced end to end. Their product, running on their cloud.</div>
 
 <!--
-The capstone. It earns the name because it uses everything built today at once: GitOps delivers it (02), RustFS stores it (03), Knative scales it from zero (06), the portal fronts it (08), and observability watches the whole chain. The one new concept is Knative Eventing.
+Door-0 reference — never presented as a section; the room reaches this through the pivot, and these slides serve door-0 walkers and the published deck.
+
+The capstone of door 0. It earns the name because it uses everything built today at once: GitOps delivers it (02), RustFS stores it (03), Knative scales it from zero (06), the portal fronts it (08), and observability watches the whole chain. The one new concept is Knative Eventing.
 -->
 
 ---
@@ -109,5 +111,5 @@ Readiness check before the moment: kubectl -n pipeline get broker,trigger,ksvc a
 
 Then stage the two terminals, upload at portal.cloudbox.k8s.test/gallery, and work through the three proofs from the previous slide. verify.sh seals it.
 
-Anyone finishing this has run the full arc: platform built by git commits, storage and databases self-hosted, a self-service API, a portal, and an event-driven serverless pipeline traced end to end. Send them to the closing section victorious — and remind the room the last 30 minutes are protected tinkering time.
+Anyone finishing this has run the full arc: platform built by git commits, storage and databases self-hosted, a self-service API, a portal, and an event-driven serverless pipeline traced end to end. Send them off victorious — and remind them the hard stop brings everyone back for the close.
 -->

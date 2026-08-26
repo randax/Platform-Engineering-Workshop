@@ -65,7 +65,7 @@ The mental model is the real takeaway: cloud products are software plus an API, 
 <div class="mt-6 text-xl opacity-80">No account. No bill. No permission.</div>
 
 <!--
-The bookend: this is the exact comparison table from the opening "What is a cloud" section — the left column was what you'd rent from a hyperscaler. Now the right column is running on the laptop in front of you, every row green.
+The bookend: the opening's two rent-vs-run tables, folded into one — the left column was what you'd rent from a hyperscaler. Now the right column is running on the laptop in front of you, every row green.
 
 Say it plainly: "Four hours ago this was a shopping list of things you pay for. Now it's a list of things you own." Then bring it home to Bruktby on the next slide.
 -->
@@ -109,7 +109,7 @@ The sentence to land: "The complete outcome of today isn't 'you learned Kubernet
 
 - Everything is public, pinned, Apache-2.0
 - `catch-up.sh <module>` — resume from anywhere
-- Skipped the stretch? It's all still there
+- Didn't finish your door? It's all still there
 - Your adventure briefing keeps going — `adventures/` was written for the couch
 - `git tag javazone-2026` = today, forever
 - Broken prereqs at home? Open an issue
@@ -119,7 +119,7 @@ The platform survives the room — that was the design goal, so make the path ho
 
 - The repo (github.com/randax/Platform-Engineering-Workshop) contains labs, hints, solutions, scripts, and these slides. Apache 2.0: take it, fork it, run your cloud on your terms.
 - catch-up.sh <module> works on a fresh cluster at home exactly like it did here — you can rebuild to any module's end-state in minutes and continue from there. The solutions/ directory holds every canonical end-state.
-- The stretch modules were designed for the couch as much as for the room: Knative, in-cluster CI, the portal source, the capstone. Nothing needs conference infrastructure.
+- The door-0 modules were designed for the couch as much as for the room: Knative, in-cluster CI, the portal source, the capstone, day-2 ops. Nothing needs conference infrastructure.
 - The javazone-2026 tag freezes today's exact versions — in a year, when everything has drifted, the tag still builds.
 - And genuinely: broken prereqs or labs are OUR bug — issues welcome.
 -->

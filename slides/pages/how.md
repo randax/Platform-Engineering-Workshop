@@ -11,24 +11,26 @@ Five minutes on mechanics, then hands on keyboards. This section is the contract
 
 ---
 
-# The map: 10 modules, 2 tiers
+# The map: one core path, then five doors
 
 | # | Module | Time |
 |---|--------|------|
-| 00 | Setup & pre-flight | 10 min |
-| 01 | Talos + Cilium — your own cloud | 35 min |
-| 02 | GitOps — Gitea + ArgoCD | 35 min |
-| 03 | Data — Postgres + S3 | 35 min |
-| 04 | Self-service — Crossplane v2 | 35 min |
+| 00 | Setup & pre-flight | running now, in the background |
+| 01 | Talos + Cilium — your own cloud | 30 min |
+| 02 | GitOps — Gitea + ArgoCD | 30 min |
+| 03 | Data — Postgres + S3 | 30 min |
+| 04 | Self-service — Crossplane v2 | 25 min |
 | 05 | Debug it (with or without AI) | 20 min |
-| 06–09 | Serverless · CI · Portal · Capstone | stretch |
+| — | **Five doors** — door 0 is the marked trail (06–10) | the last 45 |
 
 <!--
-Core is 00–05: 170 minutes of guided content. Add a ~20-minute intro and two 10-minute breaks and that's 210 of our 240 — the last 30 are yours. 06–09 are stretch: serverless (Knative), in-cluster CI (Argo Workflows + BuildKit + Zot), the Cloudbox Console portal, and the capstone picture pipeline that wires everything together.
+THIS TABLE IS THE DAY'S ONLY TIMELINE — every other slide's timebox is derived from it, so if a number moves, move it here first.
 
-Expectations management, said out loud: "We planned half of what fits. If you only finish the core, you've built a real platform. The stretch modules are for the fast 20% — and for your couch afterwards; nothing later depends on them and everything is public."
+Core is 01–05: 135 minutes of guided content, one 10-minute break (after 03), and module 00 running underneath the intro rather than in a slot of its own. There is no second break: the room goes self-paced at the pivot, so coffee is whenever you want it from there. That leaves the last 45 for the finale, which is not a sixth module but a choice of five doors — door 0 being the marked trail: the five door-0 modules 06–10 (serverless, in-cluster CI, the Console, the capstone picture pipeline, day-2 AI ops).
 
-Two 10-minute breaks: after module 03 and after module 05. The math is deliberately tight — 210 minutes of guided time — so the final 30 do double duty: buffer if we ran long, and protected open tinkering and weird questions if we didn't. The stretch modules live in that window and on your couch.
+Expectations management, said out loud: "We planned half of what fits. If you only finish the core, you've built a real platform. The doors are for the final block — and for your couch afterwards; nothing depends on them and everything is public."
+
+Every timebox here is a soft target — we walk the solution when the timer ends regardless, and catch-up.sh absorbs the rest. The door block is deliberately the day's buffer: it grows if we run fast and shrinks if we don't. The close never moves — hard stop 10 minutes before the end, and we finish together.
 -->
 
 ---
@@ -118,5 +120,5 @@ Two honest caveats to mention: it's a hint, not a judge — verify.sh in each la
 
 We'll keep it on the projector between modules as the room's shared progress board. It's also a nice teaser: the page itself is ~100 lines of Go reading the Kubernetes API — you'll read its source in module 08.
 
-Now — let's make sure everyone's laptop is ready. Module 00.
+Your pre-flight has been running since minute 10 — triage check now, then module 01.
 -->

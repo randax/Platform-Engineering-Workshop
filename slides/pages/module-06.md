@@ -3,7 +3,7 @@ layout: section
 transition: view-transition
 ---
 
-<span class="badge">Module 06 · stretch · self-paced</span>
+<span class="badge">Module 06 · door 0 · self-paced</span>
 
 # Serverless: scale from zero, on your hardware
 
@@ -11,7 +11,9 @@ transition: view-transition
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their thumbnailer scales to zero — nothing running, nothing to pay, between uploads. Lambda's trick, on hardware they own.</div>
 
 <!--
-First stretch module. From here on the room is self-paced: give the 3-minute framing, show the GO slide, and let people choose their path. Helpers keep roaming.
+Door-0 reference — never presented as a section; the room reaches this through the pivot, and these slides serve door-0 walkers and the published deck.
+
+First stop on the marked trail: framing, GO slide, then self-paced. Helpers keep roaming.
 -->
 
 ---

@@ -80,7 +80,7 @@ Now the punchline that sets up the table: Kubernetes is a control plane. Operato
 
 <div class="story mt-3"><span class="tag">BRUKTBY</span> &nbsp;The left column is everything Bruktby rented. The right column is what you'll run for them today — same primitive, minus the bill and the account.</div>
 
-<div class="mt-3 text-sm opacity-70">Modules 01–05 — the core. One row each.</div>
+<div class="mt-3 text-sm opacity-70">Modules 01–05 — the core. Top to bottom, in order.</div>
 
 <!--
 Don't read the table aloud row by row — let them scan it, then make three points:
@@ -105,21 +105,23 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 <tr><td>CI / image builds</td><td>CodeBuild · Cloud Build</td><td><Logo name="argo-workflows" label="Argo Workflows"/> <Logo name="buildkit" label/></td></tr>
 <tr><td>Container registry</td><td>ECR · Artifact Registry · ACR</td><td><Logo name="zot" label/></td></tr>
 <tr><td>Cloud console</td><td><Logo name="aws" dim/> <Logo name="azure" dim/> <Logo name="gcp" dim/></td><td><Logo name="cloudbox" label/></td></tr>
+<tr><td>Day-2 AI ops</td><td>DevOps Guru · Copilot for Azure</td><td><Logo name="kagent" text="kagent"/></td></tr>
 </tbody>
 </table>
 </div>
 
-<div class="mt-4 text-sm opacity-70">The stretch tier — same idea, all the way up the stack.</div>
+<div class="mt-4 text-sm opacity-70">Door 0, the marked trail — same idea, all the way up the stack.</div>
 
 <!--
-The stretch tier, framed as "the cloud doesn't stop at databases":
+Door 0 — the marked trail — framed as "the cloud doesn't stop at databases":
 
 - Serverless: scale-to-zero request-driven containers. Knative is the open engine underneath a lot of what you'd recognize — it's literally what Google Cloud Run is built on.
 - Messaging: durable queues and streams — what makes async reliable. NATS JetStream is the lightweight open answer (≈ SQS/SNS/EventBridge/Pub-Sub): it's the durable counterpart to module 09's in-memory broker, and the queue the golden-path Application XR requests with `spec.queue`.
 - CI + registry: the build-and-ship half of a cloud. You'll build a container INSIDE your cluster with Argo Workflows + BuildKit and push it to your own Zot registry — no Docker Hub, no cloud build minutes.
 - Console: even the web console is just software reading an API. The Cloudbox Console is ~6k lines of Go over the Kubernetes API — and you'll read its source in module 08 (the Workshop page you've been watching all day is ~100 of them).
+- Day-2 AI ops: the row people assume is a product. It's a CRD — kagent reconciles an Agent into a Deployment (module 10), with read-only eyes while git keeps the hands.
 
-Say the tiering honestly: "Core is 00–05 and it's a complete cloud on its own. Everything on this second table is for the fast 20% and for your couch tonight — it's all public and nothing later depends on it."
+Say the tiering honestly: "Core is 00–05 and it's a complete cloud on its own. Everything on this second table is door 0 in the final block — and your couch tonight; it's all public and nothing depends on it."
 -->
 
 ---
@@ -196,7 +198,7 @@ The map of the whole day — the comparison table you just showed, now as one ru
 2. Talos Linux v1.13 nodes run as containers — an immutable, API-only OS purpose-built for Kubernetes (module 01). Cilium does networking in eBPF; there is no kube-proxy in this cluster at all.
 3. Gitea + ArgoCD are the heart (module 02): the git server lives IN the cluster, and ArgoCD delivers everything below it from that git repo. Nothing depends on GitHub or the venue WiFi.
 4. The platform services: CloudNativePG for managed Postgres, RustFS for S3-compatible object storage (module 03), Crossplane v2 for the self-service API (module 04).
-5. The stretch tier: Knative serverless (06), in-cluster CI with BuildKit and the Zot registry (07), the Cloudbox Console portal (08), and observability — the Victoria stack (VictoriaMetrics/Logs/Traces + Grafana) plus the OTel Collector — enabled on-demand as the module 09 capstone, not running from minute one.
+5. Door 0, the marked trail: Knative serverless (06), in-cluster CI with BuildKit and the Zot registry (07), the Cloudbox Console portal (08), the capstone pipeline with observability — the Victoria stack (VictoriaMetrics/Logs/Traces + Grafana) plus the OTel Collector — enabled on-demand rather than running from minute one (09), and day-2 AI ops (10).
 
 Key sentence to land before moving on: "Everything below ArgoCD arrives as a git commit. That's the mechanic you'll use all day."
 

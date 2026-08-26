@@ -152,6 +152,7 @@ Knative: Kourier ingress (not Gateway API — not in Cilium's conformance matrix
 <tbody>
 <tr><td>Durable messaging</td><td><span class="we"><Logo name="nats" size="1.3rem"/> <b>NATS 2.14 + JetStream</b></span></td><td>Kafka · RabbitMQ</td><td>The durable primitive in ~15 MB of Go vs. GBs of JVM/Erlang</td></tr>
 <tr><td>Observability</td><td><span class="we"><Logo name="victoriametrics" size="1.3rem"/> <Logo name="grafana" size="1.3rem"/> <Logo name="opentelemetry" size="1.3rem"/> <b>Victoria stack + OTel</b></span></td><td>kube-prometheus-stack · otel-lgtm · LGTM</td><td>Assembled from parts — but ~1 GiB, not several, and it fits</td></tr>
+<tr><td>Day-2 AI agent</td><td><span class="we"><Logo name="kagent" text="kagent" size="1.3rem"/> <b>0.9.12 + qwen3:1.7b</b></span></td><td>hosted AIOps · k8sgpt</td><td>An Agent is a CRD — but the model runs host-side, and it only ever gets read-only eyes</td></tr>
 </tbody>
 </table>
 
@@ -166,7 +167,7 @@ Observability is the sharpest tradeoff on this slide. OTel Collector (agent Daem
 
 VM's columnar TSDB + vmrange histograms hold it to ~1 GiB where kube-prometheus-stack or full LGTM want several. And unlike single-pod otel-lgtm, there's a REAL collector — so more than three apps actually emit telemetry.
 
-Pins: NATS 2.14.5; VictoriaMetrics 1.150.0, VictoriaLogs 1.52.0, VictoriaTraces 0.10.0, Grafana 13.1.3, OTel Collector contrib 0.158.0. Observability is on-demand — enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
+Pins: NATS 2.14.5; VictoriaMetrics 1.150.0, VictoriaLogs 1.52.0, VictoriaTraces 0.10.0, Grafana 13.1.3, OTel Collector contrib 0.158.0; kagent 0.9.12 with qwen3:1.7b on host-side Ollama — never in-cluster, so it can't compete with the cluster for memory (module 10). Observability is on-demand — enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
 
 The four things we rejected, precisely: kube-prometheus-stack (heavy, and no traces at all); single-pod otel-lgtm (no real Collector — only the three instrumented apps push anything, which is the gap #57 closed); full Grafana LGTM = Loki+Tempo+Mimir (GBs); and the OTel Demo (~6 GB). "Assembled, not a blob" is the honest description: OTel Collector contrib for filelog/kubeletstats/k8s_cluster receivers, three Victoria single-node stores, Grafana wiring them as native MetricsQL/LogsQL plugins plus the built-in Jaeger type — every piece readable, and the whole thing an on-demand ~1 GiB.
 -->
