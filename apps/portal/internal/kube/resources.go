@@ -208,7 +208,8 @@ func wdbPath(ns string) string {
 type WorkshopDB struct {
 	Metadata ObjMeta `json:"metadata"`
 	Spec     struct {
-		Size string `json:"size"`
+		Size    string `json:"size"`
+		Version string `json:"version"`
 	} `json:"spec"`
 	Status struct {
 		Conditions []Condition `json:"conditions"`
