@@ -67,26 +67,29 @@ need crane
 #            for arm64 VMs, and the venue is where you would find out.
 # Nothing may be hard-coded (CI runs amd64, most laptops in the room are arm64).
 #
-# Asked through mirror_target_substrate/mirror_target_arch (lib.sh), which gate
-# on the tbx BINARY rather than on `tbx doctor` — the same bet the Talos-disk
-# warm at the bottom of this script makes, and the same one install.sh --check
-# grades the mirror by. See that helper for the amd64-Colima-on-arm64-Mac case
-# it exists for; this used to ask substrate_resolve(), so a doctor that failed
-# at home filled the mirror for the wrong architecture entirely.
+# Asked through mirror_target_substrate/mirror_target_arch (lib.sh), which now
+# follow THE DECISION — substrate_resolve(), `tbx doctor` included — and not the
+# mere presence of the tbx binary. See that helper for why the bet on the binary
+# lost: it filled (and graded) the mirror for VMs on machines that went on to
+# create docker containers. The resolved answer is passed in, so neither helper
+# re-runs doctor in a subshell.
 substrate_resolve_into INIT_SUBSTRATE
-MIRROR_TARGET="$(mirror_target_substrate)"
-node_arch="$(mirror_target_arch)" \
+MIRROR_TARGET="$(mirror_target_substrate "${INIT_SUBSTRATE}")"
+node_arch="$(mirror_target_arch "${INIT_SUBSTRATE}")" \
   || die "Could not determine the architecture your ${MIRROR_TARGET} nodes will run (docker reports '$(docker version -f '{{.Server.Arch}}' 2>/dev/null)', uname -m says '$(uname -m)') — the workshop needs amd64 or arm64."
 NODE_PLATFORM="linux/${node_arch}"
-info "Cluster nodes will run ${NODE_PLATFORM} (mirroring for: ${MIRROR_TARGET}; detected substrate: ${INIT_SUBSTRATE})"
-# The one case where mirroring for tbx can be wrong: tbx is installed, this
-# machine's CPU and its Docker daemon disagree, and the attendee ends up on the
-# docker substrate after all. Say so, with the one command that redoes it.
+info "Cluster nodes will run ${NODE_PLATFORM} (mirroring for the substrate this machine will create on: ${MIRROR_TARGET})"
+# The pair that looks wrong and is not: on tbx the mirror is filled for the VMs'
+# architecture while the Docker daemon hosting the mirror container is another
+# one (an amd64 Colima VM on an Apple Silicon Mac). Worth naming, because it is
+# also the shape a genuinely wrong mirror has — and because CHANGING substrate
+# from here means refilling it.
 if [[ "${MIRROR_TARGET}" == "tbx" ]] && daemon_arch="$(docker_server_arch)" \
    && [[ "${daemon_arch}" != "${node_arch}" ]]; then
   warn "Your Docker daemon is ${daemon_arch} while this CPU is ${node_arch}; the mirror is being"
-  warn "filled for the tbx VMs (${node_arch}). If you end up creating on the docker substrate,"
-  warn "re-run this first: CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh"
+  warn "filled for the tbx VMs (${node_arch}), which is correct — the mirror is a container on"
+  warn "that daemon, the nodes are not. If you switch to the docker substrate, refill it first:"
+  warn "  CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh"
 fi
 
 IMAGES_FILE="${SCRIPT_DIR}/images.txt"
@@ -364,19 +367,21 @@ fi
 # Note this is IN ADDITION to everything above: a tbx attendee still needs Docker
 # running for prework, because the crane mirror the VMs pull from is itself a
 # Docker container. tbx replaces the NODES, not the mirror.
-# Gated on the BINARY, not on substrate_resolve()'s answer. Those differ in the
-# case that matters: `tbx doctor` fails at home (the helper is not installed
-# yet, the resolver is not wired up, a laptop is on battery-saver) so detection
-# says "docker", the warm is skipped — and then the attendee fixes tbx before
-# the venue, `tbx doctor` passes there, create-cluster.sh picks tbx, and the
-# create goes to the Image Factory over conference WiFi for a 95-204 MB disk
-# image. Prework is cheap and idempotent; a Factory download at the venue is
-# the thing principle 2 exists to prevent. So: warm it whenever tbx exists,
-# unless the attendee has explicitly said they are on docker.
+# Gated on the DECISION (${SUBSTRATE}, i.e. substrate_resolve()), not on the tbx
+# binary — the same rule the mirror above is filled by, which is the point: one
+# question, one answer, and prework that matches the create.
 #
-# CLOUDBOX_SUBSTRATE (the explicit override), not SUBSTRATE (which is also
-# "docker" whenever detection merely failed) — that distinction is the whole
-# point of this gate.
+# It used to be gated on the binary, on the bet that a machine with tbx
+# installed is heading towards tbx even while `tbx doctor` fails today. That bet
+# also filled the MIRROR for the tbx VMs, and when the attendee then created on
+# docker (which is what a failing doctor makes create-cluster.sh do) every
+# mirrored image was the wrong architecture — offline, at the venue. The two
+# have to move together, so they do.
+#
+# The cost is real and named in the summary below: a laptop whose tbx is not
+# healthy yet does NOT get the 95-204 MB Talos disk warmed. Fixing tbx and
+# re-running this script is the answer, and so is naming it once:
+#   CLOUDBOX_SUBSTRATE=tbx ./scripts/cloudbox-init.sh
 if [[ "${SUBSTRATE}" == "kind" ]]; then
   # The lifeboat, first — and keyed on the RESOLVED identity, not on the
   # override, because `kind` is never an override in practice: it is written
@@ -388,16 +393,30 @@ if [[ "${SUBSTRATE}" == "kind" ]]; then
   # were this attendee's problem.
   info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=kind (the lifeboat runs on Docker — no Talos disk image needed)"
   info "Next: ./scripts/kind-fallback.sh   # this machine records the kind lifeboat"
-elif [[ "${CLOUDBOX_SUBSTRATE:-}" == "docker" ]]; then
-  info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=docker (CLOUDBOX_SUBSTRATE=docker — no Talos disk image needed)"
-elif ! have tbx; then
-  if [[ "${SUBSTRATE}" == "tbx" ]]; then
-    # Reachable via a persisted 'tbx' answer, or CLOUDBOX_SUBSTRATE=tbx, on a
-    # machine without the binary: detection itself requires `tbx doctor` first.
-    warn "substrate is 'tbx' but the tbx binary is not installed — cannot pre-pull"
-    warn "the Talos disk image. Install tbx (see ./scripts/dev-setup.sh) and re-run."
+elif [[ "${SUBSTRATE}" != "tbx" ]]; then
+  # The docker substrate — whichever way it was arrived at. The REASON is the
+  # part worth printing: "no Talos disk image needed" is only obviously right
+  # for the first two, and the third is the one an attendee can still change
+  # before the venue.
+  if [[ "${CLOUDBOX_SUBSTRATE:-}" == "docker" ]]; then
+    info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=docker (CLOUDBOX_SUBSTRATE=docker — no Talos disk image needed)"
+  elif ! have tbx; then
+    info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=docker (tbx not installed — no Talos disk image needed)"
+  else
+    warn "tbx is installed but this machine resolves to the DOCKER substrate: $(substrate_doctor_reason)"
+    warn "So the mirror above was filled for your Docker daemon (${NODE_PLATFORM}) and the Talos"
+    warn "disk image was NOT downloaded — both would be wrong for VMs you are not going to create."
+    warn "If you fix tbx before the venue, re-run this script: it will refill the mirror for the"
+    warn "VMs and cache the disk image. To prepare for tbx right now, whatever doctor says:"
+    warn "  CLOUDBOX_SUBSTRATE=tbx ./scripts/cloudbox-init.sh"
+    info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=docker (tbx doctor is not passing — no Talos disk image cached)"
   fi
-  info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=docker (tbx not installed — no Talos disk image needed)"
+elif ! have tbx; then
+  # Reachable via a persisted 'tbx' answer, or CLOUDBOX_SUBSTRATE=tbx, on a
+  # machine without the binary: detection itself requires `tbx doctor` first.
+  warn "substrate is 'tbx' but the tbx binary is not installed — cannot pre-pull"
+  warn "the Talos disk image. Install tbx (see ./scripts/dev-setup.sh) and re-run."
+  info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=tbx (binary missing — no Talos disk image cached)"
 else
   step "Pre-pulling the Talos ${TALOS_VERSION} disk image for tbx"
   if tbx cache pull --talos-version "${TALOS_VERSION}"; then

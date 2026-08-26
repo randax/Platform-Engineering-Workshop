@@ -73,6 +73,11 @@ case "${1:-}" in
   --write-hosts)
     shift
     [[ $# -eq 0 ]] || { usage; die "--write-hosts takes no arguments (to add a name: --add-hosts <name>)"; }
+    # A mutating mode, so the record has to be readable before the decision is
+    # even made (lib.sh, assert_identity_readable) — a tbx machine whose record
+    # cannot be read must not have the 127.0.0.1 block written over its
+    # resolver because the file looked absent.
+    assert_identity_readable
     # Assigned, never compared inline (lib.sh's substrate_resolve): an invalid
     # CLOUDBOX_SUBSTRATE makes it fail, and inside `[[ "$(…)" != docker ]]` that
     # failure is invisible — the empty string is simply "not docker", so the
@@ -108,6 +113,9 @@ case "${1:-}" in
   --add-hosts)
     shift
     [[ $# -gt 0 ]] || { usage; die "--add-hosts needs at least one name, e.g. --add-hosts my-app-demo"; }
+    # Same first question as --write-hosts, for the same reason: this ends in
+    # the same privileged rewrite of the same block.
+    assert_identity_readable
     add_substrate="$(substrate_resolve)"
     # docker OR kind, for the same reason --write-hosts accepts both: /etc/hosts
     # has no wildcards on either, and module 08's Knative names are exactly as
@@ -566,22 +574,26 @@ fi
 step "Pre-pulled images (populated by ./scripts/cloudbox-init.sh)"
 
 if [[ "${SUBSTRATE}" == "tbx" ]]; then
-  # The raw disk image every VM boots from. Nested by schematic/version/arch
-  # (upstream docs/SPEC.md:110-113), so match on the version DIRECTORY rather
-  # than guessing the schematic id — ours is talos-box's own default — but
-  # assert the FILE inside it: Cache.Ensure MkdirAll's that directory before it
-  # downloads anything (upstream internal/imagecache/cache.go:163-168), so an
-  # interrupted `tbx cache pull` leaves the directory there with no disk.raw
-  # (upstream calls that state Entry.Incomplete, cache.go:63-67) and a
-  # directory-only check would call it cached. disk.raw is published by
-  # temp-file-plus-rename (cache.go:393-417), so its presence means complete.
-  # The *disk.raw glob also covers the legacy <version>/disk.raw layout.
-  # Checked BEFORE the docker gate below: it is a plain filesystem lookup, and
-  # on tbx the answer still matters on a laptop whose Docker is not up.
-  if find "${HOME}/.talosbox/cache" -type f -path "*/${TALOS_VERSION}/*disk.raw" -size +0c 2>/dev/null | grep -q .; then
-    ok "Talos ${TALOS_VERSION} disk image is cached for tbx"
+  # The raw disk image every VM boots from — asked of tbx itself where it can be
+  # (`tbx cache list -o json`), and of the cache layout when it cannot
+  # (tbx_cache_has_disk in lib.sh, which documents both).
+  #
+  # The ARCHITECTURE is half the question and used to be missing entirely: the
+  # check globbed the version directory, and the cache is keyed
+  # schematic/version/arch — so a disk pulled while the mirror was being filled
+  # for the other architecture (an amd64 Colima daemon on an arm64 Mac) reported
+  # "cached" for VMs that cannot execute it. The VMs are natively virtualised, so
+  # their arch is the HOST CPU's: node_arch tbx / host_cpu_arch, which sees
+  # through a Rosetta shell where uname -m does not.
+  # Checked BEFORE the docker gate below: neither source needs the Docker daemon,
+  # and on tbx the answer still matters on a laptop whose Docker is not up.
+  tbx_disk_arch="$(node_arch tbx 2>/dev/null || true)"
+  if [[ -z "${tbx_disk_arch}" ]]; then
+    check_fail "could not determine this host's CPU architecture, so the cached Talos ${TALOS_VERSION} disk image cannot be checked against it (uname -m says '$(uname -m)')"
+  elif tbx_cache_has_disk "${TALOS_VERSION}" "${tbx_disk_arch}"; then
+    ok "Talos ${TALOS_VERSION} ${tbx_disk_arch} disk image is cached for tbx (${TBX_CACHE_SOURCE})"
   else
-    check_fail "no complete Talos ${TALOS_VERSION} disk.raw in ~/.talosbox/cache (an interrupted pull leaves the version directory behind, empty) — run ./scripts/cloudbox-init.sh (needs the Image Factory, so do it at home)"
+    check_fail "no complete Talos ${TALOS_VERSION} disk image for ${tbx_disk_arch} — your tbx VMs are ${tbx_disk_arch} and nothing usable is cached for them (checked via ${TBX_CACHE_SOURCE}; an interrupted pull leaves the version directory behind, empty). Run ./scripts/cloudbox-init.sh (needs the Image Factory, so do it at home)"
   fi
   # What the container-image checks below can and cannot say on tbx: the crane
   # mirror is a Docker container either way, so its content is verified the same
@@ -598,24 +610,26 @@ else
   section=""
   host_missing=0; mirror_missing=0; host_total=0; mirror_total=0
   mirror_arch_bad=0
-  # The arch the mirror was FILLED for — mirror_target_arch (lib.sh), the same
-  # helper cloudbox-init.sh decides with, and deliberately not `node_arch
-  # "${SUBSTRATE}"`. Those two disagree on the machine that has tbx installed
-  # and failing `tbx doctor` today: prework warms for the tbx VMs (the substrate
-  # the attendee is heading towards), SUBSTRATE resolves to docker, and grading
-  # arm64 mirror content against an amd64 daemon turned a correctly warmed
-  # laptop red with "re-run cloudbox-init.sh" — advice that would have made it
-  # worse. Empty on failure: the arch checks then pass open rather than guess.
-  mirror_arch="$(mirror_target_arch || true)"
-  mirror_for="$(mirror_target_substrate)"
-  # An amd64 Colima/Lima VM on an arm64 Mac with tbx installed is the case that
-  # made this worth saying out loud: the mirror is arm64 (the VMs' arch) and the
-  # Docker daemon next to it is amd64. Nothing is broken — but creating on the
-  # docker substrate then needs the mirror rebuilt, and the attendee should hear
-  # that from the preflight rather than from a crashloop.
+  # The arch the mirror MUST hold: the one the nodes of the substrate this
+  # machine will actually create on will run — `node_arch "${SUBSTRATE}"`, with
+  # SUBSTRATE the already-resolved decision (no second `tbx doctor`).
+  #
+  # This used to be mirror_target_arch(), which keyed on the tbx BINARY, so a
+  # laptop with tbx installed and a failing doctor had its mirror filled for
+  # arm64 VMs and GRADED against arm64 VMs — while create-cluster.sh built
+  # docker containers on an amd64 daemon and every pulled image was the wrong
+  # architecture. Filling and grading now follow the same decision the create
+  # follows (lib.sh, mirror_target_substrate), so the two cannot disagree.
+  # Empty on failure: the arch checks then pass open rather than guess.
+  mirror_arch="$(node_arch "${SUBSTRATE}" || true)"
+  mirror_for="${SUBSTRATE}"
+  # An amd64 Colima/Lima VM on an arm64 Mac is the case that made this worth
+  # saying out loud: on tbx the mirror is arm64 (the VMs' arch) and the Docker
+  # daemon next to it is amd64. Nothing is broken — the mirror is a container on
+  # that daemon serving images to VMs — but it is a surprising pair to see.
   daemon_arch="$(docker_server_arch || true)"
   if [[ -n "${mirror_arch}" && -n "${daemon_arch}" && "${mirror_arch}" != "${daemon_arch}" ]]; then
-    warn "The mirror serves ${mirror_arch} — the arch your ${mirror_for} nodes run — while this machine's Docker daemon is ${daemon_arch}. That is correct for ${mirror_for}; if you create on the other substrate, re-run ./scripts/cloudbox-init.sh so the mirror is rebuilt for it."
+    warn "The mirror serves ${mirror_arch} — the arch your ${mirror_for} nodes run — while this machine's Docker daemon is ${daemon_arch}. That is correct for ${mirror_for} (the mirror is a container on that daemon; the nodes are not). Change substrate and the mirror must be rebuilt: CLOUDBOX_SUBSTRATE=<the other one> ./scripts/cloudbox-init.sh"
   fi
 
   # Is the mirror registry up at all?
