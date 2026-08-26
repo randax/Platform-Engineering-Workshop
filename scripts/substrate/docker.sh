@@ -30,7 +30,7 @@ substrate_preflight() {
   # a Talos cluster on top of a running lifeboat: same name, same host ports,
   # same /etc/hosts block, two clusters. `-aq` for the same reason as above —
   # stopped kind nodes still own the ports and the name.
-  if [[ -n "$(docker ps -aq --filter "label=io.x-k8s.kind.cluster=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
+  if [[ -n "$(kind_container_ids)" ]]; then
     fail "A kind lifeboat cluster '${CLUSTER_NAME}' exists on this Docker daemon (running or stopped)."
     warn "It holds the same name, the same host ports and the same ${CLOUDBOX_HOSTS_FILE} block."
     die "Tear it down first: ./scripts/kind-fallback.sh --delete"

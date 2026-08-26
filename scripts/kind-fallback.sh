@@ -37,9 +37,11 @@
 # No state file (a machine that took the lifeboat before this existed)? Say so
 # for the session: CLOUDBOX_SUBSTRATE=kind ./scripts/install.sh --check
 # The same override works for `--delete`, but there it is honoured only against
-# PROOF — kind must list the cluster, or the marked /etc/hosts block must be
-# present. An environment variable is a claim, and this script will not delete
-# an /etc/hosts block it cannot show is its own.
+# KIND-SPECIFIC proof — kind must list the cluster, or Docker must still hold
+# containers labelled io.x-k8s.kind.cluster=<name>. The /etc/hosts block is not
+# proof: the docker substrate writes the identical block. An environment
+# variable is a claim, and this script will not delete an /etc/hosts block it
+# cannot show is its own.
 # =============================================================================
 set -euo pipefail
 
@@ -61,53 +63,98 @@ case "${1:-}" in
   *) die "Unknown argument: ${1} (see --help)" ;;
 esac
 
-need kind
-need kubectl
-
 # --delete FIRST: it needs neither helm nor a reachable cluster, and it is the
-# command someone reaches for when the create left a mess.
+# command someone reaches for when the create left a mess. It also needs neither
+# `kind` nor `kubectl` — those are asserted on the CREATE path below. --delete
+# asks DOCKER for the node containers (kind_container_ids in lib.sh), which is
+# the fact; the CLI is only the tool that removes them, and an attendee who
+# uninstalled kind still has an /etc/hosts block and an identity record to clean
+# up. Requiring the binary here made the one recovery command refuse to start on
+# the machines that most needed it.
 if [[ "${DELETE}" == "true" ]]; then
+  # Every question below — does the cluster exist, are its containers gone, is
+  # the override provable — is asked of the Docker daemon. With the daemon down
+  # all of them answer "no", and this script would then report a deleted cluster,
+  # remove the /etc/hosts block of a lifeboat that is merely stopped, and clear
+  # the identity that says whose block it was. Same refusal, same wording as
+  # substrate/docker.sh, before any of that.
+  need docker
+  docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
+  # A record that exists and cannot be read is not an absent record (lib.sh) —
+  # and "absent" is exactly what sends this arm down the CLOUDBOX_SUBSTRATE
+  # branch below and leaves an unowned block behind.
+  assert_identity_readable
   # Read the identity BEFORE deleting anything: it decides whether the
   # /etc/hosts block is ours to remove.
   identity="$(substrate_current || true)"
   # No record at all, but the session was told CLOUDBOX_SUBSTRATE=kind — the
   # documented "lost state" recipe. An override is a claim, not a record, so it
-  # is honoured only against PROOF that a lifeboat is what this machine has:
-  # kind itself lists the cluster, or the marked ${CLOUDBOX_HOSTS_FILE} block is
-  # sitting there. Without either, taking the claim at face value would remove a
-  # /etc/hosts block on the say-so of an environment variable — the same
-  # unowned-block deletion this branch was built to stop. Asked BEFORE the
-  # delete below, because `kind get clusters` is one of the two proofs.
+  # is honoured only against PROOF that a lifeboat is what this machine has, and
+  # the proof must be KIND-SPECIFIC: kind lists the cluster, or Docker holds
+  # containers labelled io.x-k8s.kind.cluster=${CLUSTER_NAME}. The marked
+  # /etc/hosts block is NOT proof — the docker substrate writes the identical
+  # block, so a machine whose Talos cluster is up and whose identity record was
+  # lost would have had its live block deleted by an environment variable, which
+  # is the exact failure this branch exists to prevent. Asked BEFORE the delete
+  # below, because both proofs are about to be destroyed by it.
   if [[ -z "${identity}" && "${CLOUDBOX_SUBSTRATE:-}" == "kind" ]]; then
     kind_proof=""
     if kind_cluster_exists; then
       kind_proof="kind lists a '${CLUSTER_NAME}' cluster"
-    elif [[ -n "$(hosts_marked_block)" ]]; then
-      kind_proof="the marked CloudBox block is in ${CLOUDBOX_HOSTS_FILE}"
+    elif [[ -n "$(kind_container_ids)" ]]; then
+      kind_proof="Docker holds containers labelled io.x-k8s.kind.cluster=${CLUSTER_NAME}"
     fi
     if [[ -n "${kind_proof}" ]]; then
       identity="kind"
       info "No identity recorded, but CLOUDBOX_SUBSTRATE=kind and ${kind_proof} — treating this as the lifeboat."
+      # Written down NOW, while the proof is still standing. Everything below
+      # can stop half-way (a declined sudo is the ordinary case), and a retry
+      # then re-asks for the proof that this run has just deleted — so without
+      # this the second `--delete` falls into the "no identity recorded" arm and
+      # leaves the block forever. Recording it also means the retry needs no
+      # environment variable at all.
+      substrate_persist kind
+      info "Recorded 'kind' in ${CLOUDBOX_SUBSTRATE_FILE} so a retry needs no CLOUDBOX_SUBSTRATE."
     else
       warn "CLOUDBOX_SUBSTRATE=kind, but nothing on this machine proves it: kind lists no"
-      warn "'${CLUSTER_NAME}' cluster and there is no marked block in ${CLOUDBOX_HOSTS_FILE}."
+      warn "'${CLUSTER_NAME}' cluster and Docker holds no containers labelled"
+      warn "io.x-k8s.kind.cluster=${CLUSTER_NAME}."
       warn "The override is not taken as ownership — nothing here will be removed."
+      warn "(The ${CLOUDBOX_HOSTS_FILE} block is deliberately not evidence: the docker"
+      warn "substrate writes the identical block, and it may belong to a live cluster.)"
     fi
   fi
   step "Deleting the kind fallback cluster '${CLUSTER_NAME}'"
   # Whether the cluster is GONE when this is over, which is half of what clearing
   # the identity requires below. A delete that fails leaves a cluster whose only
   # cleanup command needs the identity to know the block is its own.
+  #
+  # "Gone" is proven against DOCKER, not against `kind get clusters`: the
+  # containers are the thing that holds the ports, the name and the cluster, and
+  # they are askable without the kind CLI. That is what lets this arm run at all
+  # on a machine where kind was uninstalled after the lifeboat was created.
   cluster_gone="false"
-  if kind_cluster_exists; then
-    if kind delete cluster --name "${CLUSTER_NAME}"; then
-      ok "kind cluster '${CLUSTER_NAME}' deleted"
-      cluster_gone="true"
+  if kind_cluster_exists || [[ -n "$(kind_container_ids)" ]]; then
+    if ! have kind; then
+      fail "A kind lifeboat '${CLUSTER_NAME}' is on this machine (containers labelled io.x-k8s.kind.cluster=${CLUSTER_NAME}), but the 'kind' binary is not on PATH."
+      warn "Nothing else here can remove those containers safely — kind owns the network,"
+      warn "the kubeconfig context and the node labels."
+      warn "Reinstall kind (./scripts/dev-setup.sh pins it) and re-run: ./scripts/kind-fallback.sh --delete"
+    elif kind delete cluster --name "${CLUSTER_NAME}"; then
+      # `kind delete cluster` exits 0 whether or not it found anything, so the
+      # containers are asked again rather than trusted.
+      if [[ -z "$(kind_container_ids)" ]]; then
+        ok "kind cluster '${CLUSTER_NAME}' deleted"
+        cluster_gone="true"
+      else
+        fail "'kind delete cluster --name ${CLUSTER_NAME}' reported success, but containers labelled io.x-k8s.kind.cluster=${CLUSTER_NAME} are still here."
+        warn "Inspect them: docker ps -a --filter label=io.x-k8s.kind.cluster=${CLUSTER_NAME}"
+      fi
     else
       fail "'kind delete cluster --name ${CLUSTER_NAME}' failed (above)."
     fi
   else
-    info "No kind cluster '${CLUSTER_NAME}' — nothing to delete."
+    info "No kind cluster '${CLUSTER_NAME}' and no containers labelled io.x-k8s.kind.cluster=${CLUSTER_NAME} — nothing to delete."
     cluster_gone="true"
   fi
 
@@ -119,23 +166,35 @@ if [[ "${DELETE}" == "true" ]]; then
   hosts_stray=""
   case "${identity}" in
     kind)
-      # Same block, same remover as the docker substrate's destroy. Never fatal:
-      # the cluster is already gone, and a declined sudo is a name-resolution
-      # problem, not a teardown failure.
-      # 0 from remove_hosts_block means "removed, or proven not there"; 1 means
-      # "still there, or cannot tell" (a declined sudo, an unpaired block, an
-      # unreadable file). That distinction is what decides the identity below.
-      remove_hosts_block || hosts_left="true"
-      if [[ "${hosts_left}" == "true" ]]; then
-        warn "Remove the remaining CloudBox lines from ${CLOUDBOX_HOSTS_FILE} by hand (see above)."
+      if [[ "${cluster_gone}" != "true" ]]; then
+        # The cluster is STILL THERE. Those hostnames are the only way to reach
+        # it, and removing the block here would take name resolution away from a
+        # running lifeboat while leaving every container in place — the worst of
+        # both states, and reached by the ordinary failure above (a
+        # `kind delete` that errored, or a machine whose kind binary is gone).
+        hosts_left="true"
+        warn "The ${CLOUDBOX_HOSTS_FILE} block was NOT touched: the cluster is still here (see"
+        warn "above), and those names are how you reach it. Fix the delete and re-run."
       else
-        # The same scan destroy-cluster.sh runs, for the same reason: an
-        # unmarked 127.0.0.1 line — a hand-pasted --print-hosts block whose
-        # comments were deleted, a name appended to the localhost line —
-        # survives every removal this script performs, by design. It keeps
-        # resolving after the lifeboat is gone, and on a later tbx cluster it
-        # OVERRIDES talos-box's resolver on a perfectly healthy machine.
-        hosts_stray="$(hosts_loopback_lines)"
+        # Same block, same remover as the docker substrate's destroy. Never
+        # fatal here: the cluster is already gone, and a declined sudo is a
+        # name-resolution problem, not a teardown failure.
+        # 0 from remove_hosts_block means "removed, or proven not there"; 1
+        # means "still there, or cannot tell" (a declined sudo, an unpaired
+        # block, an unreadable file). That distinction decides the identity
+        # below, and this script's exit status.
+        remove_hosts_block || hosts_left="true"
+        if [[ "${hosts_left}" == "true" ]]; then
+          warn "Remove the remaining CloudBox lines from ${CLOUDBOX_HOSTS_FILE} by hand (see above)."
+        else
+          # The same scan destroy-cluster.sh runs, for the same reason: an
+          # unmarked 127.0.0.1 line — a hand-pasted --print-hosts block whose
+          # comments were deleted, a name appended to the localhost line —
+          # survives every removal this script performs, by design. It keeps
+          # resolving after the lifeboat is gone, and on a later tbx cluster it
+          # OVERRIDES talos-box's resolver on a perfectly healthy machine.
+          hosts_stray="$(hosts_loopback_lines)"
+        fi
       fi
       # The identity goes ONLY when there is nothing left that needs it. It is
       # the single thing that lets a RETRY prove the /etc/hosts block is the
@@ -156,9 +215,11 @@ if [[ "${DELETE}" == "true" ]]; then
       warn "No identity recorded in ${CLOUDBOX_SUBSTRATE_FILE}, so the ${CLOUDBOX_HOSTS_FILE} block"
       warn "was left alone — this script only removes a block it can prove is the lifeboat's."
       warn "If this machine took the lifeboat before the identity file existed, say so and"
-      warn "re-run — the claim is honoured once kind lists the cluster, or the marked block is there:"
+      warn "re-run — the claim is honoured once kind lists the cluster, or Docker still holds"
+      warn "containers labelled io.x-k8s.kind.cluster=${CLUSTER_NAME}:"
       warn "  CLOUDBOX_SUBSTRATE=kind ./scripts/kind-fallback.sh --delete"
-      warn "Otherwise, by hand: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # delete the marked block"
+      warn "Once both are gone there is nothing left to prove ownership with, and the block"
+      warn "goes by hand: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}   # delete the marked block"
       ;;
     *)
       warn "${CLOUDBOX_SUBSTRATE_FILE} says '${identity}', not 'kind' — the ${CLOUDBOX_HOSTS_FILE} block"
@@ -173,8 +234,21 @@ if [[ "${DELETE}" == "true" ]]; then
     warn "Nothing listens there now. Remove them by hand: sudo \$EDITOR ${CLOUDBOX_HOSTS_FILE}"
   fi
   info "The kubeconfig context kind-${CLUSTER_NAME} is removed by 'kind delete cluster'."
+  # The exit status is the teardown's verdict, not "the script ran". It used to
+  # be an unconditional 0, so `./scripts/kind-fallback.sh --delete && …` chained
+  # straight on after a failed delete or a declined sudo, and CI could not tell
+  # a finished teardown from a half-finished one. Anything left — the cluster
+  # still here, or the block still in ${CLOUDBOX_HOSTS_FILE} — is a 1.
+  if [[ "${cluster_gone}" != "true" || "${hosts_left}" == "true" ]]; then
+    fail "The lifeboat teardown did not finish (see above). Re-run once you have fixed it:"
+    warn "  ./scripts/kind-fallback.sh --delete"
+    exit 1
+  fi
   exit 0
 fi
+
+need kind
+need kubectl
 
 need helm
 need docker

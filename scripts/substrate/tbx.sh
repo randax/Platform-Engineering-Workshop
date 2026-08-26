@@ -74,21 +74,60 @@ substrate_preflight() {
   # that change existed — and, since the predicate is entries-or-markers rather
   # than the begin marker alone, also the file whose markers were deleted by
   # hand and whose 127.0.0.1 lines were left behind.
-  # The kind lifeboat, before any VM is asked for. It is a docker cluster, so
-  # `tbx status` is blind to it — but it holds the ${CLOUDBOX_DOMAIN} names in
-  # /etc/hosts (which is consulted BEFORE talos-box's resolver), binds host
-  # port 80, and answers `kubectl` on the same workshop context. The hosts-file
-  # guard below catches its block, but only while the block is still there: a
-  # lifeboat whose write_hosts_block was declined is invisible to it, and the
-  # attendee ends up with a Knative-less kind cluster and a Talos cluster
-  # fighting over one kubeconfig context. Asked of docker directly rather than
-  # of `kind` — the binary may be gone; the containers are the fact.
-  if have docker && docker_running \
-     && [[ -n "$(docker ps -aq --filter "label=io.x-k8s.kind.cluster=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
-    fail "A kind lifeboat cluster '${CLUSTER_NAME}' exists on this machine's Docker daemon (running or stopped)."
-    warn "It holds the ${CLOUDBOX_DOMAIN} names in ${CLOUDBOX_HOSTS_FILE}, which override talos-box's"
-    warn "resolver, and it answers on the same kubectl context this create is about to write."
-    die "Tear it down first: ./scripts/kind-fallback.sh --delete"
+  # What is on the DOCKER daemon, before any VM is asked for. Two kinds of
+  # cluster live there and `tbx status` is blind to both:
+  #
+  #   * a Talos-in-Docker cluster (label talos.cluster.name=<name>) — the
+  #     migration case, and the one this preflight never looked for at all: a
+  #     machine created on the docker substrate before the identity record
+  #     existed (or one whose record was deleted) has a running cluster, an
+  #     /etc/hosts block and a kubeconfig context, and `create-cluster.sh` on
+  #     tbx built a SECOND cloudbox next to it;
+  #   * the kind lifeboat (label io.x-k8s.kind.cluster=<name>).
+  #
+  # Both hold the ${CLOUDBOX_DOMAIN} names in /etc/hosts (consulted BEFORE
+  # talos-box's resolver), host port 80, and the same workshop kubectl context.
+  # The hosts-file guard below catches them only while their block is still
+  # there — a cluster whose write_hosts_block was declined is invisible to it.
+  # Asked of docker directly rather than of `talosctl`/`kind`: those binaries
+  # may be gone; the containers are the fact.
+  if have docker; then
+    if docker_running; then
+      local docker_talos docker_kind
+      docker_talos="$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null || true)"
+      docker_kind="$(kind_container_ids)"
+      if [[ -n "${docker_talos}" ]]; then
+        fail "A Talos-in-Docker cluster '${CLUSTER_NAME}' exists on this machine's Docker daemon (running or stopped)."
+        warn "It holds the ${CLOUDBOX_DOMAIN} names in ${CLOUDBOX_HOSTS_FILE}, which override talos-box's"
+        warn "resolver, and it answers on the same kubectl context this create is about to write."
+        die "Tear it down first: CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh"
+      fi
+      if [[ -n "${docker_kind}" ]]; then
+        fail "A kind lifeboat cluster '${CLUSTER_NAME}' exists on this machine's Docker daemon (running or stopped)."
+        warn "It holds the ${CLOUDBOX_DOMAIN} names in ${CLOUDBOX_HOSTS_FILE}, which override talos-box's"
+        warn "resolver, and it answers on the same kubectl context this create is about to write."
+        die "Tear it down first: ./scripts/kind-fallback.sh --delete"
+      fi
+    elif cloudbox_local_evidence; then
+      # Docker is installed and cannot be inspected, and this machine carries a
+      # trace of a CloudBox cluster having been built here. Whether that cluster
+      # is a set of stopped containers waiting on that daemon is exactly the
+      # question that cannot be answered — and creating VMs of the same name
+      # over it is the collision above. tbx needs a running Docker daemon
+      # anyway: the image mirror the VMs pull from is a Docker container.
+      fail "The Docker daemon is not reachable, so whether a '${CLUSTER_NAME}' cluster already exists on it cannot be checked."
+      warn "This machine carries traces of a CloudBox cluster (${CLOUDBOX_SUBSTRATE_FILE},"
+      warn "${CLOUDBOX_API_ENDPOINT_FILE} or $(talos_cluster_state_dir)), so those containers"
+      warn "may be sitting there stopped, holding this name, host port 80 and the ${CLOUDBOX_HOSTS_FILE} block."
+      die "Start Docker and re-run — the tbx substrate needs it for the image mirror in any case."
+    else
+      warn "The Docker daemon is not reachable, so this preflight cannot check it for a"
+      warn "'${CLUSTER_NAME}' cluster. Nothing on this machine says one was ever created here"
+      warn "(no ${CLOUDBOX_SUBSTRATE_FILE}, no ${CLOUDBOX_API_ENDPOINT_FILE}, no"
+      warn "$(talos_cluster_state_dir)), so there is nothing of ours to collide with. Continuing."
+      warn "Note the cluster still needs the image mirror, which is a Docker container:"
+      warn "  start Docker and run ./scripts/cloudbox-init.sh before the venue."
+    fi
   fi
   if hosts_block_stale_for_tbx; then
     fail "${CLOUDBOX_HOSTS_FILE} still points CloudBox names at 127.0.0.1."
