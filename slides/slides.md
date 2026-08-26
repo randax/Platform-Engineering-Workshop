@@ -105,11 +105,15 @@ src: ./pages/module-05.md
 ---
 
 ---
-src: ./pages/adventures.md
+src: ./pages/module-06.md
 ---
 
 ---
-src: ./pages/module-06.md
+src: ./pages/module-09.md
+---
+
+---
+src: ./pages/adventures.md
 ---
 
 ---
@@ -118,10 +122,6 @@ src: ./pages/module-07.md
 
 ---
 src: ./pages/module-08.md
----
-
----
-src: ./pages/module-09.md
 ---
 
 ---

@@ -16,17 +16,21 @@ Five minutes on mechanics, then hands on keyboards. This section is the contract
 | # | Module | Time |
 |---|--------|------|
 | 00 | Setup & pre-flight | running now, in the background |
-| 01 | Talos + Cilium — your own cloud | 30 min |
-| 02 | GitOps — Gitea + ArgoCD | 30 min |
-| 03 | Data — Postgres + S3 | 30 min |
-| 04 | Self-service — Crossplane v2 | 25 min |
-| 05 | Debug it (with or without AI) | 20 min |
-| — | **Five doors** — start with door 0: the marked trail (06–10) | the last 45 |
+| 01 | Talos + Cilium — your own cloud | 20 min |
+| 02 | GitOps — Gitea + ArgoCD | 20 min |
+| 03 | Data — Postgres + S3 | 20 min |
+| 04 | Self-service — Crossplane v2 | 20 min |
+| 05 | Debug it (with or without AI) | 15 min |
+| 06 | Serverless — Knative | 15 min |
+| 09 | **Capstone** — the picture pipeline | 25 min |
+| — | **Five doors** — start with door 0 (07 · 08 · 10) | the last 45 |
 
 <!--
 THIS TABLE IS THE DAY'S ONLY TIMELINE — every other slide's timebox is derived from it, so if a number moves, move it here first.
 
-Core is 01–05: 135 minutes of guided content, one 10-minute break (after 03), and module 00 running underneath the intro rather than in a slot of its own. There is no second break: the room goes self-paced at the pivot, so coffee is whenever you want it from there. That leaves the last 45 for the finale, which is not a sixth module but a choice of five doors. Door 0 is the one to recommend out loud: the marked trail through modules 06–10 in order — serverless, in-cluster CI, the Console, the picture-pipeline capstone, day-2 AI ops — rehearsed, hinted and verified, and written to finish at home.
+The guided day is 135 minutes: modules 01–05 at the tempo above (95), then serverless (06) and the capstone (09) — because a platform without scale-to-zero and without something running on top of it isn't finished, and those two are what make the day add up. Module 00 runs underneath the intro rather than in a slot of its own, and there is one 10-minute break, after module 03; from the pivot on the room is self-paced, so coffee is whenever you want it.
+
+That leaves the last 45 for a choice of five doors. Door 0 is the one to recommend out loud — the marked trail: in-cluster CI (07), the Console's source (08) and day-2 AI ops (10), rehearsed, hinted, verified, and written to finish at home.
 
 Expectations management, said out loud: "We planned half of what fits. If you only finish the core, you've built a real platform. The doors are for the final block — and for your couch afterwards; nothing depends on them and everything is public."
 
@@ -111,10 +115,11 @@ The tutor line, said with a smile and total honesty: the repo's CLAUDE.md/AGENTS
 - Cloudbox Console → **Workshop** page
 - One row per module, inferred from cluster
 - It reads live state — no self-reporting
-- `http://portal.cloudbox.k8s.test/workshop` (after module 02)
+- On the projector all day · yours once the Console lands
+- `http://portal.cloudbox.k8s.test/workshop`
 
 <!--
-Once the platform's portal is running (it arrives via the catalog; you'll meet it properly in module 08), its Workshop page shows a checklist of all ten modules — each row inferred from your live cluster state: nodes ready, kube-proxy absent, Gitea healthy, a CNPG cluster in demo, WorkshopDatabases present, thumbnails in the images bucket, and so on.
+The portal arrives via the catalog — on the projector cluster from the start, and on yours with the capstone's setup in module 09 (module 08, on door 0, is about reading its source rather than turning it on). Its Workshop page shows a checklist of all eleven modules — each row inferred from your live cluster state: nodes ready, kube-proxy absent, Gitea healthy, a CNPG cluster in demo, WorkshopDatabases present, thumbnails in the images bucket, and so on.
 
 Two honest caveats to mention: it's a hint, not a judge — verify.sh in each lab folder is the authoritative check; and module 05 (fault-fixing) can't be inferred from end-state at all.
 

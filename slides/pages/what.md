@@ -110,10 +110,10 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 </table>
 </div>
 
-<div class="mt-4 text-sm opacity-70">Door 0, the marked trail — same idea, all the way up the stack.</div>
+<div class="mt-4 text-sm opacity-70">Serverless and the pipeline you build today · CI, the console and day-2 ops behind door 0.</div>
 
 <!--
-Door 0 — the marked trail — framed as "the cloud doesn't stop at databases":
+The rest of the cloud, framed as "it doesn't stop at databases" — serverless and the pipeline are today's finale, the other three are door 0:
 
 - Serverless: scale-to-zero request-driven containers. Knative is the open engine underneath a lot of what you'd recognize — it's literally what Google Cloud Run is built on.
 - Messaging: durable queues and streams — what makes async reliable. NATS JetStream is the lightweight open answer (≈ SQS/SNS/EventBridge/Pub-Sub): it's the durable counterpart to module 09's in-memory broker, and the queue the golden-path Application XR requests with `spec.queue`.
@@ -121,7 +121,7 @@ Door 0 — the marked trail — framed as "the cloud doesn't stop at databases":
 - Console: even the web console is just software reading an API. The Cloudbox Console is ~6k lines of Go over the Kubernetes API — and you'll read its source in module 08 (the Workshop page you've been watching all day is ~100 of them).
 - Day-2 AI ops: the row people assume is a product. It's a CRD — kagent reconciles an Agent into a Deployment (module 10), with read-only eyes while git keeps the hands.
 
-Say the tiering honestly: "Core is 00–05 and it's a complete cloud on its own. Everything on this second table is door 0 in the final block — and your couch tonight; it's all public and nothing depends on it."
+Say the tiering honestly: "The top two rows we do together — a platform that can't scale to zero and has nothing running on it isn't finished. The rest is door 0 in the final block, and your couch tonight; it's all public."
 -->
 
 ---
@@ -198,7 +198,7 @@ The map of the whole day — the comparison table you just showed, now as one ru
 2. Talos Linux v1.13 nodes run as containers — an immutable, API-only OS purpose-built for Kubernetes (module 01). Cilium does networking in eBPF; there is no kube-proxy in this cluster at all.
 3. Gitea + ArgoCD are the heart (module 02): the git server lives IN the cluster, and ArgoCD delivers everything below it from that git repo. Nothing depends on GitHub or the venue WiFi.
 4. The platform services: CloudNativePG for managed Postgres, RustFS for S3-compatible object storage (module 03), Crossplane v2 for the self-service API (module 04).
-5. Door 0, the marked trail: Knative serverless (06), in-cluster CI with BuildKit and the Zot registry (07), the Cloudbox Console portal (08), the capstone pipeline with observability — the Victoria stack (VictoriaMetrics/Logs/Traces + Grafana) plus the OTel Collector — enabled on-demand rather than running from minute one (09), and day-2 AI ops (10).
+5. The finale, together: Knative serverless (06) and the capstone picture pipeline (09), whose setup also lands the Console and turns on observability — the Victoria stack (VictoriaMetrics/Logs/Traces + Grafana) plus the OTel Collector — on demand rather than from minute one. Then door 0 for whoever wants it: in-cluster CI with BuildKit and Zot (07), the Console's source (08), day-2 AI ops (10).
 
 Key sentence to land before moving on: "Everything below ArgoCD arrives as a git commit. That's the mechanic you'll use all day."
 

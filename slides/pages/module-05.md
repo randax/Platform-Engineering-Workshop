@@ -70,7 +70,7 @@ cd lab/05-debug-with-ai
 ./inject.sh 1        # then 4; ./verify.sh when done
 ```
 
-<span class="badge">20 min</span> · write the diagnosis **before** the fix
+<span class="badge">15 min</span> · write the diagnosis **before** the fix
 
 <!--
 The task: faults 1 and 4. inject.sh N seeds the fault; restore.sh N applies the canonical fix if you give up gracefully; restore.sh clean removes all fault namespaces afterwards.
@@ -79,9 +79,9 @@ House rule to repeat once more: one-sentence written diagnosis BEFORE any fix, t
 
 For fault 4, strongly nudge the agent-assisted path (or the pair version). Budget guidance: ~8 minutes on fault 1, the rest on fault 4.
 
-Wrap-up moment for the core arc, worth saying from the front: "In five modules you built a cloud — an OS layer, GitOps delivery, data services, a self-service API — and then you debugged it like an SRE. Everything from here is a bonus tier. Nothing depends on it; all of it is worth it."
+Wrap-up moment worth saying from the front: "In five modules you built a cloud — an OS layer, GitOps delivery, data services, a self-service API — and then you debugged it like an SRE. Two modules left together: serverless, and then the thing it all adds up to."
 
-Then straight into the pivot — no break slide here, because the door block IS the break: self-paced from this point, coffee whenever you want it, helpers still roaming. Say that out loud so nobody sits waiting for a bell.
+Then straight into module 06 — the platform isn't finished until it can scale to zero and run the pipeline on top.
 
-Anyone behind: catch-up.sh 5 (or any earlier module) gets them current in ~2 minutes, and every door is reachable from module 05 anyway.
+Anyone behind: catch-up.sh 5 (or any earlier module) gets them current in ~2 minutes.
 -->

@@ -56,22 +56,34 @@ move it in both, and nowhere else.
 | 0:00 | 10 | Cover + why build your own cloud (Bruktby) | plenum | — |
 | 0:10 | 3 | **Module 00 — pre-flight**, launched and left running | gate | `install.sh --check` all green |
 | 0:13 | 22 | what · platforms (Nav) · stack · how — zero-keyboard, pre-flight runs underneath | plenum | — |
-| 0:35 | 30 | **01** Talos cluster + Cilium — *"you now own a cloud"* | core | nodes Ready, Cilium green, no kube-proxy |
-| 1:05 | 30 | **02** GitOps — Gitea + ArgoCD, bootstrap the platform tree | core | edit → push → watch ArgoCD converge |
-| 1:35 | 30 | **03** Data services — CNPG Postgres + RustFS bucket via GitOps | core | psql into your own DBaaS; presigned URL works |
-| 2:05 | 10 | Break — the day's only scheduled one | — | (pre-enable `backstage.yaml` on the projector cluster) |
-| 2:15 | 25 | **04** Self-service — Crossplane v2 XR composes DB + bucket | core | one YAML → whole stack appears |
-| 2:40 | 20 | **05** Fault injection + AI agent segment — diagnose, verify the agent's claim | core | faults 1 + 4 found, fixed, and the claim checked |
-| 3:00 | 5 | **Adventure pivot** — five doors pitched, ≤1 min each | plenum | — |
+| 0:35 | 20 | **01** Talos cluster + Cilium — *"you now own a cloud"* | core | nodes Ready, Cilium green, no kube-proxy |
+| 0:55 | 20 | **02** GitOps — Gitea + ArgoCD, bootstrap the platform tree | core | edit → push → watch ArgoCD converge |
+| 1:15 | 20 | **03** Data services — CNPG Postgres + RustFS bucket via GitOps | core | psql into your own DBaaS; presigned URL works |
+| 1:35 | 10 | Break — the day's only scheduled one | — | (pre-enable `backstage.yaml` on the projector cluster) |
+| 1:45 | 20 | **04** Self-service — Crossplane v2 XR composes DB + bucket | core | one YAML → whole stack appears |
+| 2:05 | 15 | **05** Fault injection + AI agent segment — diagnose, verify the agent's claim | core | faults 1 + 4 found, fixed, and the claim checked |
+| 2:20 | 15 | **06** Knative — serverless, scale from zero | core | pods 0 → 1 → 0 around a `200` |
+| 2:35 | 25 | **09 Capstone** — picture pipeline (enables `portal.yaml` too) | core finale | upload → resizer wakes → thumbnail + one trace |
+| 3:00 | 5 | **Adventure pivot** — five doors pitched, door 0 recommended out loud | plenum | — |
 | 3:05 | 45 | **Adventure block** (issue #193) — attendee picks a door; room self-paced, coffee at will | open-ended finale | a door's warm-up win inside ~15 min |
 | 3:50 | 10 | **Close** — hard stop, before/after replay, take-home | plenum | the box, now full |
 
-Door 0 = the marked trail = **modules 06–10** (Knative · in-cluster CI with Argo Workflows
-+ BuildKit + Zot · the Cloudbox Console · the capstone picture pipeline · day-2 AI ops with
-kagent). They get **zero plenary minutes**: two opt-in projector demos run *inside* the block
-(in-cluster build ~3:20, Backstage ~3:35), and their slide pages serve door-0 walkers and the
-published deck. Observability stays on-demand — enabled from the catalog as module 09's "now
-observe what you built" moment, not wave-0.
+Guided total: 135 min (01–05 at 95, plus 06 and 09). Serverless and the capstone are
+**core, not stretch**: a platform that cannot scale to zero and has nothing running on top
+of it is not a complete platform, and the capstone is the day's payoff — everyone gets it,
+not just the attendees who pick one door. The capstone's setup enables `portal.yaml`, so
+every attendee ends the guided day with the Console running; module 08 is about *reading*
+that Console, which is why it stays on door 0.
+
+Door 0 = the marked trail = **modules 07 · 08 · 10** (in-cluster CI with Argo Workflows +
+BuildKit + Zot · the Cloudbox Console's source · day-2 AI ops with kagent). It gets zero
+plenary minutes and is the recommended default at the pivot; two opt-in projector demos run
+*inside* the block (in-cluster build ~3:20, Backstage ~3:35). Observability stays on-demand
+— enabled from the catalog as the capstone's "now observe what you built" step, not wave-0.
+
+The lab timeboxes above are the fast-tempo profile: measured `solve.sh` times are 0:29–2:33
+per module (docs/REHEARSALS.md), and the timeboxes are people-time on top of that. The
+Phase-5 timed dry-run is what confirms or moves them.
 
 The door block is deliberately the day's buffer: it grows if the core runs fast and shrinks
 if it doesn't. The close never moves. Timeboxes are soft targets — we walk the solution when

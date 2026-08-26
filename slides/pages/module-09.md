@@ -3,7 +3,7 @@ layout: section
 transition: view-transition
 ---
 
-<span class="badge">Module 09 · door 0 · capstone</span>
+<span class="badge">Module 09 · core · capstone</span>
 
 # The picture pipeline: everything, wired together
 
@@ -12,9 +12,7 @@ transition: view-transition
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their listing-photo pipeline goes live — upload → resize → gallery, event-driven and traced end to end. Their product, running on their cloud.</div>
 
 <!--
-Door-0 reference — never presented as a section; the room reaches this through the pivot, and these slides serve door-0 walkers and the published deck.
-
-The capstone of door 0. It earns the name because it uses everything built today at once: GitOps delivers it (02), RustFS stores it (03), Knative scales it from zero (06), the portal fronts it (08), and observability watches the whole chain. The one new concept is Knative Eventing.
+The finale of the guided day, and the reason the room stays together this long. It earns the name because it uses everything built today at once: GitOps delivers it (02), RustFS stores it (03), Knative scales it from zero (06), the portal fronts it (08), and observability watches the whole chain. The one new concept is Knative Eventing.
 -->
 
 ---
@@ -98,18 +96,18 @@ Hint 5 covers enabling the stack and the VictoriaTraces (Jaeger) navigation for 
 **Outcome:** upload a photo → a service that wasn't running resizes it.
 
 ```bash
-# enable knative-eventing.yaml + picture-pipeline.yaml
+# enable portal.yaml + knative-eventing.yaml + picture-pipeline.yaml
 cd lab/09-capstone && ./verify.sh
 ```
 
-<span class="badge">~25 min</span> · trophy: the trace in Grafana
+<span class="badge">25 min</span> · trophy: the trace in Grafana
 
 <!--
-The task: enable knative-eventing.yaml (the Broker/Trigger machinery in ns knative-eventing) and picture-pipeline.yaml (ns pipeline: Broker, uploader + resizer as cluster-local ksvcs, the Trigger, and a Job creating the images bucket) — both can go in one push; Eventing's webhook takes a minute and the pipeline app retries until it's up, same dance as module 06.
+The task: enable three catalog files in one push — portal.yaml (the Console, which is where you upload; module 08 on door 0 is about reading its source, not about turning it on), knative-eventing.yaml (the Broker/Trigger machinery in ns knative-eventing) and picture-pipeline.yaml (ns pipeline: Broker, uploader + resizer as cluster-local ksvcs, the Trigger, and a Job creating the images bucket); Eventing's webhook takes a minute and the pipeline app retries until it's up, same dance as module 06.
 
 Readiness check before the moment: kubectl -n pipeline get broker,trigger,ksvc all Ready — and note the pod count: with no traffic, both ksvcs sit at zero.
 
 Then stage the two terminals, upload at portal.cloudbox.k8s.test/gallery, and work through the three proofs from the previous slide. verify.sh seals it.
 
-This is door 0's finale, and the trail is longer than the block — plenty of people will be mid-capstone when the hard stop lands, which is what "start here, finish at home" means in practice. Anyone who does finish has run the full arc: platform built by git commits, storage and databases self-hosted, a self-service API, a portal, and an event-driven serverless pipeline traced end to end. Send them off victorious — and remind them the hard stop brings everyone back for the close.
+Anyone who finishes has run the full arc: platform built by git commits, storage and databases self-hosted, a self-service API, a portal, and an event-driven serverless pipeline traced end to end. Send them off victorious — and remind them the hard stop brings everyone back for the close.
 -->

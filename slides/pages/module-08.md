@@ -221,14 +221,14 @@ backstage.yaml stays in the catalog — anyone with RAM to spare can run this ex
 **Outcome:** a database created from a form — provably real.
 
 ```bash
-# enable portal.yaml → open http://portal.cloudbox.k8s.test
+# the Console is already running — open http://portal.cloudbox.k8s.test
 cd lab/08-portal && ./verify.sh
 ```
 
 <span class="badge">~20 min</span> · then read the source: `apps/portal/`
 
 <!--
-The task: enable portal.yaml (lands in ns portal in seconds — one small Go binary), explore the Console at http://portal.cloudbox.k8s.test, and for each page answer "which Kubernetes API is this?" — they installed every one of them today.
+The Console has been running since the capstone's setup enabled portal.yaml — this module is about what's inside it. The task: explore the Console at http://portal.cloudbox.k8s.test and for each page answer "which Kubernetes API is this?" — they installed every one of them today.
 
 Star task: create console-db (size small) via the New database form, then prove it with kubectl: the WorkshopDatabase XR, and the composed CNPG cluster booting with -w. Then the governance question: this one didn't go through git — find the evidence, keep the thought for the explain-back.
 
