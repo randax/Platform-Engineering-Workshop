@@ -372,7 +372,21 @@ machine:
       - name: virtio_balloon
 EOF
   )"
-  local patches=(--config-patch "${cni_patch}" --config-patch "${balloon_patch}")
+  # user.max_user_namespaces: Talos ships it at 0 (no unprivileged user
+  # namespaces). Module 07's rootless BuildKit (workflowtemplate-build-and-push)
+  # needs to create one, and dies with "/proc/sys/user/max_user_namespaces needs
+  # to be set to non-zero … fork/exec: no space left on device" otherwise. The
+  # docker substrate never hit this: its node containers inherit the Docker/
+  # Colima VM kernel, where the value is already non-zero (Colima: 15441).
+  # Found by Rehearsal 5 step 7 on real tbx VMs; applies live, no reboot.
+  local sysctl_patch
+  sysctl_patch="$(cat <<'EOF'
+machine:
+  sysctls:
+    user.max_user_namespaces: "10000"
+EOF
+  )"
+  local patches=(--config-patch "${cni_patch}" --config-patch "${balloon_patch}" --config-patch "${sysctl_patch}")
 
   # ONE mirror layer: our eight explicit registries -> the crane mirror on the
   # host, reached at the cluster gateway (host.docker.internal does not resolve

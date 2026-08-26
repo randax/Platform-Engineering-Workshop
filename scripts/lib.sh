@@ -352,8 +352,22 @@ is_wsl2() {
   [[ -f /proc/version ]] && grep -qi microsoft /proc/version
 }
 
+# docker_running — true when the Docker daemon answers. As a side effect it
+# hands DOCKER_HOST to everything downstream: talosctl (`cluster create` /
+# `cluster destroy`) talks to Docker through the client library's ENVIRONMENT,
+# not the CLI's context store, so with no DOCKER_HOST it dials
+# /var/run/docker.sock — which Colima never provides, and Docker Desktop only
+# via an optional symlink. Rehearsal 5 step 13 on a Colima Mac: the docker CLI
+# worked and talosctl died with "dial unix /var/run/docker.sock: no such file".
+# The active context's endpoint is the socket the CLI itself is using.
 docker_running() {
-  have docker && docker info >/dev/null 2>&1
+  have docker || return 1
+  if [[ -z "${DOCKER_HOST:-}" ]]; then
+    local ctx_host
+    ctx_host="$(docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null || true)"
+    [[ -n "${ctx_host}" ]] && export DOCKER_HOST="${ctx_host}"
+  fi
+  docker info >/dev/null 2>&1
 }
 
 # mirror_running — true when the cloudbox-mirror registry container is up.
