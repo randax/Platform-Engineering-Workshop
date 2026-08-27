@@ -170,6 +170,7 @@ allow  rustfs.yaml  27322aea  curation 3 — the `RUSTFS_OBS_LOGGER_LEVEL` comme
 allow  rustfs.yaml  a81b83fa  curation 2 — the comment explaining why the PVC carries two keep-annotations (ArgoCD ignores helm.sh/resource-policy)
 allow  rustfs.yaml  a3b94d12  curation 2 — `argocd.argoproj.io/sync-options: Prune=false` on the `rustfs-data` PVC; without it, disabling the app deletes the volume and every uploaded image
 allow  rustfs.yaml  0972f4d7  curation 5 — the DOUBLE blank line helm 4.2.4 emits after the `rustfs-secret` Secret's `data:` block, where the retired curation 4's empty KMS document used to be. Stripped on the same grounds as `39cdd0de`; it is one hunk, not two, so it needs its own id
+allow  rustfs.yaml  b542c2b2  curation 6 — `RUSTFS_REGION: eu-north-1` instead of the chart's `us-east-1`. The region is the one string in this manifest an attendee sees echoed back by every S3 client (`AWS_REGION=eu-north-1` in the labs, the bucket Job and the portal), and a workshop about where your data physically lives should not ship `us-east-1` as its answer
 ```
 
 ## History: the rc.1 log-flood workaround (upstream rustfs/rustfs#5927) — RESOLVED

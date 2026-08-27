@@ -15097,7 +15097,7 @@ spec:
                     type: boolean
                   region:
                     description: AWS region where the Bedrock model is available (e.g.,
-                      eu-north-1, us-west-2)
+                      us-east-1, us-west-2)
                     type: string
                 required:
                 - region
