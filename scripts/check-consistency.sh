@@ -486,6 +486,31 @@ for f in scripts/create-cluster.sh scripts/kind-fallback.sh; do
 done
 grep -q 'cilium_ingress_values()' scripts/lib.sh \
   || bad "cilium_ingress_values() is gone from scripts/lib.sh — check 11b asserts a helper that no longer exists"
+
+# 11c. lab 01 asks the attendee to install Cilium BY HAND, so its hints carry the
+# flags literally — a copy of the helper's output, and therefore the one place
+# that can drift away from it silently. It did: the hints shipped without the
+# ingress flags, so an attendee who followed hint 3 or the full solution exactly
+# ended the module with `cilium-ingress is 'missing'` from that lab's own
+# verify.sh, and no hint pointed at the cause. Assert every flag the helper
+# emits for the docker shape appears in the README, so the next divergence fails
+# here instead of in the room.
+lab01_readme="lab/01-cluster/README.md"
+if [[ -f "${lab01_readme}" ]]; then
+  # shellcheck disable=SC1091
+  while IFS= read -r flag; do
+    [[ "${flag}" == "--set" ]] && continue
+    # NODEPORT_INGRESS is interpolated in the README as ${NODEPORT_INGRESS};
+    # compare on the key, which is what an attendee actually pastes.
+    key="${flag%%=*}"
+    grep -qF -- "${key}" "${lab01_readme}" \
+      || bad "${lab01_readme} is missing '${key}' — lab 01's hand-install hints must carry every flag cilium_ingress_values() emits, or following them cannot pass lab 01's own verify.sh"
+    # lib.sh is not sourced here (this script deliberately stands alone), so ask
+    # a subshell for the helper's real output rather than assuming a function
+    # that would silently be undefined — an empty loop is a guard that proves
+    # nothing, which is the failure mode this whole file exists to avoid.
+  done < <(bash -c 'source scripts/versions.env; source scripts/lib.sh; cilium_ingress_values nodeport')
+fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "create-cluster.sh and kind-fallback.sh share one source for the Cilium ingress values"
 

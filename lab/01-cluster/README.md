@@ -113,8 +113,22 @@ helm upgrade --install cilium \
   --set cgroup.autoMount.enabled=false \
   --set cgroup.hostRoot=/sys/fs/cgroup \
   --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
-  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+  --set ingressController.enabled=true \
+  --set ingressController.loadbalancerMode=shared \
+  --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" \
+  --set ingressController.service.type=NodePort \
+  --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"
 ```
+
+The last five flags are the shared **ingress**, and they are not optional: one
+Cilium ingress serves every `*.cloudbox.k8s.test` hostname you will use for the
+rest of the day, and `verify.sh` checks for it. The two `service.*` lines are
+the shape for the **docker** substrate; on **tbx** the cluster has a real
+LoadBalancer, so replace both with `--set ingressController.service.type=LoadBalancer`
+(`cat ~/.cloudbox/substrate` tells you which one you are on). The script builds
+these from `cilium_ingress_values()` in `scripts/lib.sh`, which is the single
+source shared with the kind lifeboat.
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
   `kubectl get nodes -w` terminal.
@@ -151,7 +165,12 @@ helm upgrade --install cilium --server-side=false \
   --set k8sServiceHost=localhost --set k8sServicePort=7445 \
   --set cgroup.autoMount.enabled=false --set cgroup.hostRoot=/sys/fs/cgroup \
   --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
-  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+  --set ingressController.enabled=true \
+  --set ingressController.loadbalancerMode=shared \
+  --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" \
+  --set ingressController.service.type=NodePort \
+  --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"   # tbx: service.type=LoadBalancer instead
 kubectl get nodes -w             # NotReady -> Ready, live
 
 # The management plane is an API, not SSH:

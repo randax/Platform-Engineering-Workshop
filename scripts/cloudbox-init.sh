@@ -131,8 +131,16 @@ fi
 # `crane manifest` is a cheap API call per ref — a missing image should cost
 # seconds here, not surface hours into a 7.5 GB pull.
 step "Preflight: checking that all ${total} refs exist upstream"
+# One retry with a pause, because this loop is ~76 rapid unauthenticated API
+# calls and GHCR answers a burst like that with a transient 5xx or a rate limit.
+# A single miss then aborted the whole 7.5 GB pre-pull with "do not exist
+# upstream" for an image that demonstrably does — the pull an attendee is doing
+# days early, on the one evening they set aside for it. A ref that is genuinely
+# gone still fails, one second later.
 missing=()
 for image in "${host_images[@]}" "${mirror_images[@]}"; do
+  crane manifest "${image}" >/dev/null 2>&1 && continue
+  sleep 1
   crane manifest "${image}" >/dev/null 2>&1 || missing+=("${image}")
 done
 if [[ ${#missing[@]} -gt 0 ]]; then
