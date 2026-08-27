@@ -1767,7 +1767,29 @@ git_as_gitea_admin() {
   printf '#!/bin/sh\ncase "$1" in\n  Username*) echo "%s" ;;\n  *) echo "%s" ;;\nesac\n' \
     "${GITEA_ADMIN_USER}" "${GITEA_ADMIN_PASSWORD}" > "${askpass}"
   chmod 700 "${askpass}"
-  GIT_ASKPASS="${askpass}" GIT_TERMINAL_PROMPT=0 git "$@" || rc=$?
+  # Bounded, and retried twice. On the tbx substrate the shared ingress VIP goes
+  # unreachable in bursts under a held connection — a rehearsal saw the same
+  # IP:port that curl had just answered in 25ms black out for 429s mid-push,
+  # twice, while point-in-time checks kept succeeding (docs/HAZARDS.md, "VIP
+  # reachability from the host"). A git push that hangs for seven minutes and
+  # then fails reads as "the workshop is broken"; one that retries reads as a
+  # slow network. Pushes here are force-pushes and clones go to temp dirs, so a
+  # retry is safe. This does not FIX the VIP — it stops the flakiness from
+  # ending a module.
+  local attempt=0
+  while :; do
+    rc=0
+    GIT_ASKPASS="${askpass}" GIT_TERMINAL_PROMPT=0 bounded 180 git "$@" || rc=$?
+    [[ "${rc}" -eq 0 ]] && break
+    attempt=$((attempt + 1))
+    [[ "${attempt}" -ge 3 ]] && break
+    if [[ "${rc}" -eq 124 ]]; then
+      warn "git ${1:-} did not answer within 3 minutes (attempt ${attempt}/3) — retrying"
+    else
+      warn "git ${1:-} failed with status ${rc} (attempt ${attempt}/3) — retrying"
+    fi
+    sleep 5
+  done
   rm -f "${askpass}"
   return "${rc}"
 }

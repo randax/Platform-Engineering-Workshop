@@ -90,6 +90,19 @@ says which of the two you are in.
 hostnames. Run `./scripts/install.sh --write-hosts` when you are ready — do **not** re-run
 `create-cluster.sh`, which will refuse to create over the cluster you already have.
 
+**`tbx doctor` fails right after `sudo tbx system install`?** Give it a minute and run it
+again. The helper needs a moment to write `/etc/resolver/k8s.test` and settle its network
+wiring, and doctor run in the same breath as the install reports `FAIL resolver` and
+`FAIL forwarding` for state that is already on its way — in one rehearsal `sysctl` showed
+forwarding was *already* `1` while doctor still called it `0`. Two clean runs a minute
+apart is the real signal.
+
+**Everything hangs with no error, on a machine where `curl` works?** Check for a per-app
+outbound firewall (Little Snitch and friends). It prompts per binary, so `curl` can be
+allowed while `git` is not — and a blocked `git` does not fail, it waits forever against
+`gitea.cloudbox.k8s.test` with no message at all. Approve `git` (and `helm`, `kubectl`,
+`talosctl`) once, or run the workshop with the firewall in silent-allow mode.
+
 **"tbx is installed but cannot be inspected"?** That is a half-installed talos-box: the
 binary is on your PATH but its helper daemon has never run (`sudo tbx system install` not
 done, or the service is down). On the docker substrate the create continues by itself when
