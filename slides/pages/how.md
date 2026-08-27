@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 # How today works
@@ -10,24 +11,30 @@ Five minutes on mechanics, then hands on keyboards. This section is the contract
 
 ---
 
-# The map: 10 modules, 2 tiers
+# The map: one core path, then five doors
 
 | # | Module | Time |
 |---|--------|------|
-| 00 | Setup & pre-flight | 10 min |
-| 01 | Talos + Cilium — your own cloud | 35 min |
-| 02 | GitOps — Gitea + ArgoCD | 35 min |
-| 03 | Data — Postgres + S3 | 35 min |
-| 04 | Self-service — Crossplane v2 | 35 min |
-| 05 | Debug it (with or without AI) | 20 min |
-| 06–09 | Serverless · CI · Portal · Capstone | stretch |
+| 00 | Setup & pre-flight | running now, in the background |
+| 01 | Talos + Cilium — your own cloud | 20 min |
+| 02 | GitOps — Gitea + ArgoCD | 20 min |
+| 03 | Data — Postgres + S3 | 20 min |
+| 04 | Self-service — Crossplane v2 | 20 min |
+| 05 | Debug it (with or without AI) | 15 min |
+| 06 | Serverless — Knative | 15 min |
+| 09 | **Capstone** — the picture pipeline | 25 min |
+| — | **Five doors** — start with door 0 (07 · 08 · 10) | the last 45 |
 
 <!--
-Core is 00–05: 170 minutes of guided content. Add a ~20-minute intro and two 10-minute breaks and that's 210 of our 240 — the last 30 are yours. 06–09 are stretch: serverless (Knative), in-cluster CI (Argo Workflows + BuildKit + Zot), the Cloudbox Console portal, and the capstone picture pipeline that wires everything together.
+THIS TABLE IS THE DAY'S ONLY TIMELINE — every other slide's timebox is derived from it, so if a number moves, move it here first.
 
-Expectations management, said out loud: "We planned half of what fits. If you only finish the core, you've built a real platform. The stretch modules are for the fast 20% — and for your couch afterwards; nothing later depends on them and everything is public."
+The guided day is 135 minutes: modules 01–05 at the tempo above (95), then serverless (06) and the capstone (09) — because a platform without scale-to-zero and without something running on top of it isn't finished, and those two are what make the day add up. Module 00 runs underneath the intro rather than in a slot of its own, and there is one 10-minute break, after module 03; from the pivot on the room is self-paced, so coffee is whenever you want it.
 
-Two 10-minute breaks: after module 03 and after module 05. The math is deliberately tight — 210 minutes of guided time — so the final 30 do double duty: buffer if we ran long, and protected open tinkering and weird questions if we didn't. The stretch modules live in that window and on your couch.
+That leaves the last 45 for a choice of five doors. Door 0 is the one to recommend out loud — the marked trail: in-cluster CI (07), the Console's source (08) and day-2 AI ops (10), rehearsed, hinted, verified, and written to finish at home.
+
+Expectations management, said out loud: "We planned half of what fits. If you only finish the core, you've built a real platform. The doors are for the final block — and for your couch afterwards; nothing depends on them and everything is public."
+
+Every timebox here is a soft target — we walk the solution when the timer ends regardless, and catch-up.sh absorbs the rest. The door block is deliberately the day's buffer: it grows if we run fast and shrinks if we don't. The close never moves — hard stop 10 minutes before the end, and we finish together.
 -->
 
 ---
@@ -98,7 +105,7 @@ The goal was never "typed the commands yourself". It's a running platform PLUS y
 1. verify.sh and the explain-back are the finish line, not the last command an agent ran.
 2. When an assistant tells you something about YOUR cluster, check it against the cluster before acting. Module 05 exists to make that instinct permanent — including one fault where the obvious AI answer is plausible and wrong. That's a promise, not a threat.
 
-The tutor line, said with a smile and total honesty: the repo's CLAUDE.md/AGENTS.md asks agents to coach rather than solve — Socratic questions, next hint layer, no pasted solutions. It's advisory and they can bypass it; the point isn't enforcement, it's that a workshop your agent completes teaches your agent. One carve-out to state explicitly, because it's the opposite rule: broken environments (Docker, mise, half-pulled images) are fair game for full AI firepower — nobody came here to learn yak-shaving. Helpers apply the same split: coach on lab content, fix machines outright.
+The tutor line, said with a smile and total honesty: the repo's CLAUDE.md/AGENTS.md asks agents to coach rather than solve — Socratic questions, next hint layer, no pasted solutions. It's advisory and they can bypass it; the point isn't enforcement, it's that a workshop your agent completes teaches your agent. One carve-out to state explicitly, because it's the opposite rule: broken environments (Docker or tbx, mise, half-pulled images) are fair game for full AI firepower — nobody came here to learn yak-shaving. Helpers apply the same split: coach on lab content, fix machines outright.
 -->
 
 ---
@@ -108,14 +115,15 @@ The tutor line, said with a smile and total honesty: the repo's CLAUDE.md/AGENTS
 - Cloudbox Console → **Workshop** page
 - One row per module, inferred from cluster
 - It reads live state — no self-reporting
-- `http://portal.cloudbox.k8s.test/workshop` (after module 02)
+- On the projector all day · yours once the Console lands
+- `http://portal.cloudbox.k8s.test/workshop`
 
 <!--
-Once the platform's portal is running (it arrives via the catalog; you'll meet it properly in module 08), its Workshop page shows a checklist of all ten modules — each row inferred from your live cluster state: nodes ready, kube-proxy absent, Gitea healthy, a CNPG cluster in demo, WorkshopDatabases present, thumbnails in the images bucket, and so on.
+The portal arrives via the catalog — on the projector cluster from the start, and on yours with the capstone's setup in module 09 (module 08, on door 0, is about reading its source rather than turning it on). Its Workshop page shows a checklist of all eleven modules — each row inferred from your live cluster state: nodes ready, kube-proxy absent, Gitea healthy, a CNPG cluster in demo, WorkshopDatabases present, thumbnails in the images bucket, and so on.
 
 Two honest caveats to mention: it's a hint, not a judge — verify.sh in each lab folder is the authoritative check; and module 05 (fault-fixing) can't be inferred from end-state at all.
 
 We'll keep it on the projector between modules as the room's shared progress board. It's also a nice teaser: the page itself is ~100 lines of Go reading the Kubernetes API — you'll read its source in module 08.
 
-Now — let's make sure everyone's laptop is ready. Module 00.
+Your pre-flight has been running since minute 10 — triage check now, then module 01.
 -->

@@ -1,8 +1,9 @@
 ---
 layout: section
+transition: view-transition
 ---
 
-<span class="badge">Module 03 · 35 min · core</span>
+<span class="badge">Module 03 · core</span>
 
 # Data services: Postgres + S3, on your terms
 
@@ -11,7 +12,7 @@ layout: section
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;They become their own RDS <em>and</em> S3 team — the listings database and the photo bucket, self-hosted. This module is the relicensing that forced the move.</div>
 
 <!--
-"Managed database" is the single most-bought cloud product — and the thing teams miss most when leaving a hyperscaler. This module makes each attendee the RDS team and the S3 team, for 35 minutes.
+"Managed database" is the single most-bought cloud product — and the thing teams miss most when leaving a hyperscaler. This module makes each attendee the RDS team and the S3 team, for half an hour.
 -->
 
 ---
@@ -68,7 +69,7 @@ The meta-lesson connects back to the "why" section: the roadmap risk from slide 
 cd lab/03-data && ./verify.sh
 ```
 
-<span class="badge">35 min</span> · behind? `./scripts/catch-up.sh 3`
+<span class="badge">20 min</span> · behind? `./scripts/catch-up.sh 3`
 
 <!--
 The task in three beats, all through the git loop from module 02:
@@ -80,7 +81,7 @@ Wins to celebrate: the psql prompt (module win #1) and a presigned URL opening i
 
 Helper notes: the most common stall is pushing the Cluster manifest to the wrong directory — the README asks "where did module 02 put demo-namespace manifests?" on purpose. Presigned URL failures are usually a clock-skew or wrong-endpoint issue; hints cover both.
 
-BREAK after this module — 10 minutes. Announce it now so people pace themselves.
+BREAK after this module — 10 minutes, and the day's only scheduled one (from the pivot onward the room is self-paced). Announce it now so people pace themselves.
 -->
 
 ---
@@ -97,4 +98,6 @@ First break, roughly the 2-hour mark. Fill in the actual return time on the proj
 While people are away, this is a good moment to bring the Cloudbox Console's Workshop page up on the projector — by now most rows for 00–03 should be turning green across the room.
 
 Helpers: sweep for red stickies during the break; break time is catch-up time for anyone behind, and catch-up.sh 3 gets them fully current in ~2 minutes.
+
+Presenter prep during this break: pre-enable backstage.yaml from the catalog on the projector cluster NOW — its first boot is slow (~2 GB image + a CNPG database) and door 0's Backstage demo needs it warm.
 -->

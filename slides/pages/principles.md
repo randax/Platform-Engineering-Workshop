@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 # You didn't run tools.<br>You built an **IDP.**

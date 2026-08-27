@@ -1,19 +1,22 @@
 ---
 layout: section
+transition: view-transition
 ---
 
-<span class="badge">Module 10 · stretch · self-paced</span>
+<span class="badge">Module 10 · door 0 · self-paced</span>
 
 # Day 2: the app you shipped this morning is on fire
 
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their listing service — solid all morning — crashloops after a routine-looking commit at lunch. Nobody paged them; the platform did.</div>
 
 <!--
+Door-0 reference — never presented as a section; the room reaches this through the pivot, and these slides serve door-0 walkers and the published deck.
+
 Everything up to now has been day 1: build it, ship it, watch it come up green. Day 2 is where platforms actually earn their keep — the moment something that was working breaks, usually because someone (maybe you) pushed a change. Module 05 taught the debugging discipline with a bring-your-own AI assistant sitting outside the platform; this module puts an agent INSIDE the platform as a first-class, GitOps-delivered capability, wired straight into the Console built in module 08.
 
 The shape of the module: three realistic faults land as plausible git commits against your own demo-app (a bad rollback, a "rightsizing" whose memory limit is too small for the container to even start, an image reference that quietly points at Docker Hub). Work each one through an escalation ladder — signal, hint, agent — and fix everything with git revert, never a console apply button.
 
-This is a stretch module: nothing later depends on it, and module 05's muscle memory is the rehearsed fallback if anything about Kagent itself misbehaves on the day.
+Nothing depends on this module, and module 05's muscle memory is the rehearsed fallback if anything about Kagent itself misbehaves on the day.
 -->
 
 ---
@@ -141,7 +144,7 @@ cd lab/10-day2-ops && ./verify.sh
 <!--
 The task: enable kagent.yaml from the catalog (same push-to-Gitea dance as every capability today), pick one of three scenarios and inject it (inject.sh 1|2|3 — a bad rollback, a "rightsizing" commit that sets the memory limit below what the runtime needs to create the container, or a Docker Hub image reference that your own mirror answers for anyway — the guardrail there is the repo policy, not a crashing pod), then open the affected Application's detail page in the Console and click "Open investigation."
 
-Beat 1 runs entirely offline against qwen3:1.7b on host-side Ollama (never in-cluster, so it doesn't compete with the cluster's memory — 3.4 GB resident, at num_ctx 16384 rather than the chart's 64000) — the point isn't to get a right answer, it's to watch the previous slide's table happen live: real tool calls, then the same call repeated, a dropped thread, a malformed follow-up, and a verdict that narrates the evidence instead of reading it. Write down how it fails — that's the deliverable, same spirit as module 05's "agent claimed X" exercise.
+Beat 1 runs entirely offline against qwen3:1.7b on host-side Ollama (never in-cluster, so it doesn't compete with the cluster's memory — 3.4 GB resident, at num_ctx 16384 rather than the chart's 64000; on the tbx substrate Ollama must listen on more than loopback for the VMs to reach it, which the prework covers) — the point isn't to get a right answer, it's to watch the previous slide's table happen live: real tool calls, then the same call repeated, a dropped thread, a malformed follow-up, and a verdict that narrates the evidence instead of reading it. Write down how it fails — that's the deliverable, same spirit as module 05's "agent claimed X" exercise.
 
 Beat 2 is one git push: switch the same ModelConfig to the free OpenCode Zen key from the module 00 prep (or a personal Claude/OpenAI key as the documented fallback), and re-run the investigation — same fault, same Case file, now a real hypothesis with a kill-test. Verify it against the cluster, then fix it with the git revert the Case file hands you.
 

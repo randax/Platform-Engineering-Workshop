@@ -1,11 +1,13 @@
 ---
 layout: section
+transition: view-transition
 ---
 
-<span class="badge">Module 04 · 35 min · core</span>
+<span class="badge">Module 04 · core</span>
 
 # Self-service: your platform gets an API
 
+<div class="modlogos"><Logo name="crossplane" label size="2.6rem"/> <Logo name="cloudnativepg" label size="2.6rem"/></div>
 
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their app devs get self-service back — one YAML for a database, no ticket to the platform team. The 2008 magic, self-hosted.</div>
 
@@ -70,7 +72,7 @@ This lands twice: it's a real operational skill (knowing which major version you
 cd lab/04-self-service && ./verify.sh
 ```
 
-<span class="badge">35 min</span> · behind? `./scripts/catch-up.sh 4`
+<span class="badge">20 min</span> · behind? `./scripts/catch-up.sh 4`
 
 <!--
 The task: enable crossplane.yaml from the catalog (installs Crossplane v2, the patch-and-transform function, and the RBAC letting it manage CNPG Clusters and Jobs). Ship the platform API — the XRD and the Composition from the lab's platform/ dir — as a new component via git. Then be the developer: push the 10-line example WorkshopDatabase and watch the XR, the composed CNPG Cluster, and the bucket Job appear.

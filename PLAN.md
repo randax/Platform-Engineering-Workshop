@@ -42,30 +42,52 @@ one `git clean` from oblivion.
 
 ## 2. Session design (240 min)
 
-Budget: intro 15 + two breaks 20 + wrap-up/open tinkering 30 ⇒ **~175 min of modules**.
-Principle 10 says plan half of what fits: **4 core modules + stretch material**, every
-module = short framing → 10–15 min lab (outcome + verify.sh + layered hints) → walk the
-solution to re-sync.
+Budget: intro 35 (module 00 runs concurrently inside it) + one 10-min break + pivot 5 +
+door block 45 + protected close 10 ⇒ **135 min of guided core modules**. Principle 10 says
+plan half of what fits: **5 core modules + door 0**, every module = short framing → lab
+(outcome + verify.sh + layered hints) → walk the solution to re-sync.
 
-| # | Module | Time | Type | Visible win |
-|---|--------|------|------|-------------|
-| 0 | Why build your own cloud + pre-flight verify | 15 | plenum | `install.sh --check` all green |
-| 1 | Talos cluster + Cilium — *"you now own a cloud"* | 35 | core | nodes Ready, Cilium status green |
-| 2 | GitOps — Gitea + ArgoCD, bootstrap the platform tree | 35 | core | edit → push → watch ArgoCD converge |
-| 3 | Data services — CNPG Postgres + RustFS bucket via GitOps | 35 | core | psql into your own DBaaS; presigned URL works |
-| 4 | Self-service — Crossplane v2 claim composes DB + bucket | 35 | core | one YAML claim → whole stack appears |
-| 5 | **Fault injection + AI agent segment** — break it, diagnose it (with or without an agent), verify the agent's claim | 25 | core/flex | found and fixed the seeded fault |
-| S1 | Knative — deploy the app serverless | stretch | self-paced + demo | curl a scale-from-zero URL |
-| S2 | Argo Workflows — in-cluster image build → Zot → deploy | stretch | presenter demo + self-paced lab | pipeline goes green |
-| S3 | Bespoke Cloudbox Console (hands-on) + Backstage (presenter demo) | stretch | self-paced + demo | create a database from a portal form; read the whole portal's source |
-| S4 | Capstone — picture pipeline: Knative Eventing + portal gallery | stretch | self-paced finale | upload → resizer scales from zero → thumbnail + trace in Grafana |
-| A | **Adventure block — five doors** (issue #193): marked trail (=06–09) · app dev · platform · security · infra | ~45–60 | open-ended finale | attendee picks a door; briefings in `adventures/`, scoped "start here, finish at home" |
-| — | Observability | on-demand | Victoria stack + OTel Collector enabled from the catalog, not wave-0; the module-09 capstone "now observe what you built" moment | |
+The room's copy of this table is `slides/pages/how.md` — the map slide and its notes are
+derived from here, and each module's GO slide carries its timebox once. When a number moves,
+move it in both, and nowhere else.
 
-Core = 155 min + module 0 (+ the expanded platform-intro/Nav slides) ⇒ ~180–195 min;
-the remaining ~45–60 min is the adventure block (issue #193): five open-ended doors,
-with the original stretch modules 06–09 surviving intact as door 0, the marked trail.
-Fast finishers walk the trail AND pick a door; `catch-up.sh` teleports anyone anywhere.
+| Clock | Dur | Block | Type | Visible win |
+|-------|-----|-------|------|-------------|
+| 0:00 | 10 | Cover + why build your own cloud (Bruktby) | plenum | — |
+| 0:10 | 3 | **Module 00 — pre-flight**, launched and left running | gate | `install.sh --check` all green |
+| 0:13 | 22 | what · platforms (Nav) · stack · how — zero-keyboard, pre-flight runs underneath | plenum | — |
+| 0:35 | 20 | **01** Talos cluster + Cilium — *"you now own a cloud"* | core | nodes Ready, Cilium green, no kube-proxy |
+| 0:55 | 20 | **02** GitOps — Gitea + ArgoCD, bootstrap the platform tree | core | edit → push → watch ArgoCD converge |
+| 1:15 | 20 | **03** Data services — CNPG Postgres + RustFS bucket via GitOps | core | psql into your own DBaaS; presigned URL works |
+| 1:35 | 10 | Break — the day's only scheduled one | — | (pre-enable `backstage.yaml` on the projector cluster) |
+| 1:45 | 20 | **04** Self-service — Crossplane v2 XR composes DB + bucket | core | one YAML → whole stack appears |
+| 2:05 | 15 | **05** Fault injection + AI agent segment — diagnose, verify the agent's claim | core | faults 1 + 4 found, fixed, and the claim checked |
+| 2:20 | 15 | **06** Knative — serverless, scale from zero | core | pods 0 → 1 → 0 around a `200` |
+| 2:35 | 25 | **09 Capstone** — picture pipeline (enables `portal.yaml` too) | core finale | upload → resizer wakes → thumbnail + one trace |
+| 3:00 | 5 | **Adventure pivot** — five doors pitched, door 0 recommended out loud | plenum | — |
+| 3:05 | 45 | **Adventure block** (issue #193) — attendee picks a door; room self-paced, coffee at will | open-ended finale | a door's warm-up win inside ~15 min |
+| 3:50 | 10 | **Close** — hard stop, before/after replay, take-home | plenum | the box, now full |
+
+Guided total: 135 min (01–05 at 95, plus 06 and 09). Serverless and the capstone are
+**core, not stretch**: a platform that cannot scale to zero and has nothing running on top
+of it is not a complete platform, and the capstone is the day's payoff — everyone gets it,
+not just the attendees who pick one door. The capstone's setup enables `portal.yaml`, so
+every attendee ends the guided day with the Console running; module 08 is about *reading*
+that Console, which is why it stays on door 0.
+
+Door 0 = the marked trail = **modules 07 · 08 · 10** (in-cluster CI with Argo Workflows +
+BuildKit + Zot · the Cloudbox Console's source · day-2 AI ops with kagent). It gets zero
+plenary minutes and is the recommended default at the pivot; two opt-in projector demos run
+*inside* the block (in-cluster build ~3:20, Backstage ~3:35). Observability stays on-demand
+— enabled from the catalog as the capstone's "now observe what you built" step, not wave-0.
+
+The lab timeboxes above are the fast-tempo profile: measured `solve.sh` times are 0:29–2:33
+per module (docs/REHEARSALS.md), and the timeboxes are people-time on top of that. The
+Phase-5 timed dry-run is what confirms or moves them.
+
+The door block is deliberately the day's buffer: it grows if the core runs fast and shrinks
+if it doesn't. The close never moves. Timeboxes are soft targets — we walk the solution when
+the timer ends regardless, and `catch-up.sh` absorbs the variance (Principle 11).
 
 ## 3. Target architecture (what the repo must contain)
 
@@ -178,7 +200,7 @@ docs/             RESEARCH.md · PRINCIPLES.md
 | RustFS immature | Explicit switch triggers mid-Aug → SeaweedFS; one-values-file change |
 | BuildKit/Knative on Talos unrehearsed | Phase 1 spikes before any lab depends on them |
 | 16 GB laptops OOM | Backstage last + demo fallback; Hubble presenter-only; honest published spec |
-| Overrun | 4-core design with slack; stretch absorbs speed; cut by dry-run data |
+| Overrun | Soft timeboxes + `catch-up.sh`; the door block is the buffer and shrinks first; the close never moves; cut by dry-run data |
 | Speaker illness | Both speakers rehearse *all* modules; slides + labs self-contained |
 | Version drift July→Sept | Pin everything now; weekly CI bootstrap; re-verify pins late Aug |
 | Unknown headcount (30 vs 80) | Ask organizers now; helper count scales with cap |
@@ -189,8 +211,9 @@ docs/             RESEARCH.md · PRINCIPLES.md
 1. **Environment strategy: local-first + devcontainer lifeboat.** Talos-in-Docker on the
    attendee's laptop is the primary path, gated by `install.sh --check`; the repo ships a
    devcontainer so pre-flight failures open the same content in GitHub Codespaces.
-2. **Argo Workflows: presenter demo + self-paced stretch lab.** The build→Zot→deploy
-   pipeline is demoed live; the lab stays in the repo for fast attendees and home use.
+2. **Argo Workflows: projector demo + self-paced door-0 lab.** The build→Zot→deploy
+   pipeline is demoed live inside the door block (opt-in, ~3:20); the lab stays in the repo
+   for door-0 walkers and home use.
 3. **AI segment: yes, as designed.** Module 5 ships with a seeded-fault library, agent-
    assisted diagnosis, and one fault where the obvious AI answer is wrong.
 4. **Repo name: rename to `jz-2026-platform-engineering` now.** GitHub redirects the old

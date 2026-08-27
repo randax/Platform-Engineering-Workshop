@@ -1,8 +1,9 @@
 ---
 layout: section
+transition: view-transition
 ---
 
-<span class="badge">Module 07 · stretch · demo + self-paced</span>
+<span class="badge">Module 07 · door 0 · demo + self-paced</span>
 
 # CI on your terms: build inside the cluster
 
@@ -11,7 +12,9 @@ layout: section
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;They build and ship their own images in-cluster — no Docker Hub, no cloud-build minutes. The pipeline never leaves their cloud.</div>
 
 <!--
-Presenter-demo-first module: rootless BuildKit on Talos is pioneer territory (nobody has published this combo), so the front of the room shows the golden path, and the lab stays available for the brave and for home.
+Door-0 reference — never presented as a section; the room reaches this through the pivot, and these slides serve door-0 walkers and the published deck.
+
+Demo-backed module: rootless BuildKit on Talos is pioneer territory (nobody has published this combo), so the projector shows the golden path — as an opt-in demo inside the door block, ~3:20 — and the lab stays available for the brave and for home.
 -->
 
 ---
@@ -57,7 +60,7 @@ cd lab/07-ci && ./verify.sh
 <span class="badge">demo first</span> · then self-paced, ~25 min
 
 <!--
-Presenter demo first (~5 min): enable both catalog apps on the projector cluster, submit the build workflow, follow it to Succeeded, then prove the artifact is real by querying Zot's OCI API (/v2/ endpoints on NodePort 30500) — and run the freshly built image via GitOps.
+The demo (~5 min, announced at the pivot for ~3:20, opt-in — never call the room back for it): enable both catalog apps on the projector cluster, submit the build workflow, follow it to Succeeded, then prove the artifact is real by querying Zot's OCI API (/v2/ endpoints on NodePort 30500) — and run the freshly built image via GitOps.
 
 Then self-paced for those who want it: the same flow with the tiny app in lab/07-ci/app/ (a Dockerfile + one HTML page, already in everyone's Gitea because the whole repo was seeded).
 

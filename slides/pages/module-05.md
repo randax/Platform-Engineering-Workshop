@@ -1,8 +1,9 @@
 ---
 layout: section
+transition: view-transition
 ---
 
-<span class="badge">Module 05 · 25 min · core</span>
+<span class="badge">Module 05 · core</span>
 
 # Break it. Diagnose it. **Verify** the diagnosis.
 
@@ -23,7 +24,7 @@ The last core module, and the one designed for 2026: debugging on a live system,
 - Same rule for humans and agents
 
 <!--
-The philosophy slide. Installing things teaches less per minute than debugging things — that's why fault injection is a core module, not a stretch.
+The philosophy slide. Installing things teaches less per minute than debugging things — that's why fault injection is a core module, not an optional extra.
 
 The loop we're drilling:
 1. Find the SYMPTOM first (get all, logs) before hunting causes.
@@ -69,35 +70,18 @@ cd lab/05-debug-with-ai
 ./inject.sh 1        # then 4; ./verify.sh when done
 ```
 
-<span class="badge">25 min</span> · write the diagnosis **before** the fix
+<span class="badge">15 min</span> · write the diagnosis **before** the fix
 
 <!--
-The task: at least faults 1 and 4 (all four if time allows). inject.sh N seeds the fault; restore.sh N applies the canonical fix if you give up gracefully; restore.sh clean removes all fault namespaces afterwards.
+The task: faults 1 and 4. inject.sh N seeds the fault; restore.sh N applies the canonical fix if you give up gracefully; restore.sh clean removes all fault namespaces afterwards.
 
 House rule to repeat once more: one-sentence written diagnosis BEFORE any fix, then verify it against the cluster, then fix however you like — live edit, kubectl apply, agent-generated patch, all fine. verify.sh confirms every injected fault is actually fixed.
 
 For fault 4, strongly nudge the agent-assisted path (or the pair version). Budget guidance: ~8 minutes on fault 1, the rest on fault 4.
 
-Wrap-up moment for the core arc, worth saying from the front: "In five modules you built a cloud — an OS layer, GitOps delivery, data services, a self-service API — and then you debugged it like an SRE. Everything after the break is a bonus tier. Nothing depends on it; all of it is worth it."
+Wrap-up moment worth saying from the front: "In five modules you built a cloud — an OS layer, GitOps delivery, data services, a self-service API — and then you debugged it like an SRE. Two modules left together: serverless, and then the thing it all adds up to."
 
-Then the second break.
--->
+Then straight into module 06 — the platform isn't finished until it can scale to zero and run the pipeline on top.
 
----
-layout: fact
----
-
-# Break
-
-10 minutes — the core is **done**
-
-<!--
-Second break, after the core arc. Celebrate briefly before releasing the room: everyone with a green module-05 verify has built and debugged a complete platform today.
-
-Logistics to announce before the break:
-- After the break we switch to stretch mode: modules 06–09 are self-paced, with short framing + demos from the front. Nothing later depends on them; pick your own adventure, or keep polishing the core.
-- The last 30 minutes of the slot stay protected for open tinkering and questions regardless.
-- Anyone behind: catch-up.sh 5 (or any earlier module) during the break; helpers are around.
-
-Presenter prep during this break: pre-enable backstage.yaml from the catalog on the projector cluster NOW — its first boot is slow (~2 GB image + a CNPG database) and module 08's demo needs it warm.
+Anyone behind: catch-up.sh 5 (or any earlier module) gets them current in ~2 minutes.
 -->

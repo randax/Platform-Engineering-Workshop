@@ -1,8 +1,9 @@
 ---
 layout: section
+transition: view-transition
 ---
 
-<span class="badge">Module 01 · 35 min · core</span>
+<span class="badge">Module 01 · core</span>
 
 # Your own cloud: Talos + Cilium
 
@@ -11,7 +12,7 @@ layout: section
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their new datacenter is two Talos nodes on this laptop — VMs or containers, depending on your substrate — an immutable OS with no server to SSH into and pet.</div>
 
 <!--
-The first real module, and the biggest identity shift of the day: every cloud provider runs an operating system under your Kubernetes that you never get to see. For the next 35 minutes, attendees take ownership of that layer.
+The first real module, and the biggest identity shift of the day: every cloud provider runs an operating system under your Kubernetes that you never get to see. For the next half hour, attendees take ownership of that layer.
 -->
 
 ---
@@ -49,13 +50,13 @@ The lab is deliberately investigative: create the cluster networkless, diagnose 
 **Outcome:** 2-node cluster `cloudbox`, no SSH, no kube-proxy — and **you** installed its network.
 
 ```bash
-./scripts/create-cluster.sh --skip-cilium   # ~2–3 min; read it while it runs
+./scripts/create-cluster.sh --skip-cilium   # a few min; read it while it runs
 kubectl get nodes                           # NotReady. Your move.
 # → install Cilium yourself (lab task 3), watch NotReady become Ready
 cd lab/01-cluster && ./verify.sh
 ```
 
-<span class="badge">35 min</span> · fallback: `./scripts/kind-fallback.sh`
+<span class="badge">20 min</span> · fallback: `./scripts/kind-fallback.sh`
 
 <!--
 The script deliberately stops HALF-DONE: --skip-cilium leaves the cluster with no CNI, nodes NotReady, coredns Pending. That's not a bug to rescue people from — it's the lab. Say it from the front: "your cluster is exactly as alive as a cloud region with no network fabric; go find out why, then fix it." The helm install they run (hint 3 has the exact command; the script itself is the reference solution) is the same one every managed cloud hides from them. The NotReady→Ready flip in a -w watch is the moment of the module.
@@ -70,5 +71,5 @@ Presenter/helper notes:
 - Talos v1.13 pinned (never 1.12.x — known-bad in Docker); node memory limits are raised in the script.
 - Expect a mixed room: `cat ~/.cloudbox/substrate` says which one a machine got. The lab's "break a node" bonus is branched per substrate (`tbx node stop|start`, or `docker pause|unpause`); everything else is plain kubectl/talosctl and identical.
 - If the substrate won't cooperate on someone's machine (rare), don't debug past ~10 minutes: `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh` is the first fallback, and kind-fallback.sh gives them kind+Cilium as the last one — they rejoin from module 02 with everything else identical.
-- Walk the solution on screen at ~30 min to re-sync the room.
+- Walk the solution on screen at ~16 min to re-sync the room before the timer.
 -->

@@ -1,5 +1,6 @@
 ---
 layout: section
+transition: view-transition
 ---
 
 # The stack — and *why*
@@ -42,7 +43,7 @@ policy, kubeProxyReplacement via KubePrism on :7445.
 
 Talos is the biggest identity shift of the day (module 01 goes deep). The pin matters: v1.13.8, never 1.12.x — cni:none docker clusters hung on readiness until the v1.13.0 fix (talos#12885). Default node memory limit is 2048 MB and the stack won't fit, so the scripts raise it (4096 CP / 6144 worker).
 
-Cilium tradeoff to name honestly: eBPF wants a modern kernel — Docker Desktop macOS ships 6.10, WSL2 6.6, both fine; the risk platform is exotic Linux firewalld/nftables setups. We keep kube-proxy-free for the wow factor but the fallback keeps kube-proxy to remove a nested-cgroup variable — robustness vs. wow is a real dial here.
+Cilium tradeoff to name honestly: eBPF wants a modern kernel — a talos-box VM brings its own, and on the Docker substrate Docker Desktop macOS ships 6.10 and WSL2 6.6, both fine; the risk platform is exotic Linux firewalld/nftables setups. We keep kube-proxy-free for the wow factor but the fallback keeps kube-proxy to remove a nested-cgroup variable — robustness vs. wow is a real dial here.
 -->
 
 ---
@@ -151,6 +152,7 @@ Knative: Kourier ingress (not Gateway API — not in Cilium's conformance matrix
 <tbody>
 <tr><td>Durable messaging</td><td><span class="we"><Logo name="nats" size="1.3rem"/> <b>NATS 2.14 + JetStream</b></span></td><td>Kafka · RabbitMQ</td><td>The durable primitive in ~15 MB of Go vs. GBs of JVM/Erlang</td></tr>
 <tr><td>Observability</td><td><span class="we"><Logo name="victoriametrics" size="1.3rem"/> <Logo name="grafana" size="1.3rem"/> <Logo name="opentelemetry" size="1.3rem"/> <b>Victoria stack + OTel</b></span></td><td>kube-prometheus-stack · otel-lgtm · LGTM</td><td>Assembled from parts — but ~1 GiB, not several, and it fits</td></tr>
+<tr><td>Day-2 AI agent</td><td><span class="we"><Logo name="kagent" text="kagent" size="1.3rem"/> <b>0.9.12 + qwen3:1.7b</b></span></td><td>hosted AIOps · k8sgpt</td><td>An Agent is a CRD — but the model runs host-side, and it only ever gets read-only eyes</td></tr>
 </tbody>
 </table>
 
@@ -165,7 +167,7 @@ Observability is the sharpest tradeoff on this slide. OTel Collector (agent Daem
 
 VM's columnar TSDB + vmrange histograms hold it to ~1 GiB where kube-prometheus-stack or full LGTM want several. And unlike single-pod otel-lgtm, there's a REAL collector — so more than three apps actually emit telemetry.
 
-Pins: NATS 2.14.5; VictoriaMetrics 1.150.0, VictoriaLogs 1.52.0, VictoriaTraces 0.10.0, Grafana 13.1.3, OTel Collector contrib 0.158.0. Observability is on-demand — enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
+Pins: NATS 2.14.5; VictoriaMetrics 1.150.0, VictoriaLogs 1.52.0, VictoriaTraces 0.10.0, Grafana 13.1.3, OTel Collector contrib 0.158.0; kagent 0.9.12 with qwen3:1.7b on host-side Ollama — never in-cluster, so it can't compete with the cluster for memory (module 10). Observability is on-demand — enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
 
 The four things we rejected, precisely: kube-prometheus-stack (heavy, and no traces at all); single-pod otel-lgtm (no real Collector — only the three instrumented apps push anything, which is the gap #57 closed); full Grafana LGTM = Loki+Tempo+Mimir (GBs); and the OTel Demo (~6 GB). "Assembled, not a blob" is the honest description: OTel Collector contrib for filelog/kubeletstats/k8s_cluster receivers, three Victoria single-node stores, Grafana wiring them as native MetricsQL/LogsQL plugins plus the built-in Jaeger type — every piece readable, and the whole thing an on-demand ~1 GiB.
 -->
@@ -192,7 +194,7 @@ The four things we rejected, precisely: kube-prometheus-stack (heavy, and no tra
   </div>
   <div v-click class="practice">
     <strong>Fits a 16 GB laptop</strong><br>
-    In-cluster total ≈ 7.5–8 GB; ≥10 GB to Docker. Every pick optimises for this ceiling.
+    In-cluster total ≈ 7.5–8 GB; 16 GB laptop, ≥10 GB to Docker on that substrate. Every pick optimises for this ceiling.
     <div class="mod">the constraint that shaped the whole stack</div>
   </div>
 </div>

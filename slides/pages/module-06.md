@@ -1,8 +1,9 @@
 ---
 layout: section
+transition: view-transition
 ---
 
-<span class="badge">Module 06 · stretch · self-paced</span>
+<span class="badge">Module 06 · core</span>
 
 # Serverless: scale from zero, on your hardware
 
@@ -10,7 +11,7 @@ layout: section
 <div class="story"><span class="tag">BRUKTBY</span> &nbsp;Their thumbnailer scales to zero — nothing running, nothing to pay, between uploads. Lambda's trick, on hardware they own.</div>
 
 <!--
-First stretch module. From here on the room is self-paced: give the 3-minute framing, show the GO slide, and let people choose their path. Helpers keep roaming.
+Serverless is core, not a bonus: a platform without scale-to-zero is missing a primitive its users expect, and the capstone two modules from now runs on this exact mechanism. Short framing, GO slide, 15 minutes.
 -->
 
 ---
@@ -44,7 +45,7 @@ Kourier is the ingress (lighter than Istio), on NodePort 31080; traffic routes b
 cd lab/06-serverless && ./verify.sh
 ```
 
-<span class="badge">~20 min</span> · time the cold start!
+<span class="badge">15 min</span> · time the cold start!
 
 <!--
 The task: enable knative-serving.yaml from the catalog (Serving + Kourier, NodePort 31080), deliver hello-ksvc.yaml the GitOps way — by now nobody should need telling where it goes — wait for READY True, then stage the moment:
