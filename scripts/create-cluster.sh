@@ -343,12 +343,21 @@ step "Waiting for the Kubernetes API"
 # connect timeout (~75s on macOS) per attempt, so an unreachable API server
 # turned this "2 minutes" into over an hour of apparent hang instead of a
 # failure with the message below.
-for _ in $(seq 1 60); do
+#
+# The budget is per-substrate because the work is: a docker node has the
+# control-plane images in the local mirror and on the host's own storage, while
+# a tbx VM has just booted and pulls kubelet, etcd and the apiserver over the
+# guest network before any of them can answer. Two minutes is right for the
+# first and far too short for the second — it failed a cluster that came up
+# fine ninety seconds later.
+api_wait_rounds=60         # docker: 60 x 2s = 2 minutes
+[[ "${SUBSTRATE}" == "tbx" ]] && api_wait_rounds=300   # tbx: 300 x 2s = 10 minutes
+for _ in $(seq 1 "${api_wait_rounds}"); do
   kubectl --request-timeout=5s get nodes >/dev/null 2>&1 && break
   sleep 2
 done
 kubectl --request-timeout=5s get nodes >/dev/null 2>&1 \
-  || die "Kubernetes API did not come up within 2 minutes"
+  || die "Kubernetes API did not come up within $((api_wait_rounds * 2 / 60)) minutes"
 ok "API server is answering (nodes are NotReady until Cilium arrives — expected)"
 
 # --- 3. Cilium ------------------------------------------------------------------------

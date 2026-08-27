@@ -488,15 +488,24 @@ EOF
   # The string match is the fallback, not the test. tbx_etcd_live() asks the
   # node whether etcd is actually running: liveness beats parsing an error
   # message, and it is the one check that stays right when Talos rewords itself.
-  local out bootstrapped=0
-  for _ in $(seq 1 60); do
-    if out="$(talosctl bootstrap 2>&1)"; then bootstrapped=1; break; fi
+  #
+  # And liveness is the ONLY success criterion, because a bootstrap that
+  # returns 0 has not necessarily happened. On a first boot the node is still
+  # pulling the control-plane images (etcd sits in "Preparing", waiting on
+  # cri), apid answers long before that finishes, and the accepted request
+  # lives only in memory: anything that restarts machined — a reboot, a
+  # crashed pull being retried — drops it, etcd waits forever, and the API
+  # wait downstream then fails on a cluster that is one `talosctl bootstrap`
+  # away from healthy. Re-issuing is free (Talos answers "already exists"),
+  # so issue it every round until the node says etcd is actually running.
+  local bootstrapped=0
+  for _ in $(seq 1 120); do
+    talosctl bootstrap >/dev/null 2>&1 || true
     if tbx_etcd_live "${cp_ip}"; then bootstrapped=1; break; fi
-    case "${out}" in *[Aa]lready*|*"not empty"*) bootstrapped=1; break ;; esac
     sleep 5
   done
   [[ "${bootstrapped}" == "1" ]] \
-    || die "etcd never bootstrapped after 5 minutes — 'talosctl --talosconfig ${workdir}/talosconfig dmesg' and 'tbx console ${CLUSTER_NAME} ${CLUSTER_NAME}-cp-1' show why"
+    || die "etcd never bootstrapped after 10 minutes — 'talosctl --talosconfig ${workdir}/talosconfig dmesg' and 'tbx console ${CLUSTER_NAME} ${CLUSTER_NAME}-cp-1' show why"
 
   step "Merging kubeconfig"
   # No `docker port` rewrite here: the control plane's own address is routable
