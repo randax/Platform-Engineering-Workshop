@@ -409,6 +409,12 @@ fi
 before_fail=${FAILURES}
 tbx_mise="$(mise_pin 'ubi:randax/talos-box')"
 if [[ -z "${tbx_mise}" ]]; then
+  # Current form: mise's github backend, which needs the exe= hint because the
+  # repo is talos-box and the binary is tbx. Bracket chars make this a poor fit
+  # for mise_pin's generated regex, so it gets its own literal match.
+  tbx_mise="$(sed -nE 's|^"github:randax/talos-box\[exe=tbx\]"[[:space:]]*=[[:space:]]*"([^"]+)".*|\1|p' mise.toml | head -1)"
+fi
+if [[ -z "${tbx_mise}" ]]; then
   # Fallback pin form: tbx has no published mise backend yet (upstream #95/#96/
   # #101), so mise.toml may carry it as a commented pin next to the install note.
   # In this form mise installs and enforces nothing — this check only keeps
