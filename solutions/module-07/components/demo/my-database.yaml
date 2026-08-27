@@ -8,3 +8,11 @@ metadata:
   name: my-db
 spec:
   size: small
+
+  crossplane:
+    # Pinned to the revision this XR was created with — Crossplane's default,
+    # Automatic, would let `catch-up.sh <later module>` migrate a running
+    # Postgres a major version in place, and CNPG's upgrade Job then fails on
+    # binaries the pinned image does not carry. See the commented copy in
+    # lab/04-self-service/examples/my-database.yaml for the full story.
+    compositionUpdatePolicy: Manual

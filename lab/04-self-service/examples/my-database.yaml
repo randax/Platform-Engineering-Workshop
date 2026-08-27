@@ -9,3 +9,21 @@ metadata:
 spec:
   # One knob — a T-shirt size. It bundles compute, storage and HA instances.
   size: small
+
+  crossplane:
+    # Pin this XR to the Composition revision it was created with.
+    #
+    # Crossplane's default is Automatic: every XR silently adopts the newest
+    # revision the moment one appears. That is wrong for a database. Running
+    # `catch-up.sh 8` after finishing module 04 force-pushes a newer
+    # platform-api, the running Postgres jumps a major version in place, and
+    # CNPG's upgrade Job dies on binaries the pinned image does not carry:
+    #   check for "/controller/old/usr/lib/postgresql/16/bin/postgres" failed
+    # The cluster is then stuck in "Upgrading Postgres major version" and
+    # module 04's verify.sh goes red for a lab that had passed.
+    #
+    # Manual does not freeze the API: change `size` (or `version`) here and the
+    # same revision recomposes as always. It only stops an unrequested
+    # migration of someone's data, which is the platform-engineering lesson
+    # anyway — you choose when your database moves.
+    compositionUpdatePolicy: Manual
