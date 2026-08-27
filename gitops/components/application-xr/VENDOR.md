@@ -197,6 +197,6 @@ it in step with `composition.yaml` instead of letting this file rot behind it.
 
 <!-- x-release-please-start-version -->
 ```
-ghcr.io/randax/cloudbox-uploader:v0.2.2
+ghcr.io/randax/cloudbox-uploader:v0.3.0
 ```
 <!-- x-release-please-end-version -->

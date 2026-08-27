@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.0](https://github.com/randax/Platform-Engineering-Workshop/compare/apps-v0.2.2...apps-v0.3.0) (2026-08-27)
+
+
+### Features
+
+* **database:** support declarative postgres version upgrades via self-service API ([d9f5cdb](https://github.com/randax/Platform-Engineering-Workshop/commit/d9f5cdb56ae34a6ba28250bf9a7fb7a9230f7bc2))
+* **images:** pre-pull the nine adventure images — every door works offline ([da42002](https://github.com/randax/Platform-Engineering-Workshop/commit/da420023b464f6cac27719217a2384c279befc38))
+* **portal:** add activity filters, gallery diagram, and truncate long messages ([816dcbe](https://github.com/randax/Platform-Engineering-Workshop/commit/816dcbe019924c639ef99f8fecde7ea167da9c65))
+* **portal:** add humorous global Ask AI chat interface to interact with kagent ([0fd308c](https://github.com/randax/Platform-Engineering-Workshop/commit/0fd308c62c069c87a4e932c0387d5b48b52fb6b2))
+* **portal:** add native interactive postgres query terminal and use visual hello-world app as default image ([114fce0](https://github.com/randax/Platform-Engineering-Workshop/commit/114fce07a30c9ae757b076a3b8e0543a6c46db81))
+* **portal:** add YAML viewers and aggregate monitoring to list views ([54b4f90](https://github.com/randax/Platform-Engineering-Workshop/commit/54b4f90b13252ad50f6a226f3916914fd5496ff1))
+* talos-box as the primary cluster substrate, docker as fallback ([#197](https://github.com/randax/Platform-Engineering-Workshop/issues/197)) ([f071096](https://github.com/randax/Platform-Engineering-Workshop/commit/f071096475b61f488d0dfd77831e6e99f98bff6c))
+
+
+### Bug Fixes
+
+* change fallback s3 region to eu-north-1 for local context ([0d67623](https://github.com/randax/Platform-Engineering-Workshop/commit/0d67623a5b9e279560d8ae775b307008d629992c))
+* correct metrics feature flags and type conversions in UI ([9546834](https://github.com/randax/Platform-Engineering-Workshop/commit/9546834cdbb51316e871ebb2c5d6075c99c8d270))
+* **portal:** register database query route and fix Actions flex layout ([7b1e54f](https://github.com/randax/Platform-Engineering-Workshop/commit/7b1e54f9959ad72ff5ced3174cd8f2ba5a789ba3))
+* **portal:** standardize UI layouts and actions across the portal ([6a947c1](https://github.com/randax/Platform-Engineering-Workshop/commit/6a947c17b4bf6fa6a65e7116fe7ca528de1a5e11))
+* **portal:** the Functions page was 500ing, and three tests had gone stale ([#205](https://github.com/randax/Platform-Engineering-Workshop/issues/205)) ([61be505](https://github.com/randax/Platform-Engineering-Workshop/commit/61be5055b069ee840b85f33d2ec44d9a1d01f821))
+* resolve portal s3 presign, rbac, and layout bugs ([2137a1e](https://github.com/randax/Platform-Engineering-Workshop/commit/2137a1e622bf9a1d6d74df80e016c3961520525f))
+* the four things a second attendee run found ([#204](https://github.com/randax/Platform-Engineering-Workshop/issues/204)) ([60f4911](https://github.com/randax/Platform-Engineering-Workshop/commit/60f491176a9d362aceeedb6a410a04159191bd50))
+
 ## [0.2.2](https://github.com/randax/Platform-Engineering-Workshop/compare/apps-v0.2.1...apps-v0.2.2) (2026-08-18)
 
 
