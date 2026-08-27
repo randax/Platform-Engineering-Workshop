@@ -146,16 +146,23 @@ func (rz *resizer) handleEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rz.processed.Add(r.Context(), 1)
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("processed " + data.Key))
+	// 204, and no body. A 200 with a plain-text body is not a CloudEvent, and
+	// the broker's filter says so — `received a non-empty response not
+	// recognized as CloudEvent` — then redelivers the same event five or six
+	// times. It was idempotent here (the thumbnail is overwritten), which is
+	// why it went unnoticed: the pipeline looked right and quietly ran every
+	// upload several times. A reply is how you ACK to the broker, so it has to
+	// be either empty or a real CloudEvent.
+	w.WriteHeader(http.StatusNoContent)
 }
 
-// dropEvent acknowledges an event we will never be able to process: 200 so
-// the broker stops, with the reason in the body and the log.
+// dropEvent acknowledges an event we will never be able to process. The ack is
+// the 204 and nothing else: a body here is what made the broker retry the very
+// event this function exists to stop. The reason goes to the log, where it is
+// actually readable.
 func dropEvent(w http.ResponseWriter, reason string) {
 	log.Printf("DROPPED event (permanent, will not retry): %s", reason)
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("dropped: " + reason))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // process is the actual pipeline step: GET original → decode → thumbnail →
@@ -210,11 +217,14 @@ func (rz *resizer) process(ctx context.Context, data eventData) error {
 	ctx, up := tracer.Start(ctx, "s3 upload thumbnail and meta")
 	defer up.End()
 	thumbKey, metaKey := derivedKeys(data.Key)
-	if _, err := rz.s3.PutObject(ctx, bucket, thumbKey, &jpg, int64(jpg.Len()),
+	// Read the length BEFORE the upload: PutObject drains the buffer, so a
+	// jpg.Len() in the log line below always reported 0 bytes.
+	thumbSize := int64(jpg.Len())
+	if _, err := rz.s3.PutObject(ctx, bucket, thumbKey, &jpg, thumbSize,
 		minio.PutObjectOptions{ContentType: "image/jpeg"}); err != nil {
 		return fmt.Errorf("storing %s: %w", thumbKey, err)
 	}
-	log.Printf("wrote %s (%dx%d, %d bytes)", thumbKey, thumb.Bounds().Dx(), thumb.Bounds().Dy(), jpg.Len())
+	log.Printf("wrote %s (%dx%d, %d bytes)", thumbKey, thumb.Bounds().Dx(), thumb.Bounds().Dy(), thumbSize)
 
 	meta, _ := json.Marshal(map[string]any{
 		"width":         bounds.Dx(),

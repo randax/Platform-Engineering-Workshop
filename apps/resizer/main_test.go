@@ -8,6 +8,8 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -119,5 +121,23 @@ func TestDerivedKeys(t *testing.T) {
 	}
 	if meta != "meta/1700000000-cat.png.json" {
 		t.Errorf("meta = %s", meta)
+	}
+}
+
+// The broker treats the response as an ACK, and anything that is neither empty
+// nor a CloudEvent is not one: mt-broker-filter logs "received a non-empty
+// response not recognized as CloudEvent" and redelivers the same event five or
+// six times. That went unnoticed for a while because the work is idempotent —
+// every upload was simply processed several times over. Hence a test on the
+// shape of the reply rather than on any of the work behind it.
+func TestDropEventAcksWithNoBody(t *testing.T) {
+	rec := httptest.NewRecorder()
+	dropEvent(rec, "unsupported format")
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d — the broker only stops retrying on a clean ack", rec.Code, http.StatusNoContent)
+	}
+	if body := rec.Body.String(); body != "" {
+		t.Errorf("body = %q, want empty — a non-empty body is not a CloudEvent, so the broker redelivers", body)
 	}
 }
