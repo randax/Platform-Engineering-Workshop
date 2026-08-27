@@ -98,6 +98,15 @@ func main() {
 	mux.HandleFunc("GET /project", bind(srv, web.HandleProjectSwitch))
 	mux.HandleFunc("POST /projects", bind(srv, web.HandleCreateProject))
 	mux.HandleFunc("DELETE /projects/{name}", bind(srv, web.HandleDeleteProject))
+	// The root. Nothing registers "/" since the Overview page was removed (it
+	// had become a worse Components page), and without this line the console's
+	// own front door served the 404 page — which is the first URL every lab
+	// hands out. Redirect rather than resurrect a page: Components IS the
+	// overview now.
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/components", http.StatusFound)
+	})
+
 	// Catch-all: any GET the registry didn't claim renders the 404 page.
 	// Less specific than "/{$}" and every "GET /page", so it only fires last.
 	mux.HandleFunc("GET /", bind(srv, web.NotFound))

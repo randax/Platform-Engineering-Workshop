@@ -261,7 +261,7 @@ func handleDeleteObject(s *Server, w http.ResponseWriter, r *http.Request) {
 }
 
 // renderBucketObjectsAfter re-lists one bucket's objects with a flash — shared
-// by upload and delete-object, both of which target #bucket-objects.
+// by upload and delete-object, both of which re-render the detail page.
 func (s *Server) renderBucketObjectsAfter(ctx context.Context, w http.ResponseWriter, bucket string, fl flash) {
 	data, err := bucketObjects(ctx, s.Store, bucket, fl)
 	if err != nil {
