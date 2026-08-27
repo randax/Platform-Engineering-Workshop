@@ -26,9 +26,9 @@ platform teams bootstrap clusters.
    ```
 
 2. Look around your cloud's control room:
-   - Gitea: http://localhost:30300 — log in as `gitea_admin` / `cloudbox123`, find the
+   - Gitea: http://gitea.cloudbox.k8s.test — log in as `gitea_admin` / `cloudbox123`, find the
      `cloudbox/platform` repo.
-   - ArgoCD: http://localhost:30080 — username `admin`; get the password from the cluster
+   - ArgoCD: http://argocd.cloudbox.k8s.test — username `admin`; get the password from the cluster
      (hint 1). Find the root `platform` Application. What path in the repo does it watch?
      What single Application did it already create, and why is that dir called "wave 0"?
 
@@ -63,9 +63,13 @@ manages. `spec.source.path` (App details → Manifest) is the watched path: `git
 <summary>Hint 2: Cloning from your in-cluster Gitea</summary>
 
 ```bash
-git clone http://gitea_admin:cloudbox123@localhost:30300/cloudbox/platform.git ~/cloudbox-platform
+git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git ~/cloudbox-platform
 cd ~/cloudbox-platform && mise trust   # the clone carries this repo's mise.toml; untrusted, every mise tool run from here fails
 ```
+
+Ignore the URL in Gitea's own clone box: it shows the in-cluster `ROOT_URL`
+(`gitea-http.gitea.svc…`), which only resolves inside the cluster — use the
+`gitea.cloudbox.k8s.test` URL above from your laptop.
 
 This is a *different remote* than github.com — it's the copy your cluster watches. Pushes
 to GitHub change nothing on your machine; pushes here change everything. (Alternative:
@@ -105,7 +109,7 @@ experiment: which file would you edit to change the name *legitimately*?
 ./scripts/seed-gitea.sh
 
 WORKSHOP="$(git rev-parse --show-toplevel)"
-git clone http://gitea_admin:cloudbox123@localhost:30300/cloudbox/platform.git /tmp/platform
+git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git /tmp/platform
 cd /tmp/platform && mise trust
 cp "$WORKSHOP/lab/02-gitops/demo-app.yaml" gitops/apps/demo.yaml
 mkdir -p gitops/components/demo
@@ -125,8 +129,9 @@ kubectl -n demo get configmap welcome -o yaml
 ./verify.sh
 ```
 
-It checks: Gitea answers on :30300 and hosts `cloudbox/platform`; ArgoCD answers on
-:30080; the root `platform` app points at your in-cluster Gitea (not GitHub) and is
+It checks: Gitea answers at `http://gitea.cloudbox.k8s.test` and hosts
+`cloudbox/platform`; ArgoCD answers at `http://argocd.cloudbox.k8s.test`; the root
+`platform` app points at your in-cluster Gitea (not GitHub) and is
 Healthy (Synced is the happy path; sync is advisory); the wave-0 app (storage) is
 healthy; and your `demo`
 app delivered the `welcome` ConfigMap with a real name in it.

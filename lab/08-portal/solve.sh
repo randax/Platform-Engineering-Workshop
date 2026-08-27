@@ -22,13 +22,13 @@ gitops_push "$CLONE" "module 08: enable the cloudbox console + grant it demo acc
 wait_app portal
 wait_app demo
 
-# Wait until the UI actually answers on the NodePort.
+# Wait until the UI actually answers at its shared hostname.
 WAITED=0
-until curl -fsS --max-time 5 -o /dev/null http://localhost:30600/ 2>/dev/null; do
+until curl -fsS --max-time 5 -o /dev/null "${PORTAL_HOST_URL}/" 2>/dev/null; do
   [ "$WAITED" -ge 300 ] && { echo "timed out waiting for the console UI" >&2; exit 1; }
   sleep 10; WAITED=$((WAITED + 10))
 done
-echo "Cloudbox Console is up: http://localhost:30600"
+echo "Cloudbox Console is up: ${PORTAL_HOST_URL}"
 
 # The star task, non-UI path: same object the "New database" form creates.
 kubectl -n demo apply -f - <<'EOF'
@@ -41,4 +41,4 @@ spec:
 EOF
 
 kubectl -n demo wait --for=condition=Ready workshopdatabase/console-db --timeout=600s
-echo "console-db is Ready — see it on http://localhost:30600/databases"
+echo "console-db is Ready — see it on ${PORTAL_HOST_URL}/databases"

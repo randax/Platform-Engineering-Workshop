@@ -163,6 +163,68 @@ correct or current. The script prints both caveats on every run.
 Bumps that touch the cluster shape (Talos, Kubernetes, Cilium) deserve their own
 PR and their own rehearsal run. Batch the boring ones.
 
+### The Cilium bump has two operator surfaces to re-read
+
+Re-vendoring the chart `.tgz` is not the whole job. `create-cluster.sh` passes
+`--set "operator.extraArgs[0]=--ingress-default-request-timeout=24h"` and four
+of our ingresses carry `ingress.cilium.io/request-timeout: "0s"`. Both are
+**operator** surfaces, and both are load-bearing: without them Envoy's 15 s
+default route timeout applies to every hostname in the workshop (`git push`,
+the Console's SSE stream, ArgoCD's watches). On a bump, confirm
+
+* the flag still exists and still means what it means —
+  `operator/pkg/ingress/cell.go`, and note that
+  `operator/pkg/model/ingestion/ingress.go` SKIPS the flag when it is zero, so
+  "0" is not "no timeout" there;
+* the annotation is still parsed — `operator/pkg/ingress/annotations/annotations.go`;
+* the flag still renders:
+  `helm template cilium scripts/manifests/cilium-<v>.tgz --set ingressController.enabled=true --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" | grep ingress-default-request-timeout`.
+
+`docs/HAZARDS.md` carries the full reasoning.
+
+### The `tbx` pin is a special case
+
+`TBX_VERSION` in `scripts/versions.env` pins the talos-box binary — the primary
+substrate's *entire* implementation. It is not installed by mise (no backend publishes
+it yet: upstream #95/#96/#101), so nothing enforces at runtime what an attendee actually
+has on PATH. Bumping it means all three of:
+
+1. **Bump the `mise.toml` comment in the same commit.** The pin lives as the commented
+   `# tbx = "…"` line next to the install note; `check-consistency.sh` check 10 compares
+   it to `TBX_VERSION` and fails if they drift. That comment is the only other copy —
+   do not add a third.
+2. **Re-read upstream before trusting the flags.** `scripts/substrate/tbx.sh` drives
+   `tbx up -f`, `tbx status -o json`, `tbx version` and
+   `tbx cluster destroy <cluster> --force`, and `cloudbox-init.sh` drives
+   `tbx cache pull --talos-version`. Read upstream `internal/config/config.go` for
+   cluster-yaml schema changes (our `scripts/substrate/cloudbox.tbx.yaml.tmpl` is a
+   projection of it). We deliberately consume **no** `tbx manifests` section any more —
+   `balloon` was deprecated into an error, and the `mirrors` catch-all turned out to be
+   actively harmful (see `docs/HAZARDS.md`) — so a section rename upstream is no longer
+   something that can break us silently. Two things upstream *can* still move under us:
+   the `tbx status -o json` shape, and `checkOvercommit`'s reserve in
+   `internal/balloon/manager.go` (mirrored as `TBX_HOST_RESERVE_GIB` in `versions.env`;
+   if the upstream default moves, move ours in the same commit or every 16 GB laptop
+   fails to start a cluster).
+   Also re-check the version STRING: `tbx_version_check()` in `scripts/lib.sh` parses
+   field 2 of `tbx version` and both `install.sh --check` and the tbx preflight compare it
+   to `TBX_VERSION`.
+3. **Re-pin as soon as a release contains `053aecb`.** At v0.1.1 the Linux
+   `bridge-netfilter` doctor check turns an unprivileged `iptables -S FORWARD`
+   (exit 4) into a FAIL, so detection silently falls back to docker on hosts
+   where iptables cannot be inspected without privileges; `053aecb` makes it a
+   WARN with a sudo remediation. When the pin moves past it, drop the
+   "best-effort at v0.1.1" wording from the README's platform matrix and retire
+   the matching `docs/HAZARDS.md` entry.
+4. **Re-run a full tbx rehearsal.** There is **no CI for this substrate** —
+   `bootstrap-test.yaml` runs Docker on a GitHub runner and always will. A tbx pin that
+   passes `check-consistency.sh` has been proven to agree with itself and nothing more.
+
+Nothing vendored depends on the tbx version: talos-box supplies no manifests we keep
+(its curated `cni:` is deliberately *not* used — we install Cilium ourselves on both
+substrates, which check 10 also asserts). So there is nothing to re-vendor, and
+`check-upstream.sh` tracks the release via the `tbx` row in `scripts/upstream.list`.
+
 ## The first-party images
 
 `ghcr.io/randax/cloudbox-{portal,uploader,resizer,grafana}` are ours, so they do

@@ -91,7 +91,7 @@ done
 s3() {
   if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1 \
-      s5cmd --endpoint-url http://localhost:30900 "$@" 2>/dev/null
+      s5cmd --endpoint-url "${RUSTFS_S3_HOST_URL}" "$@" 2>/dev/null
   else
     kubectl -n pipeline run "verify-s3-$$-${RANDOM}" --rm -i --restart=Never --quiet \
       --image=docker.io/peakcom/s5cmd:v2.3.0 \
@@ -125,7 +125,7 @@ list_keys() { # <prefix>
 
 ORIGINALS="$(list_keys originals/)"
 if [ -z "$ORIGINALS" ]; then
-  echo "○ star task not done yet: upload a photo at http://localhost:30600/gallery (watch kubectl -n pipeline get pods -w) — verify passes without it, but the capstone moment is missing"
+  echo "○ star task not done yet: upload a photo at ${PORTAL_HOST_URL}/gallery (watch kubectl -n pipeline get pods -w) — verify passes without it, but the capstone moment is missing"
 else
   THUMBS="$(list_keys thumbs/)"
   MATCHED=""

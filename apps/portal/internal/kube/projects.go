@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // ProjectLabel marks a namespace as a console Project. New projects get it; the
@@ -44,11 +45,46 @@ func (k *Client) ListProjects(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// CreateProject provisions a project namespace and binds the portal's tenant
-// grant into it, so the console can immediately create resources there.
-func (k *Client) CreateProject(ctx context.Context, name string) error {
+// ValidProjectName is THE project-name rule — the one predicate every door
+// that selects or mutates a project asks. A project name is a DNS label we are
+// willing to put in a URL path (ValidName) AND carries no '-'. See
+// CreateProject below for why the hyphen matters; the rule lives here, alone,
+// because round 4 found it enforced at creation only: a legacy or hand-made
+// hyphenated namespace carrying the project label could still be selected in
+// the console and deployed into, which re-opens exactly the host collision
+// creation refuses. Legacy hyphenated namespaces stay listed and deletable —
+// they are read-only, not invisible.
+func ValidProjectName(s string) bool { return ValidName(s) && !strings.Contains(s, "-") }
+
+// CheckProjectName is ValidProjectName with the reason attached, for the doors
+// that can show a message (create, and the mutating routes).
+func CheckProjectName(name string) error {
 	if !ValidName(name) {
 		return fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
+	}
+	if strings.Contains(name, "-") {
+		return fmt.Errorf("project name %q can't contain '-': a Knative app's hostname is \"<app>-<project>\", so a hyphen here makes two different apps able to claim the same URL. Use %q", name, strings.ReplaceAll(name, "-", ""))
+	}
+	return nil
+}
+
+// CreateProject provisions a project namespace and binds the portal's tenant
+// grant into it, so the console can immediately create resources there.
+//
+// Project names carry ONE extra rule beyond ValidName: no hyphens. Knative's
+// domain-template composes a ksvc's external host as "<name>-<namespace>", so
+// the name and the namespace share one DNS label with a single '-' between
+// them — and with a hyphen in the namespace the split back is ambiguous:
+// `web-api` in `team` and `web` in `api-team` both compose
+// web-api-team.kn.cloudbox.k8s.test. Whichever Knative programmed last owns the
+// host; the other silently answers the wrong app, and nothing anywhere detects
+// it (see docs/HAZARDS.md, "the dash that made routing work"). With hyphen-free
+// namespaces the last dash-group is always the namespace, so no two
+// (name, namespace) pairs can collide — enforced here, at the only door that
+// creates a project namespace.
+func (k *Client) CreateProject(ctx context.Context, name string) error {
+	if err := CheckProjectName(name); err != nil {
+		return err
 	}
 	ns := map[string]any{
 		"apiVersion": "v1",

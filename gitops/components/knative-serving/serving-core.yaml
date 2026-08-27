@@ -7796,13 +7796,17 @@ metadata:
     app.kubernetes.io/component: controller
     app.kubernetes.io/version: "1.23.0"
 data:
-  # Externally-routable default domain via sslip.io magic DNS (resolves to
-  # 127.0.0.1). WITHOUT this, config-domain has only _example → Knative
-  # defaults to svc.cluster.local, which is cluster-local-only and NOT served
-  # by the external Kourier NodePort → curl/browser get 404. ksvc URLs become
-  # http://<name>.<ns>.127.0.0.1.sslip.io, reachable at :31080 with a Host
-  # header AND directly in a browser. (Found by rehearsal-in-CI: module 06.)
-  127.0.0.1.sslip.io: ""
+  # Externally-routable default domain. Every ksvc becomes
+  # http://<name>-<ns>.kn.cloudbox.k8s.test — a DASH, from the domain-template
+  # key in config-network below, which keeps the host to ONE DNS label so the
+  # single wildcard Ingress in ingress.yaml can route every namespace to the
+  # Kourier gateway. A ksvc URL is then browsable with no Host header and no
+  # port, on BOTH substrates. WITHOUT this key,
+  # config-domain holds only _example and Knative defaults to
+  # svc.cluster.local, which is cluster-local-only and 404s from outside.
+  # (The old value was 127.0.0.1.sslip.io, which only ever worked on a laptop
+  # whose loopback WAS the cluster — i.e. the docker substrate.)
+  kn.cloudbox.k8s.test: ""
   _example: |
     ################################
     #                              #
@@ -8374,6 +8378,18 @@ metadata:
 data:
   # Workshop curation: Kourier is the only ingress implementation installed.
   ingress-class: "kourier.ingress.networking.knative.dev"
+  # Workshop curation: ONE DNS label per ksvc. Upstream's default template is
+  # "{{.Name}}.{{.Namespace}}.{{.Domain}}", which makes every ksvc host two
+  # labels deep under kn.cloudbox.k8s.test — and a Kubernetes Ingress wildcard
+  # host matches exactly ONE label, so that shape cannot be covered by any
+  # single rule. It forced a per-namespace rule per namespace, and a ksvc in a
+  # namespace nobody had listed (the portal's Application XR composes into
+  # whatever project the attendee picked) had no route at all. The dash form is
+  # upstream's own documented alternative for exactly this problem — see the
+  # domain-template commentary in the _example block below. With it, hosts are
+  # <name>-<namespace>.kn.cloudbox.k8s.test and one *.kn.cloudbox.k8s.test rule
+  # in ingress.yaml covers every namespace forever.
+  domain-template: "{{.Name}}-{{.Namespace}}.{{.Domain}}"
   _example: |
     ################################
     #                              #

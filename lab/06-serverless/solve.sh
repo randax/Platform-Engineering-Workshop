@@ -24,4 +24,4 @@ kubectl -n demo wait --for=condition=Ready ksvc/hello --timeout=300s
 URL="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')"
 HOST="${URL#http://}"; HOST="${HOST#https://}"
 echo "cold-starting hello via Kourier..."
-curl -fsS --max-time 60 -H "Host: $HOST" http://localhost:31080/
+curl -fsS --max-time 60 "${URL}/"

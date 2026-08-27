@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -22,9 +23,18 @@ func TestActiveProject(t *testing.T) {
 	}
 
 	// A valid project cookie is honoured.
-	r.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
-	if got := s.activeProject(r); got != "team-a" {
-		t.Errorf("cookie team-a: got %q", got)
+	r.AddCookie(&http.Cookie{Name: "project", Value: "teama"})
+	if got := s.activeProject(r); got != "teama" {
+		t.Errorf("cookie teama: got %q", got)
+	}
+
+	// A HYPHENATED cookie is not: it is a DNS label, so the old ValidName check
+	// let it through, but a project namespace with a '-' can compose the same
+	// Knative host as another (name, namespace) pair. Falls back to the default.
+	legacy, _ := http.NewRequest("GET", "/", nil)
+	legacy.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
+	if got := s.activeProject(legacy); got != kube.XRNamespace {
+		t.Errorf("hyphenated cookie must fall back to the default, got %q", got)
 	}
 
 	// A non-DNS value falls back to the default — never trusted in a path.
@@ -44,24 +54,73 @@ func TestProjectBarRender(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 	var buf bytes.Buffer
-	data := projectBarData{Active: "team-a", Default: "demo", Projects: []string{"demo", "team-a"}}
+	// team-a here is deliberately a LEGACY project: the bar still lists and
+	// offers to delete one, it just cannot be switched into or deployed to.
+	data := projectBarData{Active: "teama", Default: "demo", Projects: projectEntries([]string{"demo", "team-a"})}
 	if err := tmpl.ExecuteTemplate(&buf, "project-bar", data); err != nil {
 		t.Fatalf("render project-bar: %v", err)
 	}
 	out := buf.String()
 	for _, want := range []string{
 		`href="/project?set=demo"`,     // switch to the default
-		`href="/project?set=team-a"`,   // switch to team-a
 		`hx-delete="/projects/team-a"`, // delete a non-default project
 		`hx-post="/projects"`,          // the create form
 		`for="proj-modal"`,             // the New-project trigger
+		`(read-only)`,                  // ...and team-a says why it is not a link
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("project-bar missing %q", want)
 		}
 	}
+	// A legacy project must NOT get a switch link: HandleProjectSwitch answers
+	// 400 for it, so the link's only outcome is an error page.
+	if strings.Contains(out, `href="/project?set=team-a"`) {
+		t.Error("a hyphenated project must not be rendered as a switch link")
+	}
 	// The default project must NOT be deletable.
 	if strings.Contains(out, `hx-delete="/projects/demo"`) {
 		t.Error("the default project must not offer delete")
+	}
+}
+
+// Deleting the project the cookie NAMES must reset the cookie — including a
+// legacy hyphenated one, which activeProject normalises to the default before
+// returning. Comparing against that normalised value meant the cookie survived
+// the deletion of the very namespace it named: reads fell back to `demo` while
+// mutableProject kept refusing every write, so the console stayed read-only for
+// the rest of the session with no project left to switch away from.
+func TestHandleDeleteProjectResetsTheCookie(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		cookie  string
+		deleted string
+		want    bool // must the response reset the cookie to the default?
+	}{
+		{"the active project", "teama", "teama", true},
+		{"a legacy hyphenated project", "team-a", "team-a", true},
+		{"some other project", "teama", "teamb", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/namespaces/") {
+					_, _ = w.Write([]byte(`{"metadata":{"labels":{"` + kube.ProjectLabel + `":"true"}}}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"items":[]}`))
+			})
+			req := httptest.NewRequest(http.MethodDelete, "/projects/"+tc.deleted, nil)
+			req.SetPathValue("name", tc.deleted)
+			req.AddCookie(&http.Cookie{Name: "project", Value: tc.cookie})
+			rec := httptest.NewRecorder()
+
+			HandleDeleteProject(srv, rec, req)
+
+			sc := rec.Header().Get("Set-Cookie")
+			reset := strings.Contains(sc, "project="+kube.XRNamespace)
+			if reset != tc.want {
+				t.Errorf("cookie %q, deleted %q: Set-Cookie = %q, reset-to-default = %v, want %v",
+					tc.cookie, tc.deleted, sc, reset, tc.want)
+			}
+		})
 	}
 }

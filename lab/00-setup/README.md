@@ -22,6 +22,23 @@ before the workshop** if you can; the room's first 15 minutes are the safety net
 
 From the repository root:
 
+0. **Pick your substrate.** On an Apple Silicon Mac (or Linux with KVM) install
+   [talos-box](https://github.com/randax/talos-box) and you get real Talos VMs with real
+   LoadBalancer addresses: `brew install randax/tap/tbx && sudo tbx system install && tbx doctor`
+   (on Linux, the release tarball plus its systemd helper instead of Homebrew). The
+   `sudo tbx system install` is a one-time privileged step — it installs the helper that
+   does the VM and network wiring. Everyone else — Windows/WSL2, Codespaces, or any machine
+   `tbx doctor` is unhappy with — runs the identical workshop on Talos-in-Docker. The
+   scripts decide for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you
+   want to. Docker is required either way: the image mirror is a container on both
+   substrates. **On tbx, also let Ollama listen on more than loopback** if you plan to
+   run module 10: the cluster reaches your laptop at `172.30.<n>.1`, and Ollama's default
+   `127.0.0.1:11434` bind refuses that. `launchctl setenv OLLAMA_HOST 0.0.0.0` (then quit
+   and reopen Ollama.app), or `OLLAMA_HOST=0.0.0.0 ollama serve`. `cloudbox-init.sh` warns
+   you if it is still loopback-only. **One catalog extra does not run on tbx+arm64:**
+   Backstage's CNOE image is amd64-only and a tbx VM emulates nothing, so that stretch
+   item needs `CLOUDBOX_SUBSTRATE=docker`; `install.sh --check` says so. Nothing on the
+   core path is affected.
 1. Install the tool chain: `./scripts/dev-setup.sh` (uses [mise](https://mise.jdx.dev/) with
    pinned versions — nothing floats). It ends by offering to hook mise into your shell —
    **say yes**: that is what puts the tools on your PATH *and* points `KUBECONFIG` at a
@@ -34,10 +51,43 @@ From the repository root:
    common: Docker not running, or Docker's memory limit below 10 GB).
 4. Run `./verify.sh` in this directory.
 
-**Hardware reality check:** 16 GB RAM is the absolute minimum (with ≥10 GB and ≥4 CPUs
-allocatable to Docker), 32 GB is comfortable. macOS and Linux are fully supported; Windows works via WSL2
-but is our least-tested platform — if it fights you, use a lifeboat below rather than
-burning workshop time.
+**Hardware reality check:** 16 GB RAM is the absolute minimum on both substrates, 32 GB is
+comfortable, and you need 40 GB free disk (the image caches are most of it). On Docker you
+also need ≥10 GB and ≥4 CPUs *allocatable to Docker*. macOS and Linux are fully supported; Windows works via WSL2
+(Docker substrate only) but is our least-tested platform — if it fights you, use a lifeboat
+below rather than burning workshop time.
+
+**Windows/WSL2 and the hostname block:** the workshop serves everything on
+`*.cloudbox.k8s.test`. `create-cluster.sh` adds those names to WSL's `/etc/hosts` for you, but
+your *Windows* browser reads `C:\Windows\System32\drivers\etc\hosts` — paste the same lines
+there, as Administrator. Print them with `./scripts/install.sh --print-hosts`.
+
+**…and WSL2 throws that block away on every restart.** WSL regenerates `/etc/hosts` from
+the Windows hosts file at boot (`generateHosts` defaults to true), so a block written
+yesterday is simply gone this morning — the containers are still running, and every
+workshop URL stops resolving. Either turn the regeneration off once:
+
+```ini
+# /etc/wsl.conf   (then, from Windows: wsl --shutdown)
+[network]
+generateHosts = false
+```
+
+or re-run `./scripts/install.sh --write-hosts` after each restart. `install.sh --check`
+says which of the two you are in.
+
+**Declined the password?** Nothing is lost: the block is written at the very *end* of
+`create-cluster.sh`, after the cluster is up and healthy, and a refusal only costs you the
+hostnames. Run `./scripts/install.sh --write-hosts` when you are ready — do **not** re-run
+`create-cluster.sh`, which will refuse to create over the cluster you already have.
+
+**"tbx is installed but cannot be inspected"?** That is a half-installed talos-box: the
+binary is on your PATH but its helper daemon has never run (`sudo tbx system install` not
+done, or the service is down). On the docker substrate the create continues by itself when
+this machine has never made a tbx cluster — there is nothing it could collide with. If you
+*have* used tbx here before, it stops instead, because two clusters called `cloudbox` is a
+mess you would meet an hour later: either fix tbx (`tbx doctor`), or, if you know its VMs
+are not running, re-run with `CLOUDBOX_IGNORE_TBX=1 ./scripts/create-cluster.sh`.
 
 ## Optional: sign up for OpenCode Zen (module 10 prep)
 
@@ -57,8 +107,14 @@ any personal Claude or OpenAI key, and its free tier is explicitly time-limited 
 - **Pair up.** The workshop is fully doable as a pair on one machine — arguably better,
   you'll talk through more. Red sticky note up, and we'll match you.
 - **Devcontainer / GitHub Codespaces.** The repo ships a `.devcontainer/` that runs the
-  identical content in Codespaces or any devcontainer-capable editor. Same labs, same
-  scripts, someone else's hardware. Open the repo in Codespaces and start from step 1.
+  same content in Codespaces or any devcontainer-capable editor. Same labs, same scripts,
+  someone else's hardware. Open the repo in Codespaces and start from step 1.
+  **One difference:** your browser is not on the machine running the cluster, and the
+  platform's ingress routes by hostname — so a forwarded port-80 preview 404s. Open
+  services from the **Ports tab**, which forwards a NodePort each (Gitea, ArgoCD, the
+  Console…). In the codespace's own terminal the hostnames work normally, so every
+  `verify.sh` behaves exactly as it does on a laptop. See the README's Plan B section
+  for the full table.
 
 ## Hints
 

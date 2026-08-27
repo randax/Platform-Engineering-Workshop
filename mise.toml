@@ -56,6 +56,9 @@ jq = "1.8.2"
 # "green in CI": 0.9.0 flagged an SC2015 that 0.11.0 does not. Principle 14
 # applies to the linters too.
 shellcheck = "0.11.0"
+# talos-box is installed out-of-band (brew install randax/tap/tbx on macOS, the
+# release tarball on Linux) — no mise backend publishes it yet (upstream #95/#96/#101).
+# tbx = "0.1.1"
 # node — only for the Slidev presentation
 node = "24"
 

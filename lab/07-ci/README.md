@@ -29,15 +29,15 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    contains it (it was seeded with the whole workshop repo). Notice the `FROM` line:
    it pulls the base image from *your* Zot, not from Docker Hub — your platform builds
    FROM your own registry, fully offline.
-3. **Seed the base image**: copy busybox into YOUR registry (host-side, against Zot's
-   NodePort). `crane copy` doesn't read your local docker — it's a registry-to-registry
+3. **Seed the base image**: copy busybox into YOUR registry (host-side, through Zot's
+   ingress hostname). `crane copy` doesn't read your local docker — it's a registry-to-registry
    copy. Source it from your own `cloudbox-mirror`, which already has it from the
    pre-pull, so this step needs no internet either (Docker Hub is rate-limited at the
    venue — that is the whole reason the mirror exists):
 
    ```bash
    mise x crane@0.21.9 -- crane copy --insecure \
-     localhost:5001/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
+     localhost:5001/library/busybox:1.37.0 zot.cloudbox.k8s.test/library/busybox:1.37.0
    ```
 
    If the mirror isn't running, `docker.io/library/busybox:1.37.0` works as a source
@@ -46,7 +46,7 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    That's the platform-team move: you decide what base images exist in your cloud.
 4. Submit a build with [`workflow-run.yaml`](workflow-run.yaml) and follow it to
    `Succeeded`. Then prove the artifact is real: ask Zot's API what's in the registry
-   (NodePort 30500, standard OCI `/v2/` endpoints).
+   (at `http://zot.cloudbox.k8s.test`, using standard OCI `/v2/` endpoints).
 5. Run the image: deliver [`hello-site.yaml`](hello-site.yaml) via GitOps, then curl the
    page it serves.
 6. Run `./verify.sh`.
@@ -69,7 +69,7 @@ them: `kubectl -n builds get workflowtemplate build-and-push -o yaml | head -40`
 
 If the *build step* fails resolving `zot.zot.svc.cluster.local:5000/library/busybox` —
 did you seed the base image (task step 3)? Check with
-`curl -s http://localhost:30500/v2/library/busybox/tags/list`.
+`curl -s http://zot.cloudbox.k8s.test/v2/library/busybox/tags/list`.
 </details>
 
 <details>
@@ -78,21 +78,21 @@ did you seed the base image (task step 3)? Check with
 Zot speaks the plain OCI registry API:
 
 ```bash
-curl -s http://localhost:30500/v2/_catalog | jq .
-curl -s http://localhost:30500/v2/hello-site/tags/list | jq .
+curl -s http://zot.cloudbox.k8s.test/v2/_catalog | jq .
+curl -s http://zot.cloudbox.k8s.test/v2/hello-site/tags/list | jq .
 ```
 
-Zot also has a small web UI on the same port.
+Zot also has a small web UI at `http://zot.cloudbox.k8s.test`.
 </details>
 
 <details>
 <summary>Hint 3: The deployment can't pull the image?</summary>
 
 Mind the two vantage points: the *build* pushed to `zot.zot.svc.cluster.local:5000`
-(cluster DNS — pods can resolve that), but the *kubelet* pulls from the node, where
-cluster DNS doesn't exist — that's why `hello-site.yaml` uses `localhost:30500`
-(Zot's NodePort, reached from the node itself; containerd allows plain HTTP for
-localhost registries). If the pull fails: first confirm the image exists in Zot
+(cluster DNS — pods can resolve that), but the *node* pulls via NodePort 30500
+(node-side),
+where cluster DNS doesn't exist. *You* reach Zot at `http://zot.cloudbox.k8s.test`.
+If the pull fails: first confirm the image exists in Zot
 (hint 2), then `kubectl -n demo describe pod` and read the exact pull error.
 </details>
 
@@ -107,14 +107,14 @@ cp gitops/catalog/argo-workflows.yaml gitops/apps/
 git add . && git commit -m "module 07: zot + argo-workflows" && git push
 # wait for both apps Healthy in ArgoCD
 
-# seed YOUR registry with the pre-pulled base image (host → Zot NodePort)
+# seed YOUR registry with the pre-pulled base image (host → Zot ingress)
 mise x crane@0.21.9 -- crane copy --insecure \
-  docker.io/library/busybox:1.37.0 localhost:30500/library/busybox:1.37.0
+  docker.io/library/busybox:1.37.0 zot.cloudbox.k8s.test/library/busybox:1.37.0
 
 kubectl create -f "$WORKSHOP/lab/07-ci/workflow-run.yaml"
 kubectl -n builds get workflows -w              # until Succeeded
 
-curl -s http://localhost:30500/v2/_catalog | jq .   # hello-site is there
+curl -s http://zot.cloudbox.k8s.test/v2/_catalog | jq .   # hello-site is there
 
 cp "$WORKSHOP/lab/07-ci/hello-site.yaml" gitops/components/demo/
 git add . && git commit -m "module 07: run hello-site" && git push
@@ -133,7 +133,7 @@ cd "$WORKSHOP/lab/07-ci" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is advisory); Zot's API answering on :30500;
+It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is advisory); Zot's API answering at `http://zot.cloudbox.k8s.test`;
 at least one `build-hello-site-*` workflow **Succeeded**; the `hello-site` image present
 in Zot's catalog; and the hello-site Deployment Available and serving the page.
 
@@ -151,6 +151,7 @@ That's the sovereignty argument in one answer.
 - Inspect the build pod's securityContext while a build runs. What does
   `--oci-worker-no-process-sandbox` trade away, and why did the `builds` namespace need
   the PSA `privileged` label on a Talos cluster?
-- Point the module-06 ksvc at `localhost:30500/hello-site:v1` — serverless serving of a
-  self-built image (the cluster's Knative config already skips tag-resolution for the
-  Zot registry names; find that setting in `config-deployment`).
+- Point the module-06 ksvc at the node-side NodePort 30500 image-pull address — the
+  *node* pulls via that NodePort; *you* reach Zot at `http://zot.cloudbox.k8s.test` (the cluster's Knative
+  config already skips tag-resolution for the Zot registry names; find that setting in
+  `config-deployment`).

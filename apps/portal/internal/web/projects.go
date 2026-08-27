@@ -29,17 +29,38 @@ func (s *Server) projectList(ctx context.Context) []string {
 	return out
 }
 
+// projectEntry is one row of the selector. Switchable is false for a LEGACY
+// hyphenated project: HandleProjectSwitch refuses those with 400, so rendering
+// a switch link for one hands the attendee a link whose only outcome is an
+// error page. It is still listed (it exists, and its resources are visible from
+// the CLI) and still deletable — deleting is the one thing you can do with it.
+type projectEntry struct {
+	Name       string
+	Switchable bool
+}
+
 type projectBarData struct {
 	Active   string
-	Projects []string
+	Projects []projectEntry
 	Default  string // the un-deletable default project
 	Flash    flash
+}
+
+// projectEntries decorates the names with the SAME predicate the switch handler
+// enforces (kube.ValidProjectName), so the bar cannot offer a door the server
+// closes.
+func projectEntries(names []string) []projectEntry {
+	out := make([]projectEntry, 0, len(names))
+	for _, n := range names {
+		out = append(out, projectEntry{Name: n, Switchable: kube.ValidProjectName(n)})
+	}
+	return out
 }
 
 func (s *Server) barData(r *http.Request, fl flash) projectBarData {
 	return projectBarData{
 		Active:   s.activeProject(r),
-		Projects: s.projectList(r.Context()),
+		Projects: projectEntries(s.projectList(r.Context())),
 		Default:  kube.XRNamespace,
 		Flash:    fl,
 	}
@@ -54,8 +75,12 @@ func HandleProjectBar(s *Server, w http.ResponseWriter, r *http.Request) {
 // without htmx: HX-Refresh for htmx, a plain redirect for a bare link click.
 func HandleProjectSwitch(s *Server, w http.ResponseWriter, r *http.Request) {
 	p := r.URL.Query().Get("set")
-	if !kube.ValidName(p) {
-		http.Error(w, "invalid project", http.StatusBadRequest)
+	// The same rule creation enforces: a hyphenated project cannot be switched
+	// INTO either, or the console would deploy into a namespace whose Knative
+	// hostnames can collide (kube.ValidProjectName). Legacy hyphenated projects
+	// stay listed and deletable; they are read-only.
+	if err := kube.CheckProjectName(p); err != nil {
+		http.Error(w, "invalid project: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	setProjectCookie(w, p)
@@ -86,7 +111,16 @@ func HandleDeleteProject(s *Server, w http.ResponseWriter, r *http.Request) {
 		s.render(w, "project-bar", s.barData(r, errorFlash("Delete failed: "+err.Error())))
 		return
 	}
-	if s.activeProject(r) == name {
+	// The RAW cookie, not activeProject: that one normalises a rejected value
+	// (a LEGACY hyphenated project) to the default before returning, so deleting
+	// `my-proj` compared "demo" against "my-proj", found them different, and left
+	// the cookie naming a namespace that no longer exists. Reads then silently
+	// fell back to `demo` while every write route kept refusing — mutableProject
+	// rejects that cookie by design — so the console stayed read-only for the
+	// rest of the session with nothing on screen to explain it, and no project
+	// left to switch away from. Deleting the project the cookie names resets it,
+	// whether or not the name is one we would switch INTO.
+	if c, err := r.Cookie("project"); err == nil && c.Value == name {
 		setProjectCookie(w, kube.XRNamespace)
 	}
 	reload(w, r)

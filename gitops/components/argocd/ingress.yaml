@@ -1,0 +1,41 @@
+# ArgoCD at http://argocd.cloudbox.k8s.test (scripts/versions.env,
+# ARGOCD_HOST_URL — written out literally because YAML is not shell).
+#
+# Plain http on purpose: bootstrap-gitops.sh sets server.insecure=true in
+# argocd-cmd-params-cm, so argocd-server speaks HTTP on 8080 and the Service's
+# :80 reaches it. Without that, Cilium's ingress would speak http to a TLS
+# listener and every request would fail.
+#
+# Backend: Service `argocd-server`, port `http` 80 → targetPort 8080, from the
+# vendored manifest scripts/manifests/argocd-install-v3.5.1.yaml:31804-31823.
+# The `https` port (443) on the same Service is deliberately NOT used — it also
+# targets 8080, but naming it would only invite a TLS assumption that
+# server.insecure has already removed.
+# NodePort 30080 (NODEPORT_ARGOCD) stays published as the docker fallback.
+#
+# NOT applied by ArgoCD (it would be applying its own front door before it can
+# sync anything): scripts/bootstrap-gitops.sh applies this file directly.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    # The ArgoCD UI holds gRPC-web watch streams open for as long as the tab is,
+    # and Envoy's default route timeout — which every hostname now passes
+    # through — is 15 s. "0s" disables it for this Ingress; see the same
+    # annotation on gitops/components/gitea/ingress.yaml for the citation.
+    ingress.cilium.io/request-timeout: "0s"
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: argocd.cloudbox.k8s.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80

@@ -41,30 +41,29 @@ check_app() { # <name>
     fi
     sleep 5
   done
-  fail "ArgoCD app '$1' is '$st' (want Healthy) — open http://localhost:30080 or: kubectl -n argocd get app $1 -o yaml"
+  fail "ArgoCD app '$1' is '$st' (want Healthy) — open ${ARGOCD_HOST_URL} or: kubectl -n argocd get app $1 -o yaml"
 }
 
 # --- Gitea -------------------------------------------------------------------
-if curl -fsS --max-time 5 http://localhost:30300/api/healthz >/dev/null 2>&1 \
-   || curl -fsS --max-time 5 http://localhost:30300/ >/dev/null 2>&1; then
-  ok "Gitea answers on http://localhost:30300"
+if curl -fsS --max-time 5 "${GITEA_HOST_URL}/api/healthz" >/dev/null 2>&1 \
+   || curl -fsS --max-time 5 "${GITEA_HOST_URL}/" >/dev/null 2>&1; then
+  ok "Gitea answers on ${GITEA_HOST_URL}"
 else
-  fail "Gitea not reachable on :30300 — did ./scripts/bootstrap-gitops.sh run? kubectl -n gitea get pods"
+  fail "Gitea not reachable at ${GITEA_HOST_URL} — did ./scripts/bootstrap-gitops.sh run? kubectl -n gitea get pods"
 fi
 
 if curl -fsS --max-time 5 -u gitea_admin:cloudbox123 \
-     http://localhost:30300/api/v1/repos/cloudbox/platform >/dev/null 2>&1; then
+     "${GITEA_HOST_URL}/api/v1/repos/cloudbox/platform" >/dev/null 2>&1; then
   ok "repo cloudbox/platform exists in Gitea"
 else
   fail "cloudbox/platform repo missing in Gitea — run ./scripts/seed-gitea.sh"
 fi
 
 # --- ArgoCD ------------------------------------------------------------------
-if curl -fsSk --max-time 5 -o /dev/null http://localhost:30080/ 2>/dev/null \
-   || curl -fsSk --max-time 5 -o /dev/null https://localhost:30080/ 2>/dev/null; then
-  ok "ArgoCD UI answers on :30080"
+if curl -fsS --max-time 5 -o /dev/null "${ARGOCD_HOST_URL}/" 2>/dev/null; then
+  ok "ArgoCD UI answers at ${ARGOCD_HOST_URL}"
 else
-  fail "ArgoCD UI not reachable on :30080 — kubectl -n argocd get pods,svc"
+  fail "ArgoCD UI not reachable at ${ARGOCD_HOST_URL} — kubectl -n argocd get pods,svc"
 fi
 
 REPO_URL="$(kubectl -n argocd get application platform -o jsonpath='{.spec.source.repoURL}' 2>/dev/null || true)"

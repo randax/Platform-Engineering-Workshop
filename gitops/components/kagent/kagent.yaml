@@ -1454,6 +1454,7 @@ spec:
   provider: "Ollama"
   model: "qwen3:1.7b"
   ollama:
+    # Patched at enable-time by ollama-host-hook.yaml (a PostSync hook) to the address bootstrap-gitops.sh recorded in configmap kagent/cloudbox-host — 172.30.<n>.1 on tbx, host.docker.internal or 10.5.0.1 on docker. The kagent Application ignoreDifferences this field.
     host: host.docker.internal:11434
     options:
       num_ctx: "16384"

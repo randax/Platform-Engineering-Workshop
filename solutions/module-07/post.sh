@@ -17,11 +17,15 @@ REPO_ROOT="$(cd "$SOLUTIONS_DIR/.." && pwd)"
 source "$REPO_ROOT/scripts/context-guard.sh"
 require_workshop_context
 
+# shellcheck source=../../scripts/versions.env
+source "$REPO_ROOT/scripts/versions.env"
+ZOT_HOST="${ZOT_HOST_URL#http://}"
+
 # 1. Bucket (same as module 03).
 "$SOLUTIONS_DIR/module-03/post.sh"
 
 # 2. Build hello-site in-cluster if Zot doesn't have it yet.
-if curl -fsS --max-time 5 http://localhost:30500/v2/_catalog 2>/dev/null | grep -q hello-site; then
+if curl -fsS --max-time 5 "${ZOT_HOST_URL}/v2/_catalog" 2>/dev/null | grep -q hello-site; then
   echo "✅ hello-site already in Zot — skipping build"
   exit 0
 fi
@@ -46,7 +50,7 @@ else
   BUSYBOX_SRC="docker.io/${BUSYBOX}"
 fi
 mise x crane@0.21.9 -- crane copy --insecure \
-  "${BUSYBOX_SRC}" "localhost:30500/${BUSYBOX}"
+  "${BUSYBOX_SRC}" "${ZOT_HOST}/${BUSYBOX}"
 
 WF_NAME="$(kubectl create -f "$REPO_ROOT/lab/07-ci/workflow-run.yaml" -o jsonpath='{.metadata.name}')"
 echo "submitted build workflow: $WF_NAME"

@@ -43,8 +43,7 @@ func init() {
 }
 
 // appRow decorates an Application XR with the URL its composed Knative Service
-// answers on (Knative programs <name>.<ns>.sslip.io, reachable via Kourier's
-// NodePort 31080) — shown once the app is Ready.
+// answers on — see ksvcURL — shown once the app is Ready.
 type appRow struct {
 	kube.Application
 	URL         string
@@ -67,12 +66,34 @@ func fetchApplications(ctx context.Context, s *Server, ns string, fl flash) (app
 		_, _, _, sourceBuilt := a.Source()
 		row := appRow{Application: a, SourceBuilt: sourceBuilt}
 		if a.Readiness().Class == "ok" {
-			// The sslip.io URL the composed ksvc serves on, via Kourier's NodePort.
-			row.URL = fmt.Sprintf("http://%s.%s.127.0.0.1.sslip.io:31080", a.Metadata.Name, a.Metadata.Namespace)
+			row.URL = s.ksvcURL(a.Metadata.Name, a.Metadata.Namespace)
 		}
 		rows = append(rows, row)
 	}
 	return applicationsData{Apps: rows, Flash: fl, ScaffoldEnabled: kube.GiteaConfigured()}, nil
+}
+
+func (s *Server) knativeDomain() string {
+	if s.KnativeDomain != "" {
+		return s.KnativeDomain
+	}
+	return "kn.cloudbox.k8s.test"
+}
+
+// ksvcURL is the browser URL a Knative Service answers on. ONE definition,
+// because this shape is not obvious and getting it wrong shows up as a dead
+// link rather than an error.
+//
+// The separator between name and namespace is a DASH, not a dot: the cluster
+// sets Knative's domain-template to "{{.Name}}-{{.Namespace}}.{{.Domain}}"
+// (gitops/components/knative-serving/serving-core.yaml). Upstream's default
+// dotted form would put every ksvc two DNS labels under the domain, and a
+// Kubernetes Ingress wildcard host matches exactly one label — so the single
+// *.kn.cloudbox.k8s.test rule that serves every namespace could not exist, and
+// the namespaces THIS console composes into are precisely the ones nobody can
+// enumerate in advance. Change one of these two and change the other.
+func (s *Server) ksvcURL(name, namespace string) string {
+	return fmt.Sprintf("http://%s-%s.%s", name, namespace, s.knativeDomain())
 }
 
 func handleApplications(s *Server, w http.ResponseWriter, r *http.Request) {
@@ -97,7 +118,11 @@ func handleApplicationsList(s *Server, w http.ResponseWriter, r *http.Request) {
 // row turns Ready as they converge. Answers with the refreshed list fragment.
 func handleCreateApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
-	ns := s.activeProject(r)
+	ns, perr := s.mutableProject(r)
+	if perr != nil {
+		s.render(w, "app-list", applicationsData{Flash: errorFlash(perr.Error())})
+		return
+	}
 	fl := deployApplication(s, r, ns, name, parseAppOpts(r))
 	data, err := fetchApplications(r.Context(), s, ns, fl)
 	if err != nil {
@@ -185,7 +210,11 @@ func newBuildTag() string { return "b" + strconv.FormatInt(time.Now().UnixNano()
 // push new code, hit Redeploy, the running app rolls forward.
 func handleRedeployApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	ns := s.activeProject(r)
+	ns, perr := s.mutableProject(r)
+	if perr != nil {
+		s.render(w, "flash", errorFlash(perr.Error()))
+		return
+	}
 	fl := redeployApplication(s, r, ns, name)
 	// Redeploy lives on the detail page now, so answer with just the flash
 	// (swapped into the detail's #redeploy-flash slot). The rebuild is async and
@@ -218,7 +247,11 @@ func redeployApplication(s *Server, r *http.Request, ns, name string) flash {
 
 func handleDeleteApplication(s *Server, w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	ns := s.activeProject(r)
+	ns, perr := s.mutableProject(r)
+	if perr != nil {
+		s.render(w, "app-list", applicationsData{Flash: errorFlash(perr.Error())})
+		return
+	}
 	fl := flash{Msg: "Deleted " + name + " — its composed workload, database and bucket are being removed."}
 	if err := s.Kube.DeleteApplication(r.Context(), ns, name); err != nil {
 		fl = errorFlash("Delete failed: " + err.Error())

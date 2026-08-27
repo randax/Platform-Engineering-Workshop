@@ -33,6 +33,11 @@ jobs:
     name: full rehearsal — all labs (01-09)
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      # GitHub runners have no nested-virt: the tbx substrate is impossible here.
+      # This is also the point — the docker substrate is the CI-PROVEN fallback,
+      # and it must be exercised on every weekly run, not just when tbx fails.
+      CLOUDBOX_SUBSTRATE: docker
     steps:
       - uses: actions/checkout@v7
         with:
@@ -146,6 +151,13 @@ jobs:
           kubectl -n kube-system rollout status ds/cilium --timeout=300s
           kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
+      - name: Show the /etc/hosts block create-cluster.sh wrote
+        run: |
+          set -euo pipefail
+          ./scripts/install.sh --print-hosts
+          getent hosts gitea.cloudbox.k8s.test
+          getent hosts hello-demo.kn.cloudbox.k8s.test
+
       - name: Bootstrap GitOps (Gitea + ArgoCD)
         run: ./scripts/bootstrap-gitops.sh
 
@@ -156,8 +168,9 @@ jobs:
         run: |
           set -euo pipefail
           kubectl get nodes -o wide
-          curl -fsS http://localhost:30300/api/healthz
-          curl -fsS -o /dev/null http://localhost:30080
+          kubectl -n kube-system get svc cilium-ingress -o wide
+          curl -fsS http://gitea.cloudbox.k8s.test/api/healthz
+          curl -fsS -o /dev/null http://argocd.cloudbox.k8s.test
           kubectl get application platform -n argocd -o wide
 
       - name: Run ALL labs (01-09) — solve + verify, with a results table
@@ -831,7 +844,7 @@ jobs:
           # in the console — namespace create + the `bind` escalation guard.
           kubectl apply -f lab/08-portal/portal-projects-access.yaml
           base=http://localhost:30600
-          proj=team-e2e
+          proj=teame2e  # hyphen-free: the console refuses a hyphenated project (see kube.ValidProjectName)
           # Create the project from the console.
           # A non-htmx client gets a 303 (POST-redirect-GET) on success; a
           # failed create renders the bar fragment with a flash (200). Accept
@@ -938,6 +951,25 @@ jobs:
             || { echo "❌ demo-app didn't report a DB-backed counter (Postgres wiring?)"; echo "$got" | head -40; exit 1; }
           echo "$got" | grep -qi "Bucket <code>" || echo "⚠️ bucket line missing on the demo-app page"
           echo "✅ deploy-from-source: the demo app runs and USES its composed Postgres (visit counter) + bucket"
+          # --- install.sh --add-hosts, on the one name that proves it ----------
+          # ${app} is Console-created, so its ksvc host was NOT in the block
+          # create-cluster.sh wrote — /etc/hosts has no wildcards and only the
+          # three names the labs create are knowable in advance. Everything
+          # above reached it with an explicit Host header, which is exactly the
+          # workaround this replaces. Assert the BEFORE state too, so a future
+          # change that pre-lists every name turns this into a green test of
+          # nothing.
+          getent hosts "${host}" >/dev/null 2>&1 \
+            && { echo "❌ ${host} already resolves — this test can no longer prove --add-hosts does anything"; exit 1; }
+          ./scripts/install.sh --add-hosts "${app}-demo"
+          getent hosts "${host}" \
+            || { echo "❌ ${host} still does not resolve after --add-hosts"; exit 1; }
+          # The LITERAL published URL, no Host header, no port — what an attendee
+          # clicks in the Console.
+          url=$(kubectl -n demo get ksvc "${app}" -o jsonpath='{.status.url}')
+          curl -sS --max-time 20 "${url}/" | grep -qE 'visitor <b>#[0-9]' \
+            || { echo "❌ ${url} did not answer without a Host header"; exit 1; }
+          echo "✅ install.sh --add-hosts: ${url} is browsable directly on the docker substrate"
           curl -sS -o /dev/null -X DELETE "$base/applications/${app}" 2>/dev/null || true
           { echo ""; echo "### Deploy-from-source + demo app (PRD-0012 / #35) — built cloudbox/demo-app from source; the running app uses its composed Postgres (live counter) + S3 bucket ✅"; } >> "${GITHUB_STEP_SUMMARY}"
 
@@ -1140,7 +1172,7 @@ jobs:
           kubectl -n argocd get applications -o yaml > /tmp/diag/applications.yaml 2>&1 || true
           kubectl get clusters.postgresql.cnpg.io,workshopdatabases,ksvc,broker,trigger -A > /tmp/diag/custom-resources.txt 2>&1 || true
           for ns in argocd gitea cnpg-system rustfs crossplane-system demo \
-                    knative-serving knative-eventing zot argo builds portal pipeline nats \
+                    knative-serving knative-eventing kourier-system zot argo builds portal pipeline nats \
                     observability; do
             kubectl -n "$ns" get pods -o wide > "/tmp/diag/pods-$ns.txt" 2>&1 || true
             kubectl -n "$ns" logs --tail=200 -l app --prefix > "/tmp/diag/logs-$ns.txt" 2>&1 || true
@@ -1156,6 +1188,49 @@ jobs:
             kubectl -n observability logs "$p" --all-containers --previous --tail=150 >> "/tmp/diag/logs-$n.txt" 2>&1 || true
             kubectl -n observability describe "$p" > "/tmp/diag/describe-$n.txt" 2>&1 || true
           done
+
+          # --- module-09 upload path: portal -> uploader.pipeline.svc (ExternalName
+          # -> kourier-internal) -> Kourier/Envoy -> the uploader ksvc. When that dial
+          # fails the portal only renders it into an HTML flash, so the cluster-side
+          # evidence has to be captured here. Everything below is best-effort.
+          for p in $(kubectl -n kourier-system get pods -o name 2>/dev/null); do
+            n="${p##*/}"
+            kubectl -n kourier-system logs "$p" --all-containers --tail=200 \
+              > "/tmp/diag/logs-kourier-$n.txt" 2>&1 || true
+          done
+          kubectl -n kourier-system get svc -o wide > /tmp/diag/kourier-svc.txt 2>&1 || true
+
+          # --- module-09 event path: uploader -> broker-ingress -> IMC ->
+          # imc-dispatcher -> the trigger's subscriber (the resizer ksvc). The
+          # `-l app` loop above CANNOT see these: the data-plane deployments
+          # label their pods `eventing.knative.dev/brokerRole` /
+          # `app.kubernetes.io/component`, not `app` — only the three controllers
+          # (eventing-controller, eventing-webhook, mt-broker-controller) carry
+          # `app`, which is why a run that lost a CloudEvent had no ingress,
+          # filter or dispatcher log to explain it. Collect them by deployment.
+          for d in mt-broker-ingress mt-broker-filter imc-dispatcher imc-controller; do
+            kubectl -n knative-eventing logs "deploy/$d" --tail=400 --all-containers \
+              > "/tmp/diag/logs-knative-eventing-$d.txt" 2>&1 || true
+          done
+          kubectl -n pipeline get broker,trigger,subscriptions.messaging.knative.dev,inmemorychannels.messaging.knative.dev \
+            -o yaml > /tmp/diag/pipeline-eventing.yaml 2>&1 || true
+          # The mt-broker-controller logged a Reconcile error naming a "secret";
+          # list what is actually there (names only — never the contents).
+          kubectl -n knative-eventing get secret -o name > /tmp/diag/knative-eventing-secrets.txt 2>&1 || true
+          kubectl -n pipeline get svc,endpoints,ksvc,trigger -o wide > /tmp/diag/pipeline-routing.txt 2>&1 || true
+          kubectl -n pipeline get svc uploader -o yaml > /tmp/diag/pipeline-svc-uploader.yaml 2>&1 || true
+          kubectl -n pipeline get ksvc -o yaml > /tmp/diag/pipeline-ksvc.yaml 2>&1 || true
+          kubectl get ciliumenvoyconfigs,ciliumclusterwideenvoyconfigs -A -o name \
+            > /tmp/diag/cilium-envoy-configs.txt 2>&1 || true
+          kubectl -n kube-system logs -l k8s-app=cilium --all-containers --tail=200 --prefix 2>/dev/null \
+            | grep -Ei 'envoy|ingress|error|warn' > /tmp/diag/cilium-agent-envoy.txt 2>&1 || true
+          # In-cluster probe from the portal's namespace. The portal image is FROM
+          # scratch (no sh/wget), so `kubectl exec` into it is impossible — run a
+          # throwaway busybox (on scripts/images.txt, so it is already pulled) instead.
+          kubectl -n portal run "diag-probe-${RANDOM}" --rm -i --restart=Never --quiet \
+            --image=docker.io/library/busybox:1.37.0 --command -- \
+            sh -c 'nslookup uploader.pipeline.svc.cluster.local; echo "--- healthz"; wget -qO- --timeout=5 http://uploader.pipeline.svc.cluster.local/healthz; echo "rc=$?"; echo "--- root"; wget -qO- --timeout=5 http://uploader.pipeline.svc.cluster.local/; echo "rc=$?"' \
+            > /tmp/diag/probe-uploader-from-portal.txt 2>&1 || true
 
       - name: Upload diagnostics artifact
         if: always()
@@ -1196,6 +1271,11 @@ jobs:
     name: recovery path — second cluster + catch-up 07
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      # GitHub runners have no nested-virt: the tbx substrate is impossible here.
+      # This is also the point — the docker substrate is the CI-PROVEN fallback,
+      # and it must be exercised on every weekly run, not just when tbx fails.
+      CLOUDBOX_SUBSTRATE: docker
     steps:
       - uses: actions/checkout@v7
         with:
@@ -1217,6 +1297,17 @@ jobs:
           echo "${HOME}/.local/share/mise/shims" >> "${GITHUB_PATH}"
           "${HOME}/.local/bin/mise" trust
           "${HOME}/.local/bin/mise" install
+
+      - name: Snapshot /etc/hosts before anything touches it
+        run: |
+          set -euo pipefail
+          # The create writes a marked block and the destroy removes it. "Exactly
+          # reversible" is a claim nothing has ever checked — and the failure it
+          # guards against is silent: nine names still pointing at 127.0.0.1
+          # after the cluster is gone break the NEXT cluster (especially one on
+          # the other substrate) with no error anywhere.
+          cp /etc/hosts /tmp/hosts.before
+          wc -l < /tmp/hosts.before
 
       - name: First cluster of the day
         run: ./scripts/create-cluster.sh
@@ -1344,6 +1435,25 @@ jobs:
           [ -z "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}")" ] \
             || { echo "❌ destroy-cluster.sh left node containers behind"; docker ps -a; exit 1; }
           echo "✅ destroy left nothing of '${CLUSTER_NAME}' behind, and kept the unrelated context — a third cluster would create cleanly"
+
+          # /etc/hosts must be byte-identical to the snapshot taken before the
+          # first create — two creates and two destroys later. Anything else
+          # means the block is not exactly reversible: leftover names resolve to
+          # 127.0.0.1 forever, which is invisible until the next cluster.
+          # (Byte-identical holds for a newline-terminated file, which the
+          # runner's /etc/hosts is; the awk rewrite terminates its last line, so
+          # a file without a trailing newline would gain one. That is the only
+          # difference the round trip can produce.)
+          if ! cmp -s /tmp/hosts.before /etc/hosts; then
+            echo "❌ /etc/hosts is not what it was before the first create:"
+            diff -u /tmp/hosts.before /etc/hosts || true
+            exit 1
+          fi
+          grep -q cloudbox-begin /etc/hosts \
+            && { echo "❌ a CloudBox marker survived the destroy"; exit 1; }
+          grep -qE 'cloudbox\.k8s\.test' /etc/hosts \
+            && { echo "❌ a *.cloudbox.k8s.test name survived the destroy"; exit 1; }
+          echo "✅ /etc/hosts is byte-identical to the pre-create snapshot (newline-terminated file) — no markers, no names"
 
       - name: Recovery-path summary
         if: always()

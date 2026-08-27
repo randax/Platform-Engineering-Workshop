@@ -94,7 +94,7 @@ ConfigMap of provisioned datasources — same treatment as rustfs / nats.
   zero `plugin.backgroundinstaller` lines, zero errors, same 54 plugins loaded,
   all three datasources still provisioned.
 - **NodePort 30030** (`service-nodeport.yaml`, a workshop addition, not
-  upstream): browser reaches Grafana at `http://localhost:30030`, the canonical
+  upstream): browser reaches Grafana at `http://grafana.cloudbox.k8s.test`, the canonical
   observability port (freed when the old single-pod stack was retired —
   issue #57). Wired into the host via `NODEPORT_GRAFANA` in
   `scripts/versions.env` and the `--exposed-ports` list in

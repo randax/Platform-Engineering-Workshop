@@ -208,7 +208,8 @@ func wdbPath(ns string) string {
 type WorkshopDB struct {
 	Metadata ObjMeta `json:"metadata"`
 	Spec     struct {
-		Size string `json:"size"`
+		Size    string `json:"size"`
+		Version string `json:"version"`
 	} `json:"spec"`
 	Status struct {
 		Conditions []Condition `json:"conditions"`
@@ -237,6 +238,33 @@ var dnsName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$`)
 
 // ValidName reports whether s is a name we are willing to put in a URL path.
 func ValidName(s string) bool { return dnsName.MatchString(s) }
+
+// maxDNSLabel is the hard limit on ONE DNS label (RFC 1035). It is not a style
+// rule here: Knative's domain-template makes a ksvc's external host
+// "<name>-<namespace>.kn.cloudbox.k8s.test", so the name and the namespace share
+// a single label with one '-' between them.
+const maxDNSLabel = 63
+
+// ValidKnativeHost checks that a ksvc in a namespace can actually be ADDRESSED.
+//
+// ValidName caps a name at 40 characters, which is fine on its own and says
+// nothing about the pair: a 40-character name in a 30-character project
+// namespace is a 71-character label, which is not a legal hostname. Knative
+// composes the host regardless, and the failure surfaces as a route that never
+// works on an Application whose XR, ksvc and pods are all perfectly Ready —
+// diagnosable only by counting characters. So it is refused at the door, with
+// the number in the message.
+//
+// ksvcName is the KNATIVE SERVICE's name, which is not always the XR's:
+// functions are deployed as "fn-<name>", and those three characters are part of
+// the budget.
+func ValidKnativeHost(ksvcName, ns string) error {
+	if n := len(ksvcName) + 1 + len(ns); n > maxDNSLabel {
+		return fmt.Errorf("%q in namespace %q needs a %d-character hostname label (%q), and the limit is %d — shorten the name by %d",
+			ksvcName, ns, n, ksvcName+"-"+ns, maxDNSLabel, n-maxDNSLabel)
+	}
+	return nil
+}
 
 // BuildWorkshopDatabase serializes the user's intent into the XR. This is the
 // trick behind "self-service platform APIs": creating a database is one POST

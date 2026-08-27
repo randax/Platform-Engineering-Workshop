@@ -9,12 +9,19 @@
     <div class="proj-menu">
       {{range .Projects}}
       <div class="proj-row">
+        {{if .Switchable}}
         {{/* plain link: the switch handler 303-redirects back, so it works
              without JS; htmx turns it into an in-page reload. */}}
-        <a class="proj-item{{if eq . $.Active}} active{{end}}" href="/project?set={{.}}">{{.}}</a>
-        {{if ne . $.Default}}
-        <button class="proj-del" title="Delete project {{.}}"
-          hx-delete="/projects/{{.}}" hx-confirm="Delete project {{.}}? This removes the namespace and everything in it.">×</button>
+        <a class="proj-item{{if eq .Name $.Active}} active{{end}}" href="/project?set={{.Name}}">{{.Name}}</a>
+        {{else}}
+        {{/* A legacy hyphenated project: the switch handler answers 400, so no
+             link — a read-only row that says why. Delete still works. */}}
+        <span class="proj-item proj-legacy"
+          title="{{.Name}} can't be opened: a project name with '-' makes two different apps able to claim the same URL (<app>-<project>). Read-only — delete it, or make a hyphen-free one.">{{.Name}} <small>(read-only)</small></span>
+        {{end}}
+        {{if ne .Name $.Default}}
+        <button class="proj-del" title="Delete project {{.Name}}"
+          hx-delete="/projects/{{.Name}}" hx-confirm="Delete project {{.Name}}? This removes the namespace and everything in it.">×</button>
         {{end}}
       </div>
       {{end}}
@@ -34,7 +41,18 @@
     itself scoped access (a <code>RoleBinding</code> to <code>portal-tenant</code>) — the databases,
     functions and apps you create then land in it. <small>Grant via git; act via console.</small></p>
     <form hx-post="/projects" hx-target="#project-bar" hx-swap="innerHTML">
-      <label>Name <input name="name" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="team-a"></label>
+      <!-- No hyphens: an app's hostname is "<app>-<project>" in one DNS label,
+           so a hyphenated project makes two different apps able to claim the
+           same URL. The server enforces it too (kube.CreateProject).
+           The {1,40} and the maxlength are the OTHER half of the server rule:
+           kube.ValidName's regexp is ^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$, i.e.
+           40 characters. `[a-z0-9]+` let the browser accept any length, so a
+           long name passed client validation, POSTed, and came back as a
+           server-side error the form gives no hint about — and the character
+           budget matters here beyond tidiness: the project namespace shares one
+           63-character DNS label with the app name (ValidKnativeHost). -->
+      <label>Name <input name="name" required pattern="[a-z0-9]{1,40}" maxlength="40" placeholder="teama"
+        title="Lowercase letters and digits, no hyphens, at most 40 characters — an app's URL is <app>-<project>.kn.cloudbox.k8s.test"></label>
       <div class="modal-actions">
         <label for="proj-modal" class="btn ghost">Cancel</label>
         <button type="submit">Create project</button>

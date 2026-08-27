@@ -20,14 +20,16 @@ together, is the one thing a video or an AI assistant can't give you.
 
 ## What we're building
 
-A two-node Talos Linux Kubernetes cluster inside Docker on your laptop, with an
-in-cluster git server and a GitOps engine delivering the entire platform on top:
+A two-node Talos Linux Kubernetes cluster on your laptop — real VMs via
+[talos-box](https://github.com/randax/talos-box) where your machine supports it, Docker
+containers everywhere else — with an in-cluster git server and a GitOps engine delivering
+the entire platform on top:
 
 ```text
 your laptop
-└── Docker (≥10 GB allocated)
+└── talos-box VMs, or Docker (≥10 GB allocated)
     └── Talos v1.13.8 cluster (1 control plane + 1 worker)
-        ├── Cilium 1.19 (eBPF CNI)
+        ├── Cilium 1.20 (eBPF CNI + shared ingress)
         ├── Gitea (in-cluster git — this is your cloud's git server)
         ├── ArgoCD v3.5 ── app-of-apps w/ sync waves ──────┐
         ├── CloudNativePG + demo Postgres                  │ everything below
@@ -85,9 +87,15 @@ You build it in [module 08](lab/08-portal) and it comes fully alive in the
 ## Prerequisites — do this BEFORE the conference
 
 Conference WiFi carries keystrokes, not gigabytes. The setup downloads roughly 7.5 GB of
-container images (7.7 GB on x86-64). **Run all three steps at home, on a network you trust:**
+container images (7.7 GB on x86-64). **Run steps 1–3 at home, on a network you trust:**
 
 ```bash
+# 0. OPTIONAL, and only on Apple Silicon macOS or Linux with KVM: real Talos VMs.
+#    Skip it and you get the Docker substrate, which runs the same workshop.
+brew install randax/tap/tbx && sudo tbx system install && tbx doctor
+#    (Linux: the release tarball + `sudo tbx system install`. mise cannot install
+#     tbx yet — it is pinned in scripts/versions.env and mise.toml's comment.)
+
 git clone https://github.com/randax/Platform-Engineering-Workshop.git
 # (will be renamed to jz-2026-platform-engineering — the old URL will redirect)
 cd Platform-Engineering-Workshop
@@ -100,6 +108,13 @@ cd Platform-Engineering-Workshop
 If step 3 is all green, you're done. If it isn't, the output tells you what to fix — and
 if it can't be fixed, the [devcontainer lifeboat](#plan-b-devcontainer--codespaces) below
 has you covered. Bring your laptop and its power supply.
+
+**Docker is required either way.** The offline story is a local registry mirror running in
+a Docker container, on both substrates — tbx replaces the *nodes*, not the mirror. On the
+tbx path step 2 additionally warms the Talos disk image (`tbx cache pull`, 95 MB on arm64 /
+204 MB on amd64), and step 3 asserts a complete `disk.raw` is in `~/.talosbox/cache`.
+`install.sh --check` prints which substrate you will get, and — when it falls back to
+Docker — the `tbx doctor` line that decided it.
 
 ### Your `kubectl` gets a workshop-only kubeconfig
 
@@ -123,24 +138,79 @@ your cluster and your terminal are looking at two different files.
 
 ### Hardware — honest numbers
 
-| | Minimum | Recommended |
+| | tbx (real Talos VMs) | Docker (Talos-in-Docker) |
 |---|---|---|
-| RAM | **16 GB** (≥10 GB allocatable to Docker) | 32 GB |
-| CPU | 4 cores | more |
-| Free disk | 40 GB | more |
+| Minimum | 16 GB RAM, 4 cores, 40 GB free | 16 GB RAM with **≥10 GB and ≥4 CPUs to Docker**, 40 GB free |
+| Comfortable | 32 GB | 32 GB |
+| What you get | real `LoadBalancer` VIPs, a real L2 segment | the same labs, the same URLs, via published ports |
 
 The full platform idles at roughly 8 GB inside the cluster. On 16 GB machines it fits,
-but close your Electron zoo. macOS users: OrbStack or a Docker Desktop with a raised
-memory limit. WSL2 users: raise the limit in `.wslconfig`.
+but close your Electron zoo. On the Docker substrate: OrbStack, or a Docker Desktop with
+a raised memory limit; WSL2 users raise it in `.wslconfig`. On tbx the VM sizes are pins
+(`TBX_CP_MEMORY` / `TBX_WORKER_MEMORY` in `scripts/versions.env`) — they are the ceiling
+each guest boots with, not a permanent reservation: talos-box balloons memory back out of
+a running node when the host comes under pressure. That keeps the laptop alive; it also
+means a hungry browser can shrink your cluster mid-module. Close the zoo anyway.
 
 ### Platform support matrix
 
-| Platform | Status |
-|---|---|
-| macOS (Apple Silicon) | ✅ Fully supported |
-| macOS (Intel) | ✅ Fully supported |
-| Linux | ✅ Fully supported (watch out for firewalld/nftables interference) |
-| Windows (WSL2) | ⚠️ Best effort — it should work, but it's our least-tested platform. If it fights you, pair up with a neighbor or use the devcontainer lifeboat. |
+| Platform | Substrate | Support |
+|---|---|---|
+| macOS, Apple Silicon | tbx (Docker if `tbx doctor` fails) | fully supported |
+| Linux, amd64/arm64 with KVM | tbx (Docker otherwise) | fully supported on Docker; **tbx is best-effort at the pinned v0.1.1** |
+| macOS, Intel | Docker | fully supported |
+| Windows via WSL2 | Docker | best-effort — pair up if it fights you |
+| GitHub Codespaces / devcontainer | Docker | the lifeboat, tested weekly in CI |
+
+Both substrates run **the same labs, the same `verify.sh` scripts and the same URLs**. The
+scripts pick for you and remember the choice in `~/.cloudbox/substrate`; override with
+`CLOUDBOX_SUBSTRATE=docker` or `=tbx`. On Linux, watch out for firewalld/nftables
+interference on either substrate.
+
+The memory lasts as long as the cluster does: `destroy-cluster.sh` removes that file
+along with the cluster it described, and the next `create-cluster.sh` decides again from
+scratch. It prints the substrate it just forgot and the command that keeps it
+(`CLOUDBOX_SUBSTRATE=<what it was> ./scripts/create-cluster.sh`) — worth using if you
+chose that substrate deliberately, because detection will not know you did.
+`catch-up.sh <module> --rebuild` carries it across for you.
+
+**The override picks; it does not overrule what is already there.** Once a cluster has
+been created, `~/.cloudbox/substrate` is a *record*, not a preference — and `create-cluster.sh`,
+`destroy-cluster.sh`, `kind-fallback.sh`, `--refresh-endpoint` and
+`install.sh --write-hosts`/`--add-hosts` all refuse, before touching anything, when the
+substrate you are asking for is not the one this machine recorded. Changing substrates is
+two commands and they say so:
+
+```bash
+CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh   # (or ./scripts/kind-fallback.sh --delete)
+CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh
+```
+
+A machine with no record — a fresh laptop, CI — is unaffected: the override is simply the
+answer there.
+
+**Linux + tbx, the fine print.** Detection gates on `tbx doctor`, and at the pinned
+v0.1.1 one of its Linux checks turns a *permission* problem into a verdict: with
+`br_netfilter` active it runs `iptables -S FORWARD`, and an unprivileged shell's exit 4
+becomes `FAIL inspect FORWARD policy` rather than "could not tell". On such a host
+detection quietly falls back to Docker — which works, and is why this is best-effort
+rather than broken. If you want the VMs anyway and you have checked the FORWARD policy
+yourself, run `sudo iptables -S FORWARD` once to see the real answer and then force the
+substrate: `CLOUDBOX_SUBSTRATE=tbx ./scripts/create-cluster.sh` (add
+`CLOUDBOX_ALLOW_TBX_DRIFT=1` if you are on a newer tbx than the pin). Upstream fixed it
+in `053aecb` — WARN with a sudo remediation — so this note retires with the first tbx
+release that contains it.
+
+**Half-installed tbx.** If `tbx` is on your PATH but its helper daemon is not running, the
+docker path cannot ask it whether a `cloudbox` cluster exists there. It continues anyway
+when this machine carries no trace of one (`~/.cloudbox/substrate`, `~/.cloudbox/cloudbox.tbx.yaml`
+and `~/.talosbox/clusters/cloudbox` all absent — nothing it ever created can be running).
+When a trace *is* present it stops rather than risk two clusters of the same name: fix tbx,
+or set `CLOUDBOX_IGNORE_TBX=1` if you know those VMs are down.
+
+**One catalog extra is amd64-only:** Backstage's CNOE image has no arm64 build, and a tbx
+VM emulates nothing, so on Apple Silicon that stretch item needs the Docker substrate.
+`install.sh --check` warns. Nothing on the core path is affected.
 
 ## At the venue
 
@@ -149,16 +219,64 @@ workshop works offline once the images are pre-pulled and the Helm charts are ve
 they are, in `scripts/manifests/`):
 
 ```bash
-./scripts/create-cluster.sh     # Talos-in-Docker cluster + Cilium
+./scripts/create-cluster.sh     # Talos cluster (tbx VMs or Docker) + Cilium
 ./scripts/bootstrap-gitops.sh   # in-cluster Gitea + ArgoCD
 ./scripts/seed-gitea.sh         # seed your cloud's git with the platform tree
 ```
 
+**On the Docker substrate, `create-cluster.sh` asks for your password once, at the very
+end.** It is the only sudo in the workshop: Docker has no resolver, so the workshop
+hostnames come from a marked `# cloudbox-begin` block in `/etc/hosts`, written via
+`sudo tee`. See exactly what goes in with `./scripts/install.sh --print-hosts` (WSL2: the
+same lines also belong in `C:\Windows\System32\drivers\etc\hosts`, edited as
+Administrator). Decline the password and every `*.cloudbox.k8s.test` URL fails on a
+perfectly healthy cluster — the cluster itself is fine and stays up, and
+`./scripts/install.sh --write-hosts` writes the block whenever you are ready.
+That is also the command to run if the names ever stop resolving: **WSL2 regenerates
+`/etc/hosts` on every restart** unless you tell it not to (see `lab/00-setup`).
+*Every* `./scripts/destroy-cluster.sh` on the Docker substrate *asks* to remove the block
+again — not only `--purge-mirror`, which additionally forgets the extra names you added
+with `--add-hosts`. It is one more sudo prompt, and you may decline it: the teardown
+finishes either way and says which lines are still there. On the tbx substrate nothing touches `/etc/hosts` — talos-box's own
+resolver answers the names.
+
 Fell behind or broke something interesting? `./scripts/catch-up.sh <module>` force-pushes
 the canonical state for that module to your Gitea and lets ArgoCD converge — scripted
-state, not hope. If Talos-in-Docker won't cooperate on your machine,
-`./scripts/kind-fallback.sh` gives you a kind+Cilium cluster and you continue from
-module 2 onward.
+state, not hope. If neither substrate will cooperate on your machine,
+`./scripts/kind-fallback.sh` gives you a kind+Cilium cluster that meets the same
+contract: the same vendored Cilium with the **same ingress values**, host port 80
+mapped to the ingress, and the same marked `/etc/hosts` block — so every
+`*.cloudbox.k8s.test` hostname works and **modules 02 onward are identical**. You
+lose only the Talos content of module 1.
+
+kind is not one of the two substrates — but it *is* a recorded identity. The script
+writes `kind` into `~/.cloudbox/substrate`, which is what tells `install.sh --check`
+to grade this machine with Docker semantics, fills the image mirror for the right
+architecture, and makes `create-cluster.sh` and `destroy-cluster.sh` **refuse**
+rather than build a second cluster over the lifeboat or delete its hostnames.
+Tear it down with `./scripts/kind-fallback.sh --delete`, which deletes the kind
+cluster, removes the `/etc/hosts` block it wrote (one sudo prompt, and you may
+decline it — it then names the lines to delete by hand) and clears the identity.
+It removes that block only when the identity says `kind`, so running it on a
+Docker-substrate machine cannot take out a live cluster's names — and it clears the
+identity only once the cluster is gone *and* the block is removed (or proven absent), so a
+declined sudo leaves you able to retry rather than stranded with a block no command will
+own. If the file is missing — a lifeboat taken before this existed — say so for the
+session: `CLOUDBOX_SUBSTRATE=kind ./scripts/install.sh --check`. The same override works
+for the teardown, `CLOUDBOX_SUBSTRATE=kind ./scripts/kind-fallback.sh --delete`, but there
+it is honoured only against **kind-specific** proof: `kind get clusters` must list
+`cloudbox`, or Docker must still hold containers labelled
+`io.x-k8s.kind.cluster=cloudbox`. The `/etc/hosts` block is *not* proof — the docker
+substrate writes an identical one, so accepting it would let an environment variable
+delete a live Talos cluster's hostnames. Once the claim is proved, `kind` is written back
+into `~/.cloudbox/substrate` immediately, so a retry after a declined sudo needs no
+override at all. The teardown exits non-zero whenever anything is left, and it needs
+Docker running (it asks the daemon for the containers) but neither `kind` nor `kubectl`
+on `PATH`.
+
+The one thing you give up is **module 01**: `lab/01-cluster/verify.sh` checks a Talos
+cluster, so on the lifeboat it prints "not gradeable here" and exits 0 rather than
+failing a cluster that is working as documented.
 
 ## Lab overview
 
@@ -215,6 +333,30 @@ Docker-in-Docker and all tools preinstalled — the exact same workshop content:
 - **Locally**: any editor that speaks the [Dev Containers spec](https://containers.dev)
   (VS Code, JetBrains, `devcontainer` CLI) — though if Docker works locally, you likely
   don't need the lifeboat.
+
+**One thing is different in Codespaces: how you open a service.** Everywhere else the
+workshop's URLs are hostnames (`http://gitea.cloudbox.k8s.test`). In a codespace your
+browser is not on the machine the cluster runs on — it reaches the container through
+`https://<codespace>-<port>.app.github.dev`, which sends whatever `Host` header GitHub
+chooses, and the platform's ingress routes **by hostname**. So the forwarded port-80 URL
+finds no matching rule and 404s, on a cluster that is completely healthy.
+
+Use the **Ports tab** instead. The devcontainer forwards a NodePort per service, and each
+row opens the right one directly, no `Host` header involved:
+
+| Ports tab entry | Service |
+|---|---|
+| NodePort 30300 | Gitea (in-cluster git) |
+| NodePort 30080 | ArgoCD |
+| NodePort 30600 | Cloudbox Console |
+| NodePort 30030 | Grafana |
+| NodePort 30900 | RustFS S3 |
+| NodePort 30500 | Zot registry |
+| NodePort 31080 | your apps (Kourier) — needs a `Host` header, so `curl` it from the terminal |
+
+Inside the codespace's own terminal the hostnames work normally (`curl` and the labs'
+`verify.sh` scripts resolve them from the container's `/etc/hosts`) — it is only the
+browser, which is somewhere else entirely, that needs the Ports tab.
 
 Note that Codespaces runs in Microsoft's cloud — a pragmatic irony for a sovereignty
 workshop, and exactly why it's the lifeboat and not the boat.

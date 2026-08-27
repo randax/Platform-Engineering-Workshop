@@ -104,7 +104,7 @@ RustFS: MinIO's community edition was gutted through 2025–26 in favour of prop
 
 CloudNativePG uses Postgres 18.4; the CRDs are far past the 262KB annotation limit so the ArgoCD app is ServerSideApply=true.
 
-RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed cluster!), ~90 MB idle, presigned GET/PUT work, presigned POST doesn't, IAM is console-first, security history is rough (that's teachable material). Switch triggers to SeaweedFS are written down for mid-August. Zot: anonymous read/write on purpose (workshop-grade), search + UI extensions on for a visible win at :30500. Harbor would be the right enterprise pick and the wrong workshop pick — Postgres, Redis, Trivy, ChartMuseum, many pods.
+RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed cluster!), ~90 MB idle, presigned GET/PUT work, presigned POST doesn't, IAM is console-first, security history is rough (that's teachable material). Switch triggers to SeaweedFS are written down for mid-August. Zot: anonymous read/write on purpose (workshop-grade), search + UI extensions on for a visible win at http://zot.cloudbox.k8s.test. Harbor would be the right enterprise pick and the wrong workshop pick — Postgres, Redis, Trivy, ChartMuseum, many pods.
 -->
 
 ---

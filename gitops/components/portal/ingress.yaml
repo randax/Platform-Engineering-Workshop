@@ -1,0 +1,29 @@
+# The Cloudbox Console at http://portal.cloudbox.k8s.test — the same URL on both
+# substrates (scripts/versions.env, PORTAL_HOST_URL). YAML is not shell, so
+# the hostname is written out literally here; keep the two in step.
+# NodePort 30600 (portal.yaml:150-160, the portal Service) stays published as the
+# fallback for when the /etc/hosts block is missing on the docker substrate.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portal
+  namespace: portal
+  annotations:
+    # The Console's agent-ask answer is an SSE stream that runs for as long as
+    # the model takes, and Envoy's default route timeout — which every hostname
+    # now passes through — is 15 s. "0s" disables it for this Ingress; see the
+    # same annotation on gitops/components/gitea/ingress.yaml for the citation.
+    ingress.cilium.io/request-timeout: "0s"
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: portal.cloudbox.k8s.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: portal
+                port:
+                  number: 8080

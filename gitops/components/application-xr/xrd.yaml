@@ -27,6 +27,39 @@ spec:
         openAPIV3Schema:
           type: object
           properties:
+            # The name is load-bearing HERE, not just in the API server: the
+            # composed ksvc is named after the XR and its external host is
+            # "<name>-<namespace>.kn.cloudbox.k8s.test" — name and namespace
+            # share ONE DNS label (63 characters, RFC 1035). Crossplane honours
+            # this restriction rather than dropping it: genCrdVersion takes
+            # min(its own default, metadata.properties.name.maxLength) and
+            # writes it into the generated CRD (crossplane internal/xcrd/crd.go,
+            # `if old := s.Properties["metadata"]…MaxLength; old != nil && *old
+            # < maxLength`). 40 is the same cap the Console enforces
+            # (apps/portal/internal/kube/resources.go, dnsName), so kubectl and
+            # the Console agree about what a name may be. The Console also
+            # checks the name+namespace PAIR (ValidKnativeHost); a schema cannot
+            # — it does not know the namespace — so 40 is the floor under it,
+            # not the whole rule. See docs/HAZARDS.md.
+            #
+            # A CEL rule cannot rescue that either, and it fails twice over —
+            # checked against the sources, so nobody spends an afternoon on it:
+            #   1. Kubernetes exposes only apiVersion, kind, metadata.name and
+            #      metadata.generateName to x-kubernetes-validations ("No other
+            #      metadata properties are accessible", CRD docs). There is no
+            #      self.metadata.namespace for a rule to read.
+            #   2. Crossplane's generated CRD keeps XValidations only from the
+            #      XRD's spec and status sub-schemas (internal/xcrd/crd.go,
+            #      genCrdVersion: cSpec.XValidations / cStatus.XValidations).
+            #      The root schema is BaseProps() plus our description, so a
+            #      root-level rule never reaches the API server at all.
+            # The pair is enforced in the Console and documented in lab 04.
+            metadata:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 40
             spec:
               type: object
               required:

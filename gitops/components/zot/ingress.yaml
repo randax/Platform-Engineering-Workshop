@@ -1,0 +1,28 @@
+# Zot's UI and OCI API at http://zot.cloudbox.k8s.test (scripts/versions.env,
+# ZOT_HOST_URL) — for the BROWSER and for host-side `crane`. Backend: Service
+# `zot`, port 5000 (zot.yaml:51-71), not the `zot-headless` Service above it.
+#
+# The in-cluster and node-side paths do NOT move here:
+#   * pushes from Argo Workflows go to zot.zot.svc.cluster.local:5000
+#   * kubelet PULLS use localhost:30500 — the node's own NodePort (zot.yaml:68),
+#     which is valid on both substrates and is in Knative's
+#     registries-skipping-tag-resolving list (serving-core.yaml).
+# Do not "tidy" those into this hostname; a node cannot resolve it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zot
+  namespace: zot
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: zot.cloudbox.k8s.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: zot
+                port:
+                  number: 5000

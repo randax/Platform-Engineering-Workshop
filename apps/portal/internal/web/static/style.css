@@ -315,6 +315,11 @@ label.check small { color: var(--muted); }
 .proj-item { flex: 1; display: block; padding: 0.32rem 0.55rem; border-radius: var(--r-sm); color: var(--ink); text-decoration: none; font-size: 0.9rem; }
 .proj-item:hover { background: var(--surface-2); }
 .proj-item.active { color: var(--accent); font-weight: 600; }
+/* A legacy hyphenated project: listed, deletable, not openable — so it must not
+   look like something you can click. */
+.proj-legacy { color: var(--muted); cursor: default; }
+.proj-legacy:hover { background: none; }
+.proj-legacy small { font-size: 0.75rem; }
 .proj-del { background: none; color: var(--muted); padding: 0.1rem 0.45rem; font-size: 1rem; line-height: 1; }
 .proj-del:hover { background: var(--bad-bg); color: var(--bad); }
 .proj-new { color: var(--accent); cursor: pointer; border-top: 1px solid var(--line); margin-top: 0.25rem; padding-top: 0.45rem; }

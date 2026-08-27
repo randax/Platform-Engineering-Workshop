@@ -17,7 +17,7 @@ Crossplane v2 pipeline + `function-patch-and-transform` — no new components.
 ## What one `Application` composes (in the XR's own namespace)
 
 1. **workload** — a Knative `Service` named after the XR. Free scale-to-zero and
-   a `http://<name>.<namespace>.127.0.0.1.sslip.io:31080` URL via Kourier — no
+   a `http://<name>-<namespace>.kn.cloudbox.k8s.test` URL via Kourier — no
    separate ingress component. `spec.image` → the container; `spec.replicas`
    `{min,max}` → the `autoscaling.knative.dev/minScale` and
    `autoscaling.knative.dev/maxScale` annotations. **`spec.env` is
@@ -57,7 +57,14 @@ Version `v1alpha1`, `served` + `referenceable`. `spec.image` is the only
 required field; `spec.replicas` defaults to `{}` with `min: 0` / `max: 3` so the
 object validates when omitted; `spec.database` / `spec.bucket` default `true`
 (and are inert — see limitations); `spec.env` is a `[{name,value}]` array (also
-inert).
+inert). `metadata.properties.name.maxLength: 40` — deliberate and load-bearing:
+the composed ksvc's host is `<name>-<namespace>` in ONE DNS label, so the name
+has to leave room for the namespace. Crossplane honours it (`genCrdVersion`
+takes the smaller of its own default and ours,
+crossplane `internal/xcrd/crd.go`) rather than dropping the block. Keep it in
+step with `dnsName` in `apps/portal/internal/kube/resources.go`; the pair check
+that a schema cannot express lives there too (`ValidKnativeHost`). See
+`docs/HAZARDS.md`, "the dash that made routing work".
 
 **`composition.yaml`** — `mode: Pipeline`, one step against
 `function-patch-and-transform` (the name must match the installed Function,
@@ -139,7 +146,7 @@ fails with a plain "forbidden" until its group is aggregated in.
   to install + mirror). Because the DB is always created, `DATABASE_URL` always
   resolves — the composition is internally consistent as-is.
 - **NATS queue (`spec.queue`) and explicit `spec.ingress` host** from the PRD are
-  **out of scope for v1** (queue depends on PRD-0001; the sslip.io URL already
+  **out of scope for v1** (queue depends on PRD-0001; the Knative URL already
   covers ingress for the golden path).
 - **Redundant bucket when a DB exists.** The `WorkshopDatabase` also creates a
   bucket (`<name>-assets`, Job `<name>-bucket`). The app's own bucket is
@@ -168,6 +175,12 @@ to compose. Rehearse before calling it done:
    `CreateContainerConfigError`).
 6. **Namespace propagation.** Confirm the composed `WorkshopDatabase` lands in
    the Application's namespace (patched `metadata.namespace`).
+7. **The `metadata.name` maxLength survives into the CRD.** Read against
+   crossplane's source, not a cluster: `kubectl get crd
+   applications.platform.cloudbox.io -o jsonpath='{.spec.versions[0].schema.openAPIV3Schema.properties.metadata.properties.name.maxLength}'`
+   should print `40`, and a 41-character name should be refused by the API
+   server. If a future Crossplane drops the block instead, the Console still
+   enforces it — but `kubectl apply` would stop agreeing with the Console.
 
 ## Prerequisites
 

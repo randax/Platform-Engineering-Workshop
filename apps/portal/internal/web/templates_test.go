@@ -27,7 +27,7 @@ func TestTemplatesRender(t *testing.T) {
 	// Same constructor main uses (FuncMap!). A bare Server with just the
 	// Grafana URL is enough: with no Kube client currentSnapshot returns the
 	// zero snapshot, so the nav renders with every gated page simply locked.
-	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"})
 	if err != nil {
 		t.Fatalf("parsing templates: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestTemplatesRender(t *testing.T) {
 				`name="image"`, `Min scale`, `Max scale`, // the fuller input set
 				`name="source"`, `Build from a repo`, `name="repo"`, // deploy-from-source toggle
 				`Attach a Postgres database`, `Attach an S3 bucket`, // dependency toggles
-				`web.demo.127.0.0.1.sslip.io`,   // the Ready app's URL
+				`web-demo.kn.cloudbox.k8s.test`, // the Ready app's URL
 				`href="/applications/web"`,      // name + Details link into the detail view
 				`hx-delete="/applications/web"`, // per-row delete
 			},
@@ -171,7 +171,7 @@ func TestTemplatesRender(t *testing.T) {
 				`hx-post="/applications/api/redeploy"`, // Redeploy lives on the detail now
 				`hx-delete="/applications/api"`,        // delete from the danger zone
 				`polyline`,                             // the monitoring sparkline (Telemetry branch)
-				`api.demo.127.0.0.1.sslip.io`,          // the Ready workload URL
+				`api-demo.kn.cloudbox.k8s.test`,        // the Ready workload URL
 			},
 		},
 		"function-detail": {
@@ -192,7 +192,7 @@ func TestTemplatesRender(t *testing.T) {
 				Secret:     "my-db-pg-app",
 				Psql:       "kubectl -n demo exec -it my-db-pg-1 -- psql -U app app",
 				Events:     []kube.Event{{Type: "Warning", Reason: "FailedScheduling", Message: "0/2 nodes"}},
-				GrafanaURL: "http://localhost:30030/explore?x",
+				GrafanaURL: "http://grafana.cloudbox.k8s.test/explore?x",
 				Telemetry:  true,
 				ConnSpark:  metrics.Sparkline([]float64{1, 3, 2, 4}, "connections"),
 				ConnNow:    "4",
@@ -267,5 +267,40 @@ func TestTemplatesRender(t *testing.T) {
 				t.Errorf("%q: rendered HTML missing %q", name, want)
 			}
 		}
+	}
+}
+
+// TestProjectNameFormMatchesServerRule pins the project-name form control to
+// the SERVER's rule (kube.ValidProjectName / kube.ValidName).
+//
+// The form carried pattern="[a-z0-9]+" with no length cap at all, while
+// kube.ValidName's regexp caps a name at 40 characters. A 41-character project
+// name therefore passed browser validation, was POSTed, and came back as a
+// server-side error the form gives no hint about. The two halves of one rule
+// have to be written down twice (HTML cannot ask Go), so this asserts they
+// still agree — and that the numbers in the pattern are the ones the server
+// actually enforces.
+func TestProjectNameFormMatchesServerRule(t *testing.T) {
+	src, err := templateFS.ReadFile("templates/project-bar.html")
+	if err != nil {
+		t.Fatalf("reading project-bar.html: %v", err)
+	}
+	html := string(src)
+	for _, want := range []string{`pattern="[a-z0-9]{1,40}"`, `maxlength="40"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("project-bar.html is missing %s — the form must carry the server's own length cap", want)
+		}
+	}
+
+	// And the numbers are right: 40 accepted, 41 refused, by the SERVER.
+	if !kube.ValidProjectName(strings.Repeat("a", 40)) {
+		t.Errorf("kube.ValidProjectName(40 chars) = false; the form's {1,40} would let it through")
+	}
+	if kube.ValidProjectName(strings.Repeat("a", 41)) {
+		t.Errorf("kube.ValidProjectName(41 chars) = true; the form's {1,40} is stricter than the server")
+	}
+	// The hyphen half of the same rule, still asserted from both sides.
+	if kube.ValidProjectName("team-a") {
+		t.Errorf("kube.ValidProjectName(%q) = true; the form's [a-z0-9] excludes it", "team-a")
 	}
 }

@@ -132,7 +132,7 @@ a different module, see the "Prerequisites" section above):
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].env}'
 kubectl -n demo rollout history deploy/demo-web
-git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -196,7 +196,7 @@ Git-managed Deployment:
 kubectl -n demo describe pod <new-pod>
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].resources}'
-git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -256,7 +256,7 @@ image that fast. Which of the things you built in module 00 and 01 could have an
 ```bash
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].image}'
-git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -310,7 +310,7 @@ If you haven't already, turn the capability on the same way as every other one i
 workshop — copy the catalog entry into `gitops/apps/` and push:
 
 ```bash
-git clone http://localhost:30300/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 cp gitops/catalog/kagent.yaml gitops/apps/
 git add gitops/apps/kagent.yaml
 git commit -m "enable kagent"
@@ -319,7 +319,8 @@ git push
 
 Wait for `kubectl -n argocd get application kagent` to report `Synced`/`Healthy`, then
 check what shipped: `kubectl -n kagent get modelconfig default-model-config -o yaml`. It
-defaults to host-side Ollama running `qwen3:1.7b`, reached at `host.docker.internal:11434`.
+defaults to host-side Ollama running `qwen3:1.7b`, reached at whatever "the host" means on
+your substrate — see the check below.
 
 **Expect `kagent-controller` to CrashLoopBackOff ~3 times on the way there, and leave it
 alone.** It runs its database migration at startup, and it starts before the
@@ -329,40 +330,45 @@ worth two minutes of attention: a restart count is not a diagnosis, and *orderin
 failures self-heal in a way *configuration* failures never do. If it is still restarting
 after ~3 minutes, then read the logs.
 
-**macOS and WSL2 (Docker Desktop, OrbStack): nothing else to do.** That address already
-resolves inside the containers your cluster nodes run in — including through to an Ollama
-listening only on `127.0.0.1`, which is its default. Verified on 2026-08-17 under Colima
-(`vmType: vz`): a pod resolved `host.docker.internal` to `192.168.5.2` and got
-`{"version":"0.32.14"}` back from `/api/version` with no `OLLAMA_HOST` change at all.
-
-**Native Linux Docker has no `host.docker.internal`.** This is the same host-vs-container
-addressing problem `cloudbox-mirror` already solved for you in module 00 (see
-`mirror_host_endpoint()` in `scripts/lib.sh`), showing up a second time for a second
-reason: "the host" means something different depending on how Docker virtualizes your
-network, and every capability that needs to reach out of the cluster hits this once. Fix
-it the same GitOps way as every other change in this module — one field, in the same
-clone:
+**"The host" is not one address, and you do not hand-edit it.** It is
+`host.docker.internal` on the macOS/WSL2 docker substrate, `10.5.0.1`
+(`TALOS_SUBNET_GATEWAY`) on the native-Linux docker substrate, and the cluster gateway
+`172.30.<n>.1` inside a talos-box VM — the same
+host-vs-container addressing problem `cloudbox-mirror` solved for you in module 00 (see
+`mirror_host_endpoint()` and `cloudbox_host_gateway()` in `scripts/lib.sh`), showing up a
+second time for a second reason. It is already handled, in two halves:
+`bootstrap-gitops.sh` resolved the address for your machine back in module 00 and recorded
+it in configmap `kagent/cloudbox-host`, and the `kagent-ollama-host` PostSync hook you just
+synced patched the `ModelConfig` with it the moment ArgoCD created it. The kagent
+Application `ignoreDifferences` that one field, so selfHeal leaves the patch alone. Verify:
 
 ```bash
-$EDITOR gitops/components/kagent/kagent.yaml   # find `kind: ModelConfig`, then `ollama:`
-#   host: host.docker.internal:11434   ->   host: 10.5.0.1:11434
-git add gitops/components/kagent/kagent.yaml
-git commit -m "kagent: Ollama host is the Linux bridge gateway, not host.docker.internal"
-git push
+kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.ollama.host}{"\n"}'
 ```
 
-`10.5.0.1` is `TALOS_SUBNET_GATEWAY` in `scripts/versions.env` — the exact address
-`mirror_host_endpoint()` resolves to on native Linux for the same reason.
+That should be your host's address, not necessarily the `host.docker.internal` that git
+carries. If it is not — the hook's log says why
+(`kubectl -n kagent logs job/kagent-ollama-host -c render-patch`, the container that
+makes the decision) — the same patch by hand:
 
-On native Linux there is a second half to it: the macOS/WSL2 shortcut above works because
-those runtimes proxy `host.docker.internal` into the host's loopback, and a plain bridge
-does not. An Ollama bound to `127.0.0.1` is unreachable across `10.5.0.1`, so start it as
+```bash
+kubectl -n kagent patch modelconfig default-model-config --type merge \
+  -p "{\"spec\":{\"ollama\":{\"host\":\"$(kubectl -n kagent get cm cloudbox-host -o jsonpath='{.data.ollama}')\"}}}"
+```
+
+**Ollama must listen on that address, not only on loopback.** macOS/WSL2 is the one case
+that needs nothing: those runtimes proxy `host.docker.internal` through to the host's
+loopback. Verified on 2026-08-17 under Colima (`vmType: vz`): a pod resolved
+`host.docker.internal` to `192.168.5.2` and got `{"version":"0.32.14"}` back from
+`/api/version` with no `OLLAMA_HOST` change at all. A plain bridge or a VM gateway does
+not proxy anything, so an Ollama bound to `127.0.0.1` is unreachable — start it as
 `OLLAMA_HOST=0.0.0.0 ollama serve` (or set that in its systemd unit) and confirm from
 inside the cluster before blaming kagent:
 
 ```bash
 # any pod with a shell will do — the kagent images are distroless, Gitea is not
-kubectl -n gitea exec deploy/gitea -c gitea -- wget -qO- http://10.5.0.1:11434/api/version
+kubectl -n gitea exec deploy/gitea -c gitea -- wget -qO- \
+  "http://$(kubectl -n kagent get cm cloudbox-host -o jsonpath='{.data.gateway}'):11434/api/version"
 ```
 
 Ollama itself needs to be running on your host with `qwen3:1.7b` pulled — `cloudbox-init.sh`
@@ -435,8 +441,10 @@ calls, then evidence that goes unread — is the point.
 >
 > ```bash
 > kubectl -n kagent logs deploy/k8s-agent -f
-> # POST http://host.docker.internal:11434/api/chat  →  your host model answered
-> # POST http://kagent-tools.kagent:8084/mcp        →  a tool call actually happened
+> # POST http://<your host>:11434/api/chat    →  your host model answered
+> #   (docker-only: host.docker.internal on macOS/WSL2, 10.5.0.1 on native Linux;
+> #    172.30.<n>.1 on talos-box — whatever the ModelConfig says)
+> # POST http://kagent-tools.kagent:8084/mcp  →  a tool call actually happened
 > ```
 >
 > (Until cloudbox-portal v0.2.1 the Console could not read kagent 0.9.12's frames at all

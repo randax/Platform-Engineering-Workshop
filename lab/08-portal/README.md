@@ -3,7 +3,7 @@
 ## The goal
 
 At the end of this module your platform has a front door: the **Cloudbox Console** at
-http://localhost:30600, showing — live — the ArgoCD apps, Postgres clusters, and Knative
+http://portal.cloudbox.k8s.test, showing — live — the ArgoCD apps, Postgres clusters, and Knative
 services *you built today*. The trophy: you create a database through its "New database"
 form and prove with `kubectl` that a real `WorkshopDatabase` XR and a real CNPG cluster
 appeared. Then you read the portal's entire source code, because it's small enough that
@@ -45,7 +45,7 @@ most portals.
 
 1. Enable `portal.yaml` from the catalog. It lands in ns `portal` and takes seconds — it's
    one small Go binary (compare that to what module 08 used to be…).
-2. Open **http://localhost:30600** and explore. The nav groups the pages into **Platform**
+2. Open **http://portal.cloudbox.k8s.test** and explore. The nav groups the pages into **Platform**
    (Overview, Components, Access, Workshop, Activity, Billing), **Services** (Applications,
    Databases, Buckets, Functions, Streams, Builds — Applications, Databases and Functions
    each have a detail page, and Buckets uses an in-page object browser), and **Capstone** (Gallery) — and none of them is a mock: every row is a live read
@@ -120,10 +120,13 @@ typically a team that owns it. A portal is a *product decision*, not a default.
 > → new Gitea repo → ArgoCD app → pods. Watch for what the template wires together —
 > that integration glue is the real work of running Backstage.
 >
-> *Presenter notes:* pre-enable `backstage.yaml` before the module (first boot is slow,
+> *Presenter notes:* the CNOE image is **amd64-only** — on an Apple Silicon laptop the
+> demo cluster has to be the docker substrate (`CLOUDBOX_SUBSTRATE=docker`), because tbx
+> VMs are native arm64 with no emulation. Pre-enable `backstage.yaml` before the module (first boot is slow,
 > ~2 GB image + CNPG database — it's why this is a demo, not the lab). Show: guest
-> sign-in at :30700, catalog entities fed from Gitea, run the template, then chase it
-> through Gitea (:30300) and ArgoCD (:30080). `backstage.yaml` stays in the catalog —
+> sign-in at `http://backstage.cloudbox.k8s.test`, catalog entities fed from Gitea, run
+> the template, then chase it through Gitea (`http://gitea.cloudbox.k8s.test`) and
+> ArgoCD (`http://argocd.cloudbox.k8s.test`). `backstage.yaml` stays in the catalog —
 > attendees with RAM to spare can run the same loop at home.
 
 ## Hints
@@ -139,7 +142,7 @@ git add . && git commit -m "enable the cloudbox console" && git push
 kubectl -n portal get pods -w    # one small pod
 ```
 
-It's up when `curl -s http://localhost:30600/healthz` answers `ok`. Note the portal needs
+It's up when `curl -s http://portal.cloudbox.k8s.test/healthz` answers `ok`. Note the portal needs
 the `demo` namespace and the module-04 platform API to exist — it *is* the UI for them.
 </details>
 
@@ -184,7 +187,7 @@ cp "$WORKSHOP/lab/08-portal/portal-access.yaml" gitops/components/demo/
 git add . && git commit -m "module 08: enable the cloudbox console + grant it demo access" && git push
 
 kubectl -n portal rollout status deploy/portal --timeout=300s
-open http://localhost:30600            # explore, then: Databases → New database
+open http://portal.cloudbox.k8s.test   # explore, then: Databases → New database
                                        # name: console-db, size: small → Create
 
 kubectl -n demo get workshopdatabase console-db -w    # until SYNCED + READY
@@ -204,8 +207,8 @@ cd "$WORKSHOP/lab/08-portal" && ./verify.sh
 ./verify.sh
 ```
 
-It checks: the portal app is Synced/Healthy; the deployment is ready; the UI answers on
-:30600; the `portal` ServiceAccount exists (that token is the portal's only credential);
+It checks: the portal app is Synced/Healthy; the deployment is ready; the UI answers at
+`http://portal.cloudbox.k8s.test`; the `portal` ServiceAccount exists (that token is the portal's only credential);
 and — once you've created it — that `console-db` is a real, Ready `WorkshopDatabase`
 with a healthy CNPG cluster behind it.
 
@@ -248,8 +251,12 @@ git instead?
   cp "$WORKSHOP/lab/08-portal/portal-applications-access.yaml" gitops/components/demo/
   git add . && git commit -m "grant portal: create Applications" && git push
   ```
-  Deploy `my-app`, watch it turn Ready, and open its `*.sslip.io` URL — the apex of the
+  Deploy `my-app`, watch it turn Ready, and open its `*.kn.cloudbox.k8s.test` URL — the apex of the
   self-service arc, from a form.
+  On the **docker substrate** that URL is a name nobody could have listed in advance, and
+  `/etc/hosts` has no wildcards — so teach it once:
+  `./scripts/install.sh --add-hosts my-app-demo` (the first label of the URL the Console
+  shows you). On tbx it already resolves.
 - **Read _why_ something is broken (Diagnostics, DR-0005).** When an Application or Function
   isn't Ready, open its **detail page**: instead of a bare red dot, the console shows the
   cause a `kubectl describe` would — the failing conditions, the offending pods' container
@@ -265,7 +272,7 @@ git instead?
   proves the wiring rather than ignoring it. Its Dockerfile builds `FROM` a golang base in Zot,
   so seed that base once first (same move as module 07's busybox — from your own mirror,
   no internet needed):
-  `crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine localhost:30500/library/golang:1.25-alpine`.
+  `crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine zot.cloudbox.k8s.test/library/golang:1.25-alpine`.
   (The golang base joined the pre-pull list with the adventure images — if your
   `cloudbox-init.sh` run predates that, either re-run it or fall back to the online
   source, `public.ecr.aws/docker/library/golang:1.25-alpine`.)
@@ -291,9 +298,13 @@ git instead?
   cp "$WORKSHOP/lab/08-portal/portal-projects-access.yaml" gitops/components/demo/
   git add . && git commit -m "grant portal: create projects (scoped)" && git push
   ```
-  Then create `team-a` from the selector, switch to it, and provision a database — note it
-  lands in the `team-a` namespace, not `demo`. (See [DR-0004](../../docs/prd/0004-console-write-model.md)
+  Then create `teama` from the selector, switch to it, and provision a database — note it
+  lands in the `teama` namespace, not `demo`. (See [DR-0004](../../docs/prd/0004-console-write-model.md)
   for why project *creation* is console-direct rather than a git round-trip.)
+  Project names have **no hyphens**, and the Console refuses one: a Knative app's URL is
+  `<app>-<project>.kn.cloudbox.k8s.test` — name and namespace in a single DNS label — so
+  `web-api` in `team` and `web` in `api-team` would compose the same hostname and one app
+  would silently answer for the other. See [docs/HAZARDS.md](../../docs/HAZARDS.md).
 - **Add a column.** Show each CNPG cluster's `instances` count on the Databases page
   (`resources.go` + `databases.html` — it's one field and one `<td>`).
 - **Add a page.** The portal already has RBAC to list pods. A "Pods" page is ~30 lines

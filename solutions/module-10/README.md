@@ -6,9 +6,10 @@ Application in `gitops/apps/` for ArgoCD to install and resets
 bad-release scenario.
 
 `catch-up.sh` does **not** create any attendee-side secret or touch host-side Ollama
-state. Kagent's ModelConfig expects Ollama on the attendee's own machine at
-`host.docker.internal:11434`; that host service is outside catch-up's scope, just as it
-is outside the module's `inject.sh` scope.
+state. Kagent's ModelConfig expects Ollama on the attendee's own machine, at whichever
+address reaches the host from inside the cluster (`bootstrap-gitops.sh` resolved it and
+recorded it in configmap `kagent/cloudbox-host`); that host service is outside catch-up's
+scope, just as it is outside the module's `inject.sh` scope.
 
 **Catch-up is cumulative; the lab is not.** The lab's scenario path needs only
 module 02, but `catch-up.sh` force-push *replaces* `gitops/apps/` with this tree —
@@ -16,7 +17,7 @@ so like every solutions tree it must carry everything earlier modules may have
 enabled, or catching up would prune capabilities out from under an attendee who
 had them running. That is why `post.sh` chains module-09's (and thereby
 module-07's) idempotent post-steps: the cumulative tree enables `hello-site`,
-whose `localhost:30500` image exists only after the in-cluster build, and the
+whose node-side `localhost:30500` image exists only after the in-cluster build, and the
 ArgoCD convergence gate would otherwise never go green. Expect `catch-up.sh 10`
 on a fresh cluster to take as long as catching up to module 09 plus the kagent
 install — it provisions the whole platform, not just this module's slice.

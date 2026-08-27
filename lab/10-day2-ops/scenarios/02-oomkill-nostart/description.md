@@ -48,7 +48,7 @@ floor* is a classic production incident.
 Deployment, because ArgoCD will reconcile it back to Git.
 
 ```bash
-git clone http://localhost:30300/cloudbox/platform.git
+git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git
 cd platform && mise trust   # the clone carries this repo's mise.toml; untrusted, mise tools refuse to run
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git revert <sha>

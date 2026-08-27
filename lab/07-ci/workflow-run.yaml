@@ -21,6 +21,6 @@ spec:
       - name: path
         value: lab/07-ci/app
       # Where to push. Zot, from inside the cluster (BuildKit resolves cluster
-      # DNS; the kubelet later pulls the same artifact via localhost:30500).
+      # DNS; the node's kubelet later pulls the same artifact via localhost:30500).
       - name: image
         value: zot.zot.svc.cluster.local:5000/hello-site:v1

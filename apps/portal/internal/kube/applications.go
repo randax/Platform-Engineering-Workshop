@@ -116,6 +116,11 @@ func BuildApplication(ns, name string, opts AppOpts) ([]byte, error) {
 	if !ValidName(name) {
 		return nil, fmt.Errorf("name %q must be a lowercase DNS label (a-z, 0-9, '-')", name)
 	}
+	// The composed ksvc is named after the XR, and its host is
+	// "<name>-<namespace>" — one DNS label for both. See ValidKnativeHost.
+	if err := ValidKnativeHost(name, ns); err != nil {
+		return nil, err
+	}
 	if opts.Image == "" {
 		return nil, fmt.Errorf("image is required")
 	}

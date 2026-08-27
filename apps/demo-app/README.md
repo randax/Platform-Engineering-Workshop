@@ -29,7 +29,7 @@ same way module 07 seeds busybox:
 
 ```sh
 crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine \
-  localhost:30500/library/golang:1.25-alpine
+  zot.cloudbox.k8s.test/library/golang:1.25-alpine
 ```
 
 This repo is seeded into the in-cluster Gitea by `scripts/seed-gitea.sh` and

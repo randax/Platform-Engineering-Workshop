@@ -1,0 +1,48 @@
+# Gitea at http://gitea.cloudbox.k8s.test — the workshop's only git remote, so
+# this URL is what attendees clone and push through all day.
+# (scripts/versions.env, GITEA_HOST_URL. YAML is not shell, so the hostname
+# is written out literally here; keep the two in step.)
+#
+# NOT applied by ArgoCD: Gitea is installed imperatively by
+# scripts/bootstrap-gitops.sh (it has to exist before GitOps does), so that
+# script applies this file directly. It lives here anyway so every component's
+# ingress is in one place.
+#
+# Backend: the chart's http Service. Release `gitea` + chart `gitea` ⇒
+# gitea.fullname = "gitea" (templates/_helpers.tpl), and
+# gitea.service.http.name = "<fullname>-http" (templates/gitea/_services.tpl:5)
+# ⇒ Service `gitea-http`, port `http` 3000 (chart values.yaml:121, not
+# overridden by bootstrap-gitops.sh) — the same address as
+# scripts/versions.env GITEA_CLUSTER_URL.
+# NodePort 30300 (NODEPORT_GITEA) stays published as the docker fallback.
+#
+# gitea.config.server.ROOT_URL deliberately stays the in-CLUSTER URL
+# (GITEA_CLUSTER_URL): that is the address ArgoCD polls, and repointing it at a
+# host name would make the platform's write path depend on host DNS.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitea
+  namespace: gitea
+  annotations:
+    # Envoy's default route timeout is 15 s, and every hostname now goes through
+    # Cilium's Envoy. `seed-gitea.sh` pushes a ~40 MiB pack through this
+    # hostname, and attendees push through it all day. "0s" means NO timeout
+    # (operator/pkg/ingress/annotations/annotations.go:88-101 parses it into a
+    # non-nil zero duration, and Envoy reads route timeout 0 as disabled).
+    # create-cluster.sh also sets a long global default on the Cilium operator;
+    # this is the belt to that pair of braces.
+    ingress.cilium.io/request-timeout: "0s"
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: gitea.cloudbox.k8s.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gitea-http
+                port:
+                  number: 3000

@@ -71,9 +71,9 @@ Fast finishers walk the trail AND pick a door; `catch-up.sh` teleports anyone an
 
 ```
 attendee laptop
-└── Docker (≥10 GB)
-    └── Talos v1.13.8 docker cluster (1 CP + 1 worker, raised memory)
-        ├── Cilium 1.18/1.19 (CNI)
+└── talos-box VMs (primary, where `tbx doctor` passes) or Docker (≥10 GB, fallback)
+    └── Talos v1.13.8 cluster (1 CP + 1 worker, raised memory)
+        ├── Cilium 1.20 (CNI + shared ingress)
         ├── Gitea (single-pod SQLite, seeded from this repo)   ← the "cloud's" git
         ├── ArgoCD v3.5.x  ── app-of-apps w/ sync waves ──┐
         ├── CloudNativePG + demo Postgres                 │ everything below
@@ -86,6 +86,19 @@ attendee laptop
         ├── Backstage (CNOE image, presenter demo)        │
         └── Victoria stack + OTel Collector (on-demand) ──┘
 ```
+
+**Substrate.** Two backends behind one dispatcher (`scripts/create-cluster.sh` +
+`scripts/substrate/{tbx,docker}.sh`): **talos-box** (`tbx`, real Talos VMs — Apple
+Silicon macOS, Linux with KVM) is primary; **Talos-in-Docker** is the fallback and the
+only substrate for Windows/WSL2, Codespaces and CI. The choice is resolved once
+(`CLOUDBOX_SUBSTRATE` → `~/.cloudbox/substrate` → `CLOUDBOX_SUBSTRATE_DEFAULT` →
+`tbx doctor`) and persisted at create. Both produce the *same* cluster: our own Talos
+config, the same `cni: none` patch, the same Cilium.
+
+**One hostname scheme, `*.cloudbox.k8s.test`,** served by a shared Cilium ingress: on tbx
+via a real `LoadBalancer` VIP (`172.30.<n>.200`, L2-announced) that talos-box's resolver
+already answers for; on Docker via NodePort 30880 published to host port 80 plus a marked
+`/etc/hosts` block. Every browser-facing URL in the labs is a hostname, on both.
 
 Repo layout to build toward:
 
@@ -169,6 +182,7 @@ docs/             RESEARCH.md · PRINCIPLES.md
 | Speaker illness | Both speakers rehearse *all* modules; slides + labs self-contained |
 | Version drift July→Sept | Pin everything now; weekly CI bootstrap; re-verify pins late Aug |
 | Unknown headcount (30 vs 80) | Ask organizers now; helper count scales with cap |
+| **Substrate swap eight days out (accepted, gated).** The analysis in `docs/talos-box-vs-docker.md` recommended against it; the owner proceeded | The fallback is first-class and CI-proven, plus a hard go-live gate on Aug 31 that flips the default back with a one-line change (`CLOUDBOX_SUBSTRATE_DEFAULT` in `scripts/versions.env`) |
 
 ## 6. Decisions (made 2026-07-13, Hans)
 

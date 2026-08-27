@@ -128,6 +128,22 @@ It checks: the crossplane and platform-api apps are Healthy (Synced is the happy
 the Composition exists; `my-db` is Synced *and* Ready; the composed CNPG cluster
 `my-db-pg` is healthy; and the `my-db-assets` bucket really exists in RustFS.
 
+## One rule the schema cannot enforce for you
+
+Module 08's `Application` XR composes a Knative Service whose URL is
+`<name>-<namespace>.kn.cloudbox.k8s.test` — **name and namespace share one DNS label**, so
+they have to fit in 63 characters together, and a hyphen in the *namespace* makes the split
+ambiguous (`web-api` in `team` and `web` in `api-team` compose the same hostname).
+
+The XRD caps `metadata.name` at 40, and that is as far as a schema can go. A CRD validation
+rule cannot check the pair: Kubernetes exposes only `metadata.name` and
+`metadata.generateName` to CEL — "no other metadata properties are accessible" — so
+`self.metadata.namespace` is not a thing a rule can read. (Crossplane also copies
+`x-kubernetes-validations` only from the XRD's `spec` and `status` sub-schemas; a root-level
+rule never reaches the generated CRD at all.) The Console enforces the pair in code and
+refuses hyphens in project names; `kubectl apply` of a hand-written XR does not.
+Keep namespaces short and hyphen-free — see [docs/HAZARDS.md](../../docs/HAZARDS.md).
+
 ## Explain-back
 
 Tell your neighbor: your teammate asks "why not just give developers the CNPG YAML from

@@ -27,7 +27,11 @@ source "${LAB_COMMON_DIR}/../scripts/context-guard.sh"
 
 require_workshop_context
 
-GITEA_HOST="${GITEA_HOST:-localhost:30300}"
+# The platform's git remote, as the HOST sees it. One hostname on both
+# substrates (tbx resolves it to the ingress VIP; docker via /etc/hosts).
+# Overridable so someone whose hosts block is missing can still work:
+#   GITEA_HOST=<reachable-gitea-host> ./verify.sh
+GITEA_HOST="${GITEA_HOST:-gitea.${CLOUDBOX_DOMAIN}}"
 GITEA_REPO_URL="${GITEA_REPO_URL:-http://gitea_admin:cloudbox123@${GITEA_HOST}/cloudbox/platform.git}"
 
 # Clone the platform repo from in-cluster Gitea into a temp dir; prints the path.

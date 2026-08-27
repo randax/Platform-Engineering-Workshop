@@ -100,6 +100,6 @@ the 512 MiB `max_file_store` cap in `nats.conf` is the only real limit.
 
 ## Workshop addition (not upstream)
 
-`service-nodeport.yaml` exposes the client port at `nats://localhost:30422` so the
+`service-nodeport.yaml` exposes the client port identified by `NODEPORT_NATS` so the
 `nats` CLI and laptop-side apps connect without a port-forward. Monitoring is on `:8222`
 (`/healthz`, `/jsz`, `/varz`) inside the cluster.

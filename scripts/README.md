@@ -21,7 +21,7 @@ the workshop needs **no image downloads at the venue**.
 ### At the venue
 
 ```bash
-./scripts/create-cluster.sh     # module 1: Talos-in-Docker cluster + Cilium
+./scripts/create-cluster.sh     # module 1: Talos cluster (tbx VMs or Docker) + Cilium
 ./scripts/bootstrap-gitops.sh   # module 2: Gitea + ArgoCD (the GitOps engine)
 ./scripts/seed-gitea.sh         # module 2: push this repo into your cloud
 ```
@@ -37,7 +37,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 ./scripts/catch-up.sh 3 --rebuild   # nuclear: destroy + recreate + bootstrap
                                     # + seed + catch up (~10 min, pre-pulled)
 ./scripts/destroy-cluster.sh        # tear down the cluster (mirror survives)
-./scripts/kind-fallback.sh          # plan B if Talos-in-Docker won't run
+./scripts/kind-fallback.sh          # plan B if neither substrate will run
 ```
 
 ## Script reference
@@ -47,12 +47,17 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | `dev-setup.sh` | Install mise (with consent) + all pinned CLI tools, verify versions |
 | `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`; start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it |
 | `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
-| `create-cluster.sh` | `talosctl cluster create docker` (Talos v1.13.8, 1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm |
+| `install.sh --write-hosts` | Mutating, and only on the **docker and kind identities** (on tbx those 127.0.0.1 lines would override talos-box's resolver): (re)write the marked `/etc/hosts` block from the pins + `~/.cloudbox/extra-hosts`. Refuses unless `~/.cloudbox/substrate` records one of those two. The recovery path after a declined `sudo`, and the refresh path after WSL2 regenerates the file |
+| `create-cluster.sh` | Substrate **dispatcher**: resolves tbx-or-docker, sources the backend, then runs the shared path — Talos config gen/apply/bootstrap (1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm. Persists the choice in `~/.cloudbox/substrate` |
+| `create-cluster.sh --refresh-endpoint` | tbx only, creates nothing: re-reads `tbx status`, **probes** the control plane's current address with both clients (explicit `--server` / `--endpoints`, so nothing is written yet), then points the kubeconfig **and** the `cloudbox` talosconfig context at it, re-checks them through those files, and only then records it in `~/.cloudbox/api-endpoint`. The probes RETRY for up to 180s: `tbx cluster start` returns when apid answers and `tbx cluster resume` waits for nothing at all, so kube-apiserver is routinely still coming up. A probe that never succeeds leaves all three files untouched. Does not touch the machine config's own `controlPlane.endpoint`. The one command for "the cluster is running again after `tbx cluster resume`/`tbx cluster start`, and its vmnet DHCP lease moved" |
+| `substrate/docker.sh` | The **Docker backend**: `talosctl cluster create docker` (raised memory/CPU, published ports) and the marked `/etc/hosts` block that gives the hostname scheme somewhere to resolve |
+| `substrate/tbx.sh` | The **talos-box backend**: `tbx up -f ~/.cloudbox/cloudbox.tbx.yaml` (rendered from `substrate/cloudbox.tbx.yaml.tmpl` + the `TBX_*` pins), then *our* Talos config — same patches as docker — plus the Cilium `LoadBalancerIPPool`/L2 policy and the wait for the ingress VIP |
 | `destroy-cluster.sh` | `talosctl cluster destroy` + kubeconfig cleanup (this workshop's named entries, in both the pinned kubeconfig and `~/.kube/config`); `--purge-mirror` also removes the image mirror |
-| `bootstrap-gitops.sh` | local-path-provisioner + Gitea (single-pod SQLite, push-to-create) + ArgoCD (vendored manifest, NodePort 30080, Application health check) |
+| `bootstrap-gitops.sh` | local-path-provisioner + Gitea (single-pod SQLite, push-to-create) + ArgoCD (vendored manifest, Application health check), then applies the Gitea and ArgoCD `Ingress` objects so both are reachable at their `*.cloudbox.k8s.test` names on either substrate |
 | `seed-gitea.sh` | Force-push the local checkout to `cloudbox/platform` in Gitea (push-to-create) and apply the root app-of-apps Application |
 | `catch-up.sh <module>` | Force-push module N's canonical `gitops/apps` + `gitops/components` state to Gitea, then run the module's post-steps; `--rebuild` for the full nuke-and-rebuild |
-| `kind-fallback.sh` | Same cluster shape on kind + Cilium (loses the Talos content, gains robustness) |
+| `kind-fallback.sh` | Plan B when neither substrate runs: same cluster shape on kind + Cilium, the **same** `cilium_ingress_values` (lib.sh) as the docker substrate, host port 80 → the ingress NodePort and the same marked `/etc/hosts` block — so modules 02 onward are identical. Loses the Talos content (lab 01 says so and exits 0), gains robustness. Records `kind` in `~/.cloudbox/substrate` — a third **identity**, not a substrate: everything keyed on that file grades this machine with Docker semantics, and `create-cluster.sh`/`destroy-cluster.sh` refuse on it |
+| `kind-fallback.sh --delete` | Deletes that cluster, removes the `/etc/hosts` block (only when the recorded identity is `kind`) and clears the identity — but only once the cluster is gone **and** the block is removed or proven absent, so a declined sudo leaves a retry possible instead of an unowned block, and it **exits 1** whenever either is unfinished. Needs neither `kind` nor `kubectl` (it asks Docker for the node containers), but does need a reachable Docker daemon — every question it asks is asked there. With no identity file, `CLOUDBOX_SUBSTRATE=kind` is honoured only against kind-specific proof: `kind get clusters` listing it, or containers labelled `io.x-k8s.kind.cluster=cloudbox`. The `/etc/hosts` block is deliberately **not** proof — the docker substrate writes an identical one, and it may belong to a live cluster. `destroy-cluster.sh` cannot — it builds and tears down substrates, and kind is not one |
 | `check-consistency.sh` | Drift detection between everything that must agree: solutions↔catalog copies, deployed images ⊆ `images.txt`, `versions.env`↔`mise.toml`, devcontainer pins, `upstream.list` pin-sources, and that every `lab/`, `scripts/` and `solutions/` script touching a cluster passes the workshop-context guard. Offline; runs in CI on every push |
 | `check-upstream.sh` | **Maintainer only, needs internet** — reports which pins have fallen *behind* upstream (`ok`/`patch`/`minor`/`major`). Reads `upstream.list`; never edits a pin. `--strict`, `--json`, `--only <name>` |
 | `lib.sh` | Shared logging/helpers — sourced by every script |
@@ -64,8 +69,9 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 
 ## Why a local registry mirror?
 
-The Talos "nodes" are Docker containers with their **own containerd inside** —
-the host Docker image cache is invisible to them. `cloudbox-init.sh` therefore
+The Talos nodes run their **own containerd**, whichever substrate you are on — a VM's
+on talos-box, the container's on docker — so the host's Docker image cache is invisible
+to them either way. `cloudbox-init.sh` therefore
 runs a plain OCI registry (`cloudbox-mirror`, data in a Docker volume, so it
 survives cluster rebuilds) and copies every cluster image into it with crane,
 preserving repository paths and digests. Tag-only images are mirrored for your
@@ -78,12 +84,52 @@ a stale mirror can never break the cluster, it just costs bandwidth.
 
 ## Endpoints (after bootstrap)
 
+One hostname scheme, both substrates — `*.cloudbox.k8s.test`:
+
 | What | URL | Credentials |
 |---|---|---|
-| Gitea | http://localhost:30300 | `gitea_admin` / `cloudbox123` |
-| ArgoCD | http://localhost:30080 | `admin` / see `bootstrap-gitops.sh` output |
-| Zot registry | http://localhost:30500 | (enabled in module S2) |
-| Kourier (Knative) | http://localhost:31080 | (enabled in module S1) |
+| Gitea | http://gitea.cloudbox.k8s.test | `gitea_admin` / `cloudbox123` |
+| ArgoCD | http://argocd.cloudbox.k8s.test | `admin` / see `bootstrap-gitops.sh` output |
+| Cloudbox Console | http://portal.cloudbox.k8s.test | (module 08) |
+| Grafana | http://grafana.cloudbox.k8s.test | (observability, on-demand) |
+| RustFS console | http://rustfs.cloudbox.k8s.test | see `versions.env` |
+| RustFS S3 endpoint | http://s3.cloudbox.k8s.test | see `versions.env` |
+| Zot registry | http://zot.cloudbox.k8s.test | (enabled in module S2) |
+| NATS monitoring | http://nats.cloudbox.k8s.test | (enabled in module S3) |
+| Backstage | http://backstage.cloudbox.k8s.test | (presenter demo) |
+| Knative services | `http://<name>-<namespace>.kn.cloudbox.k8s.test` | (enabled in module S1) |
+
+On the **tbx** substrate talos-box's own resolver answers every one of these at the
+cluster's ingress VIP (`172.30.<n>.200`). On the **Docker** substrate they come from a
+marked `/etc/hosts` block; `./scripts/install.sh --print-hosts` prints it, and
+`create-cluster.sh` writes it at the very end of the run (the one `sudo` prompt).
+`./scripts/install.sh --write-hosts` (re)writes it any time: after a declined password,
+after WSL2 regenerates `/etc/hosts` on restart, or after you remove a name from
+`~/.cloudbox/extra-hosts`. It is idempotent — with a correct block it writes nothing and
+asks for nothing. A file has no wildcards, so the block
+lists the three Knative names the labs create — for one you invent yourself (anything the
+Console composes), `./scripts/install.sh --add-hosts <first label>` adds it and remembers
+it in `~/.cloudbox/extra-hosts`, so the next rewrite of the block keeps it.
+The published-NodePort URLs on
+localhost still work there as a fallback, but they exist on the Docker substrate only —
+which is why no lab names them. Zot is the deliberate exception in the other direction:
+attendees reach it by hostname, while the kubelet pulls from Zot's NodePort on the node
+itself, which works the same way on both substrates.
+
+Gitea's clone box in the web UI shows the **in-cluster** `ROOT_URL`
+(`gitea-http.gitea.svc…`) — correct for ArgoCD, useless from your laptop. Clone from
+`http://gitea.cloudbox.k8s.test/cloudbox/platform.git` (`GITEA_HOST_URL` in
+`versions.env`) instead.
+
+Which substrate you are on: `./scripts/install.sh --check`. To force one:
+`CLOUDBOX_SUBSTRATE=docker` (or `=tbx`); the answer is remembered in
+`~/.cloudbox/substrate` from the moment a cluster is created — and forgotten by
+`destroy-cluster.sh`, which removes that file with the cluster it described. The next
+`create-cluster.sh` therefore *decides again*, not "does the same thing": the destroy
+prints the substrate it forgot and the `CLOUDBOX_SUBSTRATE=<it> ./scripts/create-cluster.sh`
+that keeps it, and `catch-up.sh <module> --rebuild` carries it across on your behalf.
+A record that exists but cannot be read (wrong owner, mode 000, junk content) stops every
+mutating script with the hand-fix; only the read-only ones (`--check`, the labs) carry on.
 
 ## Conventions
 

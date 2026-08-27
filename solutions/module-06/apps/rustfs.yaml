@@ -1,6 +1,6 @@
 # RustFS 1.0.0-rc.2, standalone single-pod S3 (module 3: object storage).
-# S3 endpoint: rustfs-svc.rustfs:9000 (NodePort http://localhost:30900),
-# console :9001. Credentials (workshop-grade): cloudbox / cloudbox123.
+# S3 endpoint: http://s3.cloudbox.k8s.test; console: http://rustfs.cloudbox.k8s.test.
+# Credentials (workshop-grade): cloudbox / cloudbox123.
 #
 # Enable with:  cp gitops/catalog/rustfs.yaml gitops/apps/ && git add . && git commit -m 'enable rustfs' && git push
 apiVersion: argoproj.io/v1alpha1

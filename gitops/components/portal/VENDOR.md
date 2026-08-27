@@ -59,21 +59,31 @@ extra-file — its version is prose, kept honest by review.
   (`networking.knative.dev/visibility: cluster-local` gives a ksvc the URL
   `http://<name>.<namespace>.svc.cluster.local`, routed via
   kourier-internal; port 80 implied).
-- **Service NodePort 30600** (`http://localhost:30600`), container port
+- **Service NodePort 30600**, published at
+  http://portal.cloudbox.k8s.test (ingress.yaml), container port
   8080, `/healthz` readiness+liveness — port and health path are the
   contract with `apps/portal` (Knative-style `$PORT=8080` default).
+- **`ingress.cilium.io/request-timeout: "0s"`** on that Ingress = **no**
+  timeout. The Console's agent-ask answer is an SSE stream that runs for as
+  long as the model takes, and a Cilium Ingress is an Envoy route whose default
+  timeout is 15 s — long enough to make module 10 look broken. See
+  `docs/HAZARDS.md`, "NodePorts had no proxy in the path".
 - **Two S3 endpoints, and they are not interchangeable.**
   `S3_ENDPOINT=http://rustfs-svc.rustfs.svc.cluster.local:9000` is what the
-  *pod* talks to; `S3_PUBLIC_ENDPOINT=localhost:30900` is the host the
+  *pod* talks to; `S3_PUBLIC_ENDPOINT=s3.cloudbox.k8s.test` is the host the
   *browser* must see, because gallery images are served through presigned URLs
-  that the browser fetches directly. It must track `NODEPORT_RUSTFS_S3` in
+  that the browser fetches directly. It must track `RUSTFS_S3_HOST` in
   `scripts/versions.env` — set it to the in-cluster Service and every gallery
   thumbnail 404s in the attendee's browser while working fine from inside the
   cluster.
-- **`GRAFANA_URL=http://localhost:30030`** — browser-facing, matches
-  `NODEPORT_GRAFANA` and the `grafana` component's NodePort. Source of the
+- **`GRAFANA_URL=http://grafana.cloudbox.k8s.test`** — browser-facing, matches
+  `GRAFANA_HOST_URL` and the `grafana` component's Ingress. Source of the
   console's Explore deep-links (which also depend on the datasource uids —
   see `../grafana/VENDOR.md`).
+- **`KNATIVE_DOMAIN=kn.cloudbox.k8s.test`** — browser-facing domain for
+  composed Application XR workloads; the portal constructs
+  `<name>-<namespace>.<domain>` links from it (the dash is Knative's
+  `domain-template`; see `ksvcURL` in `apps/portal/internal/web/applications.go`).
 - **`GITEA_USER=gitea_admin` / `GITEA_PASSWORD=cloudbox123`** — the scaffold
   bridge (PRD-0012): the console calls Gitea's *generate* API to create a
   tenant repo from a template. Workshop-grade and committed like the S3 creds;

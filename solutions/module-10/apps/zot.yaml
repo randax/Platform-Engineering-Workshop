@@ -1,6 +1,6 @@
 # Zot v2.1.20 OCI registry (module S2: in-cluster builds push here).
-# Anonymous read/write (workshop-grade). UI + API on NodePort
-# http://localhost:30500, in-cluster zot.zot.svc.cluster.local:5000.
+# Anonymous read/write (workshop-grade). UI + API: http://zot.cloudbox.k8s.test;
+# in-cluster zot.zot.svc.cluster.local:5000.
 #
 # Enable with:  cp gitops/catalog/zot.yaml gitops/apps/ && git add . && git commit -m 'enable zot' && git push
 apiVersion: argoproj.io/v1alpha1

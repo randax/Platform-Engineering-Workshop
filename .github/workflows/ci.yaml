@@ -52,7 +52,7 @@ jobs:
           set -euo pipefail
           shellcheck --version
           # -x follows sourced files (lib.sh, versions.env); SCRIPTDIR resolves them
-          shellcheck -x --source-path=SCRIPTDIR scripts/*.sh
+          shellcheck -x --source-path=SCRIPTDIR scripts/*.sh scripts/substrate/*.sh
 
   yaml-syntax:
     name: YAML syntax (gitops/, lab/, solutions/)

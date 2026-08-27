@@ -122,17 +122,17 @@ data:
   app-config.yaml: |
     app:
       title: Cloudbox Portal
-      baseUrl: http://localhost:30700
+      baseUrl: http://backstage.cloudbox.k8s.test
     organization:
       name: Cloudbox
     backend:
-      baseUrl: http://localhost:30700
+      baseUrl: http://backstage.cloudbox.k8s.test
       listen:
         port: 7007
       csp:
         connect-src: ["'self'", 'http:', 'https:']
       cors:
-        origin: http://localhost:30700
+        origin: http://backstage.cloudbox.k8s.test
         methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
         credentials: true
       database:

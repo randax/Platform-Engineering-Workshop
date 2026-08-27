@@ -54,15 +54,16 @@ func main() {
 	}
 
 	srv := &web.Server{
-		Kube:        kubeClient,
-		Store:       s3,
-		Prom:        metrics.New(cfg.PromURL),
-		Logs:        logs.New(cfg.VLogsURL),
-		Streams:     nats.New(cfg.NATSMonitorURL),
-		Registry:    registry.New(cfg.ZotURL),
-		Kagent:      kagent.New(cfg.KagentURL),
-		UploaderURL: cfg.UploaderURL,
-		GrafanaURL:  cfg.GrafanaURL,
+		Kube:          kubeClient,
+		Store:         s3,
+		Prom:          metrics.New(cfg.PromURL),
+		Logs:          logs.New(cfg.VLogsURL),
+		Streams:       nats.New(cfg.NATSMonitorURL),
+		Registry:      registry.New(cfg.ZotURL),
+		Kagent:        kagent.New(cfg.KagentURL),
+		UploaderURL:   cfg.UploaderURL,
+		GrafanaURL:    cfg.GrafanaURL,
+		KnativeDomain: cfg.KnativeDomain,
 		// otelhttp's transport adds a client span AND a `traceparent` header
 		// to the forwarded upload, so the uploader's spans join our trace.
 		// 60s timeout: generous, because the first upload wakes the uploader

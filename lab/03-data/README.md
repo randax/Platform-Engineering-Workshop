@@ -119,10 +119,10 @@ Point any of them at the NodePort instead — that is the whole lesson:
 
 ```bash
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1
-s5cmd --endpoint-url http://localhost:30900 mb s3://app-assets
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test mb s3://app-assets
 echo "hello from my own cloud" > hello.txt
-s5cmd --endpoint-url http://localhost:30900 cp hello.txt s3://app-assets/
-s5cmd --endpoint-url http://localhost:30900 presign --expire 1h s3://app-assets/hello.txt
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test cp hello.txt s3://app-assets/
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test presign --expire 1h s3://app-assets/hello.txt
 # the same four with the AWS CLI: s3 mb / s3 cp / s3 presign --expires-in 3600
 ```
 </details>
@@ -144,10 +144,10 @@ kubectl -n demo exec -it app-db-1 -- psql -U postgres -d app -c 'SELECT 1;'
 
 # any S3 client works; hint 4 has the in-cluster form if you have none installed
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1
-s5cmd --endpoint-url http://localhost:30900 mb s3://app-assets
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test mb s3://app-assets
 echo "hello from my own cloud" > /tmp/hello.txt
-s5cmd --endpoint-url http://localhost:30900 cp /tmp/hello.txt s3://app-assets/
-s5cmd --endpoint-url http://localhost:30900 presign --expire 1h s3://app-assets/hello.txt
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test cp /tmp/hello.txt s3://app-assets/
+s5cmd --endpoint-url http://s3.cloudbox.k8s.test presign --expire 1h s3://app-assets/hello.txt
 # open the printed URL in your browser
 
 cd "$WORKSHOP/lab/03-data" && ./verify.sh
@@ -162,7 +162,8 @@ cd "$WORKSHOP/lab/03-data" && ./verify.sh
 
 It checks: the cnpg-operator and rustfs ArgoCD apps are Healthy (Synced is the happy path; sync is advisory); the CNPG operator
 deployment is up; `app-db` reports healthy with 1/1 ready instances; `SELECT 1` actually
-returns 1 from inside the database; RustFS answers S3 on :30900; and bucket `app-assets`
+returns 1 from inside the database; RustFS answers S3 at
+`http://s3.cloudbox.k8s.test`; and bucket `app-assets`
 exists with at least one object.
 
 ## Explain-back

@@ -82,8 +82,8 @@ The takeaway: you don't pick a winner — mature platforms offer both, and the s
 The verification trilogy — and the observability payoff for the whole day:
 
 1. The watch: kubectl -n pipeline get pods -w in one terminal, upload a photo in the Gallery in the other. The uploader cold-starts to catch the file, then — a beat later — the resizer materializes to handle an event nobody visibly sent. Ask the room to count the actors between browser and that second pod.
-2. The storage view: the Gallery (refresh) shows the thumbnail and its metadata; raw S3 shows originals/, thumbs/, and meta/<key>.json in the images bucket — module 03 muscle memory with the aws CLI against :30900.
-3. The flourish: enable the on-demand Victoria observability stack (VictoriaMetrics/Logs/Traces + Grafana + the OTel Collector — a catalog capability, not something running since minute one), then find the upload's trace in Grafana at http://localhost:30030 → Explore → VictoriaTraces and see portal → uploader → broker → resizer as ONE waterfall. Distributed tracing across an event-driven, scale-from-zero chain — on a laptop. This is the "now observe what you built" moment: you turn observability on and immediately point it at the pipeline you just wired.
+2. The storage view: the Gallery (refresh) shows the thumbnail and its metadata; raw S3 shows originals/, thumbs/, and meta/<key>.json in the images bucket — module 03 muscle memory with the aws CLI against s3.cloudbox.k8s.test.
+3. The flourish: enable the on-demand Victoria observability stack (VictoriaMetrics/Logs/Traces + Grafana + the OTel Collector — a catalog capability, not something running since minute one), then find the upload's trace in Grafana at http://grafana.cloudbox.k8s.test → Explore → VictoriaTraces and see portal → uploader → broker → resizer as ONE waterfall. Distributed tracing across an event-driven, scale-from-zero chain — on a laptop. This is the "now observe what you built" moment: you turn observability on and immediately point it at the pipeline you just wired.
 
 Hint 5 covers enabling the stack and the VictoriaTraces (Jaeger) navigation for anyone new to traces; hint 2 has the hop-by-hop event-debugging path (uploader logs → trigger status → broker filter logs) if no resizer appears.
 -->
@@ -106,7 +106,7 @@ The task: enable knative-eventing.yaml (the Broker/Trigger machinery in ns knati
 
 Readiness check before the moment: kubectl -n pipeline get broker,trigger,ksvc all Ready — and note the pod count: with no traffic, both ksvcs sit at zero.
 
-Then stage the two terminals, upload at localhost:30600/gallery, and work through the three proofs from the previous slide. verify.sh seals it.
+Then stage the two terminals, upload at portal.cloudbox.k8s.test/gallery, and work through the three proofs from the previous slide. verify.sh seals it.
 
 Anyone finishing this has run the full arc: platform built by git commits, storage and databases self-hosted, a self-service API, a portal, and an event-driven serverless pipeline traced end to end. Send them to the closing section victorious — and remind the room the last 30 minutes are protected tinkering time.
 -->

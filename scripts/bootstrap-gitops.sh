@@ -130,6 +130,7 @@ kubectl apply --server-side --force-conflicts -n argocd \
 
 info "Restoring the Application-CRD health check (argocd-cm) so sync waves gate"
 info "  + treating metrics-less HPAs as Healthy (this lab has no metrics-server)"
+info "  + treating Cilium-class Ingresses as Healthy (NodePort publishes no LB address)"
 kubectl patch configmap argocd-cm -n argocd --type merge --patch-file /dev/stdin <<'EOF'
 data:
   resource.customizations.health.argoproj.io_Application: |
@@ -165,6 +166,42 @@ data:
       end
     end
     return hs
+  # ArgoCD's built-in health check for networking.k8s.io/Ingress (gitops-engine
+  # pkg/health/health_ingress.go) reports Progressing until
+  # `.status.loadBalancer.ingress` is non-empty, and Healthy the moment it is.
+  # That rule assumes the ingress controller is fronted by a LoadBalancer
+  # Service that gets an address written back.
+  #
+  # On the docker substrate the shared Cilium ingress Service is a NodePort
+  # published on host port 80 — there is no LB address to write, so Cilium
+  # never populates the status and every Ingress stays Progressing forever.
+  # Nine components on this branch ship an ingress.yaml, so every one of their
+  # ArgoCD Applications stayed Progressing, module 03's 420 s wait for 'rustfs'
+  # timed out (last: Synced Progressing) and the app-of-apps waves behind it
+  # never started (argo-workflows 'missing' after 10 min). CI run 32945328784.
+  #
+  # On tbx the LB VIP does populate the status, which is exactly why this only
+  # ever showed up on the docker substrate.
+  #
+  # So: an Ingress on OUR shared class is Healthy by definition — reachability
+  # is proven by the labs' own curl-the-hostname verifies, not by a field the
+  # substrate cannot fill in. Any other class keeps upstream's rule verbatim.
+  resource.customizations.health.networking.k8s.io_Ingress: |
+    hs = {}
+    if obj.spec ~= nil and obj.spec.ingressClassName == "cilium" then
+      hs.status = "Healthy"
+      hs.message = "served by the shared Cilium ingress; NodePort publishes no LB address on the docker substrate"
+      return hs
+    end
+    hs.status = "Progressing"
+    hs.message = "waiting for a load-balancer address"
+    if obj.status ~= nil and obj.status.loadBalancer ~= nil
+       and obj.status.loadBalancer.ingress ~= nil
+       and #obj.status.loadBalancer.ingress > 0 then
+      hs.status = "Healthy"
+      hs.message = ""
+    end
+    return hs
 EOF
 
 info "Creating read-only 'backstage' ArgoCD account (used by the module-08 portal)"
@@ -195,6 +232,51 @@ kubectl patch service argocd-server -n argocd \
 # Restart both: server picks up server.insecure, repo-server the size limit.
 kubectl -n argocd rollout restart deployment argocd-server argocd-repo-server >/dev/null
 
+info "Publishing Gitea and ArgoCD on ${GITEA_HOST_URL} / ${ARGOCD_HOST_URL}"
+# These two are installed imperatively, so nothing else will ever apply their
+# Ingress objects. The manifests live in gitops/components/{gitea,argocd}/ so
+# all nine ingress files (ten host rules — rustfs has two, knative-serving one
+# wildcard) read as one set; only these two are applied by hand.
+# Recount both numbers with:
+#   find gitops -name ingress.yaml | wc -l
+#   grep -rhcE '^\s*- host:' gitops --include=ingress.yaml | paste -sd+ - | bc
+kubectl apply -f "${REPO_ROOT}/gitops/components/gitea/ingress.yaml"
+kubectl apply -f "${REPO_ROOT}/gitops/components/argocd/ingress.yaml"
+
+# --- Kagent's host-side Ollama ---------------------------------------------------
+# kagent's default ModelConfig points at a host-side Ollama (module 10). The
+# address of "the host" is substrate- and OS-specific, and it used to be
+# hardcoded to host.docker.internal — which native-Linux attendees had to
+# hand-edit (lab/10-day2-ops/README.md) and which no tbx VM can resolve at all.
+# Record the right answer once, here, where the substrate is known. The
+# ModelConfig almost never exists yet — kagent is a catalog capability the
+# attendee enables in module 10 — so the ConfigMap written here is the real
+# handoff: gitops/components/kagent/ollama-host-hook.yaml is a PostSync hook
+# that reads it and patches the ModelConfig the moment ArgoCD creates it. The
+# patch below only covers the other order (a re-bootstrap against a cluster
+# that already runs kagent) and never fails the bootstrap over an optional
+# component.
+# That last promise is why the lookup itself is guarded: on tbx
+# cloudbox_host_gateway() needs jq and a live `tbx status`, and a bootstrap must
+# not die because an optional day-2 capability could not be pre-addressed.
+if gateway="$(cloudbox_host_gateway)"; then
+  info "Host gateway for in-cluster workloads: ${gateway}"
+  kubectl create namespace kagent --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl -n kagent create configmap cloudbox-host \
+    --from-literal=gateway="${gateway}" \
+    --from-literal=ollama="${gateway}:11434" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  if kubectl -n kagent get modelconfig default-model-config >/dev/null 2>&1; then
+    kubectl -n kagent patch modelconfig default-model-config --type merge \
+      -p "{\"spec\":{\"ollama\":{\"host\":\"${gateway}:11434\"}}}"
+    ok "kagent ModelConfig points at ${gateway}:11434"
+  else
+    info "kagent is not enabled yet — its Ollama host (${gateway}:11434) is recorded in configmap kagent/cloudbox-host; its PostSync hook applies it when module 10 enables kagent"
+  fi
+else
+  warn "could not determine the host gateway — kagent (module 10, optional) keeps the git default host.docker.internal:11434; lab/10-day2-ops/README.md says how to check it"
+fi
+
 # --- 4. Wait for everything --------------------------------------------------------------
 step "Waiting for Gitea and ArgoCD to become ready"
 wait_rollout gitea deployment/gitea
@@ -207,6 +289,23 @@ ok "GitOps engine is running."
 echo
 echo "  Gitea:   ${GITEA_HOST_URL}  (${GITEA_ADMIN_USER} / ${GITEA_ADMIN_PASSWORD})"
 echo "  ArgoCD:  ${ARGOCD_HOST_URL}  (user: admin)"
+echo
+# The hosts-file advice is docker-only: on tbx the names come from talos-box's
+# resolver and the NodePorts are inside the VM, not on this host — telling a tbx
+# attendee to try the Docker-only Gitea NodePort sends them chasing a dead port.
+# The kind lifeboat gets the docker answer: it publishes the same NodePorts on
+# the host and resolves the same names through the same /etc/hosts block. It got
+# the tbx one before it was a persisted identity — sending a lifeboat attendee
+# to `tbx status` on a machine with no tbx at all.
+BOOTSTRAP_SUBSTRATE="$(substrate_resolve)"
+if [[ "${BOOTSTRAP_SUBSTRATE}" == "docker" || "${BOOTSTRAP_SUBSTRATE}" == "kind" ]]; then
+  info "Name not resolving? On the docker substrate these need the ${CLOUDBOX_HOSTS_FILE} block:"
+  echo "   ./scripts/install.sh --print-hosts        # shows the exact lines"
+  echo "   The NodePort URLs still work: http://localhost:${NODEPORT_GITEA} and http://localhost:${NODEPORT_ARGOCD}"
+else
+  info "Name not resolving? talos-box's resolver answers *.${CLOUDBOX_DOMAIN}:"
+  echo "   tbx status ${CLUSTER_NAME}        # the cluster and its ingress VIP"
+fi
 echo
 info "ArgoCD admin password:"
 echo "   kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo"

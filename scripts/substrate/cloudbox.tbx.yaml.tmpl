@@ -1,0 +1,26 @@
+# GENERATED — do not edit. Rendered from scripts/versions.env by
+# render_tbx_cluster_file() in scripts/substrate/tbx.sh into ${TBX_CLUSTER_FILE}.
+# Edit the TBX_* pins in versions.env instead; this file is a projection of them.
+#
+# Deliberately SUBSTRATE-ONLY: no `cni:` key. talos-box then stops after VMs,
+# networking, DNS and image delivery (upstream docs/SPEC.md:19-21) and leaves
+# machine config, bootstrap and CNI to us — which is what keeps ONE Cilium
+# 1.20.0 install path across both substrates. Adding `cni: cilium` here would
+# hand the cluster talos-box's curated 1.19.6 and its own machine config.
+# No `csi:` either (it requires `cni:`); local-path-provisioner is wave 0.
+version: 1
+talos:
+  version: __TALOS_VERSION__
+clusters:
+  - name: __CLUSTER_NAME__
+    controlPlanes: 1
+    workers: 1
+    domain: __CLOUDBOX_DOMAIN__
+    node:
+      memory: __TBX_WORKER_MEMORY__
+      cpus: __TBX_WORKER_CPUS__
+      diskSize: __TBX_DISK_SIZE__
+    controlPlane:
+      memory: __TBX_CP_MEMORY__
+      cpus: __TBX_CP_CPUS__
+      diskSize: __TBX_DISK_SIZE__

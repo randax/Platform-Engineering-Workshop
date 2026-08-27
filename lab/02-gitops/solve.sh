@@ -14,7 +14,7 @@ if ! kubectl -n argocd get deploy argocd-server >/dev/null 2>&1; then
   "$REPO_ROOT/scripts/bootstrap-gitops.sh"
 fi
 if ! curl -fsS --max-time 5 -u gitea_admin:cloudbox123 \
-     http://localhost:30300/api/v1/repos/cloudbox/platform >/dev/null 2>&1; then
+     "${GITEA_HOST_URL}/api/v1/repos/cloudbox/platform" >/dev/null 2>&1; then
   "$REPO_ROOT/scripts/seed-gitea.sh"
 fi
 

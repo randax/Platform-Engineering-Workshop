@@ -83,7 +83,7 @@ spec:
           # pre-pull list (scripts/images.txt). The tag is rewritten by
           # release-please in the release PR — keep the annotations.
           # x-release-please-start-version
-          image: localhost:30500/cloudbox-portal:dev
+          image: ghcr.io/randax/cloudbox-portal:v0.2.2
           imagePullPolicy: Always
           # x-release-please-end-version
           env:
@@ -104,14 +104,21 @@ spec:
             # gallery is empty (but the page loads) until that is enabled.
             - name: S3_BUCKET
               value: images
-            # Host the BROWSER uses for presigned URLs (the RustFS NodePort
-            # as seen from the attendee's machine). Matches NODEPORT_RUSTFS_S3.
+            # Host the BROWSER uses for presigned URLs. Signed with Secure:false
+            # (apps/portal/internal/store/s3.go), so this must stay plain http —
+            # an https host here produces signatures the browser cannot use.
             - name: S3_PUBLIC_ENDPOINT
-              value: localhost:30900
-            # Browser-facing Grafana (NodePort 30030, the Victoria-stack
-            # Grafana) — used for the portal's observability deep-links.
+              value: s3.cloudbox.k8s.test
+            # Browser-facing Grafana (the Victoria-stack Grafana behind the
+            # cilium ingress) — used for the portal's observability deep-links.
             - name: GRAFANA_URL
-              value: http://localhost:30030
+              value: http://grafana.cloudbox.k8s.test
+            # Browser-facing domain for composed Knative Services. The portal
+            # builds <name>-<namespace>.<domain> links for Application XRs
+            # (the dash is Knative's domain-template — see ksvcURL in
+            # apps/portal/internal/web/applications.go).
+            - name: KNATIVE_DOMAIN
+              value: kn.cloudbox.k8s.test
             # Gitea credentials for the scaffold bridge (PRD-0012): the console
             # calls Gitea's generate API to create a tenant repo from a template.
             # The lab's fixed gitea_admin (versions.env) — committed on purpose,

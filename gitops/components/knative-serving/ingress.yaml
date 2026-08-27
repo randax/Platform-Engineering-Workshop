@@ -1,0 +1,53 @@
+# One Ingress in front of Knative, and ONE rule in it. Knative programs every
+# ksvc's host as <name>-<namespace>.kn.cloudbox.k8s.test — the `domain-template`
+# curation in serving-core.yaml, on top of `config-domain` (KNATIVE_DOMAIN in
+# scripts/versions.env). Kourier routes on the Host header, so this covers every
+# function anyone creates, in any namespace, for the rest of the workshop.
+#
+# WHY THE DASH IS LOAD-BEARING: a Kubernetes Ingress wildcard host matches
+# exactly ONE DNS label (networking.k8s.io/v1 semantics), so
+# "*.kn.cloudbox.k8s.test" matches hello-demo.kn.cloudbox.k8s.test but would NOT
+# have matched Knative's default hello.demo.kn.cloudbox.k8s.test. This file used
+# to carry one wildcard rule per namespace instead (`demo`, `pipeline`) — which
+# meant a ksvc in any third namespace had no route at all, and the portal's
+# Application XR composes into whichever project the attendee picked. Moving the
+# namespace into the first label (upstream's own documented alternative
+# template) is what collapses that into one rule.
+#
+# Backend is the EXTERNAL kourier gateway (kourier.yaml, port 80 -> targetPort
+# 8080), not kourier-internal (-> 8081), which is cluster-local.
+#
+# On tbx the names resolve through talos-box's own resolver — a wildcard, so
+# every ksvc an attendee creates just works. On docker /etc/hosts has no
+# wildcards, so create-cluster.sh's block lists the three fixed ksvc names the
+# labs create (hello-demo, uploader-pipeline, resizer-pipeline). Anything else
+# an attendee creates on the docker substrate needs a manual hosts line, a
+# `curl -H "Host: <name>-<ns>.kn.cloudbox.k8s.test"` against the ingress, or
+# NodePort 31080 — lab 06 says so, and its verifier reads the Knative Service's
+# published .status.url rather than assuming either.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kourier
+  namespace: kourier-system
+  annotations:
+    # A scale-from-zero ksvc can take longer than Envoy's 15 s default route
+    # timeout to answer its first request — and every hostname now passes
+    # through Envoy. This one rule fronts every function in the workshop, so a
+    # 504 here reads as "my function is broken". "0s" disables the timeout; see
+    # the same annotation on gitops/components/gitea/ingress.yaml for the
+    # citation.
+    ingress.cilium.io/request-timeout: "0s"
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: "*.kn.cloudbox.k8s.test"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kourier
+                port:
+                  number: 80

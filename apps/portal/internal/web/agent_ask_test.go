@@ -582,7 +582,7 @@ func TestAgentAskFollowupErrorPath(t *testing.T) {
 // mount when the capability is available, and the locked affordance (with the
 // unlock hint, and NO mount that could trigger a backend call) when it isn't.
 func TestCaseFileView(t *testing.T) {
-	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://localhost:30030"})
+	tmpl, err := ParseTemplates(&Server{GrafanaURL: "http://grafana.cloudbox.k8s.test"})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

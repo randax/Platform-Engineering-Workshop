@@ -23,6 +23,14 @@
 #   8. every scripts/ and solutions/ script that uses kubectl CALLS
 #      require_workshop_context, with a short self-policing allowlist for the
 #      pre-cluster ones (and lib.sh still only defines the guard, never calls it)
+#   9. the workshop kubeconfig path agrees between mise.toml and
+#      scripts/context-guard.sh
+#  10. the tbx pin agrees between versions.env and mise.toml, and the tbx
+#      cluster yaml is generated from the pins rather than checked in
+#  11. the cni:none machine-config patch is byte-identical in both substrate
+#      backends, so both substrates produce the same cluster
+#  12. browser-facing URLs use the shared hostname scheme, not Docker-only
+#      localhost NodePorts or the former sslip.io Knative domain
 #
 # Offline and fast — the upstream comparison itself lives in the maintainer-only
 # ./scripts/check-upstream.sh, which needs internet.
@@ -289,6 +297,13 @@ GUARD_EXEMPT_SCRIPTS=(
   "scripts/lib.sh"                # defines it (never calls it — asserted above)
   "scripts/check-consistency.sh"  # this file: offline, greps for the string
   "scripts/destroy-cluster.sh"    # must work when the context is ALREADY wrong
+  "scripts/substrate/docker.sh"   # backend: it CREATES the workshop context, so
+                                  # there is nothing to assert while it runs;
+                                  # create-cluster.sh (checked, not exempt)
+                                  # calls the guard the moment it returns
+  "scripts/substrate/tbx.sh"      # the other backend, same reason: it is what
+                                  # creates the workshop context (talosctl
+                                  # kubeconfig + kubectl config use-context)
   "scripts/dev-setup.sh"          # pre-cluster: kubectl version --client only
   "scripts/install.sh"            # pre-cluster preflight: likewise
 )
@@ -386,6 +401,327 @@ elif [[ "$(kc_normalize "${mise_kc}")" != "${guard_kc}" ]]; then
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "workshop kubeconfig path agrees in mise.toml and scripts/context-guard.sh (${guard_kc})"
+
+# --- 10. the tbx pin agrees between versions.env and mise.toml ----------------
+# Same rule as check 3, for the substrate that is not Docker. dev-setup.sh
+# installs only what mise.toml lists, so a drifted pin means an attendee runs a
+# tbx whose cluster-yaml schema or `tbx manifests` sections we never tested.
+before_fail=${FAILURES}
+tbx_mise="$(mise_pin 'ubi:randax/talos-box')"
+if [[ -z "${tbx_mise}" ]]; then
+  # Fallback pin form: tbx has no published mise backend yet (upstream #95/#96/
+  # #101), so mise.toml may carry it as a commented pin next to the install note.
+  # In this form mise installs and enforces nothing — this check only keeps
+  # versions.env and the mise.toml comment line in agreement with each other;
+  # it cannot assert what binary is actually on PATH. That assertion is
+  # tbx_version_check() in lib.sh, called by `install.sh --check` (as a FAIL)
+  # and by substrate_preflight in tbx.sh (as a die), with
+  # CLOUDBOX_ALLOW_TBX_DRIFT=1 as the escape hatch.
+  tbx_mise="$(sed -nE 's|^#[[:space:]]*tbx[[:space:]]*=[[:space:]]*"([^"]+)".*|\1|p' mise.toml | head -1)"
+fi
+if [[ -z "${tbx_mise}" ]]; then
+  bad "mise.toml records no tbx pin (neither a [tools] entry nor the commented fallback) — TBX_VERSION would be the only copy and dev-setup could install anything"
+elif [[ "v${tbx_mise}" != "${TBX_VERSION}" ]]; then
+  bad "tbx pin drift: versions.env ${TBX_VERSION} vs mise.toml ${tbx_mise}"
+fi
+# The cluster yaml must stay a PROJECTION of the pins, never a second source.
+if [[ -f scripts/substrate/cloudbox.tbx.yaml ]]; then
+  bad "scripts/substrate/cloudbox.tbx.yaml is checked in — the tbx cluster yaml is GENERATED from versions.env into \${TBX_CLUSTER_FILE}; only the .tmpl belongs in git"
+fi
+for token in __TALOS_VERSION__ __CLUSTER_NAME__ __CLOUDBOX_DOMAIN__ \
+             __TBX_CP_MEMORY__ __TBX_CP_CPUS__ __TBX_WORKER_MEMORY__ \
+             __TBX_WORKER_CPUS__ __TBX_DISK_SIZE__; do
+  grep -q -- "${token}" scripts/substrate/cloudbox.tbx.yaml.tmpl \
+    || bad "scripts/substrate/cloudbox.tbx.yaml.tmpl no longer contains ${token} — a sizing value was hardcoded into the template instead of pinned in versions.env"
+done
+grep -qE '^[[:space:]]+cni:' scripts/substrate/cloudbox.tbx.yaml.tmpl \
+  && bad "scripts/substrate/cloudbox.tbx.yaml.tmpl declares a curated 'cni:' — that hands the cluster talos-box's Cilium 1.19.6 and its own machine config; this workshop installs Cilium ${CILIUM_VERSION} itself on BOTH substrates"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "tbx pin agrees (${TBX_VERSION}) and the cluster yaml is generated from versions.env"
+
+# --- 11. the two substrate backends carry the same machine-config patch -------
+# The cni:none / proxy:disabled / node-label / local-path-mount patch is
+# duplicated in both backends so each reads standalone. Duplication is fine;
+# DRIFT is not — a node label that exists on one substrate and not the other
+# makes lab/01 pass on one laptop and fail on the next.
+before_fail=${FAILURES}
+# The patch is the body of the single-quoted heredoc that starts at the
+# 'cluster:' line; sed drops the closing EOF terminator awk's range included.
+patch_of() { awk '/^cluster:$/,/^EOF$/' "$1" | sed '$d'; }
+# Extracting nothing from both files would "agree" while asserting nothing —
+# that is how a renamed heredoc marker turns this check into decoration.
+if [[ -z "$(patch_of scripts/substrate/docker.sh)" || -z "$(patch_of scripts/substrate/tbx.sh)" ]]; then
+  bad "check 11 found no 'cluster:' ... EOF machine-config patch in one of the substrate backends — the heredoc moved or was renamed; fix patch_of() in this script, do not delete the check"
+elif ! diff -q <(patch_of scripts/substrate/docker.sh) <(patch_of scripts/substrate/tbx.sh) >/dev/null; then
+  bad "the cni:none machine-config patch has drifted between scripts/substrate/docker.sh and scripts/substrate/tbx.sh — both substrates must produce the same cluster (diff them)"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "both substrate backends carry the same cni:none machine-config patch"
+
+# --- 11b. one source for the Cilium ingress values ---------------------------
+# `ingressClassName: cilium` has to mean the same thing in create-cluster.sh and
+# in the kind lifeboat, or "the lifeboat serves the identical labs" is false: it
+# is the ingress that answers every *.${CLOUDBOX_DOMAIN} hostname the labs and
+# gitops/ are written against. Here the values are not duplicated at all — both
+# read cilium_ingress_values() in lib.sh — so the check is that they still do,
+# and that neither has grown a private `--set ingressController.*` beside it.
+before_fail=${FAILURES}
+for f in scripts/create-cluster.sh scripts/kind-fallback.sh; do
+  # The INVOCATION IN ITS ONE WORKING FORM, not the string and not "a line that
+  # mentions it outside a comment". Both files explain the shared helper in
+  # comments — at length, deliberately — so a bare `grep -q
+  # cilium_ingress_values` passed on prose alone. Excluding comments was the
+  # first fix and it is still too loose: `echo cilium_ingress_values nodeport`,
+  # or any other line that happens to name the helper with a word after it,
+  # satisfies it while the values are inlined right below.
+  #
+  # There is exactly one way to call this helper — it prints one flag per line
+  # and bash 3.2 on macOS has no mapfile, so both callers feed a `while read`
+  # loop from a process substitution. Anchor on that, with the shape argument
+  # spelled out: nothing but a real call has this form.
+  grep -qE '^[[:space:]]*done[[:space:]]*<[[:space:]]*<\(cilium_ingress_values[[:space:]]+("?\$\{?[A-Za-z_]|nodeport|lb)' "${f}" \
+    || bad "${f} no longer CALLS cilium_ingress_values() as 'done < <(cilium_ingress_values <shape>)' — the shared ingress values are the contract the kind lifeboat and the docker substrate both meet; do not inline them (a comment, or a line that merely names the helper, is not a call)"
+  grep -qE -- '--set[[:space:]]+"?ingressController\.' "${f}" \
+    && bad "${f} sets ingressController.* directly — those flags belong in cilium_ingress_values() (lib.sh), which is the single source both callers read"
+done
+grep -q 'cilium_ingress_values()' scripts/lib.sh \
+  || bad "cilium_ingress_values() is gone from scripts/lib.sh — check 11b asserts a helper that no longer exists"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "create-cluster.sh and kind-fallback.sh share one source for the Cilium ingress values"
+
+# --- 12. no browser-facing localhost:3xxxx literals --------------------------
+# The workshop serves one hostname scheme on both substrates. A leftover
+# localhost:30xxx URL works on exactly one of them, so it reads as a working
+# instruction and fails on half the room — the worst kind of stale text.
+#
+# `127.0.0.1` counts as `localhost`: it is the same host-published port, written
+# the other way, and half the shell snippets people paste from prefer the
+# numeric form. The sweep was blind to it, which made "no stale localhost URLs"
+# a claim about spelling rather than about reachability.
+#
+# Allowlisted exceptions, each for a reason a rewrite would break:
+#   * scripts/substrate/docker.sh — the docker backend's own port publishing.
+#   * localhost:30500 — Zot's NodePort as the NODE sees it. Only node-side
+#     image references, Knative's registries-skipping-tag-resolving setting,
+#     portal pull-host code/tests, and comments that explain that distinction
+#     may use it. With kube-proxy replacement it answers on every node on both
+#     substrates, and a tbx VM cannot resolve zot.cloudbox.k8s.test.
+#   * the Slidev development server in slides/README.md, not a NodePort.
+#   * .github/workflows/bootstrap-test.yaml — Docker-only integration fixtures
+#     deliberately exercise published NodePorts, rather than attendee URLs.
+#   * serving-core.yaml historical comments — curation records, not attendee
+#     instructions; changing rendered source requires re-vendoring.
+before_fail=${FAILURES}
+stale="$(grep -rnE '(localhost|127\.0\.0\.1):3[0-9]{4}' \
+  --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.go' \
+  lab solutions gitops scripts slides apps .devcontainer .github README.md PLAN.md 2>/dev/null \
+  | grep -v '^scripts/substrate/docker.sh:' \
+  | grep -Eiv 'image(Name)?:.*localhost:30500|registries-skipping-tag-resolving|fnPullHost|_test\.go:.*30500|node.*localhost:30500|^[^:]+:[0-9]+:[[:space:]]*(#|//).*localhost:30500.*(node|kubelet)' \
+  | grep -v '^\.github/workflows/bootstrap-test.yaml:' \
+  | grep -v '^docs/' || true)"
+if [[ -n "${stale}" ]]; then
+  bad "browser-facing localhost/127.0.0.1:3xxxx literals remain — they only work on the docker substrate:"
+  printf '   %s\n' "${stale}" | head -30
+else
+  ok "no stale localhost/127.0.0.1:3xxxx literals (the hostname scheme is the only browser URL)"
+fi
+stale_sslip="$(grep -rn 'sslip\.io' \
+  --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.go' \
+  lab solutions gitops scripts slides apps 2>/dev/null \
+  | grep -v '^scripts/check-consistency.sh:' \
+  | grep -v '^gitops/components/knative-serving/serving-core.yaml:' || true)"
+if [[ -n "${stale_sslip}" ]]; then
+  bad "127.0.0.1.sslip.io references remain — Knative's config-domain is now ${CLOUDBOX_DOMAIN}-based:"
+  printf '   %s\n' "${stale_sslip}" | head -30
+else
+  ok "no sslip.io references outside docs/"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
+# --- 12b. no bare NodePort prose in attendee-facing lab material -------------
+# Browser URLs must name the shared hostname. A NodePort is only meaningful
+# here when its line explicitly identifies the Docker substrate or node-side
+# use, so the narrow exemptions below preserve those infrastructure notes.
+before_fail=${FAILURES}
+# The range is 3[01]xxx, not 30xxx: NODEPORT_KOURIER is 31080 — the port every
+# app an attendee deploys is reached on, and the one most likely to be written
+# down bare. A 30000-only pattern was blind to exactly the busiest NodePort in
+# the workshop.
+#
+# The `[^0-9.]` before the colon keeps the sweep off the middle of longer
+# numbers — and used to exclude the loopback-address form with them, since the
+# character before that colon is a digit. Written that way it is the same
+# instruction, so it gets its own branch rather than an exemption. (Check 12
+# above catches the URL spelling; this one is about bare prose.)
+bare_nodeport="$(grep -rnE '(^|[^0-9.]|127\.0\.0\.1):3[01][0-9]{3}([^0-9]|$)' \
+  lab/*/README.md lab/*/verify.sh lab/*/solve.sh slides/pages 2>/dev/null \
+  | grep -Eiv 'docker substrate|docker-only|NodePort|node[^[:alnum:]]*(pulls|side)|node.s[[:space:]]+kubelet|kubelet' || true)"
+if [[ -n "${bare_nodeport}" ]]; then
+  bad "bare :3[01]xxx NodePort prose remains — use the shared hostname, or explicitly label Docker-substrate/node-side use:"
+  printf '   %s\n' "${bare_nodeport}" | head -30
+else
+  ok "no bare :3[01]xxx NodePort prose in attendee-facing lab material"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
+# --- 12c. no host-side localhost:${NODEPORT_*} outside the docker backend ----
+# The literal-port sweep above cannot see the templated form. A host-side
+# `http://localhost:${NODEPORT_GITEA}` is a docker-substrate fact: the docker
+# backend publishes those ports on the laptop, tbx does not — the NodePorts
+# live inside the VMs, so on tbx such a URL hangs on TCP connect. (This is what
+# broke scripts/catch-up.sh, which cloned the platform repo from a port that
+# only exists on half the room's machines.)
+#
+# Allowlisted, each because the line is docker-gated at runtime:
+#   * scripts/substrate/docker.sh — the docker backend itself; every NodePort
+#     it names it also publishes.
+#   * scripts/bootstrap-gitops.sh's "The NodePort URLs still work" hint, printed
+#     only inside `if [[ "${BOOTSTRAP_SUBSTRATE}" == "docker" ]]` (:259-263).
+#     Anchored on the text, not the line number, so a NEW violation in that same
+#     file is still caught.
+# (.github/workflows/bootstrap-test.yaml is docker-only by construction and is
+# not in the search set.)
+before_fail=${FAILURES}
+tmpl_nodeport="$(grep -rnE '(localhost|127\.0\.0\.1):\$\{?NODEPORT_' \
+  --include='*.sh' --include='*.md' --include='*.yaml' --include='*.yml' \
+  scripts lab solutions 2>/dev/null \
+  | grep -v '^scripts/check-consistency.sh:' \
+  | grep -v '^scripts/substrate/docker.sh:' \
+  | grep -v '^scripts/bootstrap-gitops.sh:[0-9]*:.*The NodePort URLs still work' || true)"
+if [[ -n "${tmpl_nodeport}" ]]; then
+  bad "host-side localhost:\${NODEPORT_*} outside the docker backend — those ports are published on the host by the docker substrate only, and hang on tbx:"
+  printf '   %s\n' "${tmpl_nodeport}" | head -30
+else
+  ok "no host-side localhost:\${NODEPORT_*} outside the docker-gated allowlist"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
+# --- 12d. no docker-substrate node facts as universal truth ------------------
+# The docker backend's node addresses (10.5.0.x — talosctl's default subnet,
+# TALOS_SUBNET) and its container names (cloudbox-controlplane-1 /
+# cloudbox-worker-1) do not exist on tbx, where nodes are VMs on a vmnet DHCP
+# lease in 172.30.<n>.0/24. Module 01's README used to hand the room
+# `talosctl -n 10.5.0.2 …` and `docker pause cloudbox-worker-1` as THE way to do
+# it, which on half the machines is a command that cannot work.
+#
+# A line stays legal when it names its substrate — the same rule as 12b:
+# "docker substrate" / "docker-only" for a docker fact, "tbx "/"talos-box" for a
+# tbx one, and a line that names both is a comparison (lab 10's host-address
+# paragraph) rather than a claim. The search set is attendee-facing material
+# only; scripts/substrate/docker.sh, scripts/context-guard.sh and docs/ are
+# where these addresses legitimately live in full.
+before_fail=${FAILURES}
+docker_only_nodes="$(grep -rnE '10\.5\.0\.|cloudbox-(controlplane|worker)-1' \
+  lab/*/README.md lab/*/verify.sh lab/*/solve.sh slides/pages 2>/dev/null \
+  | grep -Eiv 'docker substrate|docker-only|talos-box|tbx ' || true)"
+if [[ -n "${docker_only_nodes}" ]]; then
+  bad "docker-substrate node facts (10.5.0.x, cloudbox-*-1 container names) in attendee-facing material without naming the substrate — on tbx the nodes are VMs with DHCP addresses and these commands cannot work:"
+  printf '   %s\n' "${docker_only_nodes}" | head -30
+else
+  ok "no unlabelled docker-substrate node addresses/container names in lab or slides"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
+# --- 13. CI project fixtures obey the console's own project-name rule --------
+# The console refuses a project name containing '-' (kube.ValidProjectName /
+# CheckProjectName: the Knative host is "<app>-<project>" in ONE DNS label, so a
+# hyphen there makes two apps able to claim one URL). The e2e workflow drives
+# the console over HTTP, so a hyphenated fixture is not a lint failure — it is a
+# red CI run at the very end of a 40-minute job. That is exactly how `team-e2e`
+# got in. Both halves are asserted: the Go rule still forbids the hyphen, and
+# every project fixture in the workflow passes it.
+before_fail=${FAILURES}
+proj_rule="apps/portal/internal/kube/projects.go"
+if ! grep -q 'strings.Contains(name, "-")' "${proj_rule}"; then
+  bad "${proj_rule} no longer refuses a hyphenated project name — this check (and the fixtures below) are keyed to that rule"
+else
+  bad_fixtures=""
+  while IFS= read -r line; do
+    val="${line#*proj=}"
+    val="${val%%[[:space:]#]*}"
+    [[ -n "${val}" ]] || continue
+    [[ "${val}" =~ ^[a-z0-9]([a-z0-9]{0,38}[a-z0-9])?$ ]] || bad_fixtures+="${line}"$'\n'
+  done < <(grep -nE '^[[:space:]]*proj=' .github/workflows/*.yaml 2>/dev/null || true)
+  if [[ -n "${bad_fixtures}" ]]; then
+    bad "CI project fixture rejected by the console's project-name rule (hyphen-free DNS label) — the console would refuse it and the job would fail at the create step:"
+    printf '   %s\n' "${bad_fixtures}"
+  else
+    ok "CI project fixtures pass the console's project-name rule"
+  fi
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
+# --- 14. exactly ONE substrate decision ---------------------------------------
+# scripts/substrate-decide.sh exists because this decision was copied into four
+# files and the copies drifted — lab 00 had no platform gate (an Intel Mac with
+# tbx installed was graded `tbx`), lab 01 and lab 06 had no `kind` arm (the
+# lifeboat was graded as a Talos-in-Docker machine), and each was written as the
+# same little `case "$S" in tbx|docker) ;; *) S=docker ;; esac` ladder. The
+# copies are gone; this is what stops the next one, because re-adding one is
+# four keystrokes and reads like local defensiveness rather than a fork of a
+# shared rule.
+#
+# Comment lines are exempt (`^[^#]*` cannot span the `#` that opens one) — the
+# three files that used to carry a ladder now DESCRIBE it in the comment that
+# says why they source the shared file instead, and that sentence is the point.
+before_fail=${FAILURES}
+ladder_hits="$(grep -rEn '^[^#]*\bin[[:space:]]+"?tbx"?\|"?docker"?' scripts lab solutions 2>/dev/null \
+  | grep -v '^scripts/substrate-decide.sh:' || true)"
+if [[ -n "${ladder_hits}" ]]; then
+  bad "a substrate-decision case ladder outside scripts/substrate-decide.sh — source that file and call substrate_decide_into instead (it is logging-neutral by design, so a verifier with its own ok()/fail() can source it):"
+  printf '   %s\n' "${ladder_hits}"
+fi
+# …and the shared decision still has the entry point those callers use.
+grep -q '^substrate_decide_into()' scripts/substrate-decide.sh \
+  || bad "substrate_decide_into() is gone from scripts/substrate-decide.sh — check 14 forbids the copies and points at a function that no longer exists"
+for f in lab/00-setup/verify.sh lab/01-cluster/verify.sh lab/01-cluster/solve.sh lab/06-serverless/verify.sh; do
+  grep -q 'substrate-decide.sh' "${f}" \
+    || bad "${f} no longer sources scripts/substrate-decide.sh — it is one of the four files the shared decision was extracted FROM"
+  # …and still CALLS it. Sourcing a file proves nothing about using it: delete
+  # the `substrate_decide_into SUBSTRATE` line and leave the `.` line behind —
+  # which is exactly the shape a "simplification" takes — and this check stayed
+  # green while the verifier fell back to whatever SUBSTRATE happened to be.
+  # Anchored to the real invocation: not a comment (`^[^#]*`), the function name
+  # followed by the variable it sets.
+  grep -qE '^[^#]*\bsubstrate_decide_into[[:space:]]+[A-Za-z_][A-Za-z0-9_]*' "${f}" \
+    || bad "${f} sources scripts/substrate-decide.sh but never calls substrate_decide_into <var> — the decision is imported and unused"
+done
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "one substrate decision (scripts/substrate-decide.sh), sourced by every caller"
+
+# --- 15. the argocd-cm health customizations the waves depend on --------------
+# Two of the three Lua health overrides in bootstrap-gitops.sh are load-bearing
+# for sync waves, and both were added AFTER a run had already failed without
+# them, so both read like optional polish to anyone tidying that heredoc:
+#
+#   argoproj.io_Application  — without it the app-of-apps never reports its
+#                              children's health and no wave ever gates.
+#   networking.k8s.io_Ingress — ArgoCD's built-in check holds an Ingress
+#                              Progressing until `.status.loadBalancer.ingress`
+#                              is non-empty. On the docker substrate the shared
+#                              Cilium ingress is a NodePort, so that field is
+#                              never written: nine components ship an
+#                              ingress.yaml, every one of their Applications
+#                              stuck Progressing, module 03's wait for 'rustfs'
+#                              timed out and the waves behind it never started
+#                              (CI run 32945328784). tbx populates the VIP, so
+#                              deleting this override fails on docker only.
+#
+# Anchored on the ConfigMap keys, and — for the Ingress one — on the class test
+# that is the whole point of it: an override that no longer special-cases our
+# own ingress class has been rewritten into upstream's rule.
+before_fail=${FAILURES}
+for key in \
+  'resource.customizations.health.argoproj.io_Application' \
+  'resource.customizations.health.autoscaling_HorizontalPodAutoscaler' \
+  'resource.customizations.health.networking.k8s.io_Ingress'; do
+  grep -qF "  ${key}: |" scripts/bootstrap-gitops.sh \
+    || bad "scripts/bootstrap-gitops.sh no longer patches argocd-cm with '${key}' — check 15 guards the health customizations the sync waves depend on; do not delete one because the cluster looks healthy without it"
+done
+grep -qE '^[[:space:]]*if obj\.spec ~= nil and obj\.spec\.ingressClassName == "cilium" then' scripts/bootstrap-gitops.sh \
+  || bad "the networking.k8s.io_Ingress health override in scripts/bootstrap-gitops.sh no longer tests 'ingressClassName == \"cilium\"' — without that arm it is upstream's rule again and every Cilium-served Ingress goes back to Progressing forever on the docker substrate (CI run 32945328784)"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "argocd-cm carries the Application, HPA and Cilium-Ingress health overrides"
 
 echo
 if [[ "${FAILURES}" -gt 0 ]]; then

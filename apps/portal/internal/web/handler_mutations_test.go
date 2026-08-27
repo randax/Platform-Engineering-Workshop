@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"cloudbox.io/portal/internal/metrics"
 )
 
 func formReq(method, target string, form url.Values) *http.Request {
@@ -96,9 +98,11 @@ func TestHandleResizeDatabaseErrorFlash(t *testing.T) {
 
 // Deleting a function targets the namespace from the URL path, NOT the project
 // cookie. The Functions list is cluster-wide, so a function viewed under project
-// team-a must be deleted from team-a even when the cookie says demo — the bug
+// teama must be deleted from teama even when the cookie says demo — the bug
 // this guards against silently deleted demo/<name> instead. Assert the k8s
-// DELETE landed on the team-a path despite the cookie.
+// DELETE landed on the teama path despite the cookie. (The fixture is
+// hyphen-free because the console's project rule forbids the hyphen; the
+// hyphenated case is the read-only test below.)
 func TestHandleDeleteFunctionUsesPathNamespaceNotCookie(t *testing.T) {
 	var deletePath string
 	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -109,8 +113,8 @@ func TestHandleDeleteFunctionUsesPathNamespaceNotCookie(t *testing.T) {
 		}
 		_, _ = w.Write([]byte(`{"items":[]}`)) // the re-list after delete
 	})
-	req := httptest.NewRequest(http.MethodDelete, "/services/team-a/fn-x", nil)
-	req.SetPathValue("namespace", "team-a")
+	req := httptest.NewRequest(http.MethodDelete, "/services/teama/fn-x", nil)
+	req.SetPathValue("namespace", "teama")
 	req.SetPathValue("name", "fn-x")
 	req.AddCookie(&http.Cookie{Name: "project", Value: "demo"}) // the cookie must NOT win
 	rec := httptest.NewRecorder()
@@ -120,8 +124,8 @@ func TestHandleDeleteFunctionUsesPathNamespaceNotCookie(t *testing.T) {
 	if deletePath == "" {
 		t.Fatal("handler never issued a DELETE to the API")
 	}
-	if !strings.Contains(deletePath, "/namespaces/team-a/") {
-		t.Errorf("DELETE path = %q, want it scoped to the URL namespace team-a, not the cookie's demo", deletePath)
+	if !strings.Contains(deletePath, "/namespaces/teama/") {
+		t.Errorf("DELETE path = %q, want it scoped to the URL namespace teama, not the cookie's demo", deletePath)
 	}
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rec.Code)
@@ -167,7 +171,10 @@ func TestHandleCreateProject(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusCreated)
 	})
-	req := formReq(http.MethodPost, "/projects", url.Values{"name": {"team-a"}})
+	// "teama", not "team-a": project namespaces are hyphen-free, because the
+	// Knative host is "<app>-<project>" in ONE label (kube.CreateProject,
+	// TestCreateProjectRejectsHyphen, docs/HAZARDS.md).
+	req := formReq(http.MethodPost, "/projects", url.Values{"name": {"teama"}})
 	req.Header.Set("HX-Request", "true")
 	rec := httptest.NewRecorder()
 
@@ -179,7 +186,161 @@ func TestHandleCreateProject(t *testing.T) {
 	if rec.Header().Get("HX-Refresh") != "true" {
 		t.Error("expected HX-Refresh after create")
 	}
-	if !strings.Contains(rec.Header().Get("Set-Cookie"), "project=team-a") {
+	if !strings.Contains(rec.Header().Get("Set-Cookie"), "project=teama") {
 		t.Errorf("active-project cookie not set to the new project: %q", rec.Header().Get("Set-Cookie"))
 	}
+}
+
+// The other half of the same rule, at the HTTP door: a hyphenated project name
+// must come back as an error flash rather than a namespace.
+func TestHandleCreateProjectRefusesHyphen(t *testing.T) {
+	var posts int
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			posts++
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+	req := formReq(http.MethodPost, "/projects", url.Values{"name": {"team-a"}})
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+
+	HandleCreateProject(srv, rec, req)
+
+	if posts != 0 {
+		t.Errorf("a hyphenated project name reached the API server (%d POSTs)", posts)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "Create failed") {
+		t.Errorf("expected the error flash in the fragment, got:\n%s", body)
+	}
+}
+
+// A legacy hyphenated project is READ-ONLY: the console lists it, but neither
+// the switch route nor any mutating route may act on it. Before round 4 the
+// hyphen rule lived at creation only, so a namespace made by hand (or before
+// the rule) could be switched into and deployed to — re-opening the
+// "<app>-<project>" host collision that creation exists to prevent.
+func TestLegacyHyphenatedProjectIsReadOnly(t *testing.T) {
+	t.Run("switch is refused", func(t *testing.T) {
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("switch must not touch the API server (%s %s)", r.Method, r.URL.Path)
+		})
+		req := httptest.NewRequest(http.MethodGet, "/project?set=team-a", nil)
+		rec := httptest.NewRecorder()
+
+		HandleProjectSwitch(srv, rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400", rec.Code)
+		}
+		if sc := rec.Header().Get("Set-Cookie"); strings.Contains(sc, "team-a") {
+			t.Errorf("a refused switch must not set the cookie: %q", sc)
+		}
+	})
+
+	t.Run("create-application is refused", func(t *testing.T) {
+		var posts int
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				posts++
+			}
+			_, _ = w.Write([]byte(`{"items":[]}`))
+		})
+		req := formReq(http.MethodPost, "/applications", url.Values{
+			"name": {"myapp"}, "source": {"image"}, "image": {"ghcr.io/x/y:v1"},
+			"min": {"0"}, "max": {"3"},
+		})
+		req.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
+		rec := httptest.NewRecorder()
+
+		handleCreateApplication(srv, rec, req)
+
+		if posts != 0 {
+			t.Errorf("a hyphenated project cookie still deployed (%d POSTs)", posts)
+		}
+		if body := rec.Body.String(); !strings.Contains(body, "read-only") {
+			t.Errorf("expected the read-only explanation in the fragment, got:\n%s", body)
+		}
+	})
+
+	t.Run("create-database is refused, not redirected to demo", func(t *testing.T) {
+		var posts int
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				posts++
+			}
+			_, _ = w.Write([]byte(`{"items":[]}`))
+		})
+		req := formReq(http.MethodPost, "/databases", url.Values{"name": {"db1"}, "size": {"small"}})
+		req.AddCookie(&http.Cookie{Name: "project", Value: "team-a"})
+		rec := httptest.NewRecorder()
+
+		handleCreateDatabase(srv, rec, req)
+
+		if posts != 0 {
+			t.Errorf("a hyphenated project cookie still created a database (%d POSTs) — a silent write into the default project is the bug too", posts)
+		}
+		if body := rec.Body.String(); !strings.Contains(body, "read-only") {
+			t.Errorf("expected the read-only explanation in the fragment, got:\n%s", body)
+		}
+	})
+
+	// The delete route takes its namespace from the URL PATH, so the cookie rule
+	// never sees it: without its own check, the one write the console still
+	// performs inside a legacy hyphenated project would be the destructive one.
+	t.Run("delete-function is refused, with zero API calls", func(t *testing.T) {
+		var deletes int
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodDelete {
+				deletes++
+			}
+			_, _ = w.Write([]byte(`{"items":[]}`))
+		})
+		req := httptest.NewRequest(http.MethodDelete, "/services/team-a/fn-x", nil)
+		req.SetPathValue("namespace", "team-a")
+		req.SetPathValue("name", "fn-x")
+		rec := httptest.NewRecorder()
+
+		handleDeleteFunction(srv, rec, req)
+
+		if deletes != 0 {
+			t.Errorf("a hyphenated project namespace still had its function deleted (%d DELETEs)", deletes)
+		}
+		if rec.Header().Get("X-Delete-Failed") != "1" {
+			t.Errorf("expected X-Delete-Failed=1 so the detail page does not redirect as if it worked, got %q", rec.Header().Get("X-Delete-Failed"))
+		}
+		if body := rec.Body.String(); !strings.Contains(body, "read-only") {
+			t.Errorf("expected the read-only explanation in the fragment, got:\n%s", body)
+		}
+	})
+
+	// ...and the button is not drawn for it either: Deletable is the same rule.
+	t.Run("the list offers no Delete button for a hyphenated project", func(t *testing.T) {
+		srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case strings.Contains(r.URL.Path, "/namespaces") && r.Method == http.MethodGet:
+				_, _ = w.Write([]byte(`{"items":[{"metadata":{"name":"team-a","labels":{"cloudbox.io/project":"true"}}}]}`))
+			case strings.Contains(r.URL.Path, "services"):
+				_, _ = w.Write([]byte(`{"items":[{"metadata":{"name":"fn-x","namespace":"team-a"},"status":{}}]}`))
+			default:
+				_, _ = w.Write([]byte(`{"items":[]}`))
+			}
+		})
+		// A non-nil Prom whose queries simply fail: the sparkline decoration is
+		// best-effort, and fetchFunctions dereferences the client for every row.
+		srv.Prom = metrics.New("http://127.0.0.1:1")
+		req := httptest.NewRequest(http.MethodGet, "/services", nil)
+		data, err := fetchFunctions(srv, req, flash{})
+		if err != nil {
+			t.Fatalf("fetchFunctions: %v", err)
+		}
+		if len(data.Rows) == 0 {
+			t.Fatal("fixture produced no function rows — the assertion below would pass vacuously")
+		}
+		for _, row := range data.Rows {
+			if row.Deletable {
+				t.Errorf("function %s/%s in a hyphenated project is marked Deletable", row.Metadata.Namespace, row.Metadata.Name)
+			}
+		}
+	})
 }

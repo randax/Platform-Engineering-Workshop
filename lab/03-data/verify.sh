@@ -37,7 +37,7 @@ check_app() { # <name>
     fi
     sleep 5
   done
-  fail "ArgoCD app '$1' is '$st' — did you cp gitops/catalog/$1.yaml to gitops/apps/ and push? Check http://localhost:30080"
+  fail "ArgoCD app '$1' is '$st' — did you cp gitops/catalog/$1.yaml to gitops/apps/ and push? Check ${ARGOCD_HOST_URL}"
 }
 
 # --- Platform components enabled -------------------------------------------
@@ -86,10 +86,10 @@ else
   fail "no running RustFS pod — kubectl -n rustfs get pods; check the rustfs app in ArgoCD"
 fi
 
-if curl -sS --max-time 5 -o /dev/null http://localhost:30900/ 2>/dev/null; then
-  ok "S3 endpoint answers on :30900"
+if curl -sS --max-time 5 -o /dev/null "${RUSTFS_S3_HOST_URL}/" 2>/dev/null; then
+  ok "S3 endpoint answers at ${RUSTFS_S3_HOST_URL}"
 else
-  fail "nothing answering on :30900 — kubectl -n rustfs get svc; is the NodePort up?"
+  fail "nothing answering at ${RUSTFS_S3_HOST_URL} — kubectl -n rustfs get svc,ingress"
 fi
 
 # Bucket check: local s5cmd if present, else a short-lived in-cluster pod.
@@ -99,7 +99,7 @@ fi
 s3ls() {
   if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1 \
-      s5cmd --endpoint-url http://localhost:30900 ls "s3://app-assets" 2>/dev/null
+      s5cmd --endpoint-url "${RUSTFS_S3_HOST_URL}" ls "s3://app-assets" 2>/dev/null
   else
     kubectl -n demo run "verify-s3-$$" --rm -i --restart=Never --quiet \
       --image=docker.io/peakcom/s5cmd:v2.3.0 \
@@ -122,7 +122,7 @@ if LISTING="$(s3ls)"; then
     fail "bucket app-assets exists but is empty — upload any file (s5cmd cp) so you can presign it"
   fi
 else
-  fail "bucket app-assets not found — create it: s5cmd --endpoint-url http://localhost:30900 mb s3://app-assets (creds cloudbox/cloudbox123)"
+  fail "bucket app-assets not found — create it: s5cmd --endpoint-url ${RUSTFS_S3_HOST_URL} mb s3://app-assets (creds cloudbox/cloudbox123)"
 fi
 
 echo

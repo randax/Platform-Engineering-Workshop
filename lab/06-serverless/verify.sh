@@ -69,16 +69,61 @@ else
   fail "ksvc hello not Ready — kubectl -n demo describe ksvc hello (look at the conditions)"
 fi
 
-# --- Cold start / serving through Kourier ---------------------------------------
+# --- Cold start / serving through the ingress -----------------------------------
+# Two accepted paths, because name resolution is the one thing the two substrates
+# do differently. Preferred: the ksvc's own URL, browsable with no Host header and
+# no port — that works on tbx for every name (its resolver answers the whole
+# *.${CLOUDBOX_DOMAIN} wildcard) and on docker only for the names
+# install.sh --print-hosts lists, since /etc/hosts has no wildcards.
+# Fallback: the same request with an explicit Host header, aimed at whatever the
+# shared ingress actually is on this substrate — localhost:80 on docker, the
+# LoadBalancer VIP on tbx. Both paths prove the same thing.
+# Where the fallback aims, and what a failure means, differ per substrate — the
+# only substrate-aware lines in this file. Resolved inline (sourcing
+# scripts/lib.sh would clobber the counting ok()/fail() above); no detection
+# needed, because by module 06 a cluster exists and its answer is persisted.
+# The substrate decision is scripts/substrate-decide.sh — the SINGLE
+# implementation, sourced rather than copied. Three files carried their own
+# `case "$SUBSTRATE" in tbx|docker) ;; *) SUBSTRATE=docker ;; esac` ladder, and
+# copies drift: this one had no `kind` arm for a while, and lab 00's had no
+# platform gate at all, so the same laptop was graded on two different
+# substrates by two different scripts. substrate-decide.sh is deliberately
+# logging-neutral — it never calls ok/fail/warn/die and never exits — which is
+# what lets a verifier with its own counting ok()/fail() source it safely.
+# `|| SUBSTRATE=docker` covers the one failing case: an invalid
+# CLOUDBOX_SUBSTRATE, which lib.sh reports in its own voice and this file has no
+# business dying over.
+# (kind resolves to its own value here and falls into the `else` arm below with
+# the docker answer, which is right: the lifeboat's ingress IS reached at
+# localhost:80, exactly like the docker substrate's.)
+LAB06_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=../../scripts/substrate-decide.sh
+. "${LAB06_REPO_ROOT}/scripts/substrate-decide.sh"
+SUBSTRATE=""
+substrate_decide_into SUBSTRATE || SUBSTRATE=docker
+if [ "$SUBSTRATE" = tbx ]; then
+  INGRESS_ADDR="$(kubectl -n kube-system get svc cilium-ingress \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+  NAME_HINT="on tbx the talos-box resolver answers *.${CLOUDBOX_DOMAIN} — 'tbx doctor' checks that wiring; kubectl -n kube-system get svc cilium-ingress shows the VIP it should point at"
+else
+  INGRESS_ADDR="localhost"
+  NAME_HINT="on docker each name needs a line in /etc/hosts (./scripts/install.sh --print-hosts)"
+fi
+
 # Strip the scheme in pure bash — BSD sed has no \? in basic regex.
 URL="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' 2>/dev/null || true)"
 HOST="${URL#http://}"; HOST="${HOST#https://}"
 if [ -n "$HOST" ]; then
-  BODY="$(curl -fsS --max-time 30 -H "Host: $HOST" http://localhost:31080/ 2>/dev/null || true)"
+  BODY="$(curl -fsS --max-time 30 "http://${HOST}/" 2>/dev/null || true)"
+  VIA="its own URL (http://${HOST}/)"
+  if ! echo "$BODY" | grep -qi hello && [ -n "$INGRESS_ADDR" ]; then
+    BODY="$(curl -fsS --max-time 30 -H "Host: ${HOST}" "http://${INGRESS_ADDR}/" 2>/dev/null || true)"
+    VIA="the shared ingress at ${INGRESS_ADDR} with a Host header"
+  fi
   if echo "$BODY" | grep -qi hello; then
-    ok "curl via Kourier (:31080, Host: $HOST) answered: $(echo "$BODY" | head -1)"
+    ok "curl via ${VIA} answered: $(echo "$BODY" | head -1)"
   else
-    fail "no answer through Kourier — is 31080 up? kubectl get svc -A | grep 31080; try: curl -v -H 'Host: $HOST' http://localhost:31080/"
+    fail "no answer for ${HOST} — try: curl -v -H 'Host: ${HOST}' http://${INGRESS_ADDR:-<ingress-address>}/ ; if that works, only the NAME is broken: ${NAME_HINT}. If neither works: kubectl -n kourier-system get svc kourier; kubectl get ingress -A"
   fi
 else
   fail "cannot determine ksvc URL — fix the ksvc checks above first"
