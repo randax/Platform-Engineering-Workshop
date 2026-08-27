@@ -1779,7 +1779,19 @@ git_as_gitea_admin() {
   local attempt=0
   while :; do
     rc=0
-    GIT_ASKPASS="${askpass}" GIT_TERMINAL_PROMPT=0 bounded 180 git "$@" || rc=$?
+    # `env`, not a prefix assignment: bounded is a FUNCTION, and bash applies a
+    # prefix on a function call to the shell without exporting it, so git ran
+    # with no GIT_ASKPASS at all and Gitea answered 401 three times in a row.
+    # `-c credential.helper=` empties the helper chain for this call only.
+    # git consults credential helpers BEFORE GIT_ASKPASS, and macOS installs
+    # osxkeychain globally (Homebrew git and Apple git both), so the workshop's
+    # push went to the keychain instead of to the askpass script above: the
+    # attendee gets a GUI passphrase dialog for a credential they never created,
+    # and a headless run just hangs until something kills it. Gitea then logs a
+    # bare 401 with no authenticated retry, which is exactly what a rehearsal
+    # saw three times in a row.
+    bounded 180 env GIT_ASKPASS="${askpass}" GIT_TERMINAL_PROMPT=0 \
+      git -c credential.helper= "$@" || rc=$?
     [[ "${rc}" -eq 0 ]] && break
     attempt=$((attempt + 1))
     [[ "${attempt}" -ge 3 ]] && break
