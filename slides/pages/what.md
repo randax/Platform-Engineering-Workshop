@@ -159,7 +159,7 @@ The bridge from "what" to "how": a cloud isn't a pile of tools, it's a handful o
 - Self-service — the 2008 magic: ask for a database, get one, no human in the loop. Crossplane turns one YAML into a whole stack. (module 04)
 - Operators as control loops — the insight that demystifies "managed": behind RDS is a control loop, and CloudNativePG is that same loop in your cluster. (module 03)
 
-These four are the transferable skills — the thing they take to work on Monday even if they never run Talos-in-Docker again. The tools change; the practices don't.
+These four are the transferable skills — the thing they take to work on Monday even if they never run Talos on a laptop again. The tools change; the practices don't.
 -->
 
 ---
@@ -168,7 +168,7 @@ These four are the transferable skills — the thing they take to work on Monday
 
 <div class="arch">
   <div class="laptop">
-    <div class="band-title"><Logo name="docker" size="1.3rem"/> Your laptop · Docker — the "datacenter"</div>
+    <div class="band-title"><Logo name="docker" size="1.3rem"/> Your laptop — the "datacenter" · Talos VMs, or Docker</div>
     <div class="k8s">
       <div class="band-title"><Logo name="talos" size="1.3rem"/> <Logo name="cilium" size="1.3rem"/> Talos + Cilium · Kubernetes — no kube-proxy</div>
       <div class="engine">
@@ -194,7 +194,7 @@ These four are the transferable skills — the thing they take to work on Monday
 <!--
 The map of the whole day — the comparison table you just showed, now as one running system. You'll return to this exact diagram in the closing, when every box is up and green across the room. Walk it bottom-up, one layer per beat:
 
-1. Docker on your laptop is the "datacenter".
+1. Your laptop is the "datacenter" — two Talos nodes on it, as real VMs where the substrate allows and as containers otherwise.
 2. Talos Linux v1.13 nodes run as containers — an immutable, API-only OS purpose-built for Kubernetes (module 01). Cilium does networking in eBPF; there is no kube-proxy in this cluster at all.
 3. Gitea + ArgoCD are the heart (module 02): the git server lives IN the cluster, and ArgoCD delivers everything below it from that git repo. Nothing depends on GitHub or the venue WiFi.
 4. The platform services: CloudNativePG for managed Postgres, RustFS for S3-compatible object storage (module 03), Crossplane v2 for the self-service API (module 04).

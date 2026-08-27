@@ -105,7 +105,7 @@ The goal was never "typed the commands yourself". It's a running platform PLUS y
 1. verify.sh and the explain-back are the finish line, not the last command an agent ran.
 2. When an assistant tells you something about YOUR cluster, check it against the cluster before acting. Module 05 exists to make that instinct permanent — including one fault where the obvious AI answer is plausible and wrong. That's a promise, not a threat.
 
-The tutor line, said with a smile and total honesty: the repo's CLAUDE.md/AGENTS.md asks agents to coach rather than solve — Socratic questions, next hint layer, no pasted solutions. It's advisory and they can bypass it; the point isn't enforcement, it's that a workshop your agent completes teaches your agent. One carve-out to state explicitly, because it's the opposite rule: broken environments (Docker, mise, half-pulled images) are fair game for full AI firepower — nobody came here to learn yak-shaving. Helpers apply the same split: coach on lab content, fix machines outright.
+The tutor line, said with a smile and total honesty: the repo's CLAUDE.md/AGENTS.md asks agents to coach rather than solve — Socratic questions, next hint layer, no pasted solutions. It's advisory and they can bypass it; the point isn't enforcement, it's that a workshop your agent completes teaches your agent. One carve-out to state explicitly, because it's the opposite rule: broken environments (Docker or tbx, mise, half-pulled images) are fair game for full AI firepower — nobody came here to learn yak-shaving. Helpers apply the same split: coach on lab content, fix machines outright.
 -->
 
 ---

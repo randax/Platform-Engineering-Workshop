@@ -50,7 +50,7 @@ The lab is deliberately investigative: create the cluster networkless, diagnose 
 **Outcome:** 2-node cluster `cloudbox`, no SSH, no kube-proxy — and **you** installed its network.
 
 ```bash
-./scripts/create-cluster.sh --skip-cilium   # ~2–3 min; read it while it runs
+./scripts/create-cluster.sh --skip-cilium   # a few min; read it while it runs
 kubectl get nodes                           # NotReady. Your move.
 # → install Cilium yourself (lab task 3), watch NotReady become Ready
 cd lab/01-cluster && ./verify.sh

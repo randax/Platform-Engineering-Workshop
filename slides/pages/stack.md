@@ -43,7 +43,7 @@ policy, kubeProxyReplacement via KubePrism on :7445.
 
 Talos is the biggest identity shift of the day (module 01 goes deep). The pin matters: v1.13.8, never 1.12.x — cni:none docker clusters hung on readiness until the v1.13.0 fix (talos#12885). Default node memory limit is 2048 MB and the stack won't fit, so the scripts raise it (4096 CP / 6144 worker).
 
-Cilium tradeoff to name honestly: eBPF wants a modern kernel — Docker Desktop macOS ships 6.10, WSL2 6.6, both fine; the risk platform is exotic Linux firewalld/nftables setups. We keep kube-proxy-free for the wow factor but the fallback keeps kube-proxy to remove a nested-cgroup variable — robustness vs. wow is a real dial here.
+Cilium tradeoff to name honestly: eBPF wants a modern kernel — a talos-box VM brings its own, and on the Docker substrate Docker Desktop macOS ships 6.10 and WSL2 6.6, both fine; the risk platform is exotic Linux firewalld/nftables setups. We keep kube-proxy-free for the wow factor but the fallback keeps kube-proxy to remove a nested-cgroup variable — robustness vs. wow is a real dial here.
 -->
 
 ---
@@ -194,7 +194,7 @@ The four things we rejected, precisely: kube-prometheus-stack (heavy, and no tra
   </div>
   <div v-click class="practice">
     <strong>Fits a 16 GB laptop</strong><br>
-    In-cluster total ≈ 7.5–8 GB; ≥10 GB to Docker. Every pick optimises for this ceiling.
+    In-cluster total ≈ 7.5–8 GB; 16 GB laptop, ≥10 GB to Docker on that substrate. Every pick optimises for this ceiling.
     <div class="mod">the constraint that shaped the whole stack</div>
   </div>
 </div>

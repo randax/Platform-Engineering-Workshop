@@ -14,7 +14,7 @@ This is the safety net, not the plan — the prework email asked everyone to do 
 
 So release the room to run it here, at minute 10, and keep talking. The concept sections that follow (what · platforms · stack · how) are deliberately zero-keyboard, so the pre-flight, the image pull and the presenter all run in parallel. Triage happens just before module 01.
 
-Anyone whose laptop fundamentally can't run it goes straight to a lifeboat (pair up, or devcontainer/Codespaces) — do NOT let anyone burn 45 minutes fighting their Docker install.
+Anyone whose laptop fundamentally can't run it goes straight to a lifeboat (pair up, or devcontainer/Codespaces) — do NOT let anyone burn 45 minutes fighting their runtime install, on either substrate.
 -->
 
 ---
@@ -31,7 +31,7 @@ The offline rule isn't just conference pragmatism — it's the first platform-en
 
 Concretely: cloudbox-init.sh pre-pulled all pinned images into a local registry mirror; the git server will live in-cluster; ArgoCD never points at GitHub. Once images are pulled, the whole workshop works in airplane mode.
 
-Hardware honesty, one more time: 16 GB RAM minimum with at least 10 GB allocatable to Docker; 32 GB is comfortable. The full platform idles around 8 GB inside the cluster. On 16 GB machines: close the Electron zoo. macOS: OrbStack or Docker Desktop with a raised memory limit. WSL2: raise it in .wslconfig — and WSL2 is our least-tested platform, so lifeboats apply.
+Hardware honesty, one more time: 16 GB RAM is the minimum on both substrates, 32 GB is comfortable, and you need ~40 GB free disk — the image caches are most of it. The full platform idles around 8 GB inside the cluster, so on 16 GB machines: close the Electron zoo. On the Docker substrate you also need ≥10 GB and ≥4 CPUs allocatable to Docker (macOS: OrbStack or Docker Desktop with a raised limit; WSL2: .wslconfig). WSL2 is Docker-only and our least-tested platform, so lifeboats apply there first.
 -->
 
 ---
@@ -48,7 +48,9 @@ cd lab/00-setup && ./verify.sh
 <span class="badge">runs in the background</span> · red sticky if anything is <span class="svgi i-circle-x"></span>
 
 <!--
-The task: run the pre-flight, fix what it flags (most common: Docker not running, or Docker memory limit below 10 GB), and run the module's verify.sh. No timer on this one — it runs underneath the next four sections.
+The task: run the pre-flight, fix what it flags (most common: Docker not running, or Docker's memory limit below 10 GB), and run the module's verify.sh. No timer on this one — it runs underneath the next four sections.
+
+Substrate, said once so the room isn't confused by its neighbour's terminal: the scripts pick real Talos VMs (talos-box) where `tbx doctor` passes — Apple Silicon and Linux with KVM — and Talos-in-Docker everywhere else. `cat ~/.cloudbox/substrate` says which one a machine got, `CLOUDBOX_SUBSTRATE=docker` forces the fallback, and every module after 01 is identical on both. Anyone who skipped the prework's step 0 (`brew install randax/tap/tbx && sudo tbx system install && tbx doctor`) is not stuck: they get the Docker path.
 
 Say the one prework line that pays off later: the optional OpenCode Zen key from lab/00-setup's README is what door 0's module 10 needs for its second beat. Anyone who skipped it should grab it now, while there's WiFi to spare.
 

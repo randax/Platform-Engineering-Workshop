@@ -205,7 +205,7 @@ Next slide: we look at Backstage live, so this isn't a straw man.
 - `backstage.yaml` stays in the catalog — try at home
 
 <!--
-Projector demo, ~5 minutes, announced at the pivot for ~3:35 and opt-in like the module-07 one. backstage.yaml was pre-enabled during the break after module 03 — first boot is slow (~2 GB CNOE image plus a CNPG database), which is precisely why this is a demo and not the hands-on.
+Projector demo, ~5 minutes, announced at the pivot for ~3:35 and opt-in like the module-07 one. One substrate caveat for whoever drives the projector: the CNOE image is amd64-only and a tbx VM emulates nothing, so on Apple Silicon the demo cluster has to be the Docker substrate (`CLOUDBOX_SUBSTRATE=docker`) — install.sh --check says so too. backstage.yaml was pre-enabled during the break after module 03 — first boot is slow (~2 GB CNOE image plus a CNPG database), which is precisely why this is a demo and not the hands-on.
 
 The loop to show: guest sign-in at http://backstage.cloudbox.k8s.test → catalog entities fed from Gitea → run a software template → chase the result through Gitea (http://gitea.cloudbox.k8s.test, a new repo appeared) → ArgoCD (http://argocd.cloudbox.k8s.test, a new Application) → pods running.
 
