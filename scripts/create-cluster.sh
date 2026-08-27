@@ -358,6 +358,20 @@ for _ in $(seq 1 "${api_wait_rounds}"); do
 done
 kubectl --request-timeout=5s get nodes >/dev/null 2>&1 \
   || die "Kubernetes API did not come up within $((api_wait_rounds * 2 / 60)) minutes"
+# One successful call is not a ready API server. On a VM the apiserver answers
+# while it is still settling, and the very next client — helm, which opens its
+# own connection — got `TLS handshake timeout` and failed the create on a
+# cluster that was fine. Ask three times in a row before believing it.
+api_steady=0
+for _ in $(seq 1 90); do
+  if kubectl --request-timeout=5s get --raw /readyz >/dev/null 2>&1; then
+    api_steady=$((api_steady + 1))
+    [[ "${api_steady}" -ge 3 ]] && break
+  else
+    api_steady=0
+  fi
+  sleep 2
+done
 ok "API server is answering (nodes are NotReady until Cilium arrives — expected)"
 
 # --- 3. Cilium ------------------------------------------------------------------------
@@ -458,11 +472,22 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
   # reachability from the host) is what retires the "unproven" mark on it.
   cilium_values+=(--set bpf.hostLegacyRouting=true)
 fi
-helm upgrade --install cilium \
+# Retried, for the same reason the readiness check above counts to three: this
+# is the first real workload call of the run, and on a freshly booted VM a
+# transient TLS handshake timeout here used to end the create with the cluster
+# healthy and no CNI. helm upgrade --install is idempotent, so a retry costs a
+# few seconds and saves the whole cluster.
+helm_attempt=0
+until helm upgrade --install cilium \
   --server-side=false \
   "${SCRIPT_DIR}/manifests/cilium-${CILIUM_VERSION}.tgz" \
   --namespace kube-system \
-  "${cilium_values[@]}"
+  "${cilium_values[@]}"; do
+  helm_attempt=$((helm_attempt + 1))
+  [[ "${helm_attempt}" -ge 5 ]] && die "Cilium install failed ${helm_attempt} times — the API server is not answering helm; 'kubectl get --raw /readyz' and 'talosctl -n ${CLOUDBOX_CP_IP:-the control plane} dmesg' show why"
+  warn "Cilium install attempt ${helm_attempt} failed (the API is still settling) — retrying in 10s"
+  sleep 10
+done
 
 substrate_post_cni
 
