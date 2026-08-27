@@ -202,6 +202,20 @@ Cilium DaemonSet is fully available; the Cilium operator is Available; Cilium re
 kube-proxy replacement active; no kube-proxy is running anywhere; CoreDNS is Available;
 and the shared ingress holds the endpoint every `*.cloudbox.k8s.test` name lands on.
 
+On the **docker** substrate those names also need a line each in `/etc/hosts`, and that
+is the one step in this whole workshop that asks for your password. `create-cluster.sh`
+writes them for you — including on the `--skip-cilium` path you just took. If you
+declined the prompt, or the block never got written, every `*.cloudbox.k8s.test` URL
+fails from module 02 onward on a perfectly healthy cluster. Fix it any time, the cluster
+keeps running:
+
+```bash
+./scripts/install.sh --print-hosts    # exactly what would be added
+./scripts/install.sh --write-hosts    # add it (sudo, once)
+```
+
+(On **tbx** nothing is written: talos-box's own resolver answers those names.)
+
 ## Explain-back
 
 Tell your neighbor: this node has no SSH and no package manager. Name two concrete

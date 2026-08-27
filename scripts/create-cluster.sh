@@ -362,6 +362,19 @@ if [[ "${SKIP_CILIUM}" == "true" ]]; then
   echo
   info "The vendored chart is at scripts/manifests/cilium-${CILIUM_VERSION}.tgz —"
   info "the exact values live in this script and in the lab's hints."
+  # The hostnames have nothing to do with the CNI, and lab 01 sends every
+  # attendee down THIS branch — so writing them only in the full-install path
+  # below meant the documented path ended with a healthy cluster and no working
+  # *.${CLOUDBOX_DOMAIN} URL, with nothing telling anyone why. Same `|| true`
+  # rule as the other call site: a declined sudo must not cost you the cluster.
+  if [[ "${SUBSTRATE}" == "docker" ]]; then
+    echo
+    write_hosts_block || {
+      warn "The ${CLOUDBOX_HOSTS_FILE} block was NOT written, so every *.${CLOUDBOX_DOMAIN}"
+      warn "URL will fail on a healthy cluster. Fix it any time, the cluster keeps"
+      warn "running: ./scripts/install.sh --write-hosts"
+    }
+  fi
   exit 0
 fi
 
