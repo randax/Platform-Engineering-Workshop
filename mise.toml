@@ -56,9 +56,17 @@ jq = "1.8.2"
 # "green in CI": 0.9.0 flagged an SC2015 that 0.11.0 does not. Principle 14
 # applies to the linters too.
 shellcheck = "0.11.0"
-# talos-box is installed out-of-band (brew install randax/tap/tbx on macOS, the
-# release tarball on Linux) — no mise backend publishes it yet (upstream #95/#96/#101).
-# tbx = "0.1.1"
+# talos-box, the VM substrate. No REGISTRY backend publishes it (upstream
+# #95/#96/#101), but the releases are goreleaser tarballs, which mise's github
+# backend installs straight from the release — so the binary is pinned here like
+# everything else instead of arriving via brew or a hand-fetched tarball. The
+# `exe=` hint is required: the repo is talos-box, the binary is tbx.
+#
+# This installs the BINARY only. The VM substrate also needs `sudo tbx system
+# install` (a one-time privileged helper daemon) — lab/00-setup covers it. Skip
+# that step and `tbx doctor` fails, substrate-decide.sh picks docker, and the
+# workshop runs identically on the fallback.
+"github:randax/talos-box[exe=tbx]" = "0.1.1"
 # node — only for the Slidev presentation
 node = "24"
 

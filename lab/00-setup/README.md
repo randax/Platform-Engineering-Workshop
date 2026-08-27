@@ -22,12 +22,21 @@ before the workshop** if you can; the room's first 15 minutes are the safety net
 
 From the repository root:
 
-0. **Pick your substrate.** On an Apple Silicon Mac (or Linux with KVM) install
-   [talos-box](https://github.com/randax/talos-box) and you get real Talos VMs with real
-   LoadBalancer addresses: `brew install randax/tap/tbx && sudo tbx system install && tbx doctor`
-   (on Linux, the release tarball plus its systemd helper instead of Homebrew). The
-   `sudo tbx system install` is a one-time privileged step — it installs the helper that
-   does the VM and network wiring. Everyone else — Windows/WSL2, Codespaces, or any machine
+0. **Pick your substrate.** On an Apple Silicon Mac (or Linux with KVM) you get real
+   Talos VMs with real LoadBalancer addresses, via
+   [talos-box](https://github.com/randax/talos-box). The `tbx` binary comes with the
+   tool chain in step 1 — it is pinned in `mise.toml` like everything else — so all you
+   add by hand is the one-time privileged step that installs the helper doing the VM and
+   network wiring:
+
+   ```bash
+   ./scripts/dev-setup.sh          # step 1, installs tbx among the rest
+   sudo tbx system install         # one-time, needs your password
+   tbx doctor                      # all PASS? you are on the VM substrate
+   ```
+
+   Skip the `sudo` step and nothing breaks: `tbx doctor` fails, and the scripts put you
+   on Talos-in-Docker instead. Everyone else — Windows/WSL2, Codespaces, or any machine
    `tbx doctor` is unhappy with — runs the identical workshop on Talos-in-Docker. The
    scripts decide for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you
    want to. Docker is required either way: the image mirror is a container on both
