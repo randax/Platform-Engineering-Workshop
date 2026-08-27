@@ -57,10 +57,11 @@ func TestBucketsUnlock(t *testing.T) {
 	}
 }
 
-// TestBucketObjectsRender feeds a fake store through the same helper the handler
-// uses, then renders the fragment and asserts the keys, humanized sizes, and
-// presigned download links all land in the markup.
-func TestBucketObjectsRender(t *testing.T) {
+// TestBucketDetailRender feeds a fake store through the same helper the handler
+// uses, then renders the bucket detail page (b70b651 folded the old
+// "bucket-objects" fragment into it) and asserts the keys, humanized sizes,
+// and presigned download links all land in the markup.
+func TestBucketDetailRender(t *testing.T) {
 	tmpl, err := ParseTemplates(&Server{})
 	if err != nil {
 		t.Fatalf("parsing templates: %v", err)
@@ -79,8 +80,8 @@ func TestBucketObjectsRender(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "bucket-objects", data); err != nil {
-		t.Fatalf("rendering bucket-objects: %v", err)
+	if err := tmpl.ExecuteTemplate(&buf, "bucket-detail", data); err != nil {
+		t.Fatalf("rendering bucket-detail: %v", err)
 	}
 	out := buf.String()
 

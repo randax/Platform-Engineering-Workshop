@@ -46,20 +46,6 @@ func TestTemplatesRender(t *testing.T) {
 		data any
 		want []string // substrings the rendered HTML must contain
 	}{
-		"overview": {
-			data: map[string]any{
-				"Apps":    []kube.ArgoApp{app},
-				"Summary": kube.ClusterSummary{Namespaces: 3, Pods: 10, PodsRunning: 9},
-			},
-			want: []string{
-				`aria-current="page"`,
-				// the sidebar's grouped sections
-				`>Platform</span>`, `>Services</span>`, `>Capstone</span>`,
-				`href="/components"`, `href="/workshop"`,
-				`href="/activity"`, `href="/billing"`,
-				`Grafana →`, // rail footer deep link
-			},
-		},
 		"components": {
 			data: splitRows(componentRows(map[string]kube.NSHealth{
 				"kube-system": {Ready: 3, Total: 3},
@@ -67,6 +53,14 @@ func TestTemplatesRender(t *testing.T) {
 				"rustfs":      {Ready: 0, Total: 1},
 			})),
 			want: []string{
+				// The shared layout (sidebar + rail footer) used to be asserted
+				// via the Overview page; b70b651 removed Overview as redundant
+				// with this page, so the layout assertions ride here now.
+				`aria-current="page"`,
+				`>Platform</span>`, `>Services</span>`, `>Capstone</span>`,
+				`href="/workshop"`,
+				`href="/activity"`, `href="/billing"`,
+				`Grafana →`,              // rail footer deep link
 				`hx-trigger="every 10s"`, // statuspage polls itself
 				`dot ok`, `>Operational</span>`,
 				`dot meh`, `>Degraded</span>`,
@@ -180,7 +174,6 @@ func TestTemplatesRender(t *testing.T) {
 				`Diagnostics`,                         // the "why" (ShowDiag branch)
 				`ImagePullBackOff`,                    // the pod-trouble cause
 				`polyline`,                            // the monitoring sparkline (Telemetry branch)
-				`idle · 0 pods`,                       // scale-from-zero
 				`/services/demo/fn-hello/invoke`,      // Invoke wakes it server-side
 				`hx-delete="/services/demo/fn-hello"`, // delete targets the function's own namespace
 			},
@@ -201,13 +194,19 @@ func TestTemplatesRender(t *testing.T) {
 				SizeNow:    "12 MiB",
 			},
 			want: []string{
-				`hx-confirm`, `Delete this database`, // destructive action lives HERE now
+				// destructive action lives HERE now, in the consolidated
+				// Actions block (6a947c1) — plain "Delete", still confirmed
+				`hx-confirm`, `hx-delete="/databases/my-db"`,
 				`my-db-pg-app`,    // connection secret
 				`psql -U app app`, // paste-ready one-liner
 				`evwarn`,          // warning event tinted
-				`Monitoring`, `Connections`, `Database size`, `Explore in Grafana`,
-				// resize: the form + the current size pre-selected
-				`hx-post="/databases/my-db/resize"`, `value="small" selected`, `Apply size`,
+				// the Grafana deep link moved into Actions as "View metrics
+				// & logs" (6a947c1), gated on Telemetry
+				`Monitoring`, `Connections`, `Database size`, `View metrics &amp; logs`,
+				// resize became the version+size Update form (6a947c1, d9f5cdb):
+				// current size pre-selected, Postgres version selectable
+				`hx-post="/databases/my-db/resize"`, `value="small" selected`,
+				`name="version"`, `>Update</button>`,
 			},
 		},
 		"activity": {
