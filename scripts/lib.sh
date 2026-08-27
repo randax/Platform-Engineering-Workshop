@@ -64,6 +64,33 @@ die()  { fail "$@"; exit 1; }
 # --- Small utilities -----------------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# bounded <seconds> <command...> — run a command with a deadline, portably.
+# macOS ships no timeout(1) (and `timeout` is commonly a shell alias to
+# gtimeout, which a script never sees), so this is the only way a call that can
+# hang forever gets an upper bound here. Exit 124 on expiry, like timeout(1).
+#
+# It exists because of a real hang: tbx_etcd_live() asked a Talos node whether
+# etcd was running, that node's apid stopped answering mid-create, and the
+# bootstrap loop wrapped around it neither advanced nor died — it waited
+# forever, printing nothing, on a cluster one command away from healthy.
+bounded() {
+  local secs="$1"; shift
+  "$@" &
+  local pid=$! waited=0
+  while kill -0 "${pid}" 2>/dev/null; do
+    if [[ "${waited}" -ge "${secs}" ]]; then
+      kill -TERM "${pid}" 2>/dev/null
+      sleep 1
+      kill -KILL "${pid}" 2>/dev/null
+      wait "${pid}" 2>/dev/null
+      return 124
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  wait "${pid}"
+}
+
 # need <cmd> [hint] — die with a friendly message if a tool is missing.
 need() {
   have "$1" || die "'$1' not found. ${2:-Run ./scripts/dev-setup.sh first, or restart your shell so mise activation takes effect.}"

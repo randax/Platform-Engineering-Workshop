@@ -516,6 +516,15 @@ if [[ -f "${lab01_readme}" ]]; then
     # that would silently be undefined — an empty loop is a guard that proves
     # nothing, which is the failure mode this whole file exists to avoid.
   done < <(bash -c 'source scripts/versions.env; source scripts/lib.sh; cilium_ingress_values nodeport')
+  # The tbx shape is the same trap one substrate over: an attendee on VMs who
+  # follows the docker flags ends with cilium-ingress <pending> and no clue.
+  # These are the values create-cluster.sh adds for tbx, plus the two objects
+  # substrate_post_cni applies; the README has to name them.
+  for tbx_knob in "ingressController.service.type=LoadBalancer" "l2announcements.enabled" \
+                  "bpf.hostLegacyRouting" "CiliumLoadBalancerIPPool" "CiliumL2AnnouncementPolicy"; do
+    grep -qF -- "${tbx_knob}" "${lab01_readme}" \
+      || bad "${lab01_readme} does not mention '${tbx_knob}' — lab 01 is the ONE lab that installs Cilium by hand, and on tbx that install is incomplete without it (cilium-ingress stays <pending> and verify.sh cannot say why)"
+  done
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "create-cluster.sh and kind-fallback.sh share one source for the Cilium ingress values"

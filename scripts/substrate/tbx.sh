@@ -285,9 +285,15 @@ tbx_restart_verb() {
 # TALOSCONFIG with credentials, so it is only meaningful after apply-config.
 # `etcd status` is the direct question; `service etcd` is the fallback for a
 # talosctl whose etcd subcommand set differs.
+# Both probes are BOUNDED. talosctl has no client-side deadline of its own, and
+# a node whose apid stops answering mid-create makes either call hang forever —
+# which turned the bootstrap loop below into a silent, endless wait instead of
+# the 10-minute failure with an actionable message it advertises. Ten seconds is
+# far more than a healthy node needs to answer, and expiry is just "not live
+# yet": the loop retries, and eventually gives up with the message.
 tbx_etcd_live() {
-  talosctl --nodes "$1" etcd status >/dev/null 2>&1 && return 0
-  talosctl --nodes "$1" service etcd 2>/dev/null | grep -qE '^STATE[[:space:]]+Running'
+  bounded 10 talosctl --nodes "$1" etcd status >/dev/null 2>&1 && return 0
+  bounded 10 talosctl --nodes "$1" service etcd 2>/dev/null | grep -qE '^STATE[[:space:]]+Running'
 }
 
 substrate_create() {
@@ -500,7 +506,7 @@ EOF
   # so issue it every round until the node says etcd is actually running.
   local bootstrapped=0
   for _ in $(seq 1 120); do
-    talosctl bootstrap >/dev/null 2>&1 || true
+    bounded 30 talosctl bootstrap >/dev/null 2>&1 || true
     if tbx_etcd_live "${cp_ip}"; then bootstrapped=1; break; fi
     sleep 5
   done

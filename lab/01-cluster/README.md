@@ -123,12 +123,36 @@ helm upgrade --install cilium \
 
 The last five flags are the shared **ingress**, and they are not optional: one
 Cilium ingress serves every `*.cloudbox.k8s.test` hostname you will use for the
-rest of the day, and `verify.sh` checks for it. The two `service.*` lines are
-the shape for the **docker** substrate; on **tbx** the cluster has a real
-LoadBalancer, so replace both with `--set ingressController.service.type=LoadBalancer`
-(`cat ~/.cloudbox/substrate` tells you which one you are on). The script builds
-these from `cilium_ingress_values()` in `scripts/lib.sh`, which is the single
-source shared with the kind lifeboat.
+rest of the day, and `verify.sh` checks for it. The script builds them from
+`cilium_ingress_values()` in `scripts/lib.sh`, the single source it shares with
+the kind lifeboat.
+
+Those two `service.*` lines are the **docker** shape. Check which substrate you
+are on with `cat ~/.cloudbox/substrate`, because **tbx needs a different ending**
+— a real LoadBalancer instead of a NodePort, an L2 announcer to claim the VIP on
+the network, and a raised client rate limit for the announcer's API traffic:
+
+```bash
+  --set ingressController.service.type=LoadBalancer \
+  --set l2announcements.enabled=true \
+  --set k8sClientRateLimit.qps=10 \
+  --set k8sClientRateLimit.burst=20 \
+  --set bpf.hostLegacyRouting=true          # so the VIP is reachable from your laptop
+```
+
+**And on tbx the flags alone are not enough.** A LoadBalancer Service needs an
+address to hand out, which means two more objects — a `CiliumLoadBalancerIPPool`
+and a `CiliumL2AnnouncementPolicy` — and without them `cilium-ingress` sits in
+`<pending>` forever and `verify.sh` fails with nothing to tell you why. They are
+the one part the script does for you rather than making you type subnet
+arithmetic: once your Cilium is up, run
+
+```bash
+./scripts/create-cluster.sh          # no --skip-cilium this time
+```
+
+It is idempotent — it finds the cluster and the Cilium you just installed, then
+applies the pool and the policy and waits for the VIP to appear.
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
   `kubectl get nodes -w` terminal.
