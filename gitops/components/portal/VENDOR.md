@@ -34,13 +34,32 @@ extra-file — its version is prose, kept honest by review.
 - **RBAC is least-privilege by design** (teaching contrast with the
   Backstage demo's read-all ClusterRole): one ClusterRole `portal-read`,
   `get/list/watch` only, over exactly the surfaces the console renders —
-  `applications.argoproj.io`, `clusters.postgresql.cnpg.io`,
-  `services.serving.knative.dev`, core `pods`/`namespaces`/`nodes`/`events`,
-  and `apps` `deployments`/`statefulsets`/`daemonsets`. The last three groups
+  `applications.argoproj.io` **and `workflows`**, `clusters.postgresql.cnpg.io`,
+  `services.serving.knative.dev`, core `pods`/`namespaces`/`nodes`/`events`
+  **and `secrets`**, and `apps` `deployments`/`statefulsets`/`daemonsets`. The last three groups
   are easy to miss and each one is a page: `nodes` + `events` back the cluster
   inventory and the event feed, `apps/*` backs the `/components` status page
   and the `/workshop` checklist — drop them and those pages render "forbidden"
   instead of state.
+- **`workflows` is read-only here, and that is the whole design.** `get/list/watch`
+  on `workflows.argoproj.io` is what the Builds page lists — module 07's runs,
+  read back after the fact. The console also *submits* workflows (New Function,
+  and "Build from a repo"), and it deliberately cannot do that with this
+  ClusterRole: creating one needs `lab/08-portal/portal-functions-access.yaml`, a
+  namespaced Role in `builds` the attendee pushes through git. Same lesson as the
+  `demo` Role below — read cluster-wide, write only where you were handed a key.
+- **`secrets` is the one rule that deserves an argument, and it is `get/list/watch`
+  cluster-wide.** It backs the Databases page's query terminal: connecting to a
+  composed database means reading CNPG's generated `<cluster>-app` Secret, which
+  holds that database's user and password (`internal/web/databases.go`, via
+  `GetSecret`). Say plainly what that costs: a read-only account that can read
+  every Secret in the cluster is, in a real platform, a credential-exfiltration
+  path — the honest fix is a namespaced Role beside `portal-access.yaml`, or a
+  `resourceNames` restriction to `*-app`, and neither is in place. It is scoped
+  the way it is because the console must reach any project namespace an attendee
+  creates during the lab, and it is defensible only because this cluster lives on
+  one laptop for four hours. Anyone lifting this manifest into something real
+  should tighten it first.
 - **This component ships NO resources in the `demo` namespace.** XR
   self-service (the Databases page: create/get/list/delete on
   `workshopdatabases.platform.cloudbox.io`, the Crossplane v2 namespaced XR
