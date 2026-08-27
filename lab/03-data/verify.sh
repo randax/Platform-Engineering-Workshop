@@ -116,6 +116,16 @@ s3ls() {
 # existence.
 if LISTING="$(s3ls)"; then
   LISTING="$(printf '%s\n' "$LISTING" | grep -v '^ERROR ' || true)"
+  # The ERROR filter above handles stderr folded INTO stdout. It cannot handle
+  # the other half of the same race: when the pod exits before the attach lands,
+  # kubectl can lose the container's stdout entirely, and a bucket with objects
+  # in it reads as empty. That is a false FAIL on a passing lab — seen twice in
+  # one rehearsal, green on a bare re-run — so ask once more before judging.
+  if [ -z "$LISTING" ]; then
+    sleep 2
+    LISTING="$(s3ls || true)"
+    LISTING="$(printf '%s\n' "$LISTING" | grep -v '^ERROR ' || true)"
+  fi
   if [ -n "$LISTING" ]; then
     ok "bucket app-assets exists and has objects"
   else

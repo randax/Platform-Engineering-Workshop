@@ -120,7 +120,20 @@ list_keys() { # <prefix>
   # bucket. `sed -n …p` only prints lines that matched, so s5cmd's ERROR line —
   # which kubectl folds into stdout — is dropped without a second filter.
   # `|| true` because those exit-1 cases must not trip `set -e`/pipefail.
-  s3 ls --show-fullpath "s3://images/$1" | sed -n 's|^s3://images/||p' || true
+  # One retry on an empty result, for the other half of the `kubectl run -i`
+  # race the comment above describes: the pod can exit before the attach lands
+  # and kubectl then loses the container's stdout altogether, so a prefix that
+  # HAS objects lists as empty and the capstone reports "no matching thumbs/"
+  # on a pipeline that worked. Print nothing (not a blank line) when the prefix
+  # really is empty — callers test with [ -z ... ].
+  local out
+  out="$(s3 ls --show-fullpath "s3://images/$1" | sed -n 's|^s3://images/||p' || true)"
+  if [ -z "$out" ]; then
+    sleep 2
+    out="$(s3 ls --show-fullpath "s3://images/$1" | sed -n 's|^s3://images/||p' || true)"
+  fi
+  [ -n "$out" ] && printf '%s\n' "$out"
+  return 0
 }
 
 ORIGINALS="$(list_keys originals/)"
