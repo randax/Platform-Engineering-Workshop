@@ -114,12 +114,19 @@ helm upgrade --install cilium \
   --set cgroup.hostRoot=/sys/fs/cgroup \
   --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
   --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+  --set l2announcements.enabled=true \
+  --set k8sClientRateLimit.qps=10 \
+  --set k8sClientRateLimit.burst=20 \
   --set ingressController.enabled=true \
   --set ingressController.loadbalancerMode=shared \
   --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" \
   --set ingressController.service.type=NodePort \
   --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"
 ```
+
+(`l2announcements` and the raised client rate limit are set on **both** substrates on
+purpose, so `cilium config view` reads the same on every laptop in the room; only tbx
+actually announces anything.)
 
 The last five flags are the shared **ingress**, and they are not optional: one
 Cilium ingress serves every `*.cloudbox.k8s.test` hostname you will use for the
@@ -129,14 +136,12 @@ the kind lifeboat.
 
 Those two `service.*` lines are the **docker** shape. Check which substrate you
 are on with `cat ~/.cloudbox/substrate`, because **tbx needs a different ending**
-— a real LoadBalancer instead of a NodePort, an L2 announcer to claim the VIP on
-the network, and a raised client rate limit for the announcer's API traffic:
+— a real LoadBalancer instead of a NodePort (the L2 announcer already enabled above
+is what claims its VIP on the network), plus host routing so the VIP is reachable
+from your laptop:
 
 ```bash
   --set ingressController.service.type=LoadBalancer \
-  --set l2announcements.enabled=true \
-  --set k8sClientRateLimit.qps=10 \
-  --set k8sClientRateLimit.burst=20 \
   --set bpf.hostLegacyRouting=true          # so the VIP is reachable from your laptop
 ```
 
@@ -148,14 +153,42 @@ the one part the script does for you rather than making you type subnet
 arithmetic: once your Cilium is up, run
 
 ```bash
-./scripts/create-cluster.sh          # no --skip-cilium this time
+./scripts/create-cluster.sh --post-cni
 ```
 
-It is idempotent — it finds the cluster and the Cilium you just installed, then
-applies the pool and the policy and waits for the VIP to appear.
+It does exactly three things — applies the pool and the policy, waits for your
+Cilium rollout and the nodes, and proves `cilium-ingress` got `.200` — and
+nothing else: no preflight, no `tbx doctor`, no VM is touched. (Do **not** re-run
+the bare `./scripts/create-cluster.sh`: on tbx it refuses because the cluster
+already exists.)
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
   `kubectl get nodes -w` terminal.
+
+**If a node stays `NotReady` for more than a few minutes**, it is usually not
+Cilium — it is an image pull that stalled on the way into the VM. Ask the node
+itself:
+
+```bash
+talosctl -n <node-ip> -e <node-ip> service kubelet    # or: service etcd
+```
+
+A service sitting in `Preparing` whose byte count in the events has not moved
+between two looks is a stalled pull. Power-cycle that node — the disk survives,
+the pull restarts:
+
+```bash
+talosctl -n <node-ip> -e <node-ip> reboot --wait=false
+# or, from the outside:
+tbx node stop  cloudbox cloudbox-worker-1             # or cloudbox-cp-1
+tbx node start cloudbox cloudbox-worker-1
+```
+
+then keep watching `kubectl get nodes -w`. (A later talos-box release is expected
+to make `tbx status cloudbox` say "stalled" directly — randax/talos-box#482 — but
+the recovery stays `tbx node stop` + `start`; on the release this workshop pins
+(`TBX_VERSION` in `scripts/versions.env`) the `service` command is the honest
+signal.)
 </details>
 
 <details>
@@ -190,12 +223,20 @@ helm upgrade --install cilium --server-side=false \
   --set cgroup.autoMount.enabled=false --set cgroup.hostRoot=/sys/fs/cgroup \
   --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
   --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+  --set l2announcements.enabled=true \
+  --set k8sClientRateLimit.qps=10 --set k8sClientRateLimit.burst=20 \
   --set ingressController.enabled=true \
   --set ingressController.loadbalancerMode=shared \
   --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" \
   --set ingressController.service.type=NodePort \
-  --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"   # tbx: service.type=LoadBalancer instead
+  --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"   # <- docker ending
 kubectl get nodes -w             # NotReady -> Ready, live
+
+# On tbx (cat ~/.cloudbox/substrate) REPLACE the two docker lines above with
+# the tbx ending, then run the post step — the pool and policy the VIP needs:
+#   --set ingressController.service.type=LoadBalancer \
+#   --set bpf.hostLegacyRouting=true
+# ./scripts/create-cluster.sh --post-cni
 
 # The management plane is an API, not SSH:
 talosctl config info                     # which node/endpoint this context talks to

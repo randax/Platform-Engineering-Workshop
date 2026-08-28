@@ -7,12 +7,16 @@
 # the marked /etc/hosts block create-cluster.sh wrote — asks for sudo once,
 # because names that still point at 127.0.0.1 after the cluster is gone break
 # the NEXT cluster, especially one created on the other substrate.
-# The cloudbox-mirror image registry is left running (it is expensive to
-# refill) unless you pass --purge-mirror.
+# The pre-pulled images are kept (they are expensive to refill) unless you
+# pass --purge-mirror. What that removes depends on the substrate:
+#   docker/kind: the cloudbox-mirror container + its volume (CloudBox's own)
+#   tbx:         `tbx cache prune --mirror` — talos-box's MACHINE-WIDE mirror
+#                store (~/.talosbox/cache/mirror), shared with every tbx
+#                cluster on this laptop, so it asks first.
 #
 # Usage:
 #   ./scripts/destroy-cluster.sh                 # destroy the cluster
-#   ./scripts/destroy-cluster.sh --purge-mirror  # also remove the mirror container + volume
+#   ./scripts/destroy-cluster.sh --purge-mirror  # also throw the pre-pulled images away (see above)
 # =============================================================================
 set -euo pipefail
 
@@ -20,7 +24,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 PURGE_MIRROR="false"
-[[ "${1:-}" == "--purge-mirror" ]] && PURGE_MIRROR="true"
+PURGE_FAILED="false"
+case "${1:-}" in
+  "") ;;
+  --purge-mirror) PURGE_MIRROR="true"; [[ $# -eq 1 ]] || die "--purge-mirror takes no further arguments (got: ${*:2})" ;;
+  *) die "Unknown argument: ${1} (only --purge-mirror is accepted)" ;;
+esac
 
 # `need talosctl` is NOT here: it moved below the identity refusals. A machine
 # running the kind lifeboat has no reason to have talosctl installed, and
@@ -272,21 +281,61 @@ fi
 # --- Mirror ---------------------------------------------------------------------
 if [[ "${PURGE_MIRROR}" == "true" ]]; then
   step "Purging the image mirror"
-  # The mirror is a DOCKER container on both substrates, and this script only
-  # requires the docker CLI on the docker path — so on a tbx machine without it
-  # the two removals below are no-ops. Saying "removed" there would be a lie of
-  # exactly the shape docs/HAZARDS.md calls out ("recovery tooling that lies"):
-  # the attendee would believe the 7 GB mirror was gone and it would still be
-  # there, serving stale images to the next cluster.
-  if have docker; then
+  # The crane mirror is a DOCKER container (docker/kind substrates). On tbx the
+  # images live in talos-box's own store instead (#206), which this script does
+  # not touch — `tbx cache prune --mirror` is that verb (bare `prune` removes
+  # the DISK-image cache and leaves the mirror alone). This script only requires the
+  # docker CLI on the docker path, so without it the two removals below are
+  # no-ops. Saying "removed" there would be a lie of exactly the shape
+  # docs/HAZARDS.md calls out ("recovery tooling that lies"): the attendee would
+  # believe the 7 GB mirror was gone and it would still be there.
+  if [[ "${SUBSTRATE}" == "tbx" ]]; then
+    # The flag means "throw the images away" on every substrate. On tbx that is
+    # tbx's own store (`--mirror`: the container images; bare `prune` would
+    # remove the Talos DISK image instead and leave these). Failures propagate —
+    # a purge that reports success without purging is the lie HAZARDS names.
+    # Asked first: unlike the docker container this store is not CloudBox's
+    # alone. And a failure is reported, not fatal — the /etc/hosts warnings
+    # below are what protect the NEXT cluster and must still print.
+    if ! have tbx; then
+      warn "tbx not on PATH — its mirror store (~/.talosbox/cache/mirror) was NOT purged: tbx cache prune --mirror"
+    elif ! confirm "Purge talos-box's MACHINE-WIDE mirror store (~/.talosbox/cache/mirror, ~7.5 GB, shared by every tbx cluster here)?"; then
+      info "tbx's mirror store kept"
+    elif tbx cache prune --mirror; then
+      ok "tbx's mirror store purged (re-run ./scripts/cloudbox-init.sh to refill)"
+    else
+      fail "tbx cache prune --mirror failed — the store was NOT purged (is tbxd running? 'tbx doctor')"
+      PURGE_FAILED="true"
+    fi
+    # A leftover crane mirror from a docker-substrate run on this machine.
+    # Each removal is tracked: "removed" is only said for what actually went,
+    # and a failure feeds the same PURGE_FAILED the tbx prune above uses.
+    if have docker && docker_running && docker inspect "${MIRROR_NAME}" >/dev/null 2>&1; then
+      leftover_failed=""
+      docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || leftover_failed="container ${MIRROR_NAME}"
+      if ! docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 \
+         && docker volume inspect "${MIRROR_VOLUME}" >/dev/null 2>&1; then
+        leftover_failed="${leftover_failed:+${leftover_failed}, }volume ${MIRROR_VOLUME}"
+      fi
+      if [[ -z "${leftover_failed}" ]]; then
+        ok "A leftover ${MIRROR_NAME} container from a docker-substrate run was removed too"
+      else
+        fail "Leftover docker mirror NOT fully removed: ${leftover_failed} (docker rm -f ${MIRROR_NAME}; docker volume rm ${MIRROR_VOLUME})"
+        PURGE_FAILED="true"
+      fi
+    fi
+  elif have docker && docker_running; then
     docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
     docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true
     ok "Mirror container and volume removed (re-run ./scripts/cloudbox-init.sh to refill)"
+  elif have docker; then
+    warn "The Docker daemon is not reachable — the image mirror (container ${MIRROR_NAME}, volume"
+    warn "${MIRROR_VOLUME}) was NOT purged. Start Docker and re-run with --purge-mirror."
   else
     warn "docker CLI not found — the image mirror (container ${MIRROR_NAME}, volume"
-    warn "${MIRROR_VOLUME}) could NOT be purged from here. It is a Docker object on both"
-    warn "substrates; remove it wherever Docker actually runs, or re-run this with docker"
-    warn "on PATH."
+    warn "${MIRROR_VOLUME}) could NOT be purged from here. On the docker/kind substrates it"
+    warn "is a Docker object; remove it wherever Docker actually runs, or re-run this with"
+    warn "docker on PATH."
   fi
 else
   info "Image mirror kept (pass --purge-mirror to remove it)"
@@ -316,7 +365,21 @@ fi
 # needed) gets tbx back the moment detection likes it, offline, with a mirror
 # filled for the other architecture. So name what was forgotten and the one
 # command that keeps it.
-ok "Done."
+# The forgotten-substrate notice prints on BOTH outcomes: the record is gone
+# either way, and a failed purge must not hide the one command that keeps
+# the attendee on the substrate they were on.
+if [[ "${PURGE_FAILED}" == "true" ]]; then
+  fail "Done — except the --purge-mirror you asked for (see above)."
+else
+  ok "Done."
+fi
 info "This machine no longer records a substrate — it was '${SUBSTRATE}', and ${CLOUDBOX_SUBSTRATE_FILE} is gone."
 info "Recreate on the same one:  CLOUDBOX_SUBSTRATE=${SUBSTRATE} ./scripts/create-cluster.sh"
 info "Or let it decide again:    ./scripts/create-cluster.sh"
+# The if-form, not `[[ … ]] && exit 1`: an AND-list as the LAST statement of a
+# script makes its own non-zero test the exit status — every successful destroy
+# would have exited 1 (the trap this file already names at the `need docker`).
+if [[ "${PURGE_FAILED}" == "true" ]]; then
+  exit 1
+fi
+exit 0

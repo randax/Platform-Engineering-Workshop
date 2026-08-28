@@ -37,7 +37,12 @@ fi
 #     VENUE, so it must not reach for Docker Hub (rate-limited there, and
 #     unreachable if the WiFi has given up). Same logic as lab/07-ci/solve.sh
 #     and the module README; fall back to Docker Hub only if the mirror lacks it.
-MIRROR="localhost:5001"     # MIRROR_PORT in scripts/versions.env
+# Substrate-aware (issue #206): localhost:5001 is the crane container on
+# docker/kind; on tbx it is tbxd's docker.io listener on the cluster gateway,
+# serving the store `tbx cache warm` filled. mirror_host_source (lib.sh) is the
+# one place that knows; an empty answer means "no mirror reachable".
+MIRROR="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; mirror_host_source' _ "$REPO_ROOT" 2>/dev/null || true)"
+MIRROR="${MIRROR:-localhost:5001}"
 BUSYBOX="library/busybox:1.37.0"
 # Probe the MANIFEST, not `/v2/` — see the same block in lab/07-ci/solve.sh. A
 # reachable-but-unfilled mirror answered `/v2/` happily and then failed the copy
@@ -46,10 +51,22 @@ BUSYBOX="library/busybox:1.37.0"
 if mise x crane@0.21.9 -- crane manifest --insecure "${MIRROR}/${BUSYBOX}" >/dev/null 2>&1; then
   BUSYBOX_SRC="${MIRROR}/${BUSYBOX}"
 else
-  echo "⚠️  cloudbox-mirror hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)" >&2
+  echo "⚠️  the image mirror (${MIRROR}) hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)" >&2
   BUSYBOX_SRC="docker.io/${BUSYBOX}"
 fi
-mise x crane@0.21.9 -- crane copy --insecure \
+# ONE platform, not the whole index. `crane copy` without --platform copies
+# every architecture's blobs, and on tbx the warmed store holds blobs for the
+# host's architecture ONLY (tbx cache warm walks the index but downloads one
+# child) — the index manifest is cached, so the probe above says "present",
+# and the copy then asks for amd64/s390x/… blobs the store never had: a 503
+# with `tbx mirror offline on`, a silent Docker Hub pull without it. The
+# docker path is unaffected either way (its mirror holds one platform already).
+# node_arch (lib.sh) answers for the resolved substrate: the host CPU on tbx,
+# the Docker daemon's on docker/kind.
+NODE_ARCH="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; node_arch' _ "$REPO_ROOT" 2>/dev/null || uname -m)"
+case "$NODE_ARCH" in aarch64) NODE_ARCH=arm64 ;; x86_64) NODE_ARCH=amd64 ;; esac
+# `mise x crane` with no version: mise.toml's pin is the one source of it.
+mise x crane -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
   "${BUSYBOX_SRC}" "${ZOT_HOST}/${BUSYBOX}"
 
 WF_NAME="$(kubectl create -f "$REPO_ROOT/lab/07-ci/workflow-run.yaml" -o jsonpath='{.metadata.name}')"

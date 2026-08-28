@@ -71,7 +71,9 @@ a queue appears. That's the whole job, miniaturized.
 - **Offline first**: the venue network is not your friend. Anything you deploy
   must have its images in the mirror (`scripts/images.txt`) or already on your
   machine. The cert-manager/Strimzi images ship in the final prework refresh —
-  if `crane manifest --insecure localhost:5001/<image>` can't find them, you're
+  if `crane manifest --insecure localhost:5001/<image>` (docker) / `tbx cache list
+  <fully-qualified-ref>` (tbx, e.g. `tbx cache list quay.io/jetstack/cert-manager-controller:v1.19.1`
+  — the bare listing only counts blobs) can't find them, you're
   on the online path; consider the NATS-flavored apex instead (zero new
   images).
 - One namespace per component, declared in the component's own manifests —

@@ -54,22 +54,19 @@ if [ "$SUBSTRATE" = kind ]; then
 fi
 
 # --- Docker daemon ---------------------------------------------------------
-# Unconditional on both substrates: the crane image mirror is a Docker
-# container even when the cluster nodes are VMs. Only the docker substrate
-# stops here, though — on tbx the host memory, `tbx doctor` and the cached
-# Talos disk image are all still answerable with Docker down, and an attendee
-# whose Docker is asleep deserves the whole picture rather than one line
-# (scripts/install.sh takes the same view for the tbx image cache check).
-if docker info >/dev/null 2>&1; then
+# docker and kind only. The tbx path is Docker-free (#206): the nodes are VMs
+# and they pull through talos-box's own mirror, which `tbx cache warm` fills —
+# so on tbx a sleeping Docker is not a finding at all.
+if [ "$SUBSTRATE" = tbx ]; then
+  ok "tbx substrate — Docker is not needed (the VMs pull through tbx's own mirror)"
+elif docker info >/dev/null 2>&1; then
   ok "Docker daemon is running"
 else
-  fail "Docker daemon not reachable — start Docker Desktop / the docker service, then re-run (the image mirror is a container on both substrates)"
-  # Anything but tbx: on docker AND on the kind lifeboat the nodes themselves
-  # are containers, so there is nothing further to check without a daemon.
-  if [ "$SUBSTRATE" != tbx ]; then
-    echo "Cannot continue without Docker."
-    exit 1
-  fi
+  fail "Docker daemon not reachable — start Docker Desktop / the docker service, then re-run"
+  # On docker AND on the kind lifeboat the nodes themselves are containers, so
+  # there is nothing further to check without a daemon.
+  echo "Cannot continue without Docker."
+  exit 1
 fi
 
 # --- Machine resources -----------------------------------------------------
@@ -170,7 +167,12 @@ else
 fi
 
 # --- Image mirror ----------------------------------------------------------
-if curl -fsS --max-time 5 http://localhost:5001/v2/ >/dev/null 2>&1; then
+# On tbx the images live in talos-box's own store, not in a container on
+# :5001, and `install.sh --check` above graded them with `tbx cache warm
+# --check` — there is no second registry to probe here.
+if [ "$SUBSTRATE" = tbx ]; then
+  ok "tbx substrate — cluster images are graded by install.sh --check (tbx cache warm --check), no cloudbox-mirror container"
+elif curl -fsS --max-time 5 http://localhost:5001/v2/ >/dev/null 2>&1; then
   ok "cloudbox-mirror registry answers on localhost:5001"
   IMAGES="$(curl -fsS --max-time 5 http://localhost:5001/v2/_catalog 2>/dev/null | jq -r '.repositories | length' 2>/dev/null || echo 0)"
   if [ "${IMAGES:-0}" -gt 0 ]; then

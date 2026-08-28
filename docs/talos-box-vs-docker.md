@@ -192,6 +192,14 @@ digests deliberately (`:196-209`). Talos nodes reach it via
 `install.sh:196-330` verifies the mirror from *inside a container* and compares per-tag
 architecture against the Docker daemon's.
 
+  **Update 2026-08-28 (issue #206): this is now what the tbx substrate does.** The
+  nodes' eight explicit mirror entries point at tbx's catch-all port on the gateway
+  (`TBX_MIRROR_PORT`, `versions.env`), `cloudbox-init.sh` warms with `tbx cache warm`
+  over a generated `[mirror]`-only list, `install.sh --check` grades with `tbx cache
+  warm --check`, and Docker is not required on tbx at all. The `"*"`/`localhost:30500`
+  hazard applies to the catch-all *entry*, which we never render — not to the port.
+  The paragraph below is the analysis that led there, kept as written.
+
   Under talos-box the equivalent exists and is arguably better: `tbx cache warm <list>`
   takes a pinned list of fully-qualified refs (`docs/SPEC.md:118-127`) — **but not our
   `images.txt` as-is**: its `[host]`/`[mirror]` section headers fail ref validation

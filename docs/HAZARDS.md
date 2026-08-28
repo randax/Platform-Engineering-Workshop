@@ -409,6 +409,57 @@ registry, including the one that is a lie about locality.
 `check-consistency.sh` check 11 is unaffected — it compares the `cni:none` patch, which is
 still byte-identical across the two backends.
 
+**Superseded** — see the next entry: the conclusion "drop tbx's mirror" was one step too
+far. The hazard is the `"*"` *entry*, not the *port*.
+
+## RESOLVED — the tbx nodes pull through tbx's own mirror; the crane-container hop was the stall
+
+The entry above ended with "dropped tbx's mirror", and the tbx substrate went on pulling
+from the crane container on `localhost:5001` — reached from a VM as Talos VM → vmnet →
+macOS → Colima VM → container. **Rehearsal 6 (2026-08-28) is what that cost**: 60 MiB
+blobs froze in that chain, `kubelet` and `etcd` sat in `Preparing` with a byte count
+that never moved, both nodes stayed `NotReady`, and one node needed a manual reboot
+before the cluster came up (`docs/REHEARSALS.md`, rehearsal 6). Meanwhile tbxd was
+serving a pull-through mirror at `172.30.<n>.1:5059` — *on the gateway address
+itself*, no hop — and nothing used it.
+
+**The distinction the previous entry missed.** What breaks `localhost:30500` is
+containerd applying a **`"*"` mirror entry** with `skipFallback: true` to every registry
+the config does not name. An **explicit** entry (`ghcr.io:` → `http://172.30.<n>.1:5059`)
+applies to `ghcr.io` and nothing else; containerd sends `?ns=ghcr.io` on each request and
+tbx's catch-all *port* routes on that namespace (`internal/mirror/manager.go`,
+`serveCatchAll`). The port is safe to point explicit entries at; the `"*"` entry is what
+must never be rendered. Both halves of the earlier reasoning were right and the
+conclusion drawn from them was wrong — for the second time on this one topic.
+
+**Fixed by** issue #206: `scripts/substrate/tbx.sh` keeps the eight explicit registries
+and `skipFallback: false`, with the endpoint `http://${CLOUDBOX_HOST_GATEWAY}:${TBX_MIRROR_PORT}`
+(`versions.env`, the one place `5059` is written). `/v2/` is curl-proved at the gateway
+before it is baked into the machine config. `cloudbox-init.sh` warms that store with
+`tbx cache warm` over a generated `[mirror]`-only list (`images_mirror_refs`, `lib.sh` —
+`images.txt` as-is fails tbx's ref validation on its section headers), `install.sh
+--check` grades it with `tbx cache warm --check` (`--deep` rehashes), and **the tbx path
+needs no Docker at all**: the `[host]` images, the crane container and the Docker gates
+in `tbx.sh`, `install.sh` and lab 00's `verify.sh` are docker/kind-only now. `tbx mirror
+offline on` is the venue switch. talos-box separately fixes the `"*"` footgun in its
+rendered manifests (randax/talos-box#481), but this repo never renders that entry
+regardless.
+
+**What it costs:** tbx's store serves VMs only. A tbx laptop whose prework ran only the tbx
+warm has **no offline docker/kind fallback** — `CLOUDBOX_SUBSTRATE=docker
+./scripts/create-cluster.sh` and `kind-fallback.sh` would pull the Talos node image, the
+kind node image and 7.5 GB of cluster images over the venue WiFi. `cloudbox-init.sh` says
+so at the end of the tbx warm, and the remedy (run it again with
+`CLOUDBOX_SUBSTRATE=docker`, at home, with Docker) is printed there; the fallback is a
+pre-venue remedy on tbx, not a venue one. Decided in #206 rather than paying twice the
+prework for everyone.
+
+**What is NOT retired:** as of 2026-08-28 the mirror-through-tbx path is **unrehearsed**
+— it was decided and built after rehearsal 6, and proving it end to end (create, the
+eleven modules, and offline with `tbx mirror offline on`) is rehearsal 7's job. And the
+`k8sClientRateLimit`/`bpf.hostLegacyRouting` VIP-blackout question (issue #209) is a
+separate open thread, not a mirror one.
+
 ## RESOLVED — a Knative Service in a namespace nobody listed had no route at all
 
 `gitops/components/knative-serving/ingress.yaml` used to carry one wildcard rule **per
@@ -1049,25 +1100,32 @@ Everything that runs *inside* the container — `curl`, `kubectl`, every
 another machine is the shape of the problem; the fix would be a per-service
 path prefix, which no other substrate needs.
 
-## TRAP — an optional golden path needs the internet, deliberately
+## TRAP — module 08's golang base is offline on docker, online-only on tbx
 
 `lab/08-portal`'s deploy-from-source walkthrough (and `apps/demo-app`'s own
-README) tells the attendee to `crane copy
-public.ecr.aws/docker/library/golang:1.25-alpine` into Zot at run time. That
-image is **not** on `scripts/images.txt`, so `cloudbox-init.sh` never pre-pulls
-it and the step needs working WiFi at the moment it runs.
+README) has the attendee `crane copy` the golang builder base into Zot at run
+time. Since the adventures landed (issue #193) that image IS on
+`scripts/images.txt` — `public.ecr.aws/docker/library/golang:1.25-alpine@sha256:…`,
+digest-pinned — so on **docker/kind** the copy reads
+`localhost:5001/docker/library/golang:1.25-alpine` from the crane mirror and
+needs no internet.
 
-This is a choice, not an oversight, and it predates the substrate split (it is on
-`main`: `git show main:lab/08-portal/README.md:267`): the base image costs every
-attendee a download for a going-deeper path most will not take. The lab says so
-in bold, and says to do it at home if the venue's WiFi is hostile.
+On **tbx** it does. tbx's store is keyed by registry, and the slices the host
+can reach with a plain `crane` (no `?ns=`) are the per-registry listeners on the
+gateway — docker.io `:5055` (`TBX_MIRROR_DOCKERIO_PORT`), ghcr.io `:5056`,
+quay.io `:5057`, registry.k8s.io `:5058` (upstream `MirrorPorts`); everything
+else, `public.ecr.aws` included, is only behind the `?ns=` catch-all, which crane
+cannot name. Module 08's README therefore tells a tbx
+attendee to copy it from `public.ecr.aws` directly — a going-deeper path most
+will not take, and the lab says to do it at home if the venue's WiFi is hostile.
 
-**What to keep true.** Everything on the core path stays offline (principle 2).
-If this ever moves onto `images.txt`, it moves *with a digest*, and the mirror
-grows by the size of a golang base for every attendee — measure that before
-deciding. CI (`bootstrap-test.yaml`) runs the same `crane copy` on a runner that
-does have the internet, which is why the deploy-from-source job proves the
-pipeline but not the offline story.
+**What to keep true.** Everything on the core path stays offline (principle 2);
+this is a stretch path. Re-pinning the base as `docker.io/library/golang` would
+make it offline on tbx too through `:5055` — at the price of a second copy of
+the same bytes on the docker path — measure before deciding. CI
+(`bootstrap-test.yaml`) runs the same `crane copy` on a runner that does have the
+internet, which is why the deploy-from-source job proves the pipeline but not
+the offline story.
 
 ## TRAP — recovery tooling that lies is worse than recovery tooling that breaks
 
@@ -2258,7 +2316,7 @@ in an index regardless of platform. Passing at home, failing at the venue.
 | CNPG is stuck on 1.28.x | Deliberate hold — the mature minor. 1.29/1.30 exist and are ignored by a `track` regex. |
 | envoy is behind at v1.37.x | net-kourier ships `v1.37-latest`; we pin the exact patch it resolves to. A `track ^1\.37\.` regex stops the weekly report recommending 1.39. |
 | Backstage is amd64-only | Upstream ships it that way; Apple Silicon runs it emulated. Listed in `MIRROR_ARCH_EXEMPT`. **Rosetta turns out not to be required:** on 2026-08-17 it ran under Colima with `vmType: vz` and **`rosetta: false`** — 1/1, 0 restarts, `:30700` → 200, zero error lines. **And the famous 9-minute start was the CPU cap, not the emulation:** same image, same `vz`/`rosetta: false` Colima, uncapped nodes → **57 seconds** to Ready in rehearsal 2, a 9.5× improvement from a change that has nothing to do with Backstage. Keep the "start it early" guidance in module 08 as a **4-core** caveat, where the old number will still roughly apply; on 8 cores it is now over-cautious. |
-| module 10 scenario 3 never shows `ImagePullBackOff` — anywhere, even offline | Correct by design, and for a **deeper reason than the `skipFallback: false` fallback** everyone assumed. `cloudbox-init.sh` stores mirror content under the **registry-stripped** repo path (`ghcr.io/knative/helloworld-go` → `knative/helloworld-go`) and `create-cluster.sh` points the *docker.io* mirror at that same registry, so the poisoned `docker.io/…` ref with an identical path and digest is a **mirror HIT**. Measured in rehearsal 1: `containerd/v2.2.6` requested manifest and every blob with `?ns=docker.io` and got `200` from `cloudbox-mirror`; pull time 265 ms; the traffic never left the laptop. **Rehearsal 2 confirmed it on a *cold-built* mirror rather than an inherited one:** the pods go straight to `Running` on `docker.io/knative/helloworld-go@sha256:c2b7412f…`, and `verify.sh` asserts the policy violation (full cycle 2:02, then 8/8 after the revert). So the pull succeeds offline too — the failure is reserved for refs the mirror does not carry, or clusters built without the pre-pull. Do not "fix" the manifest, and do not restore an `ImagePullBackOff` expectation to the check: the scenario and `verify.sh` were rewritten to assert the policy violation reaching the cluster instead (see `lab/10-day2-ops`). |
+| module 10 scenario 3 never shows `ImagePullBackOff` — anywhere, even offline | Correct by design **on docker/kind** (on tbx, since #206, the store is keyed by registry, the `docker.io` ref is a MISS that falls through to Docker Hub, and offline it IS `ImagePullBackOff` — the scenario briefing tells both stories and `verify.sh` accepts both), and for a **deeper reason than the `skipFallback: false` fallback** everyone assumed. `cloudbox-init.sh` stores mirror content under the **registry-stripped** repo path (`ghcr.io/knative/helloworld-go` → `knative/helloworld-go`) and `create-cluster.sh` points the *docker.io* mirror at that same registry, so the poisoned `docker.io/…` ref with an identical path and digest is a **mirror HIT**. Measured in rehearsal 1: `containerd/v2.2.6` requested manifest and every blob with `?ns=docker.io` and got `200` from `cloudbox-mirror`; pull time 265 ms; the traffic never left the laptop. **Rehearsal 2 confirmed it on a *cold-built* mirror rather than an inherited one:** the pods go straight to `Running` on `docker.io/knative/helloworld-go@sha256:c2b7412f…`, and `verify.sh` asserts the policy violation (full cycle 2:02, then 8/8 after the revert). So the pull succeeds offline too — the failure is reserved for refs the mirror does not carry, or clusters built without the pre-pull. Do not "fix" the manifest, and do not restore an `ImagePullBackOff` expectation to the check: the scenario and `verify.sh` were rewritten to assert the policy violation reaching the cluster instead (see `lab/10-day2-ops`). |
 | module 10 scenario 2's poison is `2Mi`, which "cannot be a plausible rightsizing" | Deliberate and calibrated, and it replaced an `8Mi` that produced **no symptom at all**. On containerd 2.2.6 + runc, `helloworld-go` is Ready and restart-free at 4/6/8/12Mi (8Mi survived 300 sequential and 4800 concurrent requests before *one* replica OOMKilled — unusable as a lab), while ≤3Mi never starts. At `2Mi` the sandbox fails in seconds with the runtime naming the cause: `FailedCreatePodSandBox … container init was OOM-killed (memory limit too low?)`. **Re-confirmed live in rehearsal 2:** the symptom arrives on its own in **~75 s** with no load generator (`FailedCreatePodSandBox` ×6, pod stuck `ContainerCreating`), full inject→revert cycle **2:01**, against rehearsal 1's ~25 minutes of failing to make `8Mi` OOM. The scenario now teaches "a limit is the budget your container is created inside", not a `lastState: OOMKilled` cadence — that signature is not reachable with this image without a load generator. Do not raise the value back toward plausible-looking numbers without re-measuring. |
 | `kagent-controller` CrashLoopBackOffs ~3× right after you enable kagent | Ordering, not configuration. It runs its DB migration at startup and starts before `kagent-postgresql` has endpoints (`connect: no route to host`), then self-heals — 1/1 within ~40–90 s, app Synced/Healthy, seen in both rehearsal 1 runs and again in rehearsal 2 (restarted 2×, then Healthy). Module 10 now says so in the text and uses it as a teaching moment. Only read the logs if it is still restarting after ~3 minutes. |
 | `application-xr`'s `spec.env` does nothing | Correct — it is **RESERVED, not implemented**. The Composition emits no patch for it; the field stays in the XRD so the v2 append lands without an API break. The VENDOR.md claimed for months that it was "appended"; git history shows the patch never existed. The XRD description now says so. |

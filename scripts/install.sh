@@ -10,6 +10,7 @@
 #
 # Usage:
 #   ./scripts/install.sh --check    # run the pre-flight check
+#   ./scripts/install.sh --check --deep   # tbx: also rehash every cached blob (slow, catches disk corruption)
 #   ./scripts/install.sh            # same check + usage text
 #   ./scripts/install.sh --print-hosts   # the /etc/hosts lines the docker substrate needs
 #   ./scripts/install.sh --write-hosts   # docker/kind only: (re)write that block —
@@ -41,8 +42,19 @@ usage() {
   awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "${BASH_SOURCE[0]}"
 }
 
+CHECK_DEEP="false"
 case "${1:-}" in
-  --check) ;;
+  # --deep is tbx-only and read-only: it asks `tbx cache warm --check --deep` to
+  # rehash every cached blob rather than trust the manifest — the pre-travel gate
+  # talos-box documents, minutes instead of seconds on a 7.5 GB store.
+  # Strict: `--check --depp` used to run the shallow check and exit 0, which
+  # reads as "the deep gate passed" the evening before travel.
+  --check)
+    case "${2:-}" in
+      "") ;;
+      --deep) CHECK_DEEP="true"; [[ $# -eq 2 ]] || die "--check --deep takes no further arguments (got: ${*:3})" ;;
+      *) die "Unknown argument after --check: '${2}' (only --deep is accepted)" ;;
+    esac ;;
   # Read-only, and the ONE thing a Windows attendee needs: these lines also have
   # to go into C:\Windows\System32\drivers\etc\hosts for the Windows browser to
   # reach a cluster running in WSL2 (lab/00-setup covers it). The block goes to
@@ -293,28 +305,46 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
   fi
 fi
 
+# --- Free disk -------------------------------------------------------------------
+# check_free_disk <path> — where the image cache lives: Docker's root dir on the
+# docker/kind path (inside the VM on macOS/WSL2, so the home filesystem is the
+# fallback), ~/.talosbox/cache — i.e. $HOME — on tbx.
+check_free_disk() {
+  local df_target="$1" free_kb free_gb
+  free_kb="$(df -Pk "${df_target}" | awk 'NR==2 {print $4}')"
+  free_gb=$(( free_kb / 1024 / 1024 ))
+  if [[ "${free_gb}" -ge "${MIN_DISK_FREE_GB}" ]]; then
+    ok "Free disk on ${df_target}: ${free_gb} GB (need >= ${MIN_DISK_FREE_GB} GB)"
+  else
+    check_fail "Free disk on ${df_target}: ${free_gb} GB — need >= ${MIN_DISK_FREE_GB} GB"
+  fi
+}
+
 # --- Docker ---------------------------------------------------------------------
-if ! have docker; then
-  # A hard FAIL on BOTH substrates, on purpose. tbx replaces the NODES, not the
-  # mirror: cloudbox-init.sh's crane mirror is itself a Docker container
-  # (cloudbox-mirror on :${MIRROR_PORT}), and it is what every node pulls from
-  # offline. A tbx laptop without Docker can start a cluster and then has
-  # nothing to pull images from at the venue.
-  check_fail "docker CLI not found — install Docker Desktop, OrbStack or docker-ce. Needed on the tbx substrate too: the offline image mirror the VMs pull from is a Docker container (./scripts/cloudbox-init.sh)"
+# DOCKER / KIND ONLY. The tbx path is Docker-free (#206): the nodes are VMs and
+# they pull through tbx's own mirror, which `tbx cache warm` fills into
+# ~/.talosbox/cache. It used to be a hard FAIL on both substrates because the
+# crane mirror was a Docker container the VMs pulled from — and rehearsal 6 is
+# where that chain (VM -> vmnet -> macOS -> Colima -> container) froze 60 MiB
+# blobs. Not even a warning now: on tbx there is nothing Docker is for.
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
+  if have docker && docker_running; then
+    info "Docker daemon reachable — not used on tbx (the VMs pull through tbx's own mirror)"
+  else
+    ok "Docker not needed on tbx — the VMs pull through tbx's own mirror (~/.talosbox/cache)"
+  fi
+  check_free_disk "${HOME}"
+elif ! have docker; then
+  check_fail "docker CLI not found — install Docker Desktop, OrbStack or docker-ce (the nodes and the offline image mirror are containers on this substrate)"
 elif ! docker_running; then
   check_fail "Docker daemon not reachable — is Docker started?"
 else
   ok "Docker daemon reachable ($(docker info -f '{{.OperatingSystem}}' 2>/dev/null))"
 
-  # The CPU/RAM budget below is the NODE budget, and on tbx the nodes are not
-  # containers: they are VMs sized from the HOST's RAM (tbx_worker_memory() in
-  # substrate/tbx.sh), and Docker's slice is irrelevant to them. Docker is still
-  # required on tbx — the offline image mirror is a Docker container — but a
-  # mirror is a registry serving blobs, which needs neither 4 CPUs nor 10 GB.
-  # Failing a perfectly good tbx laptop over a small Docker VM would send an
-  # attendee to raise a limit that changes nothing they will use.
-  # kind counts as docker here: its nodes are containers on this daemon too, and
-  # they run the same workshop.
+  # The CPU/RAM budget below is the NODE budget: on docker and on the kind
+  # lifeboat the nodes are containers on this daemon and run the same workshop.
+  # (tbx never reaches this branch — its nodes are VMs sized from the HOST's
+  # RAM, checked above.)
   if [[ "${SUBSTRATE}" == "docker" || "${SUBSTRATE}" == "kind" ]]; then
     # CPUs available to Docker
     ncpu="$(docker info -f '{{.NCPU}}' 2>/dev/null || echo 0)"
@@ -333,8 +363,6 @@ else
       check_fail "Memory allocatable to Docker: ${mem_gb} GB — need >= ${MIN_DOCKER_MEMORY_GB} GB"
       info "  Docker Desktop: Settings -> Resources -> Memory. OrbStack: orb config set memory_mib."
     fi
-  else
-    info "Docker's CPU/RAM budget not checked — on tbx it only has to run the image mirror."
   fi
 
   # Free disk where Docker stores images. On macOS/WSL2 the Docker root dir
@@ -342,13 +370,7 @@ else
   docker_root="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || true)"
   df_target="${HOME}"
   [[ -n "${docker_root}" && -d "${docker_root}" ]] && df_target="${docker_root}"
-  free_kb="$(df -Pk "${df_target}" | awk 'NR==2 {print $4}')"
-  free_gb=$(( free_kb / 1024 / 1024 ))
-  if [[ "${free_gb}" -ge "${MIN_DISK_FREE_GB}" ]]; then
-    ok "Free disk on ${df_target}: ${free_gb} GB (need >= ${MIN_DISK_FREE_GB} GB)"
-  else
-    check_fail "Free disk on ${df_target}: ${free_gb} GB — need >= ${MIN_DISK_FREE_GB} GB"
-  fi
+  check_free_disk "${df_target}"
 fi
 
 # --- Host ports --------------------------------------------------------------------
@@ -595,17 +617,49 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
   else
     check_fail "no complete Talos ${TALOS_VERSION} disk image for ${tbx_disk_arch} — your tbx VMs are ${tbx_disk_arch} and nothing usable is cached for them (checked via ${TBX_CACHE_SOURCE}; an interrupted pull leaves the version directory behind, empty). Run ./scripts/cloudbox-init.sh (needs the Image Factory, so do it at home)"
   fi
-  # What the container-image checks below can and cannot say on tbx: the crane
-  # mirror is a Docker container either way, so its content is verified the same
-  # — but the container-side probe proves reachability from a DOCKER container,
-  # not from the tbx VMs, which reach the same registry over the cluster gateway
-  # (create-cluster.sh patches that in; tbx doctor covers the host networking).
-  info "  (the container-image checks below speak for docker; the VMs reach the mirror via the cluster gateway)"
 fi
 
-if ! docker_running; then
+if [[ "${SUBSTRATE}" == "tbx" ]]; then
+  # The container images, graded by the store that will serve them: `tbx cache
+  # warm --check` over the same generated [mirror] list cloudbox-init.sh warmed
+  # (images_mirror_refs, lib.sh — one source, so the warm and the grade cannot
+  # disagree). Offline by design (that is the venue question). It also insists
+  # on the CRI pause image whatever the list says; images.txt lists it anyway.
+  # --deep rehashes every blob; without it a manifest-complete entry passes.
+  # The ✓ lines are dropped — 73 of them say nothing — and every ✗ line and
+  # the summary are shown, since the ✗ names the ref to re-warm.
+  if ! have tbx; then
+    info "  (image check skipped — tbx is not installed, reported above)"
+  else
+    tbx_list="$(mktemp)"; tbx_check_out="$(mktemp)"
+    # shellcheck disable=SC2064  # expand now: both paths are fixed here
+    trap "rm -f '${tbx_list}' '${tbx_check_out}'" EXIT
+    images_mirror_refs "${SCRIPT_DIR}/images.txt" > "${tbx_list}"
+    tbx_check_args=(--check)
+    [[ "${CHECK_DEEP}" == "true" ]] && tbx_check_args+=(--deep)
+    tbx_total="$(wc -l < "${tbx_list}" | tr -d ' ')"
+    if tbx cache warm "${tbx_check_args[@]}" "${tbx_list}" > "${tbx_check_out}" 2>&1; then
+      ok "tbx mirror store: all ${tbx_total} cluster images present$( [[ "${CHECK_DEEP}" == "true" ]] && echo ' and rehashed (--deep)' )"
+    elif grep -q '^summary:' "${tbx_check_out}"; then
+      grep -Ev '^✓ ' "${tbx_check_out}" | sed 's/^/   /' || true
+      check_fail "tbx mirror store is incomplete (the ✗ lines above) — run ./scripts/cloudbox-init.sh at home"
+    else
+      # No summary line means the check never ran: `cache warm --check` is a
+      # tbxd RPC, and a daemon that is down or too old fails before the first
+      # ref. "Incomplete store — re-warm at home" would be the wrong diagnosis
+      # AND a recovery that fails the same way.
+      sed 's/^/   /' "${tbx_check_out}"
+      check_fail "could not ask tbxd about the mirror store (above) — is the helper running? 'tbx doctor'; the images themselves were not graded"
+    fi
+    if [[ "${CHECK_DEEP}" != "true" ]]; then
+      info "  (--check --deep also rehashes every cached blob — the pre-travel gate)"
+    fi
+  fi
+elif ! docker_running; then
+  [[ "${CHECK_DEEP}" == "true" ]] && info "  (--deep is tbx-only: it rehashes tbx's mirror store; the crane mirror has no equivalent)"
   check_fail "Skipping image checks — Docker is not running"
 else
+  [[ "${CHECK_DEEP}" == "true" ]] && info "  (--deep is tbx-only: it rehashes tbx's mirror store; the crane mirror has no equivalent)"
   # Parse images.txt (same format as cloudbox-init.sh)
   section=""
   host_missing=0; mirror_missing=0; host_total=0; mirror_total=0
@@ -621,16 +675,11 @@ else
   # architecture. Filling and grading now follow the same decision the create
   # follows (lib.sh, mirror_target_substrate), so the two cannot disagree.
   # Empty on failure: the arch checks then pass open rather than guess.
+  # Only docker and kind reach this branch now (#206), so the mirror's arch is
+  # always the daemon's — the "mirror is arm64 next to an amd64 Colima daemon"
+  # warning that lived here described the tbx arrangement and is gone with it.
   mirror_arch="$(node_arch "${SUBSTRATE}" || true)"
   mirror_for="${SUBSTRATE}"
-  # An amd64 Colima/Lima VM on an arm64 Mac is the case that made this worth
-  # saying out loud: on tbx the mirror is arm64 (the VMs' arch) and the Docker
-  # daemon next to it is amd64. Nothing is broken — the mirror is a container on
-  # that daemon serving images to VMs — but it is a surprising pair to see.
-  daemon_arch="$(docker_server_arch || true)"
-  if [[ -n "${mirror_arch}" && -n "${daemon_arch}" && "${mirror_arch}" != "${daemon_arch}" ]]; then
-    warn "The mirror serves ${mirror_arch} — the arch your ${mirror_for} nodes run — while this machine's Docker daemon is ${daemon_arch}. That is correct for ${mirror_for} (the mirror is a container on that daemon; the nodes are not). Change substrate and the mirror must be rebuilt: CLOUDBOX_SUBSTRATE=<the other one> ./scripts/cloudbox-init.sh"
-  fi
 
   # Is the mirror registry up at all?
   if mirror_running && curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1; then

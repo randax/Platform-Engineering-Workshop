@@ -39,8 +39,10 @@ From the repository root:
    on Talos-in-Docker instead. Everyone else — Windows/WSL2, Codespaces, or any machine
    `tbx doctor` is unhappy with — runs the identical workshop on Talos-in-Docker. The
    scripts decide for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you
-   want to. Docker is required either way: the image mirror is a container on both
-   substrates. **On tbx, also let Ollama listen on more than loopback** if you plan to
+   want to. **On tbx you do not need Docker at all**: the VMs pull every image through
+   talos-box's own mirror, which `cloudbox-init.sh` fills with `tbx cache warm`. On
+   Talos-in-Docker the mirror is a container, so Docker is required there.
+   **On tbx, also let Ollama listen on more than loopback** if you plan to
    run module 10: the cluster reaches your laptop at `172.30.<n>.1`, and Ollama's default
    `127.0.0.1:11434` bind refuses that. `launchctl setenv OLLAMA_HOST 0.0.0.0` (then quit
    and reopen Ollama.app), or `OLLAMA_HOST=0.0.0.0 ollama serve`. `cloudbox-init.sh` warns
@@ -53,11 +55,17 @@ From the repository root:
    **say yes**: that is what puts the tools on your PATH *and* points `KUBECONFIG` at a
    workshop-only file, `~/.kube/cloudbox.conf`, while you are in this repo. Open a new
    terminal afterwards.
-2. Pre-pull the workshop images: `./scripts/cloudbox-init.sh` (fills a local registry
-   mirror, `cloudbox-mirror`, on port 5001 — this is the slow step, do it on good WiFi).
+2. Pre-pull the workshop images: `./scripts/cloudbox-init.sh` — on tbx into talos-box's
+   own mirror store (`tbx cache warm`), on Talos-in-Docker into a local registry
+   container, `cloudbox-mirror`, on port 5001. This is the slow step, do it on good WiFi.
 3. Run the pre-flight gate: `./scripts/install.sh --check`. It checks *everything*,
    including the images from step 2 — that's why it goes last. Fix what it flags (most
-   common: Docker not running, or Docker's memory limit below 10 GB).
+   common on Docker: Docker not running, or its memory limit below 10 GB). On tbx,
+   `--check --deep` also rehashes every cached blob — run that once before you travel,
+   and at the venue flip `tbx mirror offline on` so tbx's mirror stops fetching from
+   upstream itself — a missing image then shows up as a mirror miss (and, because the
+   nodes keep `skipFallback: false`, as a slow direct pull you will notice) rather than
+   being quietly filled over the conference WiFi.
 4. Run `./verify.sh` in this directory.
 
 **Hardware reality check:** 16 GB RAM is the absolute minimum on both substrates, 32 GB is
@@ -179,7 +187,7 @@ does not get the pin.
 
 It is doing the only big download of the whole workshop — that's by design. It's resumable:
 run it again and it skips images already in the mirror. Check progress with
-`curl -s http://localhost:5001/v2/_catalog`.
+`curl -s http://localhost:5001/v2/_catalog` (docker) or `tbx cache list` (tbx).
 </details>
 
 <details>
@@ -200,9 +208,11 @@ cd lab/00-setup && ./verify.sh
 ./verify.sh
 ```
 
-It checks: Docker daemon up and with ≥10 GB memory; free disk; each required CLI present
-(`talosctl`, `kubectl`, `helm`, `cilium`, `jq`, `git`, `curl`); `install.sh --check`
-passing; and the `cloudbox-mirror` registry answering on port 5001.
+It checks: on Docker, the daemon up and with ≥10 GB memory and the `cloudbox-mirror`
+registry answering on port 5001; on tbx, host memory/CPUs, `tbx doctor` and the cached
+Talos disk image (Docker is not needed); on both, free disk, each required CLI present
+(`talosctl`, `kubectl`, `helm`, `cilium`, `jq`, `git`, `curl`) and `install.sh --check`
+passing.
 
 ## Explain-back
 
@@ -211,7 +221,7 @@ the session? (Two reasons — one is about the venue NAT, one is about the messa
 
 ## Going deeper
 
-- Peek at what got pre-pulled: `curl -s http://localhost:5001/v2/_catalog | jq .`
+- Peek at what got pre-pulled: `curl -s http://localhost:5001/v2/_catalog | jq .` (docker) or `tbx cache list` (tbx)
 - Read `scripts/install.sh` — a pre-flight gate is itself a platform artifact. What would
   *your* team's version check?
 

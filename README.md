@@ -109,10 +109,18 @@ If step 3 is all green, you're done. If it isn't, the output tells you what to f
 if it can't be fixed, the [devcontainer lifeboat](#plan-b-devcontainer--codespaces) below
 has you covered. Bring your laptop and its power supply.
 
-**Docker is required either way.** The offline story is a local registry mirror running in
-a Docker container, on both substrates — tbx replaces the *nodes*, not the mirror. On the
-tbx path step 2 additionally warms the Talos disk image (`tbx cache pull`, 95 MB on arm64 /
-204 MB on amd64), and step 3 asserts a complete `disk.raw` is in `~/.talosbox/cache`.
+**Docker is required on Talos-in-Docker only.** The offline story is a registry mirror
+the nodes pull through: on the docker path a `cloudbox-mirror` container on port 5001, on
+the tbx path talos-box's own mirror (`tbx cache warm` fills `~/.talosbox/cache`, tbxd
+serves it to the VMs at the cluster gateway) — so a tbx laptop needs no Docker at all. On
+the tbx path step 2 also warms the Talos disk image (`tbx cache pull`, 95 MB on arm64 /
+204 MB on amd64), step 3 asserts a complete `disk.raw` is in `~/.talosbox/cache` and
+grades the images with `tbx cache warm --check` (`--check --deep` before you travel), and
+at the venue `tbx mirror offline on` stops tbx's mirror from fetching upstream itself, so a
+missing image surfaces as a mirror miss instead of being quietly filled over the WiFi (the
+nodes keep `skipFallback: false`, so the pull then goes direct — slowly, visibly). One trade-off to know: tbx's store serves VMs only, so on a tbx laptop
+the Talos-in-Docker fallback is **not** offline-ready unless you also run
+`CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh` at home (needs Docker, ~7.5 GB more).
 `install.sh --check` prints which substrate you will get, and — when it falls back to
 Docker — the `tbx doctor` line that decided it.
 

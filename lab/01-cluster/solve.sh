@@ -108,5 +108,25 @@ fi
 # shellcheck source=../common.sh
 source "$REPO_ROOT/lab/common.sh"
 
+# The documented lab-01 start is `create-cluster.sh --skip-cilium`, so "already
+# exists" usually means "exists WITHOUT a CNI" — and waiting for Ready on that
+# hung 300 s and failed. Install the same Cilium create-cluster.sh would have
+# (cilium_install, scripts/lib.sh, in a sub-bash for the reason tbx_all_stopped
+# is), then on tbx run the post step the README teaches — the LB pool, the L2
+# policy and the .200 proof — which is what lab 01's verify.sh checks.
+# Unconditional, not "only if the DaemonSet is missing": a hand-installed
+# Cilium with the wrong values (no ingress, NodePort on tbx) has the DaemonSet
+# and still fails verify.sh. `helm upgrade --install` is idempotent, so on a
+# correct cluster this is a no-op that costs seconds.
+echo "installing (or reconciling) Cilium the way create-cluster.sh does"
+bash -c 'set -euo pipefail; SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null
+         cilium_install "$2"' _ "$REPO_ROOT" "$SUBSTRATE"
+# Then, on tbx, the LB pool, the L2 policy and the .200 proof — the state lab 01
+# strands people in is "Cilium is in, the pool never was". --post-cni is
+# idempotent too (apply, rollout wait, VIP wait).
+if [[ "$SUBSTRATE" == tbx ]]; then
+  "$REPO_ROOT/scripts/create-cluster.sh" --post-cni
+fi
+
 # Wait for both nodes to be Ready (Cilium needs a moment after bootstrap).
 kubectl wait --for=condition=Ready nodes --all --timeout=300s

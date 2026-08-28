@@ -472,7 +472,19 @@ fi
 # read cilium_ingress_values() in lib.sh — so the check is that they still do,
 # and that neither has grown a private `--set ingressController.*` beside it.
 before_fail=${FAILURES}
-for f in scripts/create-cluster.sh scripts/kind-fallback.sh; do
+# create-cluster.sh's install moved into cilium_install() in lib.sh (shared with
+# lab/01-cluster/solve.sh), so the call is asserted THERE — and create-cluster.sh
+# is asserted to reach it, or the helper could be orphaned and the values
+# inlined in the create with this check still green.
+grep -qE '^[[:space:]]*cilium_install[[:space:]]+"\$\{SUBSTRATE\}"' scripts/create-cluster.sh \
+  || bad "scripts/create-cluster.sh no longer calls cilium_install \"\${SUBSTRATE}\" (lib.sh) — the one Cilium install shared with lab/01-cluster/solve.sh"
+# shellcheck disable=SC2016  # the literal "$2" is what solve.sh's sub-bash passes
+grep -qE '^[[:space:]]*cilium_install[[:space:]]+"\$2"' lab/01-cluster/solve.sh \
+  || bad "lab/01-cluster/solve.sh no longer calls cilium_install (lib.sh) — without it the solve hangs 300 s on a --skip-cilium cluster with no CNI"
+# ...and create-cluster.sh must not grow a private ingress --set beside that call.
+grep -qE -- '--set[[:space:]]+"?ingressController\.' scripts/create-cluster.sh \
+  && bad "scripts/create-cluster.sh sets ingressController.* directly — those flags belong in cilium_ingress_values() (lib.sh), reached through cilium_install"
+for f in scripts/lib.sh scripts/kind-fallback.sh; do
   # The INVOCATION IN ITS ONE WORKING FORM, not the string and not "a line that
   # mentions it outside a comment". Both files explain the shared helper in
   # comments — at length, deliberately — so a bare `grep -q
@@ -487,7 +499,18 @@ for f in scripts/create-cluster.sh scripts/kind-fallback.sh; do
   # spelled out: nothing but a real call has this form.
   grep -qE '^[[:space:]]*done[[:space:]]*<[[:space:]]*<\(cilium_ingress_values[[:space:]]+("?\$\{?[A-Za-z_]|nodeport|lb)' "${f}" \
     || bad "${f} no longer CALLS cilium_ingress_values() as 'done < <(cilium_ingress_values <shape>)' — the shared ingress values are the contract the kind lifeboat and the docker substrate both meet; do not inline them (a comment, or a line that merely names the helper, is not a call)"
-  grep -qE -- '--set[[:space:]]+"?ingressController\.' "${f}" \
+  # In lib.sh the helper and its caller share a file, so the inline test is
+  # scoped to cilium_install()'s body — the helper's own --set lines are the
+  # single source, not a violation of it.
+  # Fed from a process substitution, not `cat | grep -q`: under pipefail a
+  # `grep -q` that exits early hands `cat` a SIGPIPE and the `&& bad` never
+  # fires — a guard that cannot fail, one file-growth away.
+  grep -qE -- '--set[[:space:]]+"?ingressController\.' < <(
+      if [[ "${f}" == scripts/lib.sh ]]; then
+        sed -n '/^cilium_install() {/,/^}/p' "${f}"
+      else
+        cat "${f}"
+      fi) \
     && bad "${f} sets ingressController.* directly — those flags belong in cilium_ingress_values() (lib.sh), which is the single source both callers read"
 done
 grep -q 'cilium_ingress_values()' scripts/lib.sh \
@@ -527,7 +550,7 @@ if [[ -f "${lab01_readme}" ]]; then
   done
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
-  && ok "create-cluster.sh and kind-fallback.sh share one source for the Cilium ingress values"
+  && ok "cilium_install (lib.sh, via create-cluster.sh and lab 01's solve.sh) and kind-fallback.sh share one source for the Cilium ingress values"
 
 # --- 12. no browser-facing localhost:3xxxx literals --------------------------
 # The workshop serves one hostname scheme on both substrates. A leftover

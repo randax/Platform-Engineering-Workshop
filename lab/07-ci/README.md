@@ -31,16 +31,28 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    FROM your own registry, fully offline.
 3. **Seed the base image**: copy busybox into YOUR registry (host-side, through Zot's
    ingress hostname). `crane copy` doesn't read your local docker — it's a registry-to-registry
-   copy. Source it from your own `cloudbox-mirror`, which already has it from the
+   copy. Source it from your own image mirror, which already has it from the
    pre-pull, so this step needs no internet either (Docker Hub is rate-limited at the
-   venue — that is the whole reason the mirror exists):
+   venue — that is the whole reason the mirror exists). Which mirror depends on your
+   substrate (`cat ~/.cloudbox/substrate`):
 
    ```bash
-   mise x crane@0.21.9 -- crane copy --insecure \
-     localhost:5001/library/busybox:1.37.0 zot.cloudbox.k8s.test/library/busybox:1.37.0
+   MIRROR=localhost:5001                 # docker / kind: the cloudbox-mirror container
+   if [ "$(cat ~/.cloudbox/substrate)" = tbx ]; then
+     # tbx: talos-box's own docker.io listener on your cluster gateway (172.30.<n>.1)
+     MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
+   fi
+
+   # --platform: ONE architecture — the NODES' (node_arch asks the substrate: the
+   # host CPU on tbx, the Docker daemon on docker; a Rosetta shell's uname lies).
+   # On tbx the warmed store only holds that arch's blobs, so a full-index copy
+   # would reach for the internet.
+   NODE_ARCH="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; node_arch' _ "$(git rev-parse --show-toplevel)")"
+   mise x crane@0.21.9 -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
+     "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
    ```
 
-   If the mirror isn't running, `docker.io/library/busybox:1.37.0` works as a source
+   If the mirror isn't reachable, `docker.io/library/busybox:1.37.0` works as a source
    too — but then you're online.
 
    That's the platform-team move: you decide what base images exist in your cloud.
@@ -107,9 +119,14 @@ cp gitops/catalog/argo-workflows.yaml gitops/apps/
 git add . && git commit -m "module 07: zot + argo-workflows" && git push
 # wait for both apps Healthy in ArgoCD
 
-# seed YOUR registry with the pre-pulled base image (host → Zot ingress)
-mise x crane@0.21.9 -- crane copy --insecure \
-  docker.io/library/busybox:1.37.0 zot.cloudbox.k8s.test/library/busybox:1.37.0
+# seed YOUR registry with the pre-pulled base image (host → Zot ingress),
+# from your own mirror — same MIRROR selection as step 3, one platform
+MIRROR=localhost:5001
+[ "$(cat ~/.cloudbox/substrate)" = tbx ] && \
+  MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
+NODE_ARCH="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; node_arch' _ "$WORKSHOP")"
+mise x crane@0.21.9 -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
+  "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
 
 kubectl create -f "$WORKSHOP/lab/07-ci/workflow-run.yaml"
 kubectl -n builds get workflows -w              # until Succeeded

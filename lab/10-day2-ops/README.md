@@ -246,8 +246,9 @@ kubectl -n demo describe pod <pod> | grep -A2 Pulled
 Then explain the pull *time* in that Event. Nothing on conference WiFi pulls an 8 MB
 image that fast. Which of the things you built in module 00 and 01 could have answered a
 `docker.io` request, and why would it answer for a registry it never fetched from?
-(`curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/v2/...` and
-`docker logs cloudbox-mirror | tail` are both fair game.)
+(On docker, `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/v2/...` and
+`docker logs cloudbox-mirror | tail` are both fair game; on tbx the mirror is talos-box's
+and keyed by registry, so the answer is the *opposite* — see the scenario briefing.)
 </details>
 
 <details>
@@ -334,8 +335,9 @@ after ~3 minutes, then read the logs.
 `host.docker.internal` on the macOS/WSL2 docker substrate, `10.5.0.1`
 (`TALOS_SUBNET_GATEWAY`) on the native-Linux docker substrate, and the cluster gateway
 `172.30.<n>.1` inside a talos-box VM — the same
-host-vs-container addressing problem `cloudbox-mirror` solved for you in module 00 (see
-`mirror_host_endpoint()` and `cloudbox_host_gateway()` in `scripts/lib.sh`), showing up a
+host-vs-cluster addressing problem the image mirror solved for you in module 00 — the
+`cloudbox-mirror` container on docker, tbx's mirror on the cluster gateway on tbx (see
+`mirror_host_endpoint()` and `cloudbox_host_gateway()` in `scripts/lib.sh`) — showing up a
 second time for a second reason. It is already handled, in two halves:
 `bootstrap-gitops.sh` resolved the address for your machine back in module 00 and recorded
 it in configmap `kagent/cloudbox-host`, and the `kagent-ollama-host` PostSync hook you just
