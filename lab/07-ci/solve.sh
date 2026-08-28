@@ -46,7 +46,32 @@ BUSYBOX="library/busybox:1.37.0"
 # not there: `MANIFEST_UNKNOWN: manifest unknown`. The Docker Hub fallback sat
 # right below, unused, because "reachable" had already been answered yes. That
 # is exactly how the nightly rehearsal failed module 07.
-if mise x crane@0.21.9 -- crane manifest --insecure "${MIRROR}/${BUSYBOX}" >/dev/null 2>&1; then
+# timeout_probe <seconds> <command...> — bound a command that can hang.
+# Local copy rather than lib.sh's bounded(): this script is meant to be
+# readable on its own, and an attendee may run it straight from the lab dir.
+timeout_probe() {
+  local secs="$1"; shift
+  "$@" &
+  local pid=$! waited=0
+  while kill -0 "${pid}" 2>/dev/null; do
+    if [ "${waited}" -ge "${secs}" ]; then
+      kill -TERM "${pid}" 2>/dev/null; sleep 1; kill -KILL "${pid}" 2>/dev/null
+      wait "${pid}" 2>/dev/null; return 124
+    fi
+    sleep 1; waited=$((waited + 1))
+  done
+  wait "${pid}"
+}
+
+# BOUNDED, because "unreachable" has two shapes and only one of them is quick.
+# crane tries HTTPS first even with --insecure; a registry that REFUSES TLS
+# (Zot behind the ingress) fails fast and crane falls back to HTTP, but a plain
+# HTTP listener that ACCEPTS the connection and waits — which is what
+# talos-box's mirror is — leaves crane retrying `net/http: TLS handshake
+# timeout` indefinitely. Unbounded, this probe never returns on tbx, so the
+# Docker Hub fallback below could never be reached and the step just hung.
+# 20 seconds is far more than a local registry needs to answer a manifest.
+if timeout_probe 20 mise x crane@0.21.9 -- crane manifest --insecure "${MIRROR}/${BUSYBOX}" >/dev/null 2>&1; then
   BUSYBOX_SRC="${MIRROR}/${BUSYBOX}"
 else
   echo "⚠️  the image mirror (${MIRROR}) hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)"
