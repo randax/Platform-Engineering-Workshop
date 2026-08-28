@@ -502,11 +502,15 @@ for f in scripts/lib.sh scripts/kind-fallback.sh; do
   # In lib.sh the helper and its caller share a file, so the inline test is
   # scoped to cilium_install()'s body — the helper's own --set lines are the
   # single source, not a violation of it.
-  if [[ "${f}" == scripts/lib.sh ]]; then
-    sed -n '/^cilium_install() {/,/^}/p' "${f}"
-  else
-    cat "${f}"
-  fi | grep -qE -- '--set[[:space:]]+"?ingressController\.' \
+  # Fed from a process substitution, not `cat | grep -q`: under pipefail a
+  # `grep -q` that exits early hands `cat` a SIGPIPE and the `&& bad` never
+  # fires — a guard that cannot fail, one file-growth away.
+  grep -qE -- '--set[[:space:]]+"?ingressController\.' < <(
+      if [[ "${f}" == scripts/lib.sh ]]; then
+        sed -n '/^cilium_install() {/,/^}/p' "${f}"
+      else
+        cat "${f}"
+      fi) \
     && bad "${f} sets ingressController.* directly — those flags belong in cilium_ingress_values() (lib.sh), which is the single source both callers read"
 done
 grep -q 'cilium_ingress_values()' scripts/lib.sh \
@@ -546,7 +550,7 @@ if [[ -f "${lab01_readme}" ]]; then
   done
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
-  && ok "create-cluster.sh and kind-fallback.sh share one source for the Cilium ingress values"
+  && ok "cilium_install (lib.sh, via create-cluster.sh and lab 01's solve.sh) and kind-fallback.sh share one source for the Cilium ingress values"
 
 # --- 12. no browser-facing localhost:3xxxx literals --------------------------
 # The workshop serves one hostname scheme on both substrates. A leftover
