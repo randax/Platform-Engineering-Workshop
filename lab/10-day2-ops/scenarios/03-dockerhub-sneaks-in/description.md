@@ -14,6 +14,11 @@ kubectl -n demo get pods -l app=demo-web \
 "docker.io/knative/helloworld-go@sha256:…" in 265ms`. Nothing crashed, nothing is
 `ImagePullBackOff`, and a bad release is live.
 
+(That is the **docker/kind** shape, and tbx *with* internet. On tbx the pull is a
+mirror miss that falls through to the real Docker Hub — see "why nothing broke"
+below — so offline, or with `tbx mirror offline on` and no WiFi, the tbx symptom IS
+`ImagePullBackOff`. `verify.sh` accepts either outcome; the lesson is the same.)
+
 **Root cause:** the release commit changed only the image registry host from `ghcr.io`
 to `docker.io`; the repository path and digest stayed byte-identical. This workshop's
 architecture contract requires every workload image to be pinned, hosted on GHCR, and

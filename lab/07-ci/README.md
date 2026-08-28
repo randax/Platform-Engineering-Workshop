@@ -116,9 +116,13 @@ cp gitops/catalog/argo-workflows.yaml gitops/apps/
 git add . && git commit -m "module 07: zot + argo-workflows" && git push
 # wait for both apps Healthy in ArgoCD
 
-# seed YOUR registry with the pre-pulled base image (host → Zot ingress)
-mise x crane@0.21.9 -- crane copy --insecure \
-  docker.io/library/busybox:1.37.0 zot.cloudbox.k8s.test/library/busybox:1.37.0
+# seed YOUR registry with the pre-pulled base image (host → Zot ingress),
+# from your own mirror — same MIRROR selection as step 3, one platform
+MIRROR=localhost:5001
+[ "$(cat ~/.cloudbox/substrate)" = tbx ] && \
+  MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
+mise x crane@0.21.9 -- crane copy --insecure --platform "linux/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+  "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
 
 kubectl create -f "$WORKSHOP/lab/07-ci/workflow-run.yaml"
 kubectl -n builds get workflows -w              # until Succeeded
