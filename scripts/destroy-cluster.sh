@@ -364,4 +364,10 @@ fi
 info "This machine no longer records a substrate — it was '${SUBSTRATE}', and ${CLOUDBOX_SUBSTRATE_FILE} is gone."
 info "Recreate on the same one:  CLOUDBOX_SUBSTRATE=${SUBSTRATE} ./scripts/create-cluster.sh"
 info "Or let it decide again:    ./scripts/create-cluster.sh"
-[[ "${PURGE_FAILED}" == "true" ]] && exit 1
+# The if-form, not `[[ … ]] && exit 1`: an AND-list as the LAST statement of a
+# script makes its own non-zero test the exit status — every successful destroy
+# would have exited 1 (the trap this file already names at the `need docker`).
+if [[ "${PURGE_FAILED}" == "true" ]]; then
+  exit 1
+fi
+exit 0

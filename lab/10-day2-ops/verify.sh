@@ -185,7 +185,15 @@ elif grep -Eq -- "$IMAGE_POISON_PATTERN" "$CLONE/$COMPONENT_PATH"; then
     if printf '%s\n' "$POD_STATE" | grep -Eq 'ImagePullBackOff|ErrImagePull'; then
       ok "scenario 3 confirmed live: a demo-web container is stuck on the pull — this is what the venue (or a laptop without the mirror) does with this commit"
     elif printf '%s\n' "$POD_IMAGES" | grep -Eq '(\||,)docker\.io/'; then
-      ok "scenario 3 confirmed live: demo-web is running a docker.io/ reference, and it pulled fine — your own mirror answers for docker.io too, so nothing in the cluster stops this commit; the ghcr.io/ rule is enforced in Git, which is why it still has to be reverted"
+      # Substrate-aware, like the briefing: on docker/kind the path-keyed mirror
+      # answered; on tbx the registry-keyed store MISSED and skipFallback:false
+      # pulled from Docker Hub. Saying "your mirror answered" to a tbx attendee
+      # contradicts the scenario text they just read.
+      if [ "$(cat "$HOME/.cloudbox/substrate" 2>/dev/null)" = tbx ]; then
+        ok "scenario 3 confirmed live: demo-web is running a docker.io/ reference, and it pulled fine — but NOT from your mirror: talos-box's store is keyed by registry, so this was a miss that fell through to Docker Hub (skipFallback: false — look at the pull time); nothing in the cluster stops this commit, the ghcr.io/ rule is enforced in Git, which is why it still has to be reverted"
+      else
+        ok "scenario 3 confirmed live: demo-web is running a docker.io/ reference, and it pulled fine — your own mirror answers for docker.io too, so nothing in the cluster stops this commit; the ghcr.io/ rule is enforced in Git, which is why it still has to be reverted"
+      fi
     else
       fail "Git is poisoned but no demo-web pod is running a docker.io/ image yet — the registry commit has not reached the cluster; run kubectl -n argocd get application demo, then kubectl -n demo get pods -l app=demo-web -o jsonpath='{.items[*].spec.containers[*].image}'"
     fi
