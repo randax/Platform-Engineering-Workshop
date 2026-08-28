@@ -272,12 +272,16 @@ fi
 # --- Mirror ---------------------------------------------------------------------
 if [[ "${PURGE_MIRROR}" == "true" ]]; then
   step "Purging the image mirror"
-  # The mirror is a DOCKER container on both substrates, and this script only
-  # requires the docker CLI on the docker path — so on a tbx machine without it
-  # the two removals below are no-ops. Saying "removed" there would be a lie of
-  # exactly the shape docs/HAZARDS.md calls out ("recovery tooling that lies"):
-  # the attendee would believe the 7 GB mirror was gone and it would still be
-  # there, serving stale images to the next cluster.
+  # The crane mirror is a DOCKER container (docker/kind substrates). On tbx the
+  # images live in talos-box's own store instead (#206), which this script does
+  # not touch — `tbx cache prune` is that verb. This script only requires the
+  # docker CLI on the docker path, so without it the two removals below are
+  # no-ops. Saying "removed" there would be a lie of exactly the shape
+  # docs/HAZARDS.md calls out ("recovery tooling that lies"): the attendee would
+  # believe the 7 GB mirror was gone and it would still be there.
+  if [[ "${SUBSTRATE}" == "tbx" ]]; then
+    info "tbx keeps its images in ~/.talosbox/cache, not in a container — this flag only removes a leftover cloudbox-mirror container. To drop tbx's store: tbx cache prune"
+  fi
   if have docker; then
     docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
     docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true

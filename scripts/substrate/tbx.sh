@@ -112,21 +112,21 @@ substrate_preflight() {
       # Docker is installed and cannot be inspected, and this machine carries a
       # trace of a CloudBox cluster having been built here. Whether that cluster
       # is a set of stopped containers waiting on that daemon is exactly the
-      # question that cannot be answered — and creating VMs of the same name
-      # over it is the collision above. tbx needs a running Docker daemon
-      # anyway: the image mirror the VMs pull from is a Docker container.
-      fail "The Docker daemon is not reachable, so whether a '${CLUSTER_NAME}' cluster already exists on it cannot be checked."
-      warn "This machine carries traces of a CloudBox cluster (${CLOUDBOX_SUBSTRATE_FILE},"
-      warn "${CLOUDBOX_API_ENDPOINT_FILE} or $(talos_cluster_state_dir)), so those containers"
-      warn "may be sitting there stopped, holding this name, host port 80 and the ${CLOUDBOX_HOSTS_FILE} block."
-      die "Start Docker and re-run — the tbx substrate needs it for the image mirror in any case."
-    else
+      # question that cannot be answered. A WARNING, not a gate: the tbx path
+      # is Docker-free (the VMs pull through tbx's own mirror, #206), so
+      # "start Docker" is not something this substrate may demand. The recorded
+      # identity (require_identity_match, run before this) already refuses a
+      # machine whose record says docker or kind; what is left is a trace with
+      # no record — the hosts-file guard below catches the block such a
+      # cluster leaves behind, and the attendee is told the rest.
       warn "The Docker daemon is not reachable, so this preflight cannot check it for a"
-      warn "'${CLUSTER_NAME}' cluster. Nothing on this machine says one was ever created here"
-      warn "(no ${CLOUDBOX_SUBSTRATE_FILE}, no ${CLOUDBOX_API_ENDPOINT_FILE}, no"
-      warn "$(talos_cluster_state_dir)), so there is nothing of ours to collide with. Continuing."
-      warn "Note the cluster still needs the image mirror, which is a Docker container:"
-      warn "  start Docker and run ./scripts/cloudbox-init.sh before the venue."
+      warn "'${CLUSTER_NAME}' cluster, and this machine carries traces of one (${CLOUDBOX_SUBSTRATE_FILE},"
+      warn "${CLOUDBOX_API_ENDPOINT_FILE} or $(talos_cluster_state_dir)). If stopped Talos-in-Docker"
+      warn "containers are sitting on that daemon under this name, they hold the ${CLOUDBOX_HOSTS_FILE}"
+      warn "block and host port 80 — start Docker and run CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh"
+      warn "to be sure. Continuing: tbx does not need Docker."
+    else
+      info "Docker daemon not reachable — not needed on tbx (the VMs pull through tbx's own mirror), and nothing here says a docker cluster was ever created. Continuing."
     fi
   fi
   if hosts_block_stale_for_tbx; then
@@ -394,73 +394,63 @@ EOF
   )"
   local patches=(--config-patch "${cni_patch}" --config-patch "${balloon_patch}" --config-patch "${sysctl_patch}")
 
-  # ONE mirror layer: our eight explicit registries -> the crane mirror on the
-  # host, reached at the cluster gateway (host.docker.internal does not resolve
-  # inside a VM, which is why this is not mirror_host_endpoint()).
-  # skipFallback:false, exactly as on docker: a miss falls through to the real
-  # registry.
+  # ONE mirror layer: our eight explicit registries -> tbx's OWN pull-through
+  # mirror, at its catch-all port on the cluster gateway (TBX_MIRROR_PORT,
+  # versions.env). tbxd listens there on 172.30.<n>.1 itself (upstream
+  # internal/mirror/manager.go, net.Listen on the gateway IP), so there is no
+  # Colima/vmnet/container hop: the crane container on MIRROR_PORT is the
+  # docker/kind substrates' mirror and plays no part here (#206). Rehearsal 6
+  # watched 60 MiB blobs freeze on the old chain (Talos VM -> vmnet -> macOS ->
+  # Colima VM -> container) with kubelet/etcd stuck in Preparing; tbx's store
+  # is what `tbx cache warm` fills (cloudbox-init.sh) and what `tbx mirror
+  # offline on` makes authoritative at the venue.
   #
-  # DELIBERATELY NOT tbx's own catch-all. `tbx manifests <cluster> mirrors`
-  # renders a RegistryMirrorConfig for `"*"` with `skipFallback: true`
+  # Explicit entries, NEVER the `"*"` catch-all entry — the two are different
+  # things even though they point at the same port. `tbx manifests <cluster>
+  # mirrors` renders a RegistryMirrorConfig for `"*"` with `skipFallback: true`
   # (upstream internal/manifests/manifests.go:218-231), and containerd applies
   # `"*"` to every registry the config does not name EXPLICITLY — including
   # `localhost:30500`, which is how the kubelet pulls the images lab 07-09 and
   # the portal build into the in-cluster Zot. tbx's mirror refuses to proxy a
   # loopback or private authority (403 from validateResolvedAuthority /
-  # namespaceIPBlocked, internal/mirror/manager.go:313-327 and 667-680), and
-  # `skipFallback: true` forbids the direct pull that would otherwise rescue it
-  # — so every first-party image would land in ImagePullBackOff. Our eight
-  # explicit entries already cover everything in scripts/images.txt; the
-  # catch-all bought nothing and cost module 07 onward.
-  if mirror_running; then
-    endpoint="http://${CLOUDBOX_HOST_GATEWAY}:${MIRROR_PORT}"
-    info "Image mirror detected — nodes will pull via ${endpoint}"
-    # ...and PROVE it, before that endpoint is baked into a machine config.
-    # "the mirror container is running" and "the VMs can reach it" are different
-    # claims, and only the second one matters here: the VMs reach the host at
-    # its vmnet address 172.30.<n>.1, not at loopback, so a registry published
-    # on 127.0.0.1 only (Colima and Lima default some port forwards that way,
-    # and `docker run -p 127.0.0.1:5001:5000` does it explicitly) is up, healthy,
-    # and completely unreachable from the nodes. Curling it from the HOST at the
-    # gateway address is the same question the VM will ask: the gateway IS one
-    # of this host's addresses, so a loopback-only bind fails here too.
-    #
-    # Fatal, not a warning: the whole point of the mirror is the venue, where
-    # falling through to the real registries is exactly what does not work — and
-    # the symptom lands 40 minutes later as ImagePullBackOff in module 02.
-    # /v2/ is the registry API's cheapest liveness endpoint.
-    if ! have curl; then
-      warn "curl not found — cannot prove the mirror is reachable from ${CLOUDBOX_HOST_GATEWAY}."
-      warn "If images fail to pull, check that it is bound to 0.0.0.0: docker port ${MIRROR_NAME}"
-    elif ! curl -fsS --max-time 5 "${endpoint}/v2/" >/dev/null 2>&1; then
-      fail "The image mirror is running but NOT reachable at ${endpoint}/v2/."
-      warn "The Talos VMs reach this host at ${CLOUDBOX_HOST_GATEWAY} — a mirror bound to"
-      warn "127.0.0.1 only is invisible to them, however healthy it looks locally."
-      warn "  Colima/Lima: publish on 0.0.0.0 (colima start --network-address, and make sure"
-      warn "  the container's port mapping is 0.0.0.0:${MIRROR_PORT}, not 127.0.0.1:${MIRROR_PORT})"
-      warn "  Check what it is bound to: docker port ${MIRROR_NAME}"
-      warn "  Then re-create the mirror: ./scripts/cloudbox-init.sh"
-      warn "Or accept internet pulls for this run: docker rm -f ${MIRROR_NAME} (NOT at the venue)."
-      die "Refusing to bake an unreachable mirror into the machine config."
-    else
-      ok "Mirror answers at ${endpoint}/v2/ from the cluster gateway address"
-    fi
-    # Built in ONE command substitution: appending several $( ) pieces would
-    # silently join the lines, since command substitution eats trailing
-    # newlines. The result is byte-identical to docker.sh's MIRROR_PATCH.
-    mirror_patch="$(
-      printf 'machine:\n  registries:\n    mirrors:\n'
-      for reg in docker.io ghcr.io registry.k8s.io quay.io gcr.io public.ecr.aws \
-                 xpkg.crossplane.io docker.gitea.com; do
-        printf '      %s:\n        endpoints:\n          - %s\n        skipFallback: false\n' \
-          "${reg}" "${endpoint}"
-      done
-    )"
-    patches+=(--config-patch "${mirror_patch}")
+  # namespaceIPBlocked), and `skipFallback: true` forbids the direct pull that
+  # would otherwise rescue it — every first-party image in ImagePullBackOff.
+  # Naming the eight registries keeps `localhost:30500` direct for the kubelet's Zot pulls, and
+  # skipFallback:false keeps a cache miss falling through to the real registry
+  # at home (docs/HAZARDS.md). containerd sends `?ns=<registry>` on every
+  # request through a mirror, and the catch-all port routes on exactly that.
+  endpoint="http://${CLOUDBOX_HOST_GATEWAY}:${TBX_MIRROR_PORT}"
+  # PROVE it before the endpoint is baked into a machine config. The listener
+  # only exists once the cluster's network does, which `tbx up` above created;
+  # curling from the HOST at the gateway address is the same question the VM
+  # will ask, since the gateway IS one of this host's addresses. /v2/ is the
+  # registry API's liveness endpoint and tbx answers it without a namespace.
+  #
+  # Fatal, not a warning: the whole point of the mirror is the venue, where
+  # falling through to the real registries is exactly what does not work — and
+  # the symptom lands 40 minutes later as ImagePullBackOff in module 02.
+  if ! have curl; then
+    warn "curl not found — cannot prove tbx's mirror answers at ${endpoint}; 'tbx doctor' checks mirror health."
+  elif ! curl -fsS --max-time 5 "${endpoint}/v2/" >/dev/null 2>&1; then
+    fail "tbx's registry mirror is NOT answering at ${endpoint}/v2/."
+    warn "The Talos VMs pull every image through it. tbxd serves it on the cluster"
+    warn "gateway; 'tbx doctor' (mirror-health) and 'tbx status ${CLUSTER_NAME}' say why it is not there."
+    die "Refusing to bake an unreachable mirror into the machine config."
   else
-    warn "cloudbox-mirror registry is not running — nodes will pull from the internet."
-    warn "Fine at home; at the venue run ./scripts/cloudbox-init.sh first."
+    ok "tbx's mirror answers at ${endpoint}/v2/ — nodes pull through it"
   fi
+  # Built in ONE command substitution: appending several $( ) pieces would
+  # silently join the lines, since command substitution eats trailing
+  # newlines. Same shape as docker.sh's MIRROR_PATCH, different endpoint.
+  mirror_patch="$(
+    printf 'machine:\n  registries:\n    mirrors:\n'
+    for reg in docker.io ghcr.io registry.k8s.io quay.io gcr.io public.ecr.aws \
+               xpkg.crossplane.io docker.gitea.com; do
+      printf '      %s:\n        endpoints:\n          - %s\n        skipFallback: false\n' \
+        "${reg}" "${endpoint}"
+    done
+  )"
+  patches+=(--config-patch "${mirror_patch}")
   talosctl gen config "${CLUSTER_NAME}" "${CLOUDBOX_API_ENDPOINT}" \
     --kubernetes-version "${KUBERNETES_VERSION}" \
     --output-dir "${workdir}" \

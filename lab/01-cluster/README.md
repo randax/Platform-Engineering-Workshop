@@ -148,14 +148,40 @@ the one part the script does for you rather than making you type subnet
 arithmetic: once your Cilium is up, run
 
 ```bash
-./scripts/create-cluster.sh          # no --skip-cilium this time
+./scripts/create-cluster.sh --post-cni
 ```
 
-It is idempotent — it finds the cluster and the Cilium you just installed, then
-applies the pool and the policy and waits for the VIP to appear.
+It does exactly three things — applies the pool and the policy, waits for your
+Cilium rollout and the nodes, and proves `cilium-ingress` got `.200` — and
+nothing else: no preflight, no `tbx doctor`, no VM is touched. (Do **not** re-run
+the bare `./scripts/create-cluster.sh`: on tbx it refuses because the cluster
+already exists.)
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
   `kubectl get nodes -w` terminal.
+
+**If a node stays `NotReady` for more than a few minutes**, it is usually not
+Cilium — it is an image pull that stalled on the way into the VM. Ask the node
+itself:
+
+```bash
+talosctl -n <node-ip> -e <node-ip> service kubelet    # or: service etcd
+```
+
+A service sitting in `Preparing` whose byte count in the events has not moved
+between two looks is a stalled pull. Power-cycle that node — the disk survives,
+the pull restarts:
+
+```bash
+talosctl -n <node-ip> -e <node-ip> reboot --wait=false
+# or, from the outside:
+tbx node stop  cloudbox cloudbox-worker-1             # or cloudbox-cp-1
+tbx node start cloudbox cloudbox-worker-1
+```
+
+then keep watching `kubectl get nodes -w`. (talos-box v0.1.2 adds `tbx node
+restart` and makes `tbx status cloudbox` say "stalled" directly; on the pinned
+v0.1.1 the `service` command is the honest signal.)
 </details>
 
 <details>

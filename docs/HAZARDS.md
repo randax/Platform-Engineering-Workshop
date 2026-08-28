@@ -409,6 +409,48 @@ registry, including the one that is a lie about locality.
 `check-consistency.sh` check 11 is unaffected — it compares the `cni:none` patch, which is
 still byte-identical across the two backends.
 
+**Superseded** — see the next entry: the conclusion "drop tbx's mirror" was one step too
+far. The hazard is the `"*"` *entry*, not the *port*.
+
+## RESOLVED — the tbx nodes pull through tbx's own mirror; the crane-container hop was the stall
+
+The entry above ended with "dropped tbx's mirror", and the tbx substrate went on pulling
+from the crane container on `localhost:5001` — reached from a VM as Talos VM → vmnet →
+macOS → Colima VM → container. **Rehearsal 6 (2026-08-28) is what that cost**: 60 MiB
+blobs froze in that chain, `kubelet` and `etcd` sat in `Preparing` with a byte count
+that never moved, both nodes stayed `NotReady`, and one node needed a manual reboot
+before the cluster came up (`docs/REHEARSALS.md`, rehearsal 6). Meanwhile tbxd was
+serving a pull-through mirror at `172.30.<n>.1:5059` — *on the gateway address
+itself*, no hop — and nothing used it.
+
+**The distinction the previous entry missed.** What breaks `localhost:30500` is
+containerd applying a **`"*"` mirror entry** with `skipFallback: true` to every registry
+the config does not name. An **explicit** entry (`ghcr.io:` → `http://172.30.<n>.1:5059`)
+applies to `ghcr.io` and nothing else; containerd sends `?ns=ghcr.io` on each request and
+tbx's catch-all *port* routes on that namespace (`internal/mirror/manager.go`,
+`serveCatchAll`). The port is safe to point explicit entries at; the `"*"` entry is what
+must never be rendered. Both halves of the earlier reasoning were right and the
+conclusion drawn from them was wrong — for the second time on this one topic.
+
+**Fixed by** issue #206: `scripts/substrate/tbx.sh` keeps the eight explicit registries
+and `skipFallback: false`, with the endpoint `http://${CLOUDBOX_HOST_GATEWAY}:${TBX_MIRROR_PORT}`
+(`versions.env`, the one place `5059` is written). `/v2/` is curl-proved at the gateway
+before it is baked into the machine config. `cloudbox-init.sh` warms that store with
+`tbx cache warm` over a generated `[mirror]`-only list (`images_mirror_refs`, `lib.sh` —
+`images.txt` as-is fails tbx's ref validation on its section headers), `install.sh
+--check` grades it with `tbx cache warm --check` (`--deep` rehashes), and **the tbx path
+needs no Docker at all**: the `[host]` images, the crane container and the Docker gates
+in `tbx.sh`, `install.sh` and lab 00's `verify.sh` are docker/kind-only now. `tbx mirror
+offline on` is the venue switch. talos-box separately fixes the `"*"` footgun in its
+rendered manifests (randax/talos-box#481), but this repo never renders that entry
+regardless.
+
+**What is NOT retired:** as of 2026-08-28 the mirror-through-tbx path is **unrehearsed**
+— it was decided and built after rehearsal 6, and proving it end to end (create, the
+eleven modules, and offline with `tbx mirror offline on`) is rehearsal 7's job. And the
+`k8sClientRateLimit`/`bpf.hostLegacyRouting` VIP-blackout question (issue #209) is a
+separate open thread, not a mirror one.
+
 ## RESOLVED — a Knative Service in a namespace nobody listed had no route at all
 
 `gitops/components/knative-serving/ingress.yaml` used to carry one wildcard rule **per

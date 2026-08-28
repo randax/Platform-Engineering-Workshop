@@ -19,6 +19,9 @@
 #   ./scripts/create-cluster.sh --skip-cilium   # stop after step 2: the lab-01
 #                                               # path — nodes stay NotReady
 #                                               # until YOU install the CNI
+#   ./scripts/create-cluster.sh --post-cni      # tbx, after your Cilium install:
+#                                               # LB pool + L2 policy + VIP wait,
+#                                               # nothing else (no doctor, no VM)
 #
 # --skip-cilium exists for teaching, not convenience: lab 01 asks attendees to
 # install Cilium themselves and watch NotReady become Ready. Everything
@@ -36,13 +39,18 @@ source "${SCRIPT_DIR}/lib.sh"
 
 REFRESH_ENDPOINT="false"
 SKIP_CILIUM="false"
+POST_CNI="false"
 case "${1:-}" in
   --refresh-endpoint) REFRESH_ENDPOINT="true" ;;
   --skip-cilium) SKIP_CILIUM="true" ;;
+  --post-cni) POST_CNI="true" ;;
   "") ;;
   -h|--help)
-    echo "Usage: $0 [--skip-cilium|--refresh-endpoint]"
+    echo "Usage: $0 [--skip-cilium|--post-cni|--refresh-endpoint]"
     echo "  --skip-cilium       stop after the API answers: lab 01 installs the CNI by hand"
+    echo "  --post-cni          tbx only, after --skip-cilium and YOUR Cilium install: apply the"
+    echo "                      LoadBalancer pool + L2 announcement policy and wait for the"
+    echo "                      ingress VIP. Runs no preflight, no 'tbx doctor', starts no VM."
     echo "  (no flags)          create the CloudBox cluster"
     echo "  --refresh-endpoint  re-read the running cluster's API address, check that both"
     echo "                      clients answer there BEFORE writing anything, then point the"
@@ -302,6 +310,36 @@ if [[ "${REFRESH_ENDPOINT}" == "true" ]]; then
     warn "(kubeconfig, talosconfig and ${CLOUDBOX_API_ENDPOINT_FILE} all point at ${cp_ip})."
     warn "Point kubectl at it yourself: kubectl config use-context admin@${CLUSTER_NAME}"
   fi
+  exit 0
+fi
+
+# --post-cni: lab 01's tbx ending. The attendee created with --skip-cilium and
+# installed Cilium by hand; what is still missing is the CiliumLoadBalancerIPPool
+# and the CiliumL2AnnouncementPolicy (substrate_post_cni) and the proof that
+# cilium-ingress landed on .200 (substrate_post_ready). Lab 01 used to say
+# "re-run ./scripts/create-cluster.sh, it is idempotent" — and on tbx that
+# re-run dies in substrate_preflight on "cluster already exists" first, and when
+# it gets past that, `tbx doctor`'s host-pressure gate can refuse an operation
+# that starts no VM at all (issue #207). So this runs ONLY the two post steps:
+# no doctor, no preflight, no `tbx up`. Both read the subnet from `tbx status`
+# and talk to the cluster through the kubeconfig the create already wrote.
+# tbx-only, like --refresh-endpoint: on docker the ingress is a NodePort and
+# there are no LB objects to apply.
+if [[ "${POST_CNI}" == "true" ]]; then
+  if [[ "${SUBSTRATE}" != "tbx" ]]; then
+    die "--post-cni is tbx-only: on the docker substrate the ingress is a NodePort (no LoadBalancer pool or L2 policy to apply). Lab 01 on docker is complete once your Cilium install finishes."
+  fi
+  need kubectl
+  need jq
+  step "Finishing lab 01 on tbx: LoadBalancer pool, L2 policy, ingress VIP"
+  kubectl get --raw /readyz >/dev/null 2>&1 \
+    || die "The Kubernetes API is not answering through $(kubeconfig_in_use) — is the cluster up (tbx status ${CLUSTER_NAME})? After a reboot: ./scripts/create-cluster.sh --refresh-endpoint"
+  substrate_post_cni
+  step "Waiting for nodes to become Ready (your Cilium rollout)"
+  wait_rollout kube-system daemonset/cilium
+  kubectl wait --for=condition=Ready nodes --all --timeout=300s
+  substrate_post_ready
+  ok "Lab 01's tbx ending is done — every *.${CLOUDBOX_DOMAIN} name now reaches the ingress"
   exit 0
 fi
 

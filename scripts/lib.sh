@@ -1747,6 +1747,29 @@ remove_hosts_block() {
 # registry mirror is queried with. Examples:
 #   ghcr.io/siderolabs/talos:v1.13.6    -> siderolabs/talos:v1.13.6
 #   docker.io/library/registry:3.1.1    -> library/registry:3.1.1
+# images_mirror_refs <images.txt> — the [mirror] section as bare refs, one per
+# line: comments (full-line and trailing) stripped, whitespace trimmed, section
+# headers and the [host] section dropped. This is the shape `tbx cache warm`
+# and `tbx cache warm --check` read (upstream cmd/tbx/cache_warm.go,
+# parseWarmListSource: a line is a ref or a `#` comment, nothing else), which
+# images.txt itself is not — its `[host]`/`[mirror]` headers fail ref
+# validation. cloudbox-init.sh and install.sh --check both feed tbx from this
+# so the warm and the grade can never disagree about the list.
+images_mirror_refs() { # <file>
+  local line section=""
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line%%#*}"
+    line="$(echo "${line}" | xargs)"
+    [[ -z "${line}" ]] && continue
+    case "${line}" in
+      "[host]")   section="host" ;;
+      "[mirror]") section="mirror" ;;
+      *) [[ "${section}" == "mirror" ]] && printf '%s\n' "${line}" ;;
+    esac
+  done < "$1"
+  return 0
+}
+
 strip_registry() {
   local ref="$1" first="${1%%/*}"
   if [[ "${first}" == *.* || "${first}" == *:* || "${first}" == "localhost" ]]; then

@@ -5,9 +5,15 @@
 # Downloads every pinned image from scripts/images.txt so the workshop needs
 # no image downloads on conference WiFi:
 #
+#   docker / kind substrate (containers):
 #   [host] images   -> pulled into your local Docker engine (docker pull)
 #   [mirror] images -> copied into a local registry container that the cluster
 #                      nodes use as a pull-through mirror
+#   tbx substrate (VMs) — Docker-free:
+#   [mirror] images -> `tbx cache warm` into talos-box's own mirror store
+#                      (~/.talosbox/cache), which tbxd serves to the VMs at the
+#                      cluster gateway; the [host] images are docker/kind-only
+#                      (node container, registry container, kind node) and skipped
 #
 # Why the mirror? The Talos nodes are Docker containers with their OWN
 # containerd inside — your host Docker image cache is invisible to them.
@@ -16,6 +22,9 @@
 # preserving repository paths and digests (via crane, so digest-pinned images
 # stay valid). create-cluster.sh then points the Talos machine config
 # registry mirrors at it, with automatic fallback to the real registries.
+# On tbx the same eight explicit mirror entries point at tbx's catch-all port
+# instead (scripts/substrate/tbx.sh, TBX_MIRROR_PORT), and `tbx mirror offline
+# on` is the venue switch that makes a cache miss fail instead of reaching out.
 #
 # Usage:
 #   ./scripts/cloudbox-init.sh                    # pull + mirror everything
@@ -50,10 +59,6 @@ for arg in "$@"; do
   esac
 done
 
-need docker "Install Docker Desktop / OrbStack / docker-ce first."
-docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
-need crane
-
 # The platform the cluster NODES actually run — asked of the substrate, because
 # the two answer differently and getting it wrong fills the mirror with images
 # no node can execute:
@@ -61,10 +66,7 @@ need crane
 #            arch is the DAEMON's, not uname -m (an x86_64 Rosetta shell on
 #            Apple Silicon, or a context pointing at a remote daemon).
 #   tbx    — the nodes are natively virtualised VMs, so their arch is the
-#            HOST's. Docker here only runs the mirror container, and on an
-#            amd64 Colima VM on an arm64 Mac the daemon's answer is the wrong
-#            one by a whole architecture: every mirrored image would be amd64
-#            for arm64 VMs, and the venue is where you would find out.
+#            HOST's, and `tbx cache warm` pulls for it without being told.
 # Nothing may be hard-coded (CI runs amd64, most laptops in the room are arm64).
 #
 # Asked through mirror_target_substrate/mirror_target_arch (lib.sh), which now
@@ -73,23 +75,24 @@ need crane
 # lost: it filled (and graded) the mirror for VMs on machines that went on to
 # create docker containers. The resolved answer is passed in, so neither helper
 # re-runs doctor in a subshell.
+#
+# Resolved BEFORE anything asks for Docker: on tbx nothing here needs it (#206).
+# The VMs pull through tbx's own mirror, so the docker/crane requirements and
+# the mirror container are the docker/kind path's alone.
 substrate_resolve_into INIT_SUBSTRATE
 MIRROR_TARGET="$(mirror_target_substrate "${INIT_SUBSTRATE}")"
+if [[ "${MIRROR_TARGET}" != "tbx" ]]; then
+  need docker "Install Docker Desktop / OrbStack / docker-ce first."
+  docker_running || die "Docker daemon is not reachable. Start Docker and re-run."
+  need crane
+fi
 node_arch="$(mirror_target_arch "${INIT_SUBSTRATE}")" \
   || die "Could not determine the architecture your ${MIRROR_TARGET} nodes will run (docker reports '$(docker version -f '{{.Server.Arch}}' 2>/dev/null)', uname -m says '$(uname -m)') — the workshop needs amd64 or arm64."
 NODE_PLATFORM="linux/${node_arch}"
-info "Cluster nodes will run ${NODE_PLATFORM} (mirroring for the substrate this machine will create on: ${MIRROR_TARGET})"
-# The pair that looks wrong and is not: on tbx the mirror is filled for the VMs'
-# architecture while the Docker daemon hosting the mirror container is another
-# one (an amd64 Colima VM on an Apple Silicon Mac). Worth naming, because it is
-# also the shape a genuinely wrong mirror has — and because CHANGING substrate
-# from here means refilling it.
-if [[ "${MIRROR_TARGET}" == "tbx" ]] && daemon_arch="$(docker_server_arch)" \
-   && [[ "${daemon_arch}" != "${node_arch}" ]]; then
-  warn "Your Docker daemon is ${daemon_arch} while this CPU is ${node_arch}; the mirror is being"
-  warn "filled for the tbx VMs (${node_arch}), which is correct — the mirror is a container on"
-  warn "that daemon, the nodes are not. If you switch to the docker substrate, refill it first:"
-  warn "  CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh"
+if [[ "${MIRROR_TARGET}" == "tbx" ]]; then
+  info "Cluster nodes will run ${NODE_PLATFORM} as tbx VMs — warming talos-box's own mirror (no Docker involved)"
+else
+  info "Cluster nodes will run ${NODE_PLATFORM} (mirroring for the substrate this machine will create on: ${MIRROR_TARGET})"
 fi
 
 IMAGES_FILE="${SCRIPT_DIR}/images.txt"
@@ -116,180 +119,230 @@ while IFS= read -r line; do
   esac
 done < "${IMAGES_FILE}"
 
-total=$(( ${#host_images[@]} + ${#mirror_images[@]} ))
-
-step "CloudBox image pre-pull"
-echo "  ${#host_images[@]} host images + ${#mirror_images[@]} cluster images = ${total} total"
-echo "  cluster images are mirrored for ${NODE_PLATFORM} (digest-pinned refs keep every architecture)"
-warn "This downloads ~7.5 GB (arm64) / ~7.7 GB (amd64). Make sure you have ${MIN_DISK_FREE_GB} GB free disk"
-warn "and are on a good connection (home/office — NOT conference WiFi)."
-if [[ "${ASSUME_YES}" != "true" ]]; then
-  confirm "Continue?" || die "Aborted."
-fi
-
-# --- 0. Preflight: every ref must exist upstream ---------------------------------
-# `crane manifest` is a cheap API call per ref — a missing image should cost
-# seconds here, not surface hours into a 7.5 GB pull.
-step "Preflight: checking that all ${total} refs exist upstream"
-# One retry with a pause, because this loop is ~76 rapid unauthenticated API
-# calls and GHCR answers a burst like that with a transient 5xx or a rate limit.
-# A single miss then aborted the whole 7.5 GB pre-pull with "do not exist
-# upstream" for an image that demonstrably does — the pull an attendee is doing
-# days early, on the one evening they set aside for it. A ref that is genuinely
-# gone still fails, one second later.
-missing=()
-for image in "${host_images[@]}" "${mirror_images[@]}"; do
-  crane manifest "${image}" >/dev/null 2>&1 && continue
-  sleep 1
-  crane manifest "${image}" >/dev/null 2>&1 || missing+=("${image}")
-done
-if [[ ${#missing[@]} -gt 0 ]]; then
-  fail "${#missing[@]} image(s) do not exist upstream:"
-  for image in "${missing[@]}"; do
-    case "${image}" in
-      ghcr.io/randax/*) echo "   ${image}   (not published yet — see issue #7)" ;;
-      *)                echo "   ${image}" ;;
-    esac
-  done
-  die "Nothing was downloaded. Fix scripts/images.txt (or publish the missing images) and re-run."
-fi
-ok "All ${total} refs resolve upstream"
-
-# --- 1. Host images -------------------------------------------------------------
-step "Pulling host images into Docker"
-i=0
-# Registries drop connections. This is a ~7.5 GB download on somebody's home
-# wifi, and a single transient blob failure used to abort the whole prework run
-# — the 2026-08-17 rehearsal lost one at image 9 of 63. Retry with backoff
-# before giving up on any one image; a genuinely missing image still fails, it
-# just takes three attempts to say so.
-retry() { # retry <attempts> <what> -- <cmd...>
-  local attempts="$1" what="$2"; shift 3
-  local n=1
-  while true; do
-    "$@" && return 0
-    if [[ "${n}" -ge "${attempts}" ]]; then return 1; fi
-    warn "      ${what} failed (attempt ${n}/${attempts}) — retrying in $((n * 5))s"
-    sleep $((n * 5))
-    n=$((n + 1))
-  done
+# --- tbx: warm talos-box's own mirror store ---------------------------------------
+# Docker-free (#206). The [mirror] refs go to `tbx cache warm`, which pulls each
+# one for this host's architecture into ~/.talosbox/cache — the store tbxd's
+# registry mirror serves to the VMs at the cluster gateway (TBX_MIRROR_PORT).
+# `cache warm` requires every ref to be pinned by tag or digest, which images.txt
+# already guarantees (principle 14), and it reads a one-ref-per-line file, so the
+# list is generated (images_mirror_refs, lib.sh) rather than passed as-is: the
+# `[host]`/`[mirror]` headers would fail its validation. The [host] images are
+# not warmed — they are the Talos node container, the crane registry and the kind
+# node, none of which a VM substrate runs.
+#
+# No crane preflight here: `tbx cache warm` resolves every ref upstream itself
+# and reports each miss by name, and it is resumable — a re-run says "already
+# complete" for what it has. `tbx cache warm --check` (install.sh --check) is
+# the cheap offline gate afterwards; `tbx cache warm` re-resolves tags on every
+# run and is NOT that gate.
+tbx_warm_mirror() {
+  need tbx "substrate is tbx but the tbx binary is not installed — install talos-box (./scripts/dev-setup.sh pins it) or run CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh"
+  step "CloudBox image pre-pull (tbx)"
+  echo "  ${#mirror_images[@]} cluster images -> talos-box's mirror store (~/.talosbox/cache), for ${NODE_PLATFORM}"
+  echo "  (the ${#host_images[@]} [host] images are docker/kind-only and skipped)"
+  warn "This downloads ~7.5 GB (arm64) / ~7.7 GB (amd64). Make sure you have ${MIN_DISK_FREE_GB} GB free disk"
+  warn "and are on a good connection (home/office — NOT conference WiFi)."
+  if [[ "${ASSUME_YES}" != "true" ]]; then
+    confirm "Continue?" || die "Aborted."
+  fi
+  step "Warming talos-box's mirror (tbx cache warm, ${#mirror_images[@]} refs)"
+  local list
+  list="$(mktemp)"
+  images_mirror_refs "${IMAGES_FILE}" > "${list}"
+  # Not `|| die` on the same line as the command: `cache warm` prints a
+  # per-ref ✗ line for every failure before its summary, and those lines are
+  # the actionable part — they must reach the terminal before the verdict.
+  if tbx cache warm "${list}"; then
+    rm -f "${list}"
+    ok "All ${#mirror_images[@]} cluster images are in talos-box's mirror store."
+  else
+    rm -f "${list}"
+    die "tbx cache warm reported failures (the ✗ lines above). Re-run this script to retry — already-warmed images are skipped."
+  fi
+  # The offline switch is the attendee's to flip at the venue, not ours to flip
+  # at home: with it ON, a ref that is not cached fails instead of reaching
+  # upstream — right in the room, wrong on the evening they are still pulling.
+  info "At the venue, make cache misses fail loudly instead of reaching out: tbx mirror offline on"
 }
 
-for image in "${host_images[@]}"; do
-  i=$((i + 1))
-  echo "  [${i}/${#host_images[@]}] ${image}"
-  retry 3 "docker pull" -- docker pull --quiet "${image}" \
-    || die "could not pull ${image} after 3 attempts — check your connection and re-run (already-pulled images are skipped)"
-done
-ok "Host images present"
-
-# --- 2. Start the local mirror registry ------------------------------------------
-step "Starting the '${MIRROR_NAME}' registry (localhost:${MIRROR_PORT})"
-if mirror_running; then
-  ok "Mirror already running"
-elif docker inspect "${MIRROR_NAME}" >/dev/null 2>&1; then
-  docker start "${MIRROR_NAME}" >/dev/null
-  ok "Mirror container restarted"
+total=$(( ${#host_images[@]} + ${#mirror_images[@]} ))
+if [[ "${MIRROR_TARGET}" == "tbx" ]]; then
+  tbx_warm_mirror
 else
-  docker volume create "${MIRROR_VOLUME}" >/dev/null
-  docker run -d \
-    --name "${MIRROR_NAME}" \
-    --restart unless-stopped \
-    -p "${MIRROR_PORT}:5000" \
-    -v "${MIRROR_VOLUME}:/var/lib/registry" \
-    "${MIRROR_IMAGE}" >/dev/null
-  ok "Mirror started (data persisted in Docker volume '${MIRROR_VOLUME}')"
-fi
 
-# Wait until the registry answers.
-for _ in $(seq 1 30); do
-  curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 && break
-  sleep 1
-done
-curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 \
-  || die "Mirror registry did not become ready on localhost:${MIRROR_PORT}"
+  step "CloudBox image pre-pull"
+  echo "  ${#host_images[@]} host images + ${#mirror_images[@]} cluster images = ${total} total"
+  echo "  cluster images are mirrored for ${NODE_PLATFORM} (digest-pinned refs keep every architecture)"
+  warn "This downloads ~7.5 GB (arm64) / ~7.7 GB (amd64). Make sure you have ${MIN_DISK_FREE_GB} GB free disk"
+  warn "and are on a good connection (home/office — NOT conference WiFi)."
+  if [[ "${ASSUME_YES}" != "true" ]]; then
+    confirm "Continue?" || die "Aborted."
+  fi
 
-# --- 3. Copy cluster images into the mirror ----------------------------------------
-# crane is used instead of `docker pull && docker push` because it copies
-# manifests byte-for-byte, so digest-pinned refs stay valid inside the mirror.
-#
-# Which architectures get copied is decided per ref, and both branches matter:
-#
-#   TAG-ONLY refs are copied for ${NODE_PLATFORM} only.
-#     Without --platform, crane copies the WHOLE manifest index — s390x,
-#     ppc64le, riscv64, 386, arm/v7 and the other of amd64/arm64 — none of
-#     which this laptop can execute. That was about half the pre-pull:
-#     registry.k8s.io/pause is 0.3 MB for one platform and 573 MB as a full
-#     index. Deleting the --platform flag breaks nothing visibly; it just
-#     doubles the download. Do not delete it.
-#
-#     --platform filters INDEX manifests only: a bare single-arch manifest
-#     (e.g. the amd64-only Backstage image) is copied as-is, whatever its
-#     architecture. This is a size optimization, not an architecture
-#     validation — install.sh --check is what validates the mirror's arch.
-#
-#   DIGEST-PINNED refs (…@sha256:…) are copied whole, every architecture.
-#     For a multi-arch image the pinned digest is the digest of the INDEX.
-#     `crane copy --platform` stores only the child manifest, under a
-#     different digest, so the index digest would not exist in the mirror —
-#     a Talos node asking for …@sha256:<index> gets a 404 and, because
-#     create-cluster.sh sets skipFallback: false, silently pulls from the
-#     internet instead. That works at home and hangs on conference WiFi,
-#     which is the exact failure this script exists to prevent. The foreign
-#     architectures those refs drag along are the price of the offline
-#     guarantee; the alternative (push the original index but only the one
-#     child's blobs) was tested and rejected — containerd 2.x fetches every
-#     child manifest in an index regardless of platform and errors out on the
-#     missing ones.
-#
-# If --platform copy fails (an index with no manifest for this architecture),
-# fall back to copying everything: fatter, but never a missing image offline.
-step "Copying cluster images into the mirror (crane, ${NODE_PLATFORM} + pinned indexes)"
-CRANE_LOG="$(mktemp)"
-trap 'rm -f "${CRANE_LOG}"' EXIT
-# The redirects belong on the COMMAND, not on the retry() wrapper: retry() reports
-# each failed attempt with warn(), which writes to stdout, so wrapping the whole
-# call in `>/dev/null` sent the "retrying in 5s" line to /dev/null too. The run
-# then just appeared to freeze for 15 s on one image — on 63 of the 66 refs, i.e.
-# on every path where the retry actually matters.
-crane_copy() { crane copy "$@" >/dev/null 2>"${CRANE_LOG}"; }
-i=0
-failed=()
-for image in "${mirror_images[@]}"; do
-  i=$((i + 1))
-  path="$(strip_registry "${image}")"
-  dest="localhost:${MIRROR_PORT}/${path%%@*}"   # crane derives no tag from digests;
-  [[ "${path}" == *@sha256:* && "${path}" != *:*@* ]] && dest="${dest}:pinned"
+  # --- 0. Preflight: every ref must exist upstream ---------------------------------
+  # `crane manifest` is a cheap API call per ref — a missing image should cost
+  # seconds here, not surface hours into a 7.5 GB pull.
+  step "Preflight: checking that all ${total} refs exist upstream"
+  # One retry with a pause, because this loop is ~76 rapid unauthenticated API
+  # calls and GHCR answers a burst like that with a transient 5xx or a rate limit.
+  # A single miss then aborted the whole 7.5 GB pre-pull with "do not exist
+  # upstream" for an image that demonstrably does — the pull an attendee is doing
+  # days early, on the one evening they set aside for it. A ref that is genuinely
+  # gone still fails, one second later.
+  missing=()
+  for image in "${host_images[@]}" "${mirror_images[@]}"; do
+    crane manifest "${image}" >/dev/null 2>&1 && continue
+    sleep 1
+    crane manifest "${image}" >/dev/null 2>&1 || missing+=("${image}")
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    fail "${#missing[@]} image(s) do not exist upstream:"
+    for image in "${missing[@]}"; do
+      case "${image}" in
+        ghcr.io/randax/*) echo "   ${image}   (not published yet — see issue #7)" ;;
+        *)                echo "   ${image}" ;;
+      esac
+    done
+    die "Nothing was downloaded. Fix scripts/images.txt (or publish the missing images) and re-run."
+  fi
+  ok "All ${total} refs resolve upstream"
 
-  copy_args=(--insecure)
-  if [[ "${image}" == *@sha256:* ]]; then
-    echo "  [${i}/${#mirror_images[@]}] ${image} (full index — digest-pinned)"
+  # --- 1. Host images -------------------------------------------------------------
+  step "Pulling host images into Docker"
+  i=0
+  # Registries drop connections. This is a ~7.5 GB download on somebody's home
+  # wifi, and a single transient blob failure used to abort the whole prework run
+  # — the 2026-08-17 rehearsal lost one at image 9 of 63. Retry with backoff
+  # before giving up on any one image; a genuinely missing image still fails, it
+  # just takes three attempts to say so.
+  retry() { # retry <attempts> <what> -- <cmd...>
+    local attempts="$1" what="$2"; shift 3
+    local n=1
+    while true; do
+      "$@" && return 0
+      if [[ "${n}" -ge "${attempts}" ]]; then return 1; fi
+      warn "      ${what} failed (attempt ${n}/${attempts}) — retrying in $((n * 5))s"
+      sleep $((n * 5))
+      n=$((n + 1))
+    done
+  }
+
+  for image in "${host_images[@]}"; do
+    i=$((i + 1))
+    echo "  [${i}/${#host_images[@]}] ${image}"
+    retry 3 "docker pull" -- docker pull --quiet "${image}" \
+      || die "could not pull ${image} after 3 attempts — check your connection and re-run (already-pulled images are skipped)"
+  done
+  ok "Host images present"
+
+  # --- 2. Start the local mirror registry ------------------------------------------
+  step "Starting the '${MIRROR_NAME}' registry (localhost:${MIRROR_PORT})"
+  if mirror_running; then
+    ok "Mirror already running"
+  elif docker inspect "${MIRROR_NAME}" >/dev/null 2>&1; then
+    docker start "${MIRROR_NAME}" >/dev/null
+    ok "Mirror container restarted"
   else
-    copy_args+=(--platform "${NODE_PLATFORM}")
-    echo "  [${i}/${#mirror_images[@]}] ${image}"
+    docker volume create "${MIRROR_VOLUME}" >/dev/null
+    docker run -d \
+      --name "${MIRROR_NAME}" \
+      --restart unless-stopped \
+      -p "${MIRROR_PORT}:5000" \
+      -v "${MIRROR_VOLUME}:/var/lib/registry" \
+      "${MIRROR_IMAGE}" >/dev/null
+    ok "Mirror started (data persisted in Docker volume '${MIRROR_VOLUME}')"
   fi
 
-  if retry 3 "crane copy" -- crane_copy "${copy_args[@]}" "${image}" "${dest}"; then
-    continue
-  fi
-  if [[ ${#copy_args[@]} -gt 1 ]] \
-     && retry 3 "crane copy (all arch)" -- crane_copy --insecure "${image}" "${dest}"; then
-    warn "      no ${NODE_PLATFORM} manifest — copied every architecture instead"
-    continue
-  fi
-  fail "      copy failed: ${image}"
-  tail -n 3 "${CRANE_LOG}" | sed 's/^/      | /'
-  failed+=("${image}")
-done
+  # Wait until the registry answers.
+  for _ in $(seq 1 30); do
+    curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 && break
+    sleep 1
+  done
+  curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1 \
+    || die "Mirror registry did not become ready on localhost:${MIRROR_PORT}"
 
-echo
-if [[ ${#failed[@]} -gt 0 ]]; then
-  fail "${#failed[@]} image(s) failed to copy:"
-  printf '   %s\n' "${failed[@]}"
-  die "Re-run this script to retry (already-copied images are fast)."
+  # --- 3. Copy cluster images into the mirror ----------------------------------------
+  # crane is used instead of `docker pull && docker push` because it copies
+  # manifests byte-for-byte, so digest-pinned refs stay valid inside the mirror.
+  #
+  # Which architectures get copied is decided per ref, and both branches matter:
+  #
+  #   TAG-ONLY refs are copied for ${NODE_PLATFORM} only.
+  #     Without --platform, crane copies the WHOLE manifest index — s390x,
+  #     ppc64le, riscv64, 386, arm/v7 and the other of amd64/arm64 — none of
+  #     which this laptop can execute. That was about half the pre-pull:
+  #     registry.k8s.io/pause is 0.3 MB for one platform and 573 MB as a full
+  #     index. Deleting the --platform flag breaks nothing visibly; it just
+  #     doubles the download. Do not delete it.
+  #
+  #     --platform filters INDEX manifests only: a bare single-arch manifest
+  #     (e.g. the amd64-only Backstage image) is copied as-is, whatever its
+  #     architecture. This is a size optimization, not an architecture
+  #     validation — install.sh --check is what validates the mirror's arch.
+  #
+  #   DIGEST-PINNED refs (…@sha256:…) are copied whole, every architecture.
+  #     For a multi-arch image the pinned digest is the digest of the INDEX.
+  #     `crane copy --platform` stores only the child manifest, under a
+  #     different digest, so the index digest would not exist in the mirror —
+  #     a Talos node asking for …@sha256:<index> gets a 404 and, because
+  #     create-cluster.sh sets skipFallback: false, silently pulls from the
+  #     internet instead. That works at home and hangs on conference WiFi,
+  #     which is the exact failure this script exists to prevent. The foreign
+  #     architectures those refs drag along are the price of the offline
+  #     guarantee; the alternative (push the original index but only the one
+  #     child's blobs) was tested and rejected — containerd 2.x fetches every
+  #     child manifest in an index regardless of platform and errors out on the
+  #     missing ones.
+  #
+  # If --platform copy fails (an index with no manifest for this architecture),
+  # fall back to copying everything: fatter, but never a missing image offline.
+  step "Copying cluster images into the mirror (crane, ${NODE_PLATFORM} + pinned indexes)"
+  CRANE_LOG="$(mktemp)"
+  trap 'rm -f "${CRANE_LOG}"' EXIT
+  # The redirects belong on the COMMAND, not on the retry() wrapper: retry() reports
+  # each failed attempt with warn(), which writes to stdout, so wrapping the whole
+  # call in `>/dev/null` sent the "retrying in 5s" line to /dev/null too. The run
+  # then just appeared to freeze for 15 s on one image — on 63 of the 66 refs, i.e.
+  # on every path where the retry actually matters.
+  crane_copy() { crane copy "$@" >/dev/null 2>"${CRANE_LOG}"; }
+  i=0
+  failed=()
+  for image in "${mirror_images[@]}"; do
+    i=$((i + 1))
+    path="$(strip_registry "${image}")"
+    dest="localhost:${MIRROR_PORT}/${path%%@*}"   # crane derives no tag from digests;
+    [[ "${path}" == *@sha256:* && "${path}" != *:*@* ]] && dest="${dest}:pinned"
+
+    copy_args=(--insecure)
+    if [[ "${image}" == *@sha256:* ]]; then
+      echo "  [${i}/${#mirror_images[@]}] ${image} (full index — digest-pinned)"
+    else
+      copy_args+=(--platform "${NODE_PLATFORM}")
+      echo "  [${i}/${#mirror_images[@]}] ${image}"
+    fi
+
+    if retry 3 "crane copy" -- crane_copy "${copy_args[@]}" "${image}" "${dest}"; then
+      continue
+    fi
+    if [[ ${#copy_args[@]} -gt 1 ]] \
+       && retry 3 "crane copy (all arch)" -- crane_copy --insecure "${image}" "${dest}"; then
+      warn "      no ${NODE_PLATFORM} manifest — copied every architecture instead"
+      continue
+    fi
+    fail "      copy failed: ${image}"
+    tail -n 3 "${CRANE_LOG}" | sed 's/^/      | /'
+    failed+=("${image}")
+  done
+
+  echo
+  if [[ ${#failed[@]} -gt 0 ]]; then
+    fail "${#failed[@]} image(s) failed to copy:"
+    printf '   %s\n' "${failed[@]}"
+    die "Re-run this script to retry (already-copied images are fast)."
+  fi
+
+  ok "All ${total} images pre-pulled. The mirror survives reboots and cluster rebuilds."
 fi
-
-ok "All ${total} images pre-pulled. The mirror survives reboots and cluster rebuilds."
 
 # ollama_bind_check — warn when Ollama listens on loopback only and the cluster
 # is going to reach it from OUTSIDE the host's loopback.
@@ -362,19 +415,16 @@ else
 fi
 
 # --- 5. Talos disk image for the tbx substrate ---------------------------------
-# The crane mirror above covers CONTAINER images. The tbx substrate also needs
+# The mirror warm above covers CONTAINER images. The tbx substrate also needs
 # the Talos RAW DISK IMAGE, which talos-box downloads from the Image Factory and
 # decompresses into ~/.talosbox/cache/ — 95 MB on arm64, 204 MB on amd64
 # (measured). That download is Factory-side and cannot go through our mirror, so
 # it must happen at home like everything else.
 #
-# --talos-version pins one ad-hoc combination (cmd/tbx/cache_pull.go:23,39-44):
-# naming it deliberately skips the file-driven mode that would ALSO warm tbx's
-# own registry mirror. Adopting that mirror is a spec non-goal — the crane
-# mirror on localhost:${MIRROR_PORT} stays the single container-image store.
-# Note this is IN ADDITION to everything above: a tbx attendee still needs Docker
-# running for prework, because the crane mirror the VMs pull from is itself a
-# Docker container. tbx replaces the NODES, not the mirror.
+# --talos-version pins one ad-hoc combination (cmd/tbx/cache_pull.go:23,39-44).
+# The container images were warmed into tbx's mirror store above
+# (tbx_warm_mirror); this is the one remaining download, and the CRI pause
+# image `tbx cache warm --check` insists on comes with it.
 # Gated on the DECISION (${SUBSTRATE}, i.e. substrate_resolve()), not on the tbx
 # binary — the same rule the mirror above is filled by, which is the point: one
 # question, one answer, and prework that matches the create.
@@ -412,19 +462,21 @@ elif [[ "${SUBSTRATE}" != "tbx" ]]; then
     info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=docker (tbx not installed — no Talos disk image needed)"
   else
     warn "tbx is installed but this machine resolves to the DOCKER substrate: $(substrate_doctor_reason)"
-    warn "So the mirror above was filled for your Docker daemon (${NODE_PLATFORM}) and the Talos"
-    warn "disk image was NOT downloaded — both would be wrong for VMs you are not going to create."
-    warn "If you fix tbx before the venue, re-run this script: it will refill the mirror for the"
-    warn "VMs and cache the disk image. To prepare for tbx right now, whatever doctor says:"
+    warn "So the crane mirror above was filled for your Docker nodes (${NODE_PLATFORM}); tbx's own"
+    warn "mirror store was NOT warmed and the Talos disk image was NOT downloaded — both are for"
+    warn "VMs you are not going to create. If you fix tbx before the venue, re-run this script:"
+    warn "it warms tbx's store and caches the disk image. To prepare for tbx now, whatever doctor says:"
     warn "  CLOUDBOX_SUBSTRATE=tbx ./scripts/cloudbox-init.sh"
     info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=docker (tbx doctor is not passing — no Talos disk image cached)"
   fi
 elif ! have tbx; then
   # Reachable via a persisted 'tbx' answer, or CLOUDBOX_SUBSTRATE=tbx, on a
   # machine without the binary: detection itself requires `tbx doctor` first.
+  # Unreachable in practice: tbx_warm_mirror above already dies without the
+  # binary. Kept so the branch structure stays honest if that ever moves.
   warn "substrate is 'tbx' but the tbx binary is not installed — cannot pre-pull"
   warn "the Talos disk image. Install tbx (see ./scripts/dev-setup.sh) and re-run."
-  info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} · substrate=tbx (binary missing — no Talos disk image cached)"
+  info "Prework summary: substrate=tbx (binary missing — nothing warmed, no Talos disk image cached)"
 else
   step "Pre-pulling the Talos ${TALOS_VERSION} disk image for tbx"
   if tbx cache pull --talos-version "${TALOS_VERSION}"; then
@@ -448,7 +500,7 @@ else
     warn "  CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
     tbx_doctor="fail"
   fi
-  info "Prework summary: images=${total} mirrored for ${NODE_PLATFORM} (${MIRROR_TARGET} nodes) · talos-disk=${tbx_cached} · tbx-doctor=${tbx_doctor}"
+  info "Prework summary: images=${#mirror_images[@]} warmed into tbx's mirror for ${NODE_PLATFORM} · talos-disk=${tbx_cached} · tbx-doctor=${tbx_doctor}"
 fi
 
 info "Next: ./scripts/install.sh --check"
