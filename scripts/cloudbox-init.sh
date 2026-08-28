@@ -137,6 +137,10 @@ done < "${IMAGES_FILE}"
 # run and is NOT that gate.
 tbx_warm_mirror() {
   need tbx "substrate is tbx but the tbx binary is not installed — install talos-box (./scripts/dev-setup.sh pins it) or run CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh"
+  # `cache warm` is a v0.1.1 verb, and this script runs BEFORE the two places
+  # that assert the pin (install.sh --check, substrate_preflight) — so an older
+  # tbx would fail the 7.5 GB step on an unknown verb with nothing naming why.
+  tbx_version_check die
   step "CloudBox image pre-pull (tbx)"
   echo "  ${#mirror_images[@]} cluster images -> talos-box's mirror store (~/.talosbox/cache), for ${NODE_PLATFORM}"
   echo "  (the ${#host_images[@]} [host] images are docker/kind-only and skipped)"
@@ -148,21 +152,32 @@ tbx_warm_mirror() {
   step "Warming talos-box's mirror (tbx cache warm, ${#mirror_images[@]} refs)"
   local list
   list="$(mktemp)"
+  # An EXIT trap, not rm on the two exits below: Ctrl-C during a multi-GB
+  # warm is the likeliest interruption in this script.
+  # shellcheck disable=SC2064  # expand now: the path is fixed at this point
+  trap "rm -f '${list}'" EXIT
   images_mirror_refs "${IMAGES_FILE}" > "${list}"
-  # Not `|| die` on the same line as the command: `cache warm` prints a
-  # per-ref ✗ line for every failure before its summary, and those lines are
-  # the actionable part — they must reach the terminal before the verdict.
-  if tbx cache warm "${list}"; then
-    rm -f "${list}"
-    ok "All ${#mirror_images[@]} cluster images are in talos-box's mirror store."
-  else
-    rm -f "${list}"
-    die "tbx cache warm reported failures (the ✗ lines above). Re-run this script to retry — already-warmed images are skipped."
-  fi
-  # The offline switch is the attendee's to flip at the venue, not ours to flip
-  # at home: with it ON, a ref that is not cached fails instead of reaching
-  # upstream — right in the room, wrong on the evening they are still pulling.
-  info "At the venue, make cache misses fail loudly instead of reaching out: tbx mirror offline on"
+  # `cache warm` prints a per-ref ✗ line for every failure before its summary,
+  # and those lines are the actionable part — they reach the terminal before
+  # the verdict. One automatic second pass, for the reason the docker path
+  # retries every pull: registries drop connections, a 7.5 GB run on home
+  # wifi used to die on one transient blob, and warm is resumable — the
+  # second pass says "already complete" for everything the first one got.
+  local attempt
+  for attempt in 1 2; do
+    if tbx cache warm "${list}"; then
+      ok "All ${#mirror_images[@]} cluster images are in talos-box's mirror store."
+      # The offline switch is the attendee's to flip at the venue, not ours to
+      # flip at home: with it ON, a ref that is not cached fails instead of
+      # reaching upstream — right in the room, wrong on the evening they are
+      # still pulling.
+      info "At the venue, make cache misses fail loudly instead of reaching out: tbx mirror offline on"
+      return 0
+    fi
+    [[ "${attempt}" == "1" ]] && warn "tbx cache warm reported failures (the ✗ lines above) — one more pass over the list in 10s"
+    [[ "${attempt}" == "1" ]] && sleep 10
+  done
+  die "tbx cache warm still reports failures (the ✗ lines above). Re-run this script to retry — already-warmed images are skipped."
 }
 
 total=$(( ${#host_images[@]} + ${#mirror_images[@]} ))

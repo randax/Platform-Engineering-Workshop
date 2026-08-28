@@ -1747,6 +1747,15 @@ remove_hosts_block() {
 # registry mirror is queried with. Examples:
 #   ghcr.io/siderolabs/talos:v1.13.6    -> siderolabs/talos:v1.13.6
 #   docker.io/library/registry:3.1.1    -> library/registry:3.1.1
+strip_registry() {
+  local ref="$1" first="${1%%/*}"
+  if [[ "${first}" == *.* || "${first}" == *:* || "${first}" == "localhost" ]]; then
+    echo "${ref#*/}"
+  else
+    echo "${ref}"   # no registry host prefix (shouldn't happen in images.txt)
+  fi
+}
+
 # images_mirror_refs <images.txt> — the [mirror] section as bare refs, one per
 # line: comments (full-line and trailing) stripped, whitespace trimmed, section
 # headers and the [host] section dropped. This is the shape `tbx cache warm`
@@ -1770,14 +1779,104 @@ images_mirror_refs() { # <file>
   return 0
 }
 
-strip_registry() {
-  local ref="$1" first="${1%%/*}"
-  if [[ "${first}" == *.* || "${first}" == *:* || "${first}" == "localhost" ]]; then
-    echo "${ref#*/}"
+# cilium_install <tbx|docker> — the workshop's Cilium: CNI + kube-proxy
+# replacement + shared ingress, from the vendored chart. Moved here from
+# create-cluster.sh verbatim so lab/01-cluster/solve.sh can install the SAME
+# Cilium on a cluster created with --skip-cilium (issue #207 review): before
+# this the solve path hung 300 s on NotReady nodes that had no CNI. Needs
+# SCRIPT_DIR to point at scripts/ (every caller of lib.sh sets it).
+cilium_install() { # <substrate>
+  local substrate="$1" cilium_ingress_shape cilium_flag helm_attempt
+  local -a cilium_values
+  step "Installing Cilium ${CILIUM_VERSION} (CNI + kube-proxy replacement + ingress)"
+  # Chart is vendored into scripts/manifests/ (re-vendor from CILIUM_HELM_REPO
+  # when bumping) so this needs no internet at the venue — principle 2.
+  # Base values from the official Talos Cilium guide:
+  # https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium
+  # k8sServiceHost=localhost:7445 is KubePrism, Talos' local API server balancer.
+  # --server-side=false pins helm 3's client-side apply. helm 4 defaults this to
+  # "auto", which for a FRESH release (every workshop cluster) resolves to
+  # server-side apply — a behaviour change on the one path `helm template`
+  # cannot exercise. Nothing here needs server-side; keeping the proven path
+  # makes this a same-behaviour-newer-binary bump. Drop the flag once a full
+  # bootstrap-test has been green with it removed.
+  cilium_values=(
+    --set ipam.mode=kubernetes
+    --set kubeProxyReplacement=true
+    --set k8sServiceHost=localhost
+    --set k8sServicePort=7445
+    --set cgroup.autoMount.enabled=false
+    --set cgroup.hostRoot=/sys/fs/cgroup
+    --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}"
+    --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+    # L2 announcements are what make a LoadBalancer VIP answer ARP on the shared
+    # L2 segment. Enabled on BOTH substrates deliberately: on docker there is no
+    # LB-IPAM pool so nothing is announced, and keeping the flag identical means
+    # `cilium config view` reads the same in the room whichever laptop asks.
+    --set l2announcements.enabled=true
+    # Cilium's own L2 docs: the announcement leases are renewed every 5s, so a
+    # 40-address pool is ~8 QPS against the API server. The chart's 1.20.0
+    # defaults are lower than that on some paths; raise them explicitly. Same
+    # numbers talos-box uses (internal/manifests/manifests.go:41-43).
+    --set k8sClientRateLimit.qps=10
+    --set k8sClientRateLimit.burst=20
+  )
+  # The ingress values come from cilium_ingress_values (lib.sh) — the SINGLE
+  # source, shared with the kind lifeboat, because "the lifeboat serves the
+  # identical labs" is only true while `ingressClassName: cilium` means the same
+  # thing there. The argument is the service SHAPE, not the substrate name.
+  #
+  #   tbx    — a real VIP, handed out by the CiliumLoadBalancerIPPool
+  #            substrate_post_cni() applies below (.200 by talos-box convention,
+  #            which tbx's resolver already answers for every *.${CLOUDBOX_DOMAIN}
+  #            name). Until that call runs the Service sits in <pending>, which is
+  #            the correct state for a cluster with no LB-IPAM.
+  #   docker — no LB implementation at all. The controlplane container publishes
+  #            host 80 -> NODEPORT_INGRESS, so the hostnames work port-free too.
+  if [[ "${substrate}" == "tbx" ]]; then
+    cilium_ingress_shape="lb"
   else
-    echo "${ref}"   # no registry host prefix (shouldn't happen in images.txt)
+    cilium_ingress_shape="nodeport"
   fi
+  while IFS= read -r cilium_flag; do
+    cilium_values+=("${cilium_flag}")
+  done < <(cilium_ingress_values "${cilium_ingress_shape}")
+
+  if [[ "${substrate}" == "tbx" ]]; then
+    # tbx ONLY, and taken verbatim from talos-box's own curated Cilium values
+    # (internal/manifests/manifests.go:137-138, `bpf: hostLegacyRouting: true`).
+    # It routes pod traffic through the host stack instead of short-cutting out of
+    # BPF, which is what makes the ingress VIP reachable FROM THE HOST across
+    # vmnet — the whole point of the LoadBalancer above, since on this substrate
+    # the attendee's browser is outside the cluster's L2 segment and reaches it
+    # through the vmnet interface. Chart key verified in the vendored 1.20.0
+    # values.yaml (:716) and in `helm template … --set bpf.hostLegacyRouting=true`,
+    # which renders `enable-host-legacy-routing: "true"` into the ConfigMap.
+    #
+    # Deliberately NOT set on docker: that path is CI-proven as it stands, the
+    # host reaches the ingress through a published port rather than a VIP, and the
+    # flag costs the BPF fast path. See docs/HAZARDS.md — rehearsal step 3 (VIP
+    # reachability from the host) is what retires the "unproven" mark on it.
+    cilium_values+=(--set bpf.hostLegacyRouting=true)
+  fi
+  # Retried, for the same reason the readiness check above counts to three: this
+  # is the first real workload call of the run, and on a freshly booted VM a
+  # transient TLS handshake timeout here used to end the create with the cluster
+  # healthy and no CNI. helm upgrade --install is idempotent, so a retry costs a
+  # few seconds and saves the whole cluster.
+  helm_attempt=0
+  until helm upgrade --install cilium \
+    --server-side=false \
+    "${SCRIPT_DIR}/manifests/cilium-${CILIUM_VERSION}.tgz" \
+    --namespace kube-system \
+    "${cilium_values[@]}"; do
+    helm_attempt=$((helm_attempt + 1))
+    [[ "${helm_attempt}" -ge 5 ]] && die "Cilium install failed ${helm_attempt} times — the API server is not answering helm; 'kubectl get --raw /readyz' and 'talosctl -n ${CLOUDBOX_CP_IP:-the control plane} dmesg' show why"
+    warn "Cilium install attempt ${helm_attempt} failed (the API is still settling) — retrying in 10s"
+    sleep 10
+  done
 }
+
 
 # git_as_gitea_admin <git args...> — run git authenticating as the Gitea admin
 # via GIT_ASKPASS instead of credentials embedded in the URL, so they stay out

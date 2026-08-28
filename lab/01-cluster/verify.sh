@@ -185,7 +185,7 @@ if [ "$SUBSTRATE" = tbx ]; then
   # cluster's own subnet index and this check does not need to know it.
   case "$VIP" in
     "")
-      fail "cilium-ingress has no LoadBalancer address (type ${ING_TYPE:-missing}) — kubectl get ciliumloadbalancerippools; kubectl -n kube-system describe svc cilium-ingress" ;;
+      fail "cilium-ingress has no LoadBalancer address (type ${ING_TYPE:-missing}) — on tbx the pool and L2 policy come from: ./scripts/create-cluster.sh --post-cni   (diagnose: kubectl get ciliumloadbalancerippools; kubectl -n kube-system describe svc cilium-ingress)" ;;
     172.30.*.200)
       ok "shared ingress holds the VIP ${VIP} (every *.cloudbox.k8s.test name resolves here)" ;;
     *)

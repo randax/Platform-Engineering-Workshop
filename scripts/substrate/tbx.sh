@@ -22,6 +22,10 @@ substrate_preflight() {
   # Every introspection below reads `tbx status -o json`; jq is pinned in
   # mise.toml but nothing in create-cluster.sh required it until now.
   need jq
+  # substrate_create curl-proves tbx's mirror at the gateway before baking it
+  # into the machine config; without curl that proof cannot run, and a venue
+  # cluster whose nodes cannot reach their only image source is what it guards.
+  need curl "The tbx substrate proves the image mirror is reachable with curl before creating the cluster."
   need tbx "Install talos-box: 'brew install randax/tap/tbx && sudo tbx system install' (macOS) or the release tarball + systemd helper (Linux). Or run the docker substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
   # `tbx doctor` exits non-zero on any FAIL finding. It checks the helper, the
   # resolver, DNS wiring, forwarding, routes, host pressure, mirror health and
@@ -112,19 +116,21 @@ substrate_preflight() {
       # Docker is installed and cannot be inspected, and this machine carries a
       # trace of a CloudBox cluster having been built here. Whether that cluster
       # is a set of stopped containers waiting on that daemon is exactly the
-      # question that cannot be answered. A WARNING, not a gate: the tbx path
-      # is Docker-free (the VMs pull through tbx's own mirror, #206), so
-      # "start Docker" is not something this substrate may demand. The recorded
-      # identity (require_identity_match, run before this) already refuses a
-      # machine whose record says docker or kind; what is left is a trace with
-      # no record — the hosts-file guard below catches the block such a
-      # cluster leaves behind, and the attendee is told the rest.
-      warn "The Docker daemon is not reachable, so this preflight cannot check it for a"
-      warn "'${CLUSTER_NAME}' cluster, and this machine carries traces of one (${CLOUDBOX_SUBSTRATE_FILE},"
-      warn "${CLOUDBOX_API_ENDPOINT_FILE} or $(talos_cluster_state_dir)). If stopped Talos-in-Docker"
-      warn "containers are sitting on that daemon under this name, they hold the ${CLOUDBOX_HOSTS_FILE}"
-      warn "block and host port 80 — start Docker and run CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh"
-      warn "to be sure. Continuing: tbx does not need Docker."
+      # question that cannot be answered — and creating VMs of the same name
+      # over it is the collision above. Still fail-closed, and for THAT reason
+      # only: the tbx path itself is Docker-free (#206), so Docker is asked for
+      # here to look, not to run anything. The recorded identity
+      # (require_identity_match, run before this) already refuses a machine
+      # whose record says docker or kind; what reaches this branch is a trace
+      # with no usable record, which is exactly the machine that cannot be
+      # trusted without looking.
+      fail "The Docker daemon is not reachable, so whether a '${CLUSTER_NAME}' cluster already exists on it cannot be checked."
+      warn "This machine carries traces of a CloudBox cluster (${CLOUDBOX_SUBSTRATE_FILE},"
+      warn "${CLOUDBOX_API_ENDPOINT_FILE} or $(talos_cluster_state_dir)), so those containers"
+      warn "may be sitting there stopped, holding this name, host port 80 and the ${CLOUDBOX_HOSTS_FILE} block."
+      warn "tbx itself does not need Docker — start it only to check (docker ps -a), tear down"
+      warn "what is there (CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh), then re-run."
+      die "Refusing to create over a cluster that cannot be looked for."
     else
       info "Docker daemon not reachable — not needed on tbx (the VMs pull through tbx's own mirror), and nothing here says a docker cluster was ever created. Continuing."
     fi
@@ -338,8 +344,6 @@ substrate_create() {
   info "Subnet 172.30.${idx}.0/24 — gateway ${CLOUDBOX_HOST_GATEWAY}, CP ${cp_ip}, worker ${worker_ip}"
 
   step "Generating the machine config (our patches, our sequence)"
-  local workdir
-  workdir="$(mktemp -d)"
   # SAME cni:none / proxy:disabled / node-label / local-path-mount patch as the
   # docker backend. One copy would be nicer; two identical heredocs is what
   # keeps each backend readable in isolation, and check-consistency.sh asserts
@@ -429,9 +433,7 @@ EOF
   # Fatal, not a warning: the whole point of the mirror is the venue, where
   # falling through to the real registries is exactly what does not work — and
   # the symptom lands 40 minutes later as ImagePullBackOff in module 02.
-  if ! have curl; then
-    warn "curl not found — cannot prove tbx's mirror answers at ${endpoint}; 'tbx doctor' checks mirror health."
-  elif ! curl -fsS --max-time 5 "${endpoint}/v2/" >/dev/null 2>&1; then
+  if ! curl -fsS --max-time 5 "${endpoint}/v2/" >/dev/null 2>&1; then
     fail "tbx's registry mirror is NOT answering at ${endpoint}/v2/."
     warn "The Talos VMs pull every image through it. tbxd serves it on the cluster"
     warn "gateway; 'tbx doctor' (mirror-health) and 'tbx status ${CLUSTER_NAME}' say why it is not there."
@@ -451,6 +453,14 @@ EOF
     done
   )"
   patches+=(--config-patch "${mirror_patch}")
+  # Created only now, past the die paths above — and removed on every exit
+  # from this function from here on, because `talosctl gen config` writes the
+  # cluster's PKI and secrets into it and an etcd bootstrap that gives up
+  # (below) must not leave those in /tmp.
+  local workdir
+  workdir="$(mktemp -d)"
+  # shellcheck disable=SC2064  # expand now: workdir is local to this call
+  trap "rm -rf '${workdir}'" RETURN
   talosctl gen config "${CLUSTER_NAME}" "${CLOUDBOX_API_ENDPOINT}" \
     --kubernetes-version "${KUBERNETES_VERSION}" \
     --output-dir "${workdir}" \

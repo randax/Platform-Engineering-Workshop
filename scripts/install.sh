@@ -625,17 +625,25 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
     info "  (image check skipped — tbx is not installed, reported above)"
   else
     tbx_list="$(mktemp)"; tbx_check_out="$(mktemp)"
+    # shellcheck disable=SC2064  # expand now: both paths are fixed here
+    trap "rm -f '${tbx_list}' '${tbx_check_out}'" EXIT
     images_mirror_refs "${SCRIPT_DIR}/images.txt" > "${tbx_list}"
     tbx_check_args=(--check)
     [[ "${CHECK_DEEP}" == "true" ]] && tbx_check_args+=(--deep)
     tbx_total="$(wc -l < "${tbx_list}" | tr -d ' ')"
     if tbx cache warm "${tbx_check_args[@]}" "${tbx_list}" > "${tbx_check_out}" 2>&1; then
       ok "tbx mirror store: all ${tbx_total} cluster images present$( [[ "${CHECK_DEEP}" == "true" ]] && echo ' and rehashed (--deep)' )"
-    else
+    elif grep -q '^summary:' "${tbx_check_out}"; then
       grep -Ev '^✓ ' "${tbx_check_out}" | sed 's/^/   /' || true
       check_fail "tbx mirror store is incomplete (the ✗ lines above) — run ./scripts/cloudbox-init.sh at home"
+    else
+      # No summary line means the check never ran: `cache warm --check` is a
+      # tbxd RPC, and a daemon that is down or too old fails before the first
+      # ref. "Incomplete store — re-warm at home" would be the wrong diagnosis
+      # AND a recovery that fails the same way.
+      sed 's/^/   /' "${tbx_check_out}"
+      check_fail "could not ask tbxd about the mirror store (above) — is the helper running? 'tbx doctor'; the images themselves were not graded"
     fi
-    rm -f "${tbx_list}" "${tbx_check_out}"
     if [[ "${CHECK_DEEP}" != "true" ]]; then
       info "  (--check --deep also rehashes every cached blob — the pre-travel gate)"
     fi

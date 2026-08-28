@@ -108,5 +108,20 @@ fi
 # shellcheck source=../common.sh
 source "$REPO_ROOT/lab/common.sh"
 
+# The documented lab-01 start is `create-cluster.sh --skip-cilium`, so "already
+# exists" usually means "exists WITHOUT a CNI" — and waiting for Ready on that
+# hung 300 s and failed. Install the same Cilium create-cluster.sh would have
+# (cilium_install, scripts/lib.sh, in a sub-bash for the reason tbx_all_stopped
+# is), then on tbx run the post step the README teaches — the LB pool, the L2
+# policy and the .200 proof — which is what lab 01's verify.sh checks.
+if ! kubectl -n kube-system get ds cilium >/dev/null 2>&1; then
+  echo "no CNI on this cluster (created with --skip-cilium) — installing Cilium the way create-cluster.sh does"
+  bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1
+           cilium_install "$2"' _ "$REPO_ROOT" "$SUBSTRATE"
+  if [[ "$SUBSTRATE" == tbx ]]; then
+    "$REPO_ROOT/scripts/create-cluster.sh" --post-cni
+  fi
+fi
+
 # Wait for both nodes to be Ready (Cilium needs a moment after bootstrap).
 kubectl wait --for=condition=Ready nodes --all --timeout=300s
