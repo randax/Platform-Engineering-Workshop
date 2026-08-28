@@ -478,6 +478,9 @@ before_fail=${FAILURES}
 # inlined in the create with this check still green.
 grep -qE '^[[:space:]]*cilium_install[[:space:]]+"\$\{SUBSTRATE\}"' scripts/create-cluster.sh \
   || bad "scripts/create-cluster.sh no longer calls cilium_install \"\${SUBSTRATE}\" (lib.sh) — the one Cilium install shared with lab/01-cluster/solve.sh"
+# shellcheck disable=SC2016  # the literal "$2" is what solve.sh's sub-bash passes
+grep -qE '^[[:space:]]*cilium_install[[:space:]]+"\$2"' lab/01-cluster/solve.sh \
+  || bad "lab/01-cluster/solve.sh no longer calls cilium_install (lib.sh) — without it the solve hangs 300 s on a --skip-cilium cluster with no CNI"
 for f in scripts/lib.sh scripts/kind-fallback.sh; do
   # The INVOCATION IN ITS ONE WORKING FORM, not the string and not "a line that
   # mentions it outside a comment". Both files explain the shared helper in

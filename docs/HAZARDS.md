@@ -445,6 +445,15 @@ offline on` is the venue switch. talos-box separately fixes the `"*"` footgun in
 rendered manifests (randax/talos-box#481), but this repo never renders that entry
 regardless.
 
+**What it costs:** tbx's store serves VMs only. A tbx laptop whose prework ran only the tbx
+warm has **no offline docker/kind fallback** — `CLOUDBOX_SUBSTRATE=docker
+./scripts/create-cluster.sh` and `kind-fallback.sh` would pull the Talos node image, the
+kind node image and 7.5 GB of cluster images over the venue WiFi. `cloudbox-init.sh` says
+so at the end of the tbx warm, and the remedy (run it again with
+`CLOUDBOX_SUBSTRATE=docker`, at home, with Docker) is printed there; the fallback is a
+pre-venue remedy on tbx, not a venue one. Decided in #206 rather than paying twice the
+prework for everyone.
+
 **What is NOT retired:** as of 2026-08-28 the mirror-through-tbx path is **unrehearsed**
 — it was decided and built after rehearsal 6, and proving it end to end (create, the
 eleven modules, and offline with `tbx mirror offline on`) is rehearsal 7's job. And the

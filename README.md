@@ -117,7 +117,9 @@ the tbx path step 2 also warms the Talos disk image (`tbx cache pull`, 95 MB on 
 204 MB on amd64), step 3 asserts a complete `disk.raw` is in `~/.talosbox/cache` and
 grades the images with `tbx cache warm --check` (`--check --deep` before you travel), and
 at the venue `tbx mirror offline on` makes a missing image fail loudly instead of quietly
-reaching for the WiFi.
+reaching for the WiFi. One trade-off to know: tbx's store serves VMs only, so on a tbx laptop
+the Talos-in-Docker fallback is **not** offline-ready unless you also run
+`CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh` at home (needs Docker, ~7.5 GB more).
 `install.sh --check` prints which substrate you will get, and — when it falls back to
 Docker — the `tbx doctor` line that decided it.
 

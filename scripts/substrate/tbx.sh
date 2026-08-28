@@ -453,14 +453,14 @@ EOF
     done
   )"
   patches+=(--config-patch "${mirror_patch}")
-  # Created only now, past the die paths above — and removed on every exit
-  # from this function from here on, because `talosctl gen config` writes the
-  # cluster's PKI and secrets into it and an etcd bootstrap that gives up
-  # (below) must not leave those in /tmp.
+  # Created only now, past the die paths above, so a refused mirror leaks
+  # nothing. From here on the directory SURVIVES a failed create on purpose:
+  # the etcd-bootstrap die below hands the attendee
+  # `talosctl --talosconfig ${workdir}/talosconfig dmesg`, which needs it.
+  # It holds the cluster's PKI, so the success path removes it (rm -rf at the
+  # end) and a failed create's leftover is named in that die message.
   local workdir
   workdir="$(mktemp -d)"
-  # shellcheck disable=SC2064  # expand now: workdir is local to this call
-  trap "rm -rf '${workdir}'" RETURN
   talosctl gen config "${CLUSTER_NAME}" "${CLOUDBOX_API_ENDPOINT}" \
     --kubernetes-version "${KUBERNETES_VERSION}" \
     --output-dir "${workdir}" \

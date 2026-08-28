@@ -172,6 +172,14 @@ tbx_warm_mirror() {
       # reaching upstream — right in the room, wrong on the evening they are
       # still pulling.
       info "At the venue, make cache misses fail loudly instead of reaching out: tbx mirror offline on"
+      # The trade-off #206 chose, said out loud: this store serves VMs only. The
+      # docker/kind FALLBACK (CLOUDBOX_SUBSTRATE=docker, kind-fallback.sh) pulls
+      # from the crane container and the host Docker cache, neither of which
+      # was filled here — so on this laptop that fallback is a pre-venue
+      # remedy, not a venue one, unless it is warmed too, at home.
+      warn "Not warmed: the Talos-in-Docker / kind fallback. On this laptop it would pull ~7.5 GB"
+      warn "over the venue WiFi. If you want it offline-ready as a plan B, also run at home:"
+      warn "  CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh   # needs Docker; fills the crane mirror"
       return 0
     fi
     [[ "${attempt}" == "1" ]] && warn "tbx cache warm reported failures (the ✗ lines above) — one more pass over the list in 10s"

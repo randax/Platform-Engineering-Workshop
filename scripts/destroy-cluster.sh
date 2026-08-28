@@ -288,15 +288,18 @@ if [[ "${PURGE_MIRROR}" == "true" ]]; then
       docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true
       ok "A leftover ${MIRROR_NAME} container from a docker-substrate run was removed too"
     fi
-  elif have docker; then
+  elif have docker && docker_running; then
     docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
     docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true
     ok "Mirror container and volume removed (re-run ./scripts/cloudbox-init.sh to refill)"
+  elif have docker; then
+    warn "The Docker daemon is not reachable — the image mirror (container ${MIRROR_NAME}, volume"
+    warn "${MIRROR_VOLUME}) was NOT purged. Start Docker and re-run with --purge-mirror."
   else
     warn "docker CLI not found — the image mirror (container ${MIRROR_NAME}, volume"
-    warn "${MIRROR_VOLUME}) could NOT be purged from here. It is a Docker object on both"
-    warn "substrates; remove it wherever Docker actually runs, or re-run this with docker"
-    warn "on PATH."
+    warn "${MIRROR_VOLUME}) could NOT be purged from here. On the docker/kind substrates it"
+    warn "is a Docker object; remove it wherever Docker actually runs, or re-run this with"
+    warn "docker on PATH."
   fi
 else
   info "Image mirror kept (pass --purge-mirror to remove it)"

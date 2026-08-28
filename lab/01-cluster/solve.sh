@@ -116,11 +116,15 @@ source "$REPO_ROOT/lab/common.sh"
 # policy and the .200 proof — which is what lab 01's verify.sh checks.
 if ! kubectl -n kube-system get ds cilium >/dev/null 2>&1; then
   echo "no CNI on this cluster (created with --skip-cilium) — installing Cilium the way create-cluster.sh does"
-  bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1
+  bash -c 'set -euo pipefail; SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null
            cilium_install "$2"' _ "$REPO_ROOT" "$SUBSTRATE"
-  if [[ "$SUBSTRATE" == tbx ]]; then
-    "$REPO_ROOT/scripts/create-cluster.sh" --post-cni
-  fi
+fi
+# Unconditional on tbx, NOT inside the branch above: the state lab 01 strands
+# people in is "installed Cilium myself, never applied the pool" — Cilium is
+# present, the VIP is not. --post-cni is idempotent (apply, rollout wait, VIP
+# wait), so running it over a finished cluster costs seconds.
+if [[ "$SUBSTRATE" == tbx ]]; then
+  "$REPO_ROOT/scripts/create-cluster.sh" --post-cni
 fi
 
 # Wait for both nodes to be Ready (Cilium needs a moment after bootstrap).

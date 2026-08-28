@@ -649,8 +649,10 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
     fi
   fi
 elif ! docker_running; then
+  [[ "${CHECK_DEEP}" == "true" ]] && info "  (--deep is tbx-only: it rehashes tbx's mirror store; the crane mirror has no equivalent)"
   check_fail "Skipping image checks — Docker is not running"
 else
+  [[ "${CHECK_DEEP}" == "true" ]] && info "  (--deep is tbx-only: it rehashes tbx's mirror store; the crane mirror has no equivalent)"
   # Parse images.txt (same format as cloudbox-init.sh)
   section=""
   host_missing=0; mirror_missing=0; host_total=0; mirror_total=0
