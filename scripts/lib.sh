@@ -279,7 +279,20 @@ cilium_ingress_values() { # <lb|nodeport>
     --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h"
   case "$1" in
     lb)
-      printf '%s\n' --set ingressController.service.type=LoadBalancer ;;
+      # allocateLoadBalancerNodePorts=false, or the ingress plays the NodePort
+      # lottery. A LoadBalancer Service still gets node ports allocated by
+      # default, from the same 30000-32767 range the workshop pins its fixed
+      # ones in — so on tbx the ingress can grab 30600 (the portal), 30080
+      # (ArgoCD), 30300 (Gitea), 30500 (Zot) or 30900 (RustFS) at random, and
+      # that module then fails to sync with
+      #   Service "portal" is invalid: spec.ports[0].nodePort: Invalid value:
+      #   30600: provided port is already allocated
+      # on some clusters and not others. It cost a rehearsal its module 08.
+      # Nothing reaches this ingress by node port anyway: on tbx it is the VIP,
+      # and on docker this branch is not taken.
+      printf '%s\n' \
+        --set ingressController.service.type=LoadBalancer \
+        --set ingressController.service.allocateLoadBalancerNodePorts=false ;;
     nodeport)
       printf '%s\n' \
         --set ingressController.service.type=NodePort \
