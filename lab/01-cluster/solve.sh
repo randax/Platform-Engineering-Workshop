@@ -114,15 +114,16 @@ source "$REPO_ROOT/lab/common.sh"
 # (cilium_install, scripts/lib.sh, in a sub-bash for the reason tbx_all_stopped
 # is), then on tbx run the post step the README teaches — the LB pool, the L2
 # policy and the .200 proof — which is what lab 01's verify.sh checks.
-if ! kubectl -n kube-system get ds cilium >/dev/null 2>&1; then
-  echo "no CNI on this cluster (created with --skip-cilium) — installing Cilium the way create-cluster.sh does"
-  bash -c 'set -euo pipefail; SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null
-           cilium_install "$2"' _ "$REPO_ROOT" "$SUBSTRATE"
-fi
-# Unconditional on tbx, NOT inside the branch above: the state lab 01 strands
-# people in is "installed Cilium myself, never applied the pool" — Cilium is
-# present, the VIP is not. --post-cni is idempotent (apply, rollout wait, VIP
-# wait), so running it over a finished cluster costs seconds.
+# Unconditional, not "only if the DaemonSet is missing": a hand-installed
+# Cilium with the wrong values (no ingress, NodePort on tbx) has the DaemonSet
+# and still fails verify.sh. `helm upgrade --install` is idempotent, so on a
+# correct cluster this is a no-op that costs seconds.
+echo "installing (or reconciling) Cilium the way create-cluster.sh does"
+bash -c 'set -euo pipefail; SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null
+         cilium_install "$2"' _ "$REPO_ROOT" "$SUBSTRATE"
+# Then, on tbx, the LB pool, the L2 policy and the .200 proof — the state lab 01
+# strands people in is "Cilium is in, the pool never was". --post-cni is
+# idempotent too (apply, rollout wait, VIP wait).
 if [[ "$SUBSTRATE" == tbx ]]; then
   "$REPO_ROOT/scripts/create-cluster.sh" --post-cni
 fi

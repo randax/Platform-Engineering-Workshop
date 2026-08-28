@@ -130,9 +130,11 @@ number the 240-minute budget cares about, and there is no prior measurement for 
 *Retires:* TRAP — `.200` resolves before anything owns it.
 
 **4. The mirror actually reaches the VMs.** `talosctl -n <cp> get registries`
-shows the mirror endpoint; the worker's kubelet logs show pulls from
-`172.30.<n>.1:5001`; `docker logs cloudbox-mirror | tail` shows them arriving.
-This is the step that proves a tbx laptop still needs Docker.
+shows the eight explicit entries pointing at `http://172.30.<n>.1:5059` (tbx's own
+mirror, issue #206 — the `:5001` crane container of rehearsals 5–6 is docker-only
+now); the worker's kubelet logs show pulls from that address; `tbx cache list`
+(and `tbx doctor`'s mirror-health line) show them served from `~/.talosbox/cache`.
+No Docker is involved on this substrate — this is the step that proves it.
 
 **5. Bootstrap and seed.** `./scripts/bootstrap-gitops.sh && ./scripts/seed-gitea.sh`,
 then `dig +short gitea.cloudbox.k8s.test` → the `.200` VIP, and

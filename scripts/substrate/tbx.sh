@@ -112,6 +112,13 @@ substrate_preflight() {
         warn "resolver, and it answers on the same kubectl context this create is about to write."
         die "Tear it down first: ./scripts/kind-fallback.sh --delete"
       fi
+    elif [[ "$(substrate_current 2>/dev/null || true)" == "tbx" ]]; then
+      # A readable record that says tbx is OUR evidence, not Docker's: it is
+      # written before `tbx up` (create-cluster.sh, substrate_persist), so a
+      # create that failed before any VM existed leaves exactly this behind.
+      # Refusing the retry until Docker is started would make the Docker-free
+      # tbx path need Docker to recover from its own failure.
+      info "Docker daemon not reachable — not needed on tbx, and this machine's record says tbx. Continuing."
     elif cloudbox_local_evidence; then
       # Docker is installed and cannot be inspected, and this machine carries a
       # trace of a CloudBox cluster having been built here. Whether that cluster
@@ -461,6 +468,14 @@ EOF
   # end) and a failed create's leftover is named in that die message.
   local workdir
   workdir="$(mktemp -d)"
+  # Removed on EVERY exit — success, any `set -e` failure below, Ctrl-C — with
+  # one exception: the etcd-bootstrap timeout disarms this (trap - EXIT) before
+  # dying, because its message hands the attendee a talosctl command that
+  # needs the talosconfig in here. Every other failure would otherwise leave
+  # the cluster's PKI in an unnamed /tmp directory. create-cluster.sh sets no
+  # EXIT trap of its own, so this does not clobber one.
+  # shellcheck disable=SC2064  # expand now: the path is fixed at this point
+  trap "rm -rf '${workdir}'" EXIT
   talosctl gen config "${CLUSTER_NAME}" "${CLOUDBOX_API_ENDPOINT}" \
     --kubernetes-version "${KUBERNETES_VERSION}" \
     --output-dir "${workdir}" \
@@ -510,6 +525,8 @@ EOF
     if tbx_etcd_live "${cp_ip}"; then bootstrapped=1; break; fi
     sleep 5
   done
+  # Keep the workdir for the diagnostic this message names (see the trap above).
+  [[ "${bootstrapped}" == "1" ]] || trap - EXIT
   [[ "${bootstrapped}" == "1" ]] \
     || die "etcd never bootstrapped after 10 minutes — 'talosctl --talosconfig ${workdir}/talosconfig dmesg' and 'tbx console ${CLUSTER_NAME} ${CLUSTER_NAME}-cp-1' show why"
 
@@ -571,6 +588,7 @@ EOF
   else
     unset TALOSCONFIG
   fi
+  trap - EXIT
   rm -rf "${workdir}"
 }
 

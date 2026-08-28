@@ -220,8 +220,16 @@ helm upgrade --install cilium --server-side=false \
   --set ingressController.loadbalancerMode=shared \
   --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" \
   --set ingressController.service.type=NodePort \
-  --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"   # tbx: service.type=LoadBalancer instead
+  --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"   # <- docker ending
 kubectl get nodes -w             # NotReady -> Ready, live
+
+# On tbx (cat ~/.cloudbox/substrate) REPLACE the two docker lines above with
+# the tbx ending, then run the post step — the pool and policy the VIP needs:
+#   --set ingressController.service.type=LoadBalancer \
+#   --set l2announcements.enabled=true \
+#   --set k8sClientRateLimit.qps=10 --set k8sClientRateLimit.burst=20 \
+#   --set bpf.hostLegacyRouting=true
+# ./scripts/create-cluster.sh --post-cni
 
 # The management plane is an API, not SSH:
 talosctl config info                     # which node/endpoint this context talks to
