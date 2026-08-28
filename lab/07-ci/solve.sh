@@ -63,7 +63,8 @@ fi
 # the Docker daemon's on docker/kind.
 NODE_ARCH="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; node_arch' _ "$REPO_ROOT" 2>/dev/null || uname -m)"
 case "$NODE_ARCH" in aarch64) NODE_ARCH=arm64 ;; x86_64) NODE_ARCH=amd64 ;; esac
-mise x crane@0.21.9 -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
+# `mise x crane` with no version: mise.toml's pin is the one source of it.
+mise x crane -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
   "${BUSYBOX_SRC}" "${ZOT_HOST}/${BUSYBOX}"
 
 # 3. Build inside the cluster.

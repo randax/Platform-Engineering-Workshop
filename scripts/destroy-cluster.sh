@@ -307,10 +307,22 @@ if [[ "${PURGE_MIRROR}" == "true" ]]; then
       fail "tbx cache prune --mirror failed — the store was NOT purged (is tbxd running? 'tbx doctor')"
       PURGE_FAILED="true"
     fi
+    # A leftover crane mirror from a docker-substrate run on this machine.
+    # Each removal is tracked: "removed" is only said for what actually went,
+    # and a failure feeds the same PURGE_FAILED the tbx prune above uses.
     if have docker && docker_running && docker inspect "${MIRROR_NAME}" >/dev/null 2>&1; then
-      docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
-      docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true
-      ok "A leftover ${MIRROR_NAME} container from a docker-substrate run was removed too"
+      leftover_failed=""
+      docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || leftover_failed="container ${MIRROR_NAME}"
+      if ! docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 \
+         && docker volume inspect "${MIRROR_VOLUME}" >/dev/null 2>&1; then
+        leftover_failed="${leftover_failed:+${leftover_failed}, }volume ${MIRROR_VOLUME}"
+      fi
+      if [[ -z "${leftover_failed}" ]]; then
+        ok "A leftover ${MIRROR_NAME} container from a docker-substrate run was removed too"
+      else
+        fail "Leftover docker mirror NOT fully removed: ${leftover_failed} (docker rm -f ${MIRROR_NAME}; docker volume rm ${MIRROR_VOLUME})"
+        PURGE_FAILED="true"
+      fi
     fi
   elif have docker && docker_running; then
     docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true

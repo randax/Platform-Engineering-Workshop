@@ -184,10 +184,11 @@ tbx node stop  cloudbox cloudbox-worker-1             # or cloudbox-cp-1
 tbx node start cloudbox cloudbox-worker-1
 ```
 
-then keep watching `kubectl get nodes -w`. (talos-box v0.1.2 is expected to make
-`tbx status cloudbox` say "stalled" directly — randax/talos-box#482 — but the
-recovery stays `tbx node stop` + `start`; on the pinned v0.1.1 the `service`
-command is the honest signal.)
+then keep watching `kubectl get nodes -w`. (A later talos-box release is expected
+to make `tbx status cloudbox` say "stalled" directly — randax/talos-box#482 — but
+the recovery stays `tbx node stop` + `start`; on the release this workshop pins
+(`TBX_VERSION` in `scripts/versions.env`) the `service` command is the honest
+signal.)
 </details>
 
 <details>
