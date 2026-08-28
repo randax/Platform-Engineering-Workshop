@@ -281,8 +281,16 @@ if [[ "${PURGE_MIRROR}" == "true" ]]; then
   # docs/HAZARDS.md calls out ("recovery tooling that lies"): the attendee would
   # believe the 7 GB mirror was gone and it would still be there.
   if [[ "${SUBSTRATE}" == "tbx" ]]; then
-    info "tbx keeps its images in ~/.talosbox/cache, not in a container — nothing to purge here."
-    info "  To drop tbx's mirror store: tbx cache prune --mirror   (bare 'prune' removes the Talos DISK image instead)"
+    # The flag means "throw the images away" on every substrate. On tbx that is
+    # tbx's own store (`--mirror`: the container images; bare `prune` would
+    # remove the Talos DISK image instead and leave these). Failures propagate —
+    # a purge that reports success without purging is the lie HAZARDS names.
+    if have tbx; then
+      tbx cache prune --mirror
+      ok "tbx's mirror store purged (~/.talosbox/cache; re-run ./scripts/cloudbox-init.sh to refill)"
+    else
+      warn "tbx not on PATH — its mirror store (~/.talosbox/cache) was NOT purged: tbx cache prune --mirror"
+    fi
     if have docker && docker_running && docker inspect "${MIRROR_NAME}" >/dev/null 2>&1; then
       docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
       docker volume rm "${MIRROR_VOLUME}" >/dev/null 2>&1 || true

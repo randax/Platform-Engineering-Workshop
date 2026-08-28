@@ -43,9 +43,12 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
      MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
    fi
 
-   # --platform: ONE architecture (yours), not the whole index — on tbx the warmed
-   # store only holds your CPU's blobs, so a full-index copy reaches for the internet
-   mise x crane@0.21.9 -- crane copy --insecure --platform "linux/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+   # --platform: ONE architecture — the NODES' (node_arch asks the substrate: the
+   # host CPU on tbx, the Docker daemon on docker; a Rosetta shell's uname lies).
+   # On tbx the warmed store only holds that arch's blobs, so a full-index copy
+   # would reach for the internet.
+   NODE_ARCH="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; node_arch' _ "$(git rev-parse --show-toplevel)")"
+   mise x crane@0.21.9 -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
      "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
    ```
 
@@ -121,7 +124,8 @@ git add . && git commit -m "module 07: zot + argo-workflows" && git push
 MIRROR=localhost:5001
 [ "$(cat ~/.cloudbox/substrate)" = tbx ] && \
   MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
-mise x crane@0.21.9 -- crane copy --insecure --platform "linux/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+NODE_ARCH="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; node_arch' _ "$WORKSHOP")"
+mise x crane@0.21.9 -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
   "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
 
 kubectl create -f "$WORKSHOP/lab/07-ci/workflow-run.yaml"
