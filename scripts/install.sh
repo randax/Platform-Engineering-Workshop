@@ -47,7 +47,14 @@ case "${1:-}" in
   # --deep is tbx-only and read-only: it asks `tbx cache warm --check --deep` to
   # rehash every cached blob rather than trust the manifest — the pre-travel gate
   # talos-box documents, minutes instead of seconds on a 7.5 GB store.
-  --check) [[ "${2:-}" == "--deep" ]] && CHECK_DEEP="true" ;;
+  # Strict: `--check --depp` used to run the shallow check and exit 0, which
+  # reads as "the deep gate passed" the evening before travel.
+  --check)
+    case "${2:-}" in
+      "") ;;
+      --deep) CHECK_DEEP="true"; [[ $# -eq 2 ]] || die "--check --deep takes no further arguments (got: ${*:3})" ;;
+      *) die "Unknown argument after --check: '${2}' (only --deep is accepted)" ;;
+    esac ;;
   # Read-only, and the ONE thing a Windows attendee needs: these lines also have
   # to go into C:\Windows\System32\drivers\etc\hosts for the Windows browser to
   # reach a cluster running in WSL2 (lab/00-setup covers it). The block goes to
