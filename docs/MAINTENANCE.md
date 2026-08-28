@@ -196,7 +196,16 @@ has on PATH. Bumping it means all three of:
 2. **Re-read upstream before trusting the flags.** `scripts/substrate/tbx.sh` drives
    `tbx up -f`, `tbx status -o json`, `tbx version` and
    `tbx cluster destroy <cluster> --force`, and `cloudbox-init.sh` drives
-   `tbx cache pull --talos-version`. Read upstream `internal/config/config.go` for
+   `tbx cache pull --talos-version` and `tbx cache warm <list>` (`install.sh --check`
+   drives `tbx cache warm --check [--deep] <list>`; `cmd/tbx/cache_warm.go` — its
+   ref validation is what `images_mirror_refs` in `lib.sh` feeds). Since #206 the tbx
+   nodes pull through tbx's OWN mirror: `TBX_MIRROR_PORT` in `versions.env` mirrors
+   `CatchAllPort` in upstream `internal/manifests/manifests.go`, and the catch-all's
+   `?ns=` routing lives in `internal/mirror/manager.go` (`serveCatchAll`). If the port
+   or the routing moves, every tbx create dies at the curl proof in `tbx.sh` — re-read
+   both on every bump. Verbs quoted to attendees that must still exist: `tbx cache
+   prune --mirror`, `tbx mirror offline on|off`, `tbx node start|stop <cluster> <node>`
+   (lab 01, destroy-cluster.sh, cloudbox-init.sh). Read upstream `internal/config/config.go` for
    cluster-yaml schema changes (our `scripts/substrate/cloudbox.tbx.yaml.tmpl` is a
    projection of it). We deliberately consume **no** `tbx manifests` section any more —
    `balloon` was deprecated into an error, and the `mirrors` catch-all turned out to be

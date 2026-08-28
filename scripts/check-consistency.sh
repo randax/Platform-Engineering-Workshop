@@ -481,6 +481,9 @@ grep -qE '^[[:space:]]*cilium_install[[:space:]]+"\$\{SUBSTRATE\}"' scripts/crea
 # shellcheck disable=SC2016  # the literal "$2" is what solve.sh's sub-bash passes
 grep -qE '^[[:space:]]*cilium_install[[:space:]]+"\$2"' lab/01-cluster/solve.sh \
   || bad "lab/01-cluster/solve.sh no longer calls cilium_install (lib.sh) — without it the solve hangs 300 s on a --skip-cilium cluster with no CNI"
+# ...and create-cluster.sh must not grow a private ingress --set beside that call.
+grep -qE -- '--set[[:space:]]+"?ingressController\.' scripts/create-cluster.sh \
+  && bad "scripts/create-cluster.sh sets ingressController.* directly — those flags belong in cilium_ingress_values() (lib.sh), reached through cilium_install"
 for f in scripts/lib.sh scripts/kind-fallback.sh; do
   # The INVOCATION IN ITS ONE WORKING FORM, not the string and not "a line that
   # mentions it outside a comment". Both files explain the shared helper in

@@ -74,6 +74,13 @@ assert_identity_readable
 # The _into form: `$(substrate_resolve)` is a subshell, so the `tbx doctor` memo
 # detection fills in (TBX_DOCTOR_RC, lib.sh) died with it and substrate_preflight
 # below re-ran the slowest read-only probe in the repo a second time.
+# --post-cni is tbx-only and promises "no tbx doctor". Detection runs doctor
+# only when there is neither a record nor an override — a state a --skip-cilium
+# create leaves behind only if the record was deleted — and a FAIL there would
+# resolve to docker and refuse the flag on a live tbx cluster. Pin the answer.
+if [[ "${POST_CNI}" == "true" && -z "${CLOUDBOX_SUBSTRATE:-}" && -z "$(substrate_current 2>/dev/null || true)" ]]; then
+  export CLOUDBOX_SUBSTRATE="tbx"
+fi
 SUBSTRATE=""
 substrate_resolve_into SUBSTRATE
 info "Substrate: ${SUBSTRATE}"

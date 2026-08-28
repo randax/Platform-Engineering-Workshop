@@ -114,12 +114,19 @@ helm upgrade --install cilium \
   --set cgroup.hostRoot=/sys/fs/cgroup \
   --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
   --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+  --set l2announcements.enabled=true \
+  --set k8sClientRateLimit.qps=10 \
+  --set k8sClientRateLimit.burst=20 \
   --set ingressController.enabled=true \
   --set ingressController.loadbalancerMode=shared \
   --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" \
   --set ingressController.service.type=NodePort \
   --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"
 ```
+
+(`l2announcements` and the raised client rate limit are set on **both** substrates on
+purpose, so `cilium config view` reads the same on every laptop in the room; only tbx
+actually announces anything.)
 
 The last five flags are the shared **ingress**, and they are not optional: one
 Cilium ingress serves every `*.cloudbox.k8s.test` hostname you will use for the
@@ -129,14 +136,12 @@ the kind lifeboat.
 
 Those two `service.*` lines are the **docker** shape. Check which substrate you
 are on with `cat ~/.cloudbox/substrate`, because **tbx needs a different ending**
-— a real LoadBalancer instead of a NodePort, an L2 announcer to claim the VIP on
-the network, and a raised client rate limit for the announcer's API traffic:
+— a real LoadBalancer instead of a NodePort (the L2 announcer already enabled above
+is what claims its VIP on the network), plus host routing so the VIP is reachable
+from your laptop:
 
 ```bash
   --set ingressController.service.type=LoadBalancer \
-  --set l2announcements.enabled=true \
-  --set k8sClientRateLimit.qps=10 \
-  --set k8sClientRateLimit.burst=20 \
   --set bpf.hostLegacyRouting=true          # so the VIP is reachable from your laptop
 ```
 
@@ -216,6 +221,8 @@ helm upgrade --install cilium --server-side=false \
   --set cgroup.autoMount.enabled=false --set cgroup.hostRoot=/sys/fs/cgroup \
   --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
   --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+  --set l2announcements.enabled=true \
+  --set k8sClientRateLimit.qps=10 --set k8sClientRateLimit.burst=20 \
   --set ingressController.enabled=true \
   --set ingressController.loadbalancerMode=shared \
   --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" \
@@ -226,8 +233,6 @@ kubectl get nodes -w             # NotReady -> Ready, live
 # On tbx (cat ~/.cloudbox/substrate) REPLACE the two docker lines above with
 # the tbx ending, then run the post step — the pool and policy the VIP needs:
 #   --set ingressController.service.type=LoadBalancer \
-#   --set l2announcements.enabled=true \
-#   --set k8sClientRateLimit.qps=10 --set k8sClientRateLimit.burst=20 \
 #   --set bpf.hostLegacyRouting=true
 # ./scripts/create-cluster.sh --post-cni
 

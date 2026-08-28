@@ -444,6 +444,10 @@ EOF
     fail "tbx's registry mirror is NOT answering at ${endpoint}/v2/."
     warn "The Talos VMs pull every image through it. tbxd serves it on the cluster"
     warn "gateway; 'tbx doctor' (mirror-health) and 'tbx status ${CLUSTER_NAME}' say why it is not there."
+    warn "The VMs already exist, so a bare re-run is refused. tbxd binds the mirror when the"
+    warn "cluster starts (and only logs a failure), so bounce it and re-run the create:"
+    warn "  tbx down && tbx cluster start ${CLUSTER_NAME} && ./scripts/create-cluster.sh --refresh-endpoint"
+    warn "  — or start over: ./scripts/destroy-cluster.sh && ./scripts/create-cluster.sh"
     die "Refusing to bake an unreachable mirror into the machine config."
   else
     ok "tbx's mirror answers at ${endpoint}/v2/ — nodes pull through it"
