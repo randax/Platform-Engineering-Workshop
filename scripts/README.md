@@ -71,7 +71,10 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 
 The Talos nodes run their **own containerd**, whichever substrate you are on — a VM's
 on talos-box, the container's on docker — so the host's Docker image cache is invisible
-to them either way. `cloudbox-init.sh` therefore
+to them either way. On **tbx** the answer is talos-box's own pull-through mirror: `tbx
+cache warm` fills `~/.talosbox/cache` at home and tbxd serves it to the VMs at the
+cluster gateway (`TBX_MIRROR_PORT`), no Docker involved (issue #206). On **docker/kind**
+`cloudbox-init.sh`
 runs a plain OCI registry (`cloudbox-mirror`, data in a Docker volume, so it
 survives cluster rebuilds) and copies every cluster image into it with crane,
 preserving repository paths and digests. Tag-only images are mirrored for your
