@@ -52,7 +52,18 @@ else
   echo "⚠️  the image mirror (${MIRROR}) hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)"
   BUSYBOX_SRC="docker.io/${BUSYBOX}"
 fi
-mise x crane@0.21.9 -- crane copy --insecure \
+# ONE platform, not the whole index. `crane copy` without --platform copies
+# every architecture's blobs, and on tbx the warmed store holds blobs for the
+# host's architecture ONLY (tbx cache warm walks the index but downloads one
+# child) — the index manifest is cached, so the probe above says "present",
+# and the copy then asks for amd64/s390x/… blobs the store never had: a 503
+# with `tbx mirror offline on`, a silent Docker Hub pull without it. The
+# docker path is unaffected either way (its mirror holds one platform already).
+# node_arch (lib.sh) answers for the resolved substrate: the host CPU on tbx,
+# the Docker daemon's on docker/kind.
+NODE_ARCH="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; node_arch' _ "$REPO_ROOT" 2>/dev/null || uname -m)"
+case "$NODE_ARCH" in aarch64) NODE_ARCH=arm64 ;; x86_64) NODE_ARCH=amd64 ;; esac
+mise x crane@0.21.9 -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
   "${BUSYBOX_SRC}" "${ZOT_HOST}/${BUSYBOX}"
 
 # 3. Build inside the cluster.

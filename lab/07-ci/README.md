@@ -43,7 +43,9 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
      MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
    fi
 
-   mise x crane@0.21.9 -- crane copy --insecure \
+   # --platform: ONE architecture (yours), not the whole index — on tbx the warmed
+   # store only holds your CPU's blobs, so a full-index copy reaches for the internet
+   mise x crane@0.21.9 -- crane copy --insecure --platform "linux/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
      "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
    ```
 
