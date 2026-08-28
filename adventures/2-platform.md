@@ -71,7 +71,7 @@ a queue appears. That's the whole job, miniaturized.
 - **Offline first**: the venue network is not your friend. Anything you deploy
   must have its images in the mirror (`scripts/images.txt`) or already on your
   machine. The cert-manager/Strimzi images ship in the final prework refresh —
-  if `crane manifest --insecure localhost:5001/<image>` (docker) / `tbx cache warm --check`
+  if `crane manifest --insecure localhost:5001/<image>` (docker) / `tbx cache list`
   (tbx) can't find them, you're
   on the online path; consider the NATS-flavored apex instead (zero new
   images).

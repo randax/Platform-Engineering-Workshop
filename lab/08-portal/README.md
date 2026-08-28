@@ -273,7 +273,9 @@ git instead?
   so seed that base once first (same move as module 07's busybox — from your own mirror,
   no internet needed):
   `crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine zot.cloudbox.k8s.test/library/golang:1.25-alpine`
-  (on tbx the source is `172.30.<n>.1:5055/library/golang:1.25-alpine` — module 07 shows how to read `<n>`).
+  (on tbx this base is NOT reachable host-side from your mirror — it was warmed from
+  `public.ecr.aws`, and tbx's host-side listener on `:5055` serves docker.io images only —
+  so copy it online: `crane copy public.ecr.aws/docker/library/golang:1.25-alpine zot.cloudbox.k8s.test/library/golang:1.25-alpine`.)
   (The golang base joined the pre-pull list with the adventure images — if your
   `cloudbox-init.sh` run predates that, either re-run it or fall back to the online
   source, `public.ecr.aws/docker/library/golang:1.25-alpine`.)

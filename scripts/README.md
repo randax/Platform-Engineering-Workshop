@@ -45,7 +45,7 @@ running scripts: copy an Application manifest from `gitops/catalog/` into
 | Script | Purpose |
 |---|---|
 | `dev-setup.sh` | Install mise (with consent) + all pinned CLI tools, verify versions |
-| `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`; start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it |
+| `cloudbox-init.sh` | Pre-pull every pinned image from `images.txt`: on docker/kind, start the `cloudbox-mirror` registry (localhost:5001) and copy cluster images into it; on tbx, warm talos-box's own store with `tbx cache warm` (no Docker) |
 | `install.sh --check` | Read-only pre-flight: platform, Docker resources, tools, pre-pulled images. Exit 0 = ready |
 | `install.sh --write-hosts` | Mutating, and only on the **docker and kind identities** (on tbx those 127.0.0.1 lines would override talos-box's resolver): (re)write the marked `/etc/hosts` block from the pins + `~/.cloudbox/extra-hosts`. Refuses unless `~/.cloudbox/substrate` records one of those two. The recovery path after a declined `sudo`, and the refresh path after WSL2 regenerates the file |
 | `create-cluster.sh` | Substrate **dispatcher**: resolves tbx-or-docker, sources the backend, then runs the shared path — Talos config gen/apply/bootstrap (1 CP + 1 worker, CNI/kube-proxy off, registry mirrors) + Cilium via Helm. Persists the choice in `~/.cloudbox/substrate` |

@@ -37,10 +37,11 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    substrate (`cat ~/.cloudbox/substrate`):
 
    ```bash
-   # docker / kind: the cloudbox-mirror container
-   MIRROR=localhost:5001
-   # tbx: talos-box's own docker.io listener on your cluster gateway (172.30.<n>.1)
-   MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
+   MIRROR=localhost:5001                 # docker / kind: the cloudbox-mirror container
+   if [ "$(cat ~/.cloudbox/substrate)" = tbx ]; then
+     # tbx: talos-box's own docker.io listener on your cluster gateway (172.30.<n>.1)
+     MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
+   fi
 
    mise x crane@0.21.9 -- crane copy --insecure \
      "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
