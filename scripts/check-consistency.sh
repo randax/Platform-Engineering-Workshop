@@ -552,6 +552,33 @@ fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] \
   && ok "cilium_install (lib.sh, via create-cluster.sh and lab 01's solve.sh) and kind-fallback.sh share one source for the Cilium ingress values"
 
+# --- 11d. a fresh clone is a fresh workshop -----------------------------------
+# gitops/apps/ is what the app-of-apps root reconciles, and gitops/components/demo/
+# is the attendee's own namespace. A checkout is supposed to carry exactly one
+# Application (wave 0) and no demo manifests at all — every other capability is
+# something a module teaches you to enable, and every demo manifest is something
+# a lab teaches you to copy in.
+#
+# This is not hypothetical tidiness. Both had been committed to main by a
+# catch-up run: 19 Applications and seven demo manifests, which made modules
+# 02-09's "copy from the catalog and push" a no-op, left lab 02's "what single
+# Application did it already create?" unanswerable, and let lab 02's verify.sh
+# pass for an attendee who did nothing. It was fixed by hand and came back
+# within a day, from a catch-up run committing into the checkout instead of its
+# temp clone. Hence a guard rather than another cleanup.
+before_fail=${FAILURES}
+apps_present="$(find gitops/apps -maxdepth 1 -name '*.yaml' -exec basename {} \; | sort | tr '\n' ' ')"
+if [[ "${apps_present}" != "local-path-provisioner.yaml " ]]; then
+  bad "gitops/apps/ should hold exactly local-path-provisioner.yaml (wave 0) on a fresh checkout, but holds: ${apps_present:-nothing}"
+  bad "  Every other capability is enabled by an attendee copying it from gitops/catalog/. If a catch-up run committed these, drop the commit — do not push it."
+fi
+demo_manifests="$(find gitops/components/demo -maxdepth 1 -name '*.yaml' -exec basename {} \; | sort | tr '\n' ' ')"
+if [[ -n "${demo_manifests}" ]]; then
+  bad "gitops/components/demo/ ships manifests: ${demo_manifests}— that directory belongs to the attendee (see its VENDOR.md); the labs copy files INTO it from lab/*/"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "a fresh clone starts at wave 0 (one Application, no demo manifests)"
+
 # --- 12. no browser-facing localhost:3xxxx literals --------------------------
 # The workshop serves one hostname scheme on both substrates. A leftover
 # localhost:30xxx URL works on exactly one of them, so it reads as a working
