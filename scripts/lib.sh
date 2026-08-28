@@ -1742,6 +1742,29 @@ remove_hosts_block() {
   ok "${CLOUDBOX_HOSTS_FILE} block removed"
 }
 
+# mirror_host_source — the registry authority (host:port, no scheme) the HOST
+# copies pre-pulled docker.io images out of: `crane copy --insecure
+# $(mirror_host_source)/library/busybox:1.37.0 zot…` in module 07's solve and
+# post.sh (catch-up's venue path), and module 08's golang base. On docker/kind
+# that is the crane container on localhost:MIRROR_PORT, which stores every
+# registry's images under the registry-stripped path. On tbx there is no such
+# container (#206): tbxd's per-registry docker.io listener on the cluster
+# gateway serves the same warmed store, keyed by registry — so this only
+# answers for docker.io refs, which is the only registry those callers copy
+# from. Prints nothing and returns 1 when the tbx gateway cannot be read (no
+# cluster yet); callers fall back to the internet with a warning.
+mirror_host_source() {
+  local substrate gw
+  substrate="$(substrate_resolve)" || return 1
+  if [[ "${substrate}" == "tbx" ]]; then
+    gw="$(cloudbox_host_gateway)" || return 1
+    [[ -n "${gw}" ]] || return 1
+    echo "${gw}:${TBX_MIRROR_DOCKERIO_PORT}"
+  else
+    echo "localhost:${MIRROR_PORT}"
+  fi
+}
+
 # strip_registry <image-ref> — drop the registry host from an image reference,
 # leaving the repository path + tag/digest. This is the path a containerd
 # registry mirror is queried with. Examples:

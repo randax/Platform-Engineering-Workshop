@@ -246,8 +246,9 @@ kubectl -n demo describe pod <pod> | grep -A2 Pulled
 Then explain the pull *time* in that Event. Nothing on conference WiFi pulls an 8 MB
 image that fast. Which of the things you built in module 00 and 01 could have answered a
 `docker.io` request, and why would it answer for a registry it never fetched from?
-(`curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/v2/...` and
-`docker logs cloudbox-mirror | tail` are both fair game.)
+(On docker, `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/v2/...` and
+`docker logs cloudbox-mirror | tail` are both fair game; on tbx the mirror is talos-box's
+and keyed by registry, so the answer is the *opposite* — see the scenario briefing.)
 </details>
 
 <details>

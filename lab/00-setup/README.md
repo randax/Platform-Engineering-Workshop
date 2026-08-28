@@ -62,8 +62,10 @@ From the repository root:
    including the images from step 2 — that's why it goes last. Fix what it flags (most
    common on Docker: Docker not running, or its memory limit below 10 GB). On tbx,
    `--check --deep` also rehashes every cached blob — run that once before you travel,
-   and at the venue flip `tbx mirror offline on` so a missing image fails loudly instead
-   of quietly reaching for the conference WiFi.
+   and at the venue flip `tbx mirror offline on` so tbx's mirror stops fetching from
+   upstream itself — a missing image then shows up as a mirror miss (and, because the
+   nodes keep `skipFallback: false`, as a slow direct pull you will notice) rather than
+   being quietly filled over the conference WiFi.
 4. Run `./verify.sh` in this directory.
 
 **Hardware reality check:** 16 GB RAM is the absolute minimum on both substrates, 32 GB is
@@ -185,7 +187,7 @@ does not get the pin.
 
 It is doing the only big download of the whole workshop — that's by design. It's resumable:
 run it again and it skips images already in the mirror. Check progress with
-`curl -s http://localhost:5001/v2/_catalog`.
+`curl -s http://localhost:5001/v2/_catalog` (docker) or `tbx cache list` (tbx).
 </details>
 
 <details>
@@ -219,7 +221,7 @@ the session? (Two reasons — one is about the venue NAT, one is about the messa
 
 ## Going deeper
 
-- Peek at what got pre-pulled: `curl -s http://localhost:5001/v2/_catalog | jq .`
+- Peek at what got pre-pulled: `curl -s http://localhost:5001/v2/_catalog | jq .` (docker) or `tbx cache list` (tbx)
 - Read `scripts/install.sh` — a pre-flight gate is itself a platform artifact. What would
   *your* team's version check?
 

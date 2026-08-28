@@ -32,7 +32,12 @@ wait_exists builds workflowtemplate/build-and-push 180
 #    SOURCE is the local cloudbox-mirror, not Docker Hub: busybox:1.37.0 is on
 #    the pre-pull list, so it is already there, and Docker Hub is rate-limited
 #    at the venue. Falls back to Docker Hub only if the mirror hasn't got it.
-MIRROR="localhost:5001"     # cloudbox-mirror; MIRROR_PORT in scripts/versions.env
+# Substrate-aware (issue #206): localhost:5001 is the crane container on
+# docker/kind; on tbx it is tbxd's docker.io listener on the cluster gateway,
+# serving the store `tbx cache warm` filled. mirror_host_source (lib.sh) is the
+# one place that knows; an empty answer means "no mirror reachable".
+MIRROR="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; mirror_host_source' _ "$REPO_ROOT" 2>/dev/null || true)"
+MIRROR="${MIRROR:-localhost:5001}"
 BUSYBOX="library/busybox:1.37.0"
 # Probe the MANIFEST, not `/v2/`. `/v2/` answers "some registry is listening on
 # :5001" and nothing about what is in it, so a mirror that is up but unfilled —
@@ -44,7 +49,7 @@ BUSYBOX="library/busybox:1.37.0"
 if mise x crane@0.21.9 -- crane manifest --insecure "${MIRROR}/${BUSYBOX}" >/dev/null 2>&1; then
   BUSYBOX_SRC="${MIRROR}/${BUSYBOX}"
 else
-  echo "⚠️  cloudbox-mirror hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)"
+  echo "⚠️  the image mirror (${MIRROR}) hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)"
   BUSYBOX_SRC="docker.io/${BUSYBOX}"
 fi
 mise x crane@0.21.9 -- crane copy --insecure \

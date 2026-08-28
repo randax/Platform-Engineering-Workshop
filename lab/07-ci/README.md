@@ -31,16 +31,22 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    FROM your own registry, fully offline.
 3. **Seed the base image**: copy busybox into YOUR registry (host-side, through Zot's
    ingress hostname). `crane copy` doesn't read your local docker — it's a registry-to-registry
-   copy. Source it from your own `cloudbox-mirror`, which already has it from the
+   copy. Source it from your own image mirror, which already has it from the
    pre-pull, so this step needs no internet either (Docker Hub is rate-limited at the
-   venue — that is the whole reason the mirror exists):
+   venue — that is the whole reason the mirror exists). Which mirror depends on your
+   substrate (`cat ~/.cloudbox/substrate`):
 
    ```bash
+   # docker / kind: the cloudbox-mirror container
+   MIRROR=localhost:5001
+   # tbx: talos-box's own docker.io listener on your cluster gateway (172.30.<n>.1)
+   MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
+
    mise x crane@0.21.9 -- crane copy --insecure \
-     localhost:5001/library/busybox:1.37.0 zot.cloudbox.k8s.test/library/busybox:1.37.0
+     "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
    ```
 
-   If the mirror isn't running, `docker.io/library/busybox:1.37.0` works as a source
+   If the mirror isn't reachable, `docker.io/library/busybox:1.37.0` works as a source
    too — but then you're online.
 
    That's the platform-team move: you decide what base images exist in your cloud.

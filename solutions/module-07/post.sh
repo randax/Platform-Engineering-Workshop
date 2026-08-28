@@ -37,7 +37,12 @@ fi
 #     VENUE, so it must not reach for Docker Hub (rate-limited there, and
 #     unreachable if the WiFi has given up). Same logic as lab/07-ci/solve.sh
 #     and the module README; fall back to Docker Hub only if the mirror lacks it.
-MIRROR="localhost:5001"     # MIRROR_PORT in scripts/versions.env
+# Substrate-aware (issue #206): localhost:5001 is the crane container on
+# docker/kind; on tbx it is tbxd's docker.io listener on the cluster gateway,
+# serving the store `tbx cache warm` filled. mirror_host_source (lib.sh) is the
+# one place that knows; an empty answer means "no mirror reachable".
+MIRROR="$(bash -c 'SCRIPT_DIR="$1/scripts"; source "$1/scripts/lib.sh" >/dev/null 2>&1; mirror_host_source' _ "$REPO_ROOT" 2>/dev/null || true)"
+MIRROR="${MIRROR:-localhost:5001}"
 BUSYBOX="library/busybox:1.37.0"
 # Probe the MANIFEST, not `/v2/` — see the same block in lab/07-ci/solve.sh. A
 # reachable-but-unfilled mirror answered `/v2/` happily and then failed the copy
@@ -46,7 +51,7 @@ BUSYBOX="library/busybox:1.37.0"
 if mise x crane@0.21.9 -- crane manifest --insecure "${MIRROR}/${BUSYBOX}" >/dev/null 2>&1; then
   BUSYBOX_SRC="${MIRROR}/${BUSYBOX}"
 else
-  echo "⚠️  cloudbox-mirror hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)" >&2
+  echo "⚠️  the image mirror (${MIRROR}) hasn't got ${BUSYBOX} — falling back to Docker Hub (needs internet)" >&2
   BUSYBOX_SRC="docker.io/${BUSYBOX}"
 fi
 mise x crane@0.21.9 -- crane copy --insecure \

@@ -152,10 +152,6 @@ tbx_warm_mirror() {
   step "Warming talos-box's mirror (tbx cache warm, ${#mirror_images[@]} refs)"
   local list
   list="$(mktemp)"
-  # An EXIT trap, not rm on the two exits below: Ctrl-C during a multi-GB
-  # warm is the likeliest interruption in this script.
-  # shellcheck disable=SC2064  # expand now: the path is fixed at this point
-  trap "rm -f '${list}'" EXIT
   images_mirror_refs "${IMAGES_FILE}" > "${list}"
   # `cache warm` prints a per-ref ✗ line for every failure before its summary,
   # and those lines are the actionable part — they reach the terminal before
@@ -163,15 +159,23 @@ tbx_warm_mirror() {
   # retries every pull: registries drop connections, a 7.5 GB run on home
   # wifi used to die on one transient blob, and warm is resumable — the
   # second pass says "already complete" for everything the first one got.
-  local attempt
+  local attempt out
+  out="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '${list}' '${out}'" EXIT
   for attempt in 1 2; do
-    if tbx cache warm "${list}"; then
+    # tee'd so a failure can be told apart: per-ref ✗ lines and a `summary:`
+    # line mean the warm RAN and some refs failed (retry is right); no summary
+    # means tbxd never answered — helper not installed, daemon down after a
+    # reboot, or a daemon older than the verb — and a retry fails identically.
+    # Same distinction install.sh --check makes.
+    if tbx cache warm "${list}" 2>&1 | tee "${out}"; then
       ok "All ${#mirror_images[@]} cluster images are in talos-box's mirror store."
       # The offline switch is the attendee's to flip at the venue, not ours to
-      # flip at home: with it ON, a ref that is not cached fails instead of
-      # reaching upstream — right in the room, wrong on the evening they are
-      # still pulling.
-      info "At the venue, make cache misses fail loudly instead of reaching out: tbx mirror offline on"
+      # flip at home: with it ON the MIRROR stops reaching upstream (a miss is
+      # a 503); the nodes' skipFallback:false then pulls direct. Right in the
+      # room, wrong on the evening they are still pulling.
+      info "At the venue: tbx mirror offline on   # the mirror stops fetching upstream; a miss then falls through to the real registry (skipFallback:false), visibly slow"
       # The trade-off #206 chose, said out loud: this store serves VMs only. The
       # docker/kind FALLBACK (CLOUDBOX_SUBSTRATE=docker, kind-fallback.sh) pulls
       # from the crane container and the host Docker cache, neither of which
@@ -181,6 +185,9 @@ tbx_warm_mirror() {
       warn "over the venue WiFi. If you want it offline-ready as a plan B, also run at home:"
       warn "  CLOUDBOX_SUBSTRATE=docker ./scripts/cloudbox-init.sh   # needs Docker; fills the crane mirror"
       return 0
+    fi
+    if ! grep -q '^summary:' "${out}"; then
+      die "could not ask tbxd to warm the store (above) — is the helper running and current? 'tbx doctor' (sudo tbx system install if it never was)"
     fi
     [[ "${attempt}" == "1" ]] && warn "tbx cache warm reported failures (the ✗ lines above) — one more pass over the list in 10s"
     [[ "${attempt}" == "1" ]] && sleep 10

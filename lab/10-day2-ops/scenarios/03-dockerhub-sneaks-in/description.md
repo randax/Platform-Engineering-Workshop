@@ -20,7 +20,8 @@ architecture contract requires every workload image to be pinned, hosted on GHCR
 pre-pulled by `scripts/cloudbox-init.sh` precisely because Docker Hub is rate-limited at
 the venue. See the [root repository guide](../../../../CLAUDE.md).
 
-**Why nothing broke — the part worth understanding.** Two mechanisms hide this commit,
+**Why nothing broke — the part worth understanding.** It depends on your substrate
+(`cat ~/.cloudbox/substrate`). On **docker/kind**, two mechanisms hide this commit,
 both of them things you built in module 00 and 01:
 
 1. `cloudbox-init.sh` copies every pre-pulled image into `cloudbox-mirror` under its
@@ -68,7 +69,16 @@ repository rule (`verify.sh` requires every `image:` in this manifest to start w
 3. `kubectl -n demo describe pod <pod>` → the `Pulled` Event shows the docker.io
    reference and a suspiciously fast pull time. Ask **who answered**, not just whether
    it worked.
-4. Prove it from the mirror side, on your host:
+   **On tbx** the story is the opposite, and arguably the better lesson. talos-box's
+   mirror is keyed by *registry* (`?ns=docker.io` reads a `docker.io/` store, and
+   `cloudbox-init.sh` warmed the image under `ghcr.io/`), so the poisoned reference is a
+   **miss** — and it still pulled, because the nodes' mirror entries keep
+   `skipFallback: false`: the miss fell through to the real Docker Hub. The pull *time*
+   in the Event is the tell (an 8 MB image over venue WiFi is not fast), and
+   `tbx doctor`'s mirror line / tbxd's log show the miss. The commit was invisible
+   because the fallback is silent, not because the mirror answered.
+
+4. Prove it from the mirror side, on your host (docker/kind):
    `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/v2/knative/helloworld-go/manifests/sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba`
    → `200`. Your mirror carries that path, whatever registry the manifest names, which
    is exactly why the change was invisible.
