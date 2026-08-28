@@ -7,12 +7,16 @@
 # the marked /etc/hosts block create-cluster.sh wrote — asks for sudo once,
 # because names that still point at 127.0.0.1 after the cluster is gone break
 # the NEXT cluster, especially one created on the other substrate.
-# The cloudbox-mirror image registry is left running (it is expensive to
-# refill) unless you pass --purge-mirror.
+# The pre-pulled images are kept (they are expensive to refill) unless you
+# pass --purge-mirror. What that removes depends on the substrate:
+#   docker/kind: the cloudbox-mirror container + its volume (CloudBox's own)
+#   tbx:         `tbx cache prune --mirror` — talos-box's MACHINE-WIDE mirror
+#                store (~/.talosbox/cache/mirror), shared with every tbx
+#                cluster on this laptop, so it asks first.
 #
 # Usage:
 #   ./scripts/destroy-cluster.sh                 # destroy the cluster
-#   ./scripts/destroy-cluster.sh --purge-mirror  # also remove the mirror container + volume
+#   ./scripts/destroy-cluster.sh --purge-mirror  # also throw the pre-pulled images away (see above)
 # =============================================================================
 set -euo pipefail
 
@@ -20,6 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 PURGE_MIRROR="false"
+PURGE_FAILED="false"
 [[ "${1:-}" == "--purge-mirror" ]] && PURGE_MIRROR="true"
 
 # `need talosctl` is NOT here: it moved below the identity refusals. A machine
@@ -285,11 +290,18 @@ if [[ "${PURGE_MIRROR}" == "true" ]]; then
     # tbx's own store (`--mirror`: the container images; bare `prune` would
     # remove the Talos DISK image instead and leave these). Failures propagate —
     # a purge that reports success without purging is the lie HAZARDS names.
-    if have tbx; then
-      tbx cache prune --mirror
-      ok "tbx's mirror store purged (~/.talosbox/cache; re-run ./scripts/cloudbox-init.sh to refill)"
+    # Asked first: unlike the docker container this store is not CloudBox's
+    # alone. And a failure is reported, not fatal — the /etc/hosts warnings
+    # below are what protect the NEXT cluster and must still print.
+    if ! have tbx; then
+      warn "tbx not on PATH — its mirror store (~/.talosbox/cache/mirror) was NOT purged: tbx cache prune --mirror"
+    elif ! confirm "Purge talos-box's MACHINE-WIDE mirror store (~/.talosbox/cache/mirror, ~7.5 GB, shared by every tbx cluster here)?"; then
+      info "tbx's mirror store kept"
+    elif tbx cache prune --mirror; then
+      ok "tbx's mirror store purged (re-run ./scripts/cloudbox-init.sh to refill)"
     else
-      warn "tbx not on PATH — its mirror store (~/.talosbox/cache) was NOT purged: tbx cache prune --mirror"
+      fail "tbx cache prune --mirror failed — the store was NOT purged (is tbxd running? 'tbx doctor')"
+      PURGE_FAILED="true"
     fi
     if have docker && docker_running && docker inspect "${MIRROR_NAME}" >/dev/null 2>&1; then
       docker rm -f "${MIRROR_NAME}" >/dev/null 2>&1 || true
@@ -337,6 +349,10 @@ fi
 # needed) gets tbx back the moment detection likes it, offline, with a mirror
 # filled for the other architecture. So name what was forgotten and the one
 # command that keeps it.
+if [[ "${PURGE_FAILED}" == "true" ]]; then
+  fail "Done — except the --purge-mirror you asked for (see above)."
+  exit 1
+fi
 ok "Done."
 info "This machine no longer records a substrate — it was '${SUBSTRATE}', and ${CLOUDBOX_SUBSTRATE_FILE} is gone."
 info "Recreate on the same one:  CLOUDBOX_SUBSTRATE=${SUBSTRATE} ./scripts/create-cluster.sh"
