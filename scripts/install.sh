@@ -658,16 +658,11 @@ else
   # architecture. Filling and grading now follow the same decision the create
   # follows (lib.sh, mirror_target_substrate), so the two cannot disagree.
   # Empty on failure: the arch checks then pass open rather than guess.
+  # Only docker and kind reach this branch now (#206), so the mirror's arch is
+  # always the daemon's — the "mirror is arm64 next to an amd64 Colima daemon"
+  # warning that lived here described the tbx arrangement and is gone with it.
   mirror_arch="$(node_arch "${SUBSTRATE}" || true)"
   mirror_for="${SUBSTRATE}"
-  # An amd64 Colima/Lima VM on an arm64 Mac is the case that made this worth
-  # saying out loud: on tbx the mirror is arm64 (the VMs' arch) and the Docker
-  # daemon next to it is amd64. Nothing is broken — the mirror is a container on
-  # that daemon serving images to VMs — but it is a surprising pair to see.
-  daemon_arch="$(docker_server_arch || true)"
-  if [[ -n "${mirror_arch}" && -n "${daemon_arch}" && "${mirror_arch}" != "${daemon_arch}" ]]; then
-    warn "The mirror serves ${mirror_arch} — the arch your ${mirror_for} nodes run — while this machine's Docker daemon is ${daemon_arch}. That is correct for ${mirror_for} (the mirror is a container on that daemon; the nodes are not). Change substrate and the mirror must be rebuilt: CLOUDBOX_SUBSTRATE=<the other one> ./scripts/cloudbox-init.sh"
-  fi
 
   # Is the mirror registry up at all?
   if mirror_running && curl -fsS "http://localhost:${MIRROR_PORT}/v2/" >/dev/null 2>&1; then
