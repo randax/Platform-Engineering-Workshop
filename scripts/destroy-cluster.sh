@@ -25,7 +25,11 @@ source "${SCRIPT_DIR}/lib.sh"
 
 PURGE_MIRROR="false"
 PURGE_FAILED="false"
-[[ "${1:-}" == "--purge-mirror" ]] && PURGE_MIRROR="true"
+case "${1:-}" in
+  "") ;;
+  --purge-mirror) PURGE_MIRROR="true"; [[ $# -eq 1 ]] || die "--purge-mirror takes no further arguments (got: ${*:2})" ;;
+  *) die "Unknown argument: ${1} (only --purge-mirror is accepted)" ;;
+esac
 
 # `need talosctl` is NOT here: it moved below the identity refusals. A machine
 # running the kind lifeboat has no reason to have talosctl installed, and
@@ -349,11 +353,15 @@ fi
 # needed) gets tbx back the moment detection likes it, offline, with a mirror
 # filled for the other architecture. So name what was forgotten and the one
 # command that keeps it.
+# The forgotten-substrate notice prints on BOTH outcomes: the record is gone
+# either way, and a failed purge must not hide the one command that keeps
+# the attendee on the substrate they were on.
 if [[ "${PURGE_FAILED}" == "true" ]]; then
   fail "Done — except the --purge-mirror you asked for (see above)."
-  exit 1
+else
+  ok "Done."
 fi
-ok "Done."
 info "This machine no longer records a substrate — it was '${SUBSTRATE}', and ${CLOUDBOX_SUBSTRATE_FILE} is gone."
 info "Recreate on the same one:  CLOUDBOX_SUBSTRATE=${SUBSTRATE} ./scripts/create-cluster.sh"
 info "Or let it decide again:    ./scripts/create-cluster.sh"
+[[ "${PURGE_FAILED}" == "true" ]] && exit 1

@@ -1110,10 +1110,12 @@ digest-pinned — so on **docker/kind** the copy reads
 `localhost:5001/docker/library/golang:1.25-alpine` from the crane mirror and
 needs no internet.
 
-On **tbx** it does. tbx's store is keyed by registry, and the only slice the
-host can reach with a plain `crane` (no `?ns=`) is the docker.io listener on
-`172.30.<n>.1:5055` (`TBX_MIRROR_DOCKERIO_PORT`); a `public.ecr.aws` image sits
-in a namespace crane cannot name. Module 08's README therefore tells a tbx
+On **tbx** it does. tbx's store is keyed by registry, and the slices the host
+can reach with a plain `crane` (no `?ns=`) are the per-registry listeners on the
+gateway — docker.io `:5055` (`TBX_MIRROR_DOCKERIO_PORT`), ghcr.io `:5056`,
+quay.io `:5057`, registry.k8s.io `:5058` (upstream `MirrorPorts`); everything
+else, `public.ecr.aws` included, is only behind the `?ns=` catch-all, which crane
+cannot name. Module 08's README therefore tells a tbx
 attendee to copy it from `public.ecr.aws` directly — a going-deeper path most
 will not take, and the lab says to do it at home if the venue's WiFi is hostile.
 

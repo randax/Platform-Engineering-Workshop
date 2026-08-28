@@ -453,8 +453,9 @@ fi
 #
 # --talos-version pins one ad-hoc combination (cmd/tbx/cache_pull.go:23,39-44).
 # The container images were warmed into tbx's mirror store above
-# (tbx_warm_mirror); this is the one remaining download, and the CRI pause
-# image `tbx cache warm --check` insists on comes with it.
+# (tbx_warm_mirror); this is the one remaining download. (The CRI pause image
+# `tbx cache warm --check` insists on is NOT pulled here — the ad-hoc form
+# skips the cluster-image warm — it is covered because images.txt lists it.)
 # Gated on the DECISION (${SUBSTRATE}, i.e. substrate_resolve()), not on the tbx
 # binary — the same rule the mirror above is filled by, which is the point: one
 # question, one answer, and prework that matches the create.
