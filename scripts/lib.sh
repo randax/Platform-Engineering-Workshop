@@ -1745,7 +1745,9 @@ remove_hosts_block() {
 # mirror_host_source — the registry authority (host:port, no scheme) the HOST
 # copies pre-pulled docker.io images out of: `crane copy --insecure
 # $(mirror_host_source)/library/busybox:1.37.0 zot…` in module 07's solve and
-# post.sh (catch-up's venue path), and module 08's golang base. On docker/kind
+# post.sh (catch-up's venue path). (Module 08's golang base is a public.ecr.aws
+# ref and is NOT reachable this way on tbx — its README copies it online there.)
+# On docker/kind
 # that is the crane container on localhost:MIRROR_PORT, which stores every
 # registry's images under the registry-stripped path. On tbx there is no such
 # container (#206): tbxd's per-registry docker.io listener on the cluster

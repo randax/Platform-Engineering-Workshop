@@ -1100,25 +1100,30 @@ Everything that runs *inside* the container — `curl`, `kubectl`, every
 another machine is the shape of the problem; the fix would be a per-service
 path prefix, which no other substrate needs.
 
-## TRAP — an optional golden path needs the internet, deliberately
+## TRAP — module 08's golang base is offline on docker, online-only on tbx
 
 `lab/08-portal`'s deploy-from-source walkthrough (and `apps/demo-app`'s own
-README) tells the attendee to `crane copy
-public.ecr.aws/docker/library/golang:1.25-alpine` into Zot at run time. That
-image is **not** on `scripts/images.txt`, so `cloudbox-init.sh` never pre-pulls
-it and the step needs working WiFi at the moment it runs.
+README) has the attendee `crane copy` the golang builder base into Zot at run
+time. Since the adventures landed (issue #193) that image IS on
+`scripts/images.txt` — `public.ecr.aws/docker/library/golang:1.25-alpine@sha256:…`,
+digest-pinned — so on **docker/kind** the copy reads
+`localhost:5001/docker/library/golang:1.25-alpine` from the crane mirror and
+needs no internet.
 
-This is a choice, not an oversight, and it predates the substrate split (it is on
-`main`: `git show main:lab/08-portal/README.md:267`): the base image costs every
-attendee a download for a going-deeper path most will not take. The lab says so
-in bold, and says to do it at home if the venue's WiFi is hostile.
+On **tbx** it does. tbx's store is keyed by registry, and the only slice the
+host can reach with a plain `crane` (no `?ns=`) is the docker.io listener on
+`172.30.<n>.1:5055` (`TBX_MIRROR_DOCKERIO_PORT`); a `public.ecr.aws` image sits
+in a namespace crane cannot name. Module 08's README therefore tells a tbx
+attendee to copy it from `public.ecr.aws` directly — a going-deeper path most
+will not take, and the lab says to do it at home if the venue's WiFi is hostile.
 
-**What to keep true.** Everything on the core path stays offline (principle 2).
-If this ever moves onto `images.txt`, it moves *with a digest*, and the mirror
-grows by the size of a golang base for every attendee — measure that before
-deciding. CI (`bootstrap-test.yaml`) runs the same `crane copy` on a runner that
-does have the internet, which is why the deploy-from-source job proves the
-pipeline but not the offline story.
+**What to keep true.** Everything on the core path stays offline (principle 2);
+this is a stretch path. Re-pinning the base as `docker.io/library/golang` would
+make it offline on tbx too through `:5055` — at the price of a second copy of
+the same bytes on the docker path — measure before deciding. CI
+(`bootstrap-test.yaml`) runs the same `crane copy` on a runner that does have the
+internet, which is why the deploy-from-source job proves the pipeline but not
+the offline story.
 
 ## TRAP — recovery tooling that lies is worse than recovery tooling that breaks
 
