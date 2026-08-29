@@ -158,6 +158,68 @@ the measured numbers landing in `scripts/versions.env` (up, or down) — ideally
 with the usual conference-day tab collection open, since an idle-host measurement says
 nothing about what the balloon will do at the venue.
 
+## LIVE — tbxd can panic the macOS kernel, and the v0.1.4 bump does not fix it
+
+New on **2026-08-30**, on a rehearsal host that is *not* the one Rehearsal 7 ran on.
+Two macOS kernel panics 18 minutes apart, each a hard reset of the laptop with no
+warning and no chance to save anything. Both name `tbxd` as the panicked task:
+
+```
+panic(cpu 17 caller 0x…): Kernel tag check fault (expected tagged address: 0xfefffe29f784b028)
+Panicked task 0xf8fffe230a7e5c88: 6034 pages, 24 threads: pid 74954: tbxd
+```
+
+The second, on a fully upgraded v0.1.4 (client, daemon *and* privileged helper), is
+the same fault with a different KASLR slide and the same register fingerprint
+(`x2=0x13e`, `x5=0x3a980`); the panicked task holds the Virtualization.framework
+guest threads — `com.apple.virtualization.thread.cpu-0..15` and
+`raw-disk-image-io-0..7`. The first came during cluster teardown or create; the
+second came during `scripts/create-cluster.sh`. **Upgrading v0.1.3 → v0.1.4 did not
+fix it**, which is the whole point of this entry: the obvious remedy is already
+spent. Filed upstream.
+
+Host: Mac17,7, macOS 26.6.2 (25G83), Darwin 25.6.0 `xnu-12377.161.14~5`, 128 GB.
+A "kernel tag check fault" is MTE catching a pointer-tag mismatch in *kernel*
+memory — userspace cannot legitimately cause one, so this is a bug on the far side
+of Virtualization.framework that tbxd provokes. It is not a tbx bug you can work
+around by configuring tbx differently.
+
+**This is host-specific, not universal.** Rehearsal 7 ran the whole workshop on tbx
+v0.1.4 the same week — 2 min 05 s create, ten modules green, zero manual recoveries
+— on Apple Silicon with 32 GB and 10 CPUs. So the default stays `tbx`. What differs
+between the two hosts (chip generation, macOS build, 128 GB vs 32 GB, the host
+pressure each was under) is exactly what is unknown, and the sample is two machines.
+
+**How you would notice.** You do not get a diagnostic — the laptop resets. Afterwards
+`ls -lt /Library/Logs/DiagnosticReports/*.panic` has a fresh file, and
+`tr ',' '\n' < <that file> | grep 'Panicked task'` names `tbxd`. Suspect it if a
+machine reboots during `create-cluster.sh`, `destroy-cluster.sh`, or any lab that
+stops and starts a node (lab 01's stall-recovery hint does exactly that).
+
+**What to do on an affected machine.** Uninstall tbx rather than fight it: boot out
+`dev.talosbox.helper` (`sudo launchctl bootout system/dev.talosbox.helper`, then
+remove `/Library/LaunchDaemons/dev.talosbox.helper.plist`) and `mise uninstall` the
+binary. `scripts/substrate-decide.sh` then picks docker on its own, which is the
+fallback working as designed — no repo change, no flag. Keep `~/.talosbox/cache`;
+it is inert without the binary and expensive to re-warm.
+
+**Removing the helper is the guard that holds; removing the binary is not.**
+`dev-setup.sh` runs `mise install`, and `mise.toml` pins tbx, so the binary comes
+straight back the next time anyone sets the workshop up — observed within the hour,
+daemon and all. That is fine: the binary is inert and `tbxd` alone has not panicked
+anything. VMs are the hazard, and VMs need the privileged helper, which `mise`
+cannot reinstall (it takes an admin prompt). So boot out the helper and leave the
+pin alone rather than fighting mise.
+
+**On the day.** An attendee whose laptop panics has lost their whole environment, so
+this outranks a slow cluster: put them on docker and move on, do not debug it in the
+room. If a second attendee machine panics, flip `CLOUDBOX_SUBSTRATE_DEFAULT` to
+`docker` for everyone rather than collecting a third data point.
+
+**Retired by:** an upstream fix released and surviving a full rehearsal on the
+panicking host — not on a host that never reproduced it, which proves nothing.
+
+
 ## LIVE — L2 failover on macOS takes 40-50 s
 
 Cilium announces the ingress VIP over L2 (`scripts/substrate/lb-objects.tbx.yaml.tmpl`,
