@@ -185,17 +185,22 @@ That's the sovereignty argument in one answer.
 
 ## Going deeper
 
-- **Rebuild `:v1` and watch nothing happen.** Change `app/index.html`, push it to Gitea
-  (the build clones from there, not from your laptop), submit the same workflow again so it
-  pushes `hello-site:v1` a second time, and refresh the page. It is
-  unchanged. Ask Zot what it thinks: `curl -s
-  http://zot.cloudbox.k8s.test/v2/hello-site/manifests/v1 -H 'Accept:
-  application/vnd.oci.image.manifest.v1+json' -I | grep -i docker-content-digest` — a new
-  digest, same tag. Then `kubectl -n demo get pod -l app=hello-site -o
-  jsonpath='{.items[0].status.containerStatuses[0].imageID}'` — the node still runs the old
-  one: Kubernetes defaults a non-`:latest` tag to `IfNotPresent`, and an unchanged tag means
-  it never looks again. A tag is a lie you tell yourself; a digest is a fact. Module 08's Redeploy mints a fresh tag for
-  exactly this reason, and module 10 pins digests for it too.
+- **Rebuild `:v1` and watch nothing happen.** Change `app/index.html` and push it to
+  Gitea, because the build clones from there and not from your laptop. Submit the same
+  workflow again so it pushes `hello-site:v1` a second time, then refresh the page. Nothing
+  changed. Now ask Zot:
+
+  ```bash
+  curl -sI http://zot.cloudbox.k8s.test/v2/hello-site/manifests/v1 \
+    -H 'Accept: application/vnd.oci.image.manifest.v1+json' | grep -i docker-content-digest
+  kubectl -n demo get pod -l app=hello-site \
+    -o jsonpath='{.items[0].status.containerStatuses[0].imageID}'
+  ```
+
+  New digest, same tag, and the node still runs the old bytes. Kubernetes defaults a
+  non-`:latest` tag to `IfNotPresent`, so an unchanged tag means it never looks again. A tag
+  is a lie you tell yourself. A digest is a fact. Module 08's Redeploy mints a fresh tag for
+  this reason, and module 10 pins digests for it.
 
 - Change `index.html` (v2!), push to Gitea, build `:v2`, and roll `hello-site` to it via
   git. You've reinvented a release pipeline — how would you trigger the build on push?

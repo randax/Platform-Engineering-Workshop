@@ -162,18 +162,17 @@ through this API?)
 
 ## Going deeper
 
-- **Upgrade Postgres by changing one line.** On a *throwaway* database — never `my-db`,
-  and never one with data you want — create it at `version: "17"`, wait for it, then bump
-  that line to `"18"` and push. CNPG attempts an in-place major upgrade behind *your* API:
-  watch for the `<name>-pg-1-major-upgrade` Job and follow its logs. If it fails, the
-  cluster stays in `Upgrading Postgres major version` and the fix is to delete the XR and
-  start again — which is itself the lesson. A major version is not a config value you can
-  take back, and the platform that offers it as one owes its users a way out.
-  Prove it landed: `kubectl -n demo exec <cluster>-1 -c postgres -- psql -U postgres -tAc
-  "select version()"`. This is the half of "managed service" the lab otherwise skips: day-1
-  provisioning is easy, and day-2 lifecycle through the same declarative API is what people
-  are actually buying. The images for 15, 16, 17 and 18 are all pre-pulled, so it works
-  offline. Delete the extra database afterwards — a laptop only has so much RAM.
+- **Upgrade Postgres by changing one line.** Do this on a throwaway database. Never
+  `my-db`, never one holding data you want. Create it at `version: "17"`, wait for it, then
+  change that line to `"18"` and push. CNPG starts an in-place major upgrade behind your own
+  API. Watch the `<name>-pg-1-major-upgrade` Job and read its logs. Prove the result with
+  `kubectl -n demo exec <cluster>-1 -c postgres -- psql -U postgres -tAc "select version()"`.
+  If the Job fails, the cluster sits in `Upgrading Postgres major version` until you either
+  set the version back or delete the XR and start over. That failure is worth as much as the
+  success. Provisioning a database on day 1 is the easy half. Changing one on day 2, through
+  the same API a developer already knows, is what people are paying for. All four images are
+  pre-pulled, so this works offline. Delete the extra database when you are done, because a
+  laptop only has so much RAM.
 
 - Edit `my-database.yaml` to `size: medium` (or `large`) via git. Watch the **one knob**
   ripple: the CNPG cluster gains replicas (2, then 3 — HA) and storage, all from one word.

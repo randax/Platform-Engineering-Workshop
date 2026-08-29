@@ -226,13 +226,13 @@ git instead?
   detail page, use the Resize action to move `console-db` from `small` to `medium`. Then
   work backwards: which verbs in `portal-access.yaml` made that possible, and what did CNPG
   actually do about it (`kubectl -n demo describe cluster console-db-pg`, look at the
-  events)? You granted `patch` in module 08 and have never used it until now — every verb
-  in that Role is a capability you handed over deliberately, and this is the one that lets
-  a form change infrastructure someone else's database is running on. Then try resizing back to `small` and read the
-  events again: CNPG refuses (`can't shrink existing storage`), and because that rejection
-  blocks the whole Cluster update, the second instance never goes away either — while the
-  form cheerfully reports success. Storage is a one-way door. Delete `console-db` and
-  recreate it `small` from the form; modules 09 and 10 want that memory back.
+  events)? You granted `patch` in module 08 and have not used it until now. Every verb in
+  that Role is a capability you handed over on purpose, and this is the one that lets a web
+  form change infrastructure somebody else's database runs on. Now try resizing back to
+  `small` and read the events again. CNPG refuses with `can't shrink existing storage`, and
+  that rejection blocks the whole Cluster update, so the second instance stays too. The form
+  still reports success. Storage only goes one way. Delete `console-db` and recreate it
+  `small` from the form, because modules 09 and 10 want that memory back.
 
 <p align="center">
   <img src="../../docs/screenshots/console-new-function-dark.png" alt="Cloudbox Console — the New function modal: name, source, optional env vars and a keep-warm toggle; builds the image in-cluster and deploys it as a Knative Service" width="80%" />

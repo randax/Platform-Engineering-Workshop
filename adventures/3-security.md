@@ -75,10 +75,10 @@ what you'd tighten first and why.
   is being brute-forced past.
 - `cosign verify` passes on your built image and fails on an unsigned one.
 
-**Arc 5 — see the map, not just the log lines.** `hubble observe` is one terminal's
-worth of truth. Turn on Hubble Relay and the UI — the images are already in your mirror,
-pinned for exactly this — and watch Arc 1's default-deny paint edges red in a picture the
-whole table can read:
+**Arc 5. See the map, not just the log lines.** `hubble observe` gives you one
+terminal's worth of truth. Turn on Hubble Relay and the UI, whose images are already in
+your mirror, and watch Arc 1's default-deny paint edges red in a picture the whole table
+can read:
 
 ```bash
 helm upgrade cilium scripts/manifests/cilium-1.20.0.tgz -n kube-system --reuse-values \
@@ -86,8 +86,7 @@ helm upgrade cilium scripts/manifests/cilium-1.20.0.tgz -n kube-system --reuse-v
 kubectl -n kube-system port-forward svc/hubble-ui 12000:80
 ```
 
-Observe-then-enforce needs a map the whole team can see; policy that only one person can
-read in a CLI stays one person's knowledge.
+Policy only one person can read in a terminal stays one person's knowledge.
 
 ## Known traps
 
@@ -107,9 +106,9 @@ read in a CLI stays one person's knowledge.
   public transparency log on an air-gapped laptop, and that's fine; you're the
   root of trust here.
 
-- **`--reuse-values` is not optional.** Cilium here is Helm-managed, not GitOps-managed,
-  and the workshop's Talos-specific values live only in that release. Drop the flag and you
-  reset them — and lose the cluster's networking. Copy the invocation; don't retype it.
+- **`--reuse-values` is not optional.** Helm manages Cilium here, not GitOps, and the
+  workshop's Talos-specific values live only in that release. Drop the flag and you reset
+  them, which takes the cluster's networking with it. Copy the command, don't retype it.
 
 ## At home
 
