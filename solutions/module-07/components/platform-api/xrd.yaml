@@ -25,9 +25,28 @@ spec:
         openAPIV3Schema:
           type: object
           properties:
+            metadata:
+              type: object
+              properties:
+                name:
+                  type: string
+                  # The README says the XRD caps the name at 40, so make that true.
+                  # Names become CNPG cluster names and Kubernetes labels: CNPG's
+                  # own webhook rejects over 50, and a label value dies at 63 —
+                  # both AFTER the object is accepted, which reads as "the platform
+                  # broke" rather than "that name is too long". 40 leaves room for
+                  # the "-pg" suffix and the per-instance suffixes CNPG appends.
+                  maxLength: 40
             spec:
               type: object
               properties:
+                version:
+                  type: string
+                  description: >-
+                    The PostgreSQL major version. The platform maps this to the
+                    specific approved and patched container image.
+                  enum: ["15", "16", "17"]
+                  default: "16"
                 size:
                   type: string
                   description: >-
