@@ -68,9 +68,11 @@ module-10-adjacent punchline — kill your worker mid-event and watch the replay
   *and the thumbnail still appears* (you broke nothing).
 - Level 2: `crane ls localhost:30500/<repo> --insecure` lists your tag and the
   running pod's image is your Zot URL.
-- Level 3: the Console's **Streams** page shows your consumer's ack floor advancing.
-  (There is no `nats` CLI on this laptop — not in `mise.toml`, not in the NATS image. The
-  Streams page is the shipped way to watch JetStream, and it works offline.)
+- Level 3: the Console's **Streams** page shows your stream's message count and consumers.
+  For the ack floor itself, ask NATS directly — it ships a monitoring endpoint:
+  `curl -s 'http://nats.cloudbox.k8s.test/jsz?consumers=true' | jq '.account_details'`.
+  (There is no `nats` CLI on this laptop — not in `mise.toml`, not in the NATS image —
+  and both of these work offline.)
 
 ## Known traps
 

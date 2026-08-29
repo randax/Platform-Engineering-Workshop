@@ -1,6 +1,6 @@
 # Adventures — the last hour is yours
 
-The core path (modules 00–05) ends with a platform that works: a cluster you own,
+The core path (modules 00–06 and 09) ends with a platform that works: a cluster you own,
 GitOps as the only write path, databases and buckets as a service, self-service
 via Crossplane, and the confidence of having debugged it. What happens next is
 not one path — it's five doors. Pick the one that matches why you came.
@@ -37,8 +37,7 @@ from module 05 to any door is a supported move, not a cheat.
 ## Door 0 — the marked trail
 
 Modules 07, 08 and 10 — the three the guided day does not reach (06 and 09 are core now).
-In order, rehearsed, hinted. Rehearsed, hinted, each with a
-`verify.sh` and a visible win:
+Rehearsed, hinted, each with a `verify.sh` and a visible win:
 
 - **[Module 07 — CI on your terms](../lab/07-ci/)**: your cluster builds its own
   images — Gitea → BuildKit → Zot, no external service touched.

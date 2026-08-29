@@ -24,7 +24,7 @@ talosctl --context cloudbox get machineconfig -o yaml | less
 Find three deliberate choices in that config: the CNI is `none` (Cilium came by
 Helm — module 01), the kubelet's image, and KubePrism on `localhost:7445`
 (which is why Cilium's `k8sServiceHost` is `localhost` — check
-`cilium_install_values` in `scripts/lib.sh` — create-cluster.sh is a dispatcher now). Talos has **no SSH and no shell**; everything
+`cilium_install` in `scripts/lib.sh` — create-cluster.sh is a dispatcher now). Talos has **no SSH and no shell**; everything
 you just did went through an authenticated API. That's the security model.
 
 ## The build
@@ -69,6 +69,13 @@ Now you have scheduling to play with: cordon and drain the old worker and watch
 CNPG and Knative reschedule; find what has a PodDisruptionBudget and what
 merely should.
 
+**Arc 5 — ask a dead pod what happened.** (Needs the observability stack, so `catch-up.sh 9` first if you came straight here.)
+Before you drain, `kubectl logs` a pod in `pipeline`. After the drain kills it, run the same command: it dies with the pod. Then find
+those same lines in Grafana → Explore → VictoriaLogs, which the filelog agent shipped off
+the node while the pod was alive. Log persistence is an infrastructure concern precisely
+because pods are not permanent — this is why the DaemonSet-plus-central-store pattern
+exists, and why 3am debugging survives a rescheduling.
+
 ## You know it works when…
 
 - Arc 1: your sysctl reads back from a pod; `talosctl get machineconfig` shows
@@ -79,13 +86,6 @@ merely should.
   service deleted.
 - Arc 4: `kubectl get nodes` shows two workers and the pipeline still passes an
   upload while one of them is cordoned.
-
-**Arc 5 — ask a dead pod what happened.** Before you drain, `kubectl logs` a pod in
-`pipeline`. After the drain kills it, run the same command: it dies with the pod. Then find
-those same lines in Grafana → Explore → VictoriaLogs, which the filelog agent shipped off
-the node while the pod was alive. Log persistence is an infrastructure concern precisely
-because pods are not permanent — this is why the DaemonSet-plus-central-store pattern
-exists, and why 3am debugging survives a rescheduling.
 
 ## Known traps
 
@@ -108,8 +108,11 @@ exists, and why 3am debugging survives a rescheduling.
   works on paper too.
 
 - **On 16 GB, pick one.** Two workers plus the Victoria stack is over budget. Do the
-  drain against your single worker (`kubectl drain --ignore-daemonsets`, watch pods go
-  Pending) and keep the logs; or add the second worker and skip Arc 5.
+  drain against your single worker and keep the logs, or add the second worker and skip
+  Arc 5. Draining the only worker needs
+  `kubectl drain --ignore-daemonsets --delete-emptydir-data` — half the platform mounts
+  emptyDirs — and it evicts Grafana too, so read the logs after `kubectl uncordon`. The
+  data survives; the query UI is what went away.
 
 ## At home
 
