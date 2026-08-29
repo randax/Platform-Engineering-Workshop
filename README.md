@@ -92,9 +92,11 @@ container images (7.7 GB on x86-64). **Run steps 1–3 at home, on a network you
 ```bash
 # 0. OPTIONAL, and only on Apple Silicon macOS or Linux with KVM: real Talos VMs.
 #    Skip it and you get the Docker substrate, which runs the same workshop.
-brew install randax/tap/tbx && sudo tbx system install && tbx doctor
-#    (Linux: the release tarball + `sudo tbx system install`. mise cannot install
-#     tbx yet — it is pinned in scripts/versions.env and mise.toml's comment.)
+#    The tbx BINARY arrives with step 1 (dev-setup.sh installs the version
+#    pinned in mise.toml); what only you can do is the privileged helper:
+#      sudo tbx system install && tbx doctor        # after step 1
+#    (A Homebrew `randax/tap/tbx` also works, but it is not pinned — keep one
+#     tbx on PATH, or `tbx doctor` warns about two installations.)
 
 git clone https://github.com/randax/Platform-Engineering-Workshop.git
 # (will be renamed to jz-2026-platform-engineering — the old URL will redirect)

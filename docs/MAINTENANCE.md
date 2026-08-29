@@ -185,14 +185,15 @@ the Console's SSE stream, ArgoCD's watches). On a bump, confirm
 ### The `tbx` pin is a special case
 
 `TBX_VERSION` in `scripts/versions.env` pins the talos-box binary — the primary
-substrate's *entire* implementation. It is not installed by mise (no backend publishes
-it yet: upstream #95/#96/#101), so nothing enforces at runtime what an attendee actually
-has on PATH. Bumping it means all three of:
+substrate's *entire* implementation. mise installs it (the
+`github:randax/talos-box[exe=tbx]` entry — goreleaser tarballs, no tap needed), but mise
+enforces nothing about what is on PATH at run time: an attendee who installed from the
+Homebrew tap has whatever the tap serves, so `tbx_version_check()` in `scripts/lib.sh`
+is the runtime assertion. Bumping it means all four of:
 
-1. **Bump the `mise.toml` comment in the same commit.** The pin lives as the commented
-   `# tbx = "…"` line next to the install note; `check-consistency.sh` check 10 compares
-   it to `TBX_VERSION` and fails if they drift. That comment is the only other copy —
-   do not add a third.
+1. **Bump the `mise.toml` entry in the same commit.** `check-consistency.sh` check 10
+   compares it to `TBX_VERSION` and fails if they drift. That entry is the only other
+   copy — do not add a third (comments included: use `vX.Y.Z` in examples).
 2. **Re-read upstream before trusting the flags.** `scripts/substrate/tbx.sh` drives
    `tbx up -f`, `tbx status -o json`, `tbx version` and
    `tbx cluster destroy <cluster> --force`, and `cloudbox-init.sh` drives

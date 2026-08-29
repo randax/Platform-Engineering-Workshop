@@ -405,7 +405,7 @@ fi
 # --- 10. the tbx pin agrees between versions.env and mise.toml ----------------
 # Same rule as check 3, for the substrate that is not Docker. dev-setup.sh
 # installs only what mise.toml lists, so a drifted pin means an attendee runs a
-# tbx whose cluster-yaml schema or `tbx manifests` sections we never tested.
+# tbx whose cluster-yaml schema or `tbx status` shape we never tested.
 before_fail=${FAILURES}
 tbx_mise="$(mise_pin 'ubi:randax/talos-box')"
 if [[ -z "${tbx_mise}" ]]; then

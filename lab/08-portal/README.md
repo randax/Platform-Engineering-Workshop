@@ -273,9 +273,11 @@ git instead?
   so seed that base once first (same move as module 07's busybox — from your own mirror,
   no internet needed):
   `crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine zot.cloudbox.k8s.test/library/golang:1.25-alpine`
-  (on tbx this base is NOT reachable host-side from your mirror — it was warmed from
-  `public.ecr.aws`, and tbx's host-side listener on `:5055` serves docker.io images only —
-  so copy it online: `crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine zot.cloudbox.k8s.test/library/golang:1.25-alpine`.)
+  (on tbx the base was warmed from `public.ecr.aws`, which the `:5055` listener from
+  module 07 does not serve — use the catch-all port's path form instead, same gateway,
+  still offline:
+  `MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5059"`
+  then `crane copy --insecure "$MIRROR/public.ecr.aws/docker/library/golang:1.25-alpine" zot.cloudbox.k8s.test/library/golang:1.25-alpine`.)
   (The golang base joined the pre-pull list with the adventure images — if your
   `cloudbox-init.sh` run predates that, either re-run it or fall back to the online
   source, `public.ecr.aws/docker/library/golang:1.25-alpine`.)

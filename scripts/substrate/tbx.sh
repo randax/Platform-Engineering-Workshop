@@ -53,7 +53,9 @@ substrate_preflight() {
        # the whole cluster and 20 minutes of re-create; `tbx cluster start|resume
        # <name>` (cmd/tbx/main.go) brings the same one back. Phases come from
        # `tbx status -o json`: stopped | suspended | unreachable | maintenance |
-       # configured (internal/daemon/phase.go). WHICH verb matters:
+       # configured | rebooted (internal/daemon/phase.go; `rebooted` is a
+       # configured node whose Talos boot identity changed while the VM
+       # process stayed up, held for 15 min). WHICH verb matters:
        # tbx_restart_verb picks `resume` for a suspended cluster, because
        # `start` cold-boots it and discards the saved memory.
        if tbx_cluster_all_stopped; then
@@ -260,8 +262,8 @@ tbx_node_ip() { # <control-plane|worker>
 # running. `stopped` and `suspended` are the two phases with no VM behind them
 # (internal/daemon/phase.go: PhaseStopped, PhaseSuspended, and Phase.Stopped()
 # treats them as one); `unreachable`, `maintenance`, `configured` and `rebooted`
-# (v0.1.4) all mean a VM is up. Empty or unreadable status is NOT "all stopped" — an absent answer
-# must never turn into advice to start something.
+# all mean a VM is up. Empty or unreadable status is NOT "all stopped" — an
+# absent answer must never turn into advice to start something.
 tbx_cluster_all_stopped() {
   local verdict
   verdict="$(tbx_cluster_json | jq -r '

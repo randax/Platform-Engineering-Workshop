@@ -257,6 +257,11 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
       printf '%s\n' "${TBX_DOCTOR_OUT}"
       check_fail "'tbx doctor' reports problems (above) — fix them, or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
     else
+      # A clean run can still carry WARN lines (host pressure, a rebooted
+      # node, two tbx binaries on PATH). They never fail the gate — doctor's
+      # contract is FAIL-only for the exit code — but hiding them behind
+      # "clean" is how an attendee learns about swap at the venue.
+      printf '%s\n' "${TBX_DOCTOR_OUT}" | grep '^WARN' || true
       ok "tbx doctor is clean"
     fi
   fi

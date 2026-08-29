@@ -683,21 +683,20 @@ require_identity_match() { # <desired>
 # check_fail in install.sh --check). Lives in lib.sh, not in substrate/tbx.sh,
 # so --check can make the assertion without sourcing a create backend.
 #
-# Nothing asserted this before: check 10 in check-consistency.sh keeps
-# versions.env and mise.toml agreeing with EACH OTHER, and says in its own
-# comment that asserting the actual binary is the preflight's job — because tbx
-# has no mise backend yet (upstream #95/#96/#101), so mise installs and enforces
-# nothing. An attendee who ran `brew upgrade` gets whatever the tap has today,
-# and the cluster-yaml schema and the `tbx manifests` sections we render are
-# exactly the parts that move between versions.
+# Check 10 in check-consistency.sh keeps versions.env and mise.toml agreeing
+# with EACH OTHER, and mise's github backend installs that pin — but mise
+# enforces nothing about what is on PATH at run time: an attendee who installed
+# from the Homebrew tap, or ran `brew upgrade`, gets whatever the tap has today,
+# and the cluster-yaml schema and `tbx status` shape are exactly the parts that
+# move between versions. This is the assertion that catches that.
 #
-# `tbx version` prints "tbx v0.1.4 (darwin/arm64, daemon protocol N, …)"; take field 2 and accept
-# a bare "0.1.4" too. An unreadable answer is a mismatch, not a pass.
+# `tbx version` prints "tbx vX.Y.Z (darwin/arm64, daemon protocol N, …)"; take field 2 and accept
+# a bare "X.Y.Z" too. An unreadable answer is a mismatch, not a pass.
 # CLOUDBOX_ALLOW_TBX_DRIFT=1 is the documented escape hatch for whoever is
 # deliberately testing a newer tbx before the pin moves.
 tbx_version_check() {
   local report="$1" found
-  # Field 2 of "tbx v0.1.4 (darwin/arm64, daemon protocol N, …)". The field-1 fallback covers a
+  # Field 2 of "tbx vX.Y.Z (darwin/arm64, daemon protocol N, …)". The field-1 fallback covers a
   # future `tbx version` that prints the bare version, so a cosmetic upstream
   # change reads as drift-to-investigate rather than "unreadable" on every run.
   found="$(tbx version 2>/dev/null \
@@ -1759,7 +1758,8 @@ remove_hosts_block() {
 # copies pre-pulled docker.io images out of: `crane copy --insecure
 # $(mirror_host_source)/library/busybox:1.37.0 zot…` in module 07's solve and
 # post.sh (catch-up's venue path). (Module 08's golang base is a public.ecr.aws
-# ref and is NOT reachable this way on tbx — its README copies it online there.)
+# ref, which this listener does not serve; on tbx its README uses the catch-all
+# port's path form instead — `<gateway>:TBX_MIRROR_PORT/public.ecr.aws/…`.)
 # On docker/kind
 # that is the crane container on localhost:MIRROR_PORT, which stores every
 # registry's images under the registry-stripped path. On tbx there is no such

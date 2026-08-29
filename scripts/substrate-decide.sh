@@ -138,7 +138,7 @@ substrate_platform_supported() {
 # substrate_decide_detect_into <varname> — the substrate this MACHINE can run,
 # with no persisted answer and no override. tbx needs its daemon+helper
 # installed and healthy, so `tbx doctor` (which exits non-zero on any FAIL —
-# cmd/tbx/doctor.go:345-347) is the gate, not the mere presence of the binary.
+# cmd/tbx/doctor.go: `return errors.New("one or more doctor checks failed")`) is the gate, not the mere presence of the binary.
 # Always sets the variable; always returns 0. Only ever `tbx` or `docker` —
 # substrate_detectable is the rule, and `kind` is deliberately not in it.
 substrate_decide_detect_into() { # <varname>

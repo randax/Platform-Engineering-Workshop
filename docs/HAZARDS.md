@@ -117,9 +117,14 @@ A VM's memory is soft in the *other* direction. `TBX_CP_MEMORY="4GiB"` and
 sizes the guest kernel boots with, but `tbxd` runs an **active balloon manager**: on macOS it samples host memory
 pressure and inflates the guests' virtio balloons when host free memory drops below a
 **6 GiB reserve**, taking memory back from a running node down to a **1 GiB per-node
-floor**, and deflating on release (upstream `docs/SPEC.md:319-328` and the closed G3 gate
-at `:595-600`; the Linux host-free sampler is not implemented yet, so the policy is
-presently inactive there). We opt into it deliberately — `substrate_create()` patches
+floor**, and deflating on release — with, since tbx v0.1.4, a 256 MiB deadband, a
+one-minute minimum between retargets, and a **pressure latch**: while host swap is above
+80% used (clears at 70%) or the compressor is busy, reclaimed memory is deliberately
+*held* even after free memory recovers (upstream `internal/balloon/manager.go`,
+`ReconcileSnapshot`). A guest that stays small after the host has calmed down is that
+latch, not a stuck balloon — `tbx status` prints the pressure notice while it is armed.
+(Upstream `docs/SPEC.md` "balloon"; the Linux host-free sampler is not implemented, so
+the policy is presently inactive there.) We opt into it deliberately — `substrate_create()` patches
 `machine.kernel.modules: [virtio_balloon]` into the guests
 (the `balloon_patch` in `substrate_create()`, `scripts/substrate/tbx.sh:313-319`), because without the module loaded the balloon device
 is inert and the overcommit story stops working.
@@ -181,8 +186,9 @@ cluster"). The trap is *when* we ask:
 
 - **Detection runs doctor before any cluster exists.** `substrate_detect()`
   (`substrate_detect_into()` / `substrate_detect()`, `scripts/lib.sh:247-259`) uses `tbx doctor`'s exit code to choose the substrate, and at
-  that moment `routes` is a `SKIP` — "no clusters exist" (`cmd/tbx/doctor.go:270-277`), as
-  it also is for a cluster that exists but is stopped (`:293-300`). So a VPN'd laptop
+  that moment `routes` is a `SKIP` — "no clusters exist" (`cmd/tbx/doctor.go`, the
+  `doctorFinding{level: "SKIP", check: "routes", …}` block), as it also is for a cluster
+  that exists but is stopped. So a VPN'd laptop
   passes detection cleanly and gets sent down the tbx path.
 - **`routes` covers the gateway and node IPs, not the ingress VIP.** The workshop's
   hostnames all resolve to `172.30.<n>.200`, which is in the same subnet — so in practice
@@ -1079,32 +1085,31 @@ Everything that runs *inside* the container — `curl`, `kubectl`, every
 another machine is the shape of the problem; the fix would be a per-service
 path prefix, which no other substrate needs.
 
-## TRAP — module 08's golang base is offline on docker, online-only on tbx
+## RETIRED — module 08's golang base was online-only on tbx (fixed by tbx v0.1.4)
 
 `lab/08-portal`'s deploy-from-source walkthrough (and `apps/demo-app`'s own
 README) has the attendee `crane copy` the golang builder base into Zot at run
-time. Since the adventures landed (issue #193) that image IS on
-`scripts/images.txt` — `public.ecr.aws/docker/library/golang:1.25-alpine@sha256:…`,
-digest-pinned — so on **docker/kind** the copy reads
-`localhost:5001/docker/library/golang:1.25-alpine` from the crane mirror and
-needs no internet.
+time. That image is on `scripts/images.txt` —
+`public.ecr.aws/docker/library/golang:1.25-alpine@sha256:…`, digest-pinned — so
+on **docker/kind** the copy reads `localhost:5001/docker/library/golang:1.25-alpine`
+from the crane mirror and needs no internet.
 
-On **tbx** it does. tbx's store is keyed by registry, and the slices the host
-can reach with a plain `crane` (no `?ns=`) are the per-registry listeners on the
-gateway — docker.io `:5055` (`TBX_MIRROR_DOCKERIO_PORT`), ghcr.io `:5056`,
-quay.io `:5057`, registry.k8s.io `:5058` (upstream `MirrorPorts`); everything
-else, `public.ecr.aws` included, is only behind the `?ns=` catch-all, which crane
-cannot name. Module 08's README therefore tells a tbx
-attendee to copy it from `public.ecr.aws` directly — a going-deeper path most
-will not take, and the lab says to do it at home if the venue's WiFi is hostile.
+On **tbx** it used to need one. tbx's store is keyed by registry, and up to
+v0.1.3 the only slices the host could reach with a plain `crane` (no `?ns=`)
+were the per-registry listeners on the gateway — docker.io `:5055`
+(`TBX_MIRROR_DOCKERIO_PORT`), ghcr.io `:5056`, quay.io `:5057`, registry.k8s.io
+`:5058`; `public.ecr.aws` sat only behind the `?ns=` catch-all, which crane
+cannot name, so the README sent tbx attendees to `public.ecr.aws` online.
 
-**What to keep true.** Everything on the core path stays offline (principle 2);
-this is a stretch path. Re-pinning the base as `docker.io/library/golang` would
-make it offline on tbx too through `:5055` — at the price of a second copy of
-the same bytes on the docker path — measure before deciding. CI
-(`bootstrap-test.yaml`) runs the same `crane copy` on a runner that does have the
-internet, which is why the deploy-from-source job proves the pipeline but not
-the offline story.
+**Retired by** talos-box v0.1.4 (randax/talos-box#499): the catch-all port
+`:5059` (`TBX_MIRROR_PORT`) also answers a **path form**,
+`<gateway>:5059/public.ecr.aws/docker/library/golang:1.25-alpine`, sharing the
+cache with containerd's `?ns=` form and serving a warmed image after
+`tbx mirror offline on`. Module 08's README and `apps/demo-app/Dockerfile` now
+use it; the re-pin to `docker.io/library/golang` this entry once weighed is no
+longer needed. CI (`bootstrap-test.yaml`) still copies from `public.ecr.aws`
+on a runner with internet — it proves the pipeline, not the offline story;
+Rehearsal 7 in `docs/REHEARSALS.md` is where the path form was proven.
 
 ## TRAP — recovery tooling that lies is worse than recovery tooling that breaks
 
@@ -1486,8 +1491,8 @@ are all `stopped`/`suspended` — a reboot, a `tbx down` — is not that state: 
 is a cluster waiting to be started, and destroying it costs the attendee
 everything they built plus 20 minutes. Both now read the node phases from `tbx
 status -o json` (`stopped` | `suspended` | `unreachable` | `maintenance` |
-`configured`, `internal/daemon/phase.go`; `PhaseSuspended` is a stopped node
-with saved memory) and, when nothing is running, say
+`configured` | `rebooted`, `internal/daemon/phase.go`; `PhaseSuspended` is a stopped node
+with saved memory, `rebooted` a configured one whose Talos rebooted in place) and, when nothing is running, say
 
     tbx cluster start|resume cloudbox
     ./scripts/create-cluster.sh --refresh-endpoint
