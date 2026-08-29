@@ -90,24 +90,25 @@ Conference WiFi carries keystrokes, not gigabytes. The setup downloads roughly 7
 container images (7.7 GB on x86-64). **Run steps 1–3 at home, on a network you trust:**
 
 ```bash
-# 0. OPTIONAL — done right AFTER step 1 — and only on Apple Silicon macOS or
-#    Linux with KVM: real Talos VMs. Skip it and you get the Docker substrate,
-#    which runs the same workshop. The tbx BINARY arrives with step 1
-#    (dev-setup.sh installs the version pinned in mise.toml); what only you can
-#    do is the privileged helper:
-#      tbx system install && tbx doctor        # macOS; it asks for your
-#                                              # password itself
-#    (Linux: no `system install` — that is the macOS launchd installer; set up
-#     the systemd helper per talos-box's docs/linux.md. A Homebrew
-#     `randax/tap/tbx` also works but is not pinned — keep ONE tbx on PATH, or
-#     `tbx doctor` warns about two installations. Never `sudo tbx …`: sudo's
-#     PATH may find a different tbx; use `sudo "$(command -v tbx)"` if you must.)
-
 git clone https://github.com/randax/Platform-Engineering-Workshop.git
 # (will be renamed to jz-2026-platform-engineering — the old URL will redirect)
 cd Platform-Engineering-Workshop
 
-./scripts/dev-setup.sh        # 1. install the pinned CLI tools (via mise)
+./scripts/dev-setup.sh        # 1. install the pinned CLI tools (via mise) — tbx included
+
+# 1b. OPTIONAL, Apple Silicon macOS only: real Talos VMs instead of Talos-in-Docker.
+#     Skip it and you get the Docker substrate, which runs the same workshop.
+#     Step 1 installed the tbx BINARY (pinned in mise.toml); what only you can do
+#     is the privileged helper:
+tbx system install && tbx doctor   # asks for your password itself; "no FAIL" is the bar
+#     (Linux with KVM: mise ships only the binaries — the helper is a systemd unit
+#      set that talos-box's docs/linux.md installs from a source checkout; check out
+#      the v0.1.4 tag so daemon and helper match the pinned client, and do NOT run
+#      `system install` there. A Homebrew `randax/tap/tbx` also works but is not
+#      pinned — keep ONE tbx/tbxd/tbx-helper triad on PATH, or `tbx doctor` warns.
+#      Never `sudo tbx …`: sudo's PATH may find a different tbx; use
+#      `sudo "$(command -v tbx)"` if you must.)
+
 ./scripts/cloudbox-init.sh    # 2. pre-pull all pinned images (~7.5 GB — be patient)
 ./scripts/install.sh --check  # 3. preflight: prints ✅/❌ for everything
 ```

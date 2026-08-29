@@ -26,7 +26,7 @@ substrate_preflight() {
   # into the machine config; without curl that proof cannot run, and a venue
   # cluster whose nodes cannot reach their only image source is what it guards.
   need curl "The tbx substrate proves the image mirror is reachable with curl before creating the cluster."
-  need tbx "install talos-box the pinned way: ./scripts/dev-setup.sh, then tbx system install (macOS; it re-runs itself under sudo) or the systemd helper from upstream docs/linux.md (Linux). Or run the docker substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
+  need tbx "install talos-box the pinned way: ./scripts/dev-setup.sh, then tbx system install (macOS; it re-runs itself under sudo) or, on Linux, the systemd helper from upstream docs/linux.md at the pinned tag (mise ships only the binaries). Or run the docker substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
   # `tbx doctor` exits non-zero on any FAIL finding. It checks the helper, the
   # resolver, DNS wiring, forwarding, routes, host pressure, mirror health and
   # image access — all of which the workshop needs and none of which a bare

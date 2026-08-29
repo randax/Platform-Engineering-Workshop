@@ -202,8 +202,13 @@ is the runtime assertion. Bumping it means all four of:
    ref validation is what `images_mirror_refs` in `lib.sh` feeds). Since #206 the tbx
    nodes pull through tbx's OWN mirror: `TBX_MIRROR_PORT` in `versions.env` mirrors
    `CatchAllPort` in upstream `internal/manifests/manifests.go`, and the catch-all's
-   `?ns=` routing lives in `internal/mirror/manager.go` (`serveCatchAll`). If the port
-   or the routing moves, every tbx create dies at the curl proof in `tbx.sh` — re-read
+   `?ns=` routing lives in `internal/mirror/manager.go` (`serveCatchAll`), with the
+   host-side PATH form (`routeCatchAllRequest`, `/v2/<registry>/<repo>…`) next to it —
+   that form is what `lab/08-portal`, `apps/demo-app` and adventure 1 send a host
+   `crane` to, and nothing in the scripts proves it (the curl proof hits `/v2/` only),
+   so re-read it by hand on every bump or those four documents silently go
+   online-only again. If the port
+   or the `?ns=` routing moves, every tbx create dies at the curl proof in `tbx.sh` — re-read
    both on every bump. Verbs quoted to attendees that must still exist: `tbx cache
    prune --mirror`, `tbx mirror offline on|off`, `tbx node start|stop <cluster> <node>`
    (lab 01, destroy-cluster.sh, cloudbox-init.sh). Read upstream `internal/config/config.go` for

@@ -725,7 +725,7 @@ tbx_version_check() {
 #   * the cluster does not exist — `cluster.Load` cannot read its state file
 #     (upstream internal/cluster/store.go:63-70, the ONLY site whose wrapper
 #     says "read cluster state"), which the daemon's `status` handler
-#     (internal/daemon/operations.go) calls per cluster. The message is
+#     (internal/daemon/operations.go) calls for a named cluster. The message is
 #     "read cluster state: open <dir>/<state file>: no such file or directory".
 #   * tbxd is not reachable — the CLI dials a unix socket
 #     (cmd/tbx/client.go:268, wrapped in dialError), and a MISSING SOCKET reads

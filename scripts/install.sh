@@ -238,7 +238,7 @@ fi
 # preflight that passes. A machine that cannot create a cluster read as ready.
 if [[ "${SUBSTRATE}" == "tbx" ]]; then
   if ! have tbx; then
-    check_fail "substrate is tbx but the 'tbx' binary is not on PATH — install talos-box the pinned way: ./scripts/dev-setup.sh, then 'tbx system install' (macOS; it re-runs itself under sudo) or the systemd helper from upstream docs/linux.md (Linux); or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
+    check_fail "substrate is tbx but the 'tbx' binary is not on PATH — install talos-box the pinned way: ./scripts/dev-setup.sh, then 'tbx system install' (macOS; it re-runs itself under sudo) or, on Linux, the systemd helper from upstream docs/linux.md at the v0.1.4 tag (mise ships only the binaries); or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
   else
     # The pin this laptop will actually run. check-consistency.sh check 10 only
     # proves versions.env and mise.toml agree with each other, and mise installs
