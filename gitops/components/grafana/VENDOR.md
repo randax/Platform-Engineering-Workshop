@@ -11,7 +11,7 @@ Deployed image (first-party, built from `apps/grafana`):
 
 <!-- x-release-please-start-version -->
 ```
-ghcr.io/randax/cloudbox-grafana:v0.3.0
+ghcr.io/randax/cloudbox-grafana:v0.4.0
 ```
 <!-- x-release-please-end-version -->
 
