@@ -63,14 +63,12 @@ timeout_probe() {
   wait "${pid}"
 }
 
-# BOUNDED, because "unreachable" has two shapes and only one of them is quick.
-# crane tries HTTPS first even with --insecure; a registry that REFUSES TLS
-# (Zot behind the ingress) fails fast and crane falls back to HTTP, but a plain
-# HTTP listener that ACCEPTS the connection and waits — which is what
-# talos-box's mirror is — leaves crane retrying `net/http: TLS handshake
-# timeout` indefinitely. Unbounded, this probe never returns on tbx, so the
-# Docker Hub fallback below could never be reached and the step just hung.
-# 20 seconds is far more than a local registry needs to answer a manifest.
+# BOUNDED: a healthy tbx mirror answers crane's HTTPS probe with a non-TLS reply
+# in ~10 ms and crane falls back to HTTP (verified against tbx v0.1.3, 2026-08-29).
+# The one way this probe hangs is a stalled tbxd that accepts the TCP connection
+# and never reads it (randax/talos-box#498); without a bound, the Docker Hub
+# fallback below could never be reached. 20 seconds is far more than a local
+# registry needs to answer a manifest.
 if timeout_probe 20 mise x crane@0.21.9 -- crane manifest --insecure "${MIRROR}/${BUSYBOX}" >/dev/null 2>&1; then
   BUSYBOX_SRC="${MIRROR}/${BUSYBOX}"
 else
