@@ -224,15 +224,49 @@ git instead?
 
 - **Resize from the form, then find the permission that allowed it.** On a database's
   detail page, use the Resize action to move `console-db` from `small` to `medium`. Then
-  work backwards: which verbs in `portal-access.yaml` made that possible, and what did CNPG
-  actually do about it (`kubectl -n demo describe cluster console-db-pg`, look at the
-  events)? You granted `patch` back in task 3 and have not used it until now. Every verb in
-  that Role is a capability you handed over on purpose, and this is the one that lets a web
-  form change infrastructure somebody else's database runs on. Now try resizing back to
-  `small` and read the events again. CNPG refuses with `can't shrink existing storage`, and
-  that rejection blocks the whole Cluster update, so the second instance stays too. The form
-  still reports success. Storage only goes one way. Delete `console-db` and recreate it
-  `small` from the form, because modules 09 and 10 want that memory back.
+  work backwards: which verbs in `portal-access.yaml` made that possible? You granted
+  `patch` back in task 3 and have not used it until now. Every verb in that Role is a
+  capability you handed over on purpose, and this is the one that lets a web form change
+  infrastructure somebody else's database runs on.
+
+  Now check whether it actually worked, because three different things will tell you it
+  did. The form reports success. `spec` says `medium`. And
+  `kubectl -n demo get cluster console-db-pg` prints **`Cluster in healthy state`**. All
+  three are wrong:
+
+  ```bash
+  kubectl -n demo get cluster console-db-pg \
+    -o custom-columns=PHASE:.status.phase,READY:.status.readyInstances,WANT:.spec.instances
+  kubectl -n demo describe cluster console-db-pg | tail -20
+  ```
+
+  `medium` means 5Gi and two instances; `small` was 1Gi and one. The cluster is stuck at
+  one instance and 1Gi, and it will stay stuck forever. The events say why: this cluster's
+  StorageClass is `local-path`, and `kubectl get sc local-path -o yaml` has no
+  `allowVolumeExpansion: true`, so Kubernetes forbids growing the PVC —
+  *only dynamically provisioned pvc can be resized and the storageclass that provisions
+  the pvc must support resize*. That single failure blocks the **whole** Cluster
+  reconcile, which is why the second instance never appears either. CNPG retries about
+  every 24 seconds, forever, while `status.phase` keeps saying healthy.
+
+  Sit with that, because it is the real lesson: **`status.phase` is a summary, not a
+  health check.** A platform that reports success at three separate layers while nothing
+  happens is the failure mode you will actually meet in production. The truth was in the
+  events and the operator's log (`kubectl -n cnpg-system logs deploy/cnpg-controller-manager
+  | tail`), one layer below anything the form could show you.
+
+  Now try resizing back to `small` and read the events again. CNPG refuses with
+  `can't shrink existing storage` — it compares against the 5Gi you asked for, not the
+  1Gi you still have, so a resize that never happened still cost you the ability to go
+  back. Storage only goes one way, and it went that way without moving. Delete
+  `console-db` and recreate it `small` from the form, because modules 09 and 10 want that
+  memory back.
+
+  Worth asking, and there is no single right answer: should the platform have refused
+  the resize up front, since it can read its own StorageClass? Should the console show
+  `readyInstances` next to the size it claims? Or should sizes just not change storage on
+  a cluster whose storage cannot change? That is a real platform-design argument, and you
+  now have the evidence to have it.
 
 <p align="center">
   <img src="../../docs/screenshots/console-new-function-dark.png" alt="Cloudbox Console — the New function modal: name, source, optional env vars and a keep-warm toggle; builds the image in-cluster and deploys it as a Knative Service" width="80%" />

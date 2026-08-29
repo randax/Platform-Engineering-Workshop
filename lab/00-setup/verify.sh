@@ -172,9 +172,9 @@ fi
 # --check` — there is no second registry to probe here.
 if [ "$SUBSTRATE" = tbx ]; then
   ok "tbx substrate — cluster images are graded by install.sh --check (tbx cache warm --check), no cloudbox-mirror container"
-elif curl -fsS --max-time 5 http://localhost:5001/v2/ >/dev/null 2>&1; then
+elif curl -4 -fsS --max-time 5 http://localhost:5001/v2/ >/dev/null 2>&1; then
   ok "cloudbox-mirror registry answers on localhost:5001"
-  IMAGES="$(curl -fsS --max-time 5 http://localhost:5001/v2/_catalog 2>/dev/null | jq -r '.repositories | length' 2>/dev/null || echo 0)"
+  IMAGES="$(curl -4 -fsS --max-time 5 http://localhost:5001/v2/_catalog 2>/dev/null | jq -r '.repositories | length' 2>/dev/null || echo 0)"
   if [ "${IMAGES:-0}" -gt 0 ]; then
     ok "mirror holds ${IMAGES} repositories (pre-pull has run)"
   else

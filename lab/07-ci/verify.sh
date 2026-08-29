@@ -44,7 +44,7 @@ check_app zot
 check_app argo-workflows
 
 # --- Zot registry ---------------------------------------------------------------
-if curl -fsS --max-time 5 "${ZOT_HOST_URL}/v2/" >/dev/null 2>&1; then
+if curl -4 -fsS --max-time 5 "${ZOT_HOST_URL}/v2/" >/dev/null 2>&1; then
   ok "Zot registry API answers at ${ZOT_HOST_URL}"
 else
   fail "Zot not answering at ${ZOT_HOST_URL} — kubectl -n zot get pods,svc"
@@ -69,7 +69,7 @@ else
 fi
 
 # --- Image actually in the registry ---------------------------------------------------
-CATALOG="$(curl -fsS --max-time 5 "${ZOT_HOST_URL}/v2/_catalog" 2>/dev/null || echo '{}')"
+CATALOG="$(curl -4 -fsS --max-time 5 "${ZOT_HOST_URL}/v2/_catalog" 2>/dev/null || echo '{}')"
 if echo "$CATALOG" | grep -q 'hello-site'; then
   ok "image 'hello-site' present in Zot catalog"
 else

@@ -86,7 +86,7 @@ else
   fail "no running RustFS pod — kubectl -n rustfs get pods; check the rustfs app in ArgoCD"
 fi
 
-if curl -sS --max-time 5 -o /dev/null "${RUSTFS_S3_HOST_URL}/" 2>/dev/null; then
+if curl -4 -sS --max-time 5 -o /dev/null "${RUSTFS_S3_HOST_URL}/" 2>/dev/null; then
   ok "S3 endpoint answers at ${RUSTFS_S3_HOST_URL}"
 else
   fail "nothing answering at ${RUSTFS_S3_HOST_URL} — kubectl -n rustfs get svc,ingress"

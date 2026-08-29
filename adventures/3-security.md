@@ -29,10 +29,17 @@ policy.
 ## The build
 
 **Arc 1: break it with default-deny.** Apply a default-deny
-`CiliumNetworkPolicy` to ns `pipeline` (empty `ingress: []` / `egress: []`
-against all endpoints). Upload a photo: watch it fail, and watch
-`hubble observe --verdict DROPPED` name every flow you just severed,
-**including DNS**, which is the one everyone forgets.
+`CiliumNetworkPolicy` to ns `pipeline` against all endpoints
+(`endpointSelector: {}`), with `ingress: [{}]` and `egress: [{}]`. Upload a
+photo: watch it fail, and watch `hubble observe --verdict DROPPED` name every
+flow you just severed, **including DNS**, which is the one everyone forgets.
+
+Mind those braces. `ingress: [{}]` is a list holding **one rule that matches
+nothing** — which is what puts the endpoint in default-deny. `ingress: []` is
+an **empty list of rules**, which reads like the same thing and is not: the API
+accepts it, stores it verbatim, reports no error, and enforces nothing at all.
+The tell is that everything keeps working and `hubble observe --verdict DROPPED`
+stays empty — you will hunt for the drop that never happened.
 
 **Arc 2: earn it back, least privilege.** Restore the pipeline one rule at a
 time, DNS egress first (allow UDP 53 to kube-dns), then only the flows the

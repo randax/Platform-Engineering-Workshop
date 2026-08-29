@@ -114,16 +114,16 @@ fi
 URL="$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}' 2>/dev/null || true)"
 HOST="${URL#http://}"; HOST="${HOST#https://}"
 if [ -n "$HOST" ]; then
-  BODY="$(curl -fsS --max-time 30 "http://${HOST}/" 2>/dev/null || true)"
+  BODY="$(curl -4 -fsS --max-time 30 "http://${HOST}/" 2>/dev/null || true)"
   VIA="its own URL (http://${HOST}/)"
   if ! echo "$BODY" | grep -qi hello && [ -n "$INGRESS_ADDR" ]; then
-    BODY="$(curl -fsS --max-time 30 -H "Host: ${HOST}" "http://${INGRESS_ADDR}/" 2>/dev/null || true)"
+    BODY="$(curl -4 -fsS --max-time 30 -H "Host: ${HOST}" "http://${INGRESS_ADDR}/" 2>/dev/null || true)"
     VIA="the shared ingress at ${INGRESS_ADDR} with a Host header"
   fi
   if echo "$BODY" | grep -qi hello; then
     ok "curl via ${VIA} answered: $(echo "$BODY" | head -1)"
   else
-    fail "no answer for ${HOST} — try: curl -v -H 'Host: ${HOST}' http://${INGRESS_ADDR:-<ingress-address>}/ ; if that works, only the NAME is broken: ${NAME_HINT}. If neither works: kubectl -n kourier-system get svc kourier; kubectl get ingress -A"
+    fail "no answer for ${HOST} — try: curl -4 -v -H 'Host: ${HOST}' http://${INGRESS_ADDR:-<ingress-address>}/ ; if that works, only the NAME is broken: ${NAME_HINT}. If neither works: kubectl -n kourier-system get svc kourier; kubectl get ingress -A"
   fi
 else
   fail "cannot determine ksvc URL — fix the ksvc checks above first"
