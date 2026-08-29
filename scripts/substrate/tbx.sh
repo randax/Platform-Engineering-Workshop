@@ -240,7 +240,7 @@ render_tbx_cluster_file() {
 # one named cluster (cmd/tbx/main.go:661-670 unmarshals into []ClusterStatus
 # and encodes that) — hence the normaliser below, which also tolerates a bare
 # object in case a later tbx unwraps it. A missing cluster is an error from
-# `cluster.Load` (internal/daemon/operations.go), so a non-zero exit
+# `cluster.Load` in the daemon's `status` handler (internal/daemon/operations.go), so a non-zero exit
 # is what "no such cluster" looks like — which is what preflight and destroy
 # key on.
 tbx_cluster_json() {

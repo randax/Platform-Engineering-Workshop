@@ -724,8 +724,8 @@ tbx_version_check() {
 # a destroy erases state it could not see:
 #   * the cluster does not exist — `cluster.Load` cannot read its state file
 #     (upstream internal/cluster/store.go:63-70, the ONLY site whose wrapper
-#     says "read cluster state"), reached from the daemon's status op via
-#     `cluster.Load` (internal/daemon/operations.go). The message is
+#     says "read cluster state"), which the daemon's `status` handler
+#     (internal/daemon/operations.go) calls per cluster. The message is
 #     "read cluster state: open <dir>/<state file>: no such file or directory".
 #   * tbxd is not reachable — the CLI dials a unix socket
 #     (cmd/tbx/client.go:268, wrapped in dialError), and a MISSING SOCKET reads
@@ -765,7 +765,7 @@ tbx_cluster_absent() {
 #                                      (render_tbx_cluster_file, tbx.sh:129-156)
 #   ~/.talosbox/clusters/<name>      — upstream's own state directory, one per
 #                                      cluster, holding cluster.json
-#                                      (internal/cluster/store.go:14-22, const
+#                                      (internal/cluster/store.go, const
 #                                      stateFile = "cluster.json")
 # None of the three present means nothing this machine ever created with tbx can
 # be running, whatever tbxd says about itself.

@@ -388,7 +388,7 @@ was the wrong thing to conclude from. What that patch renders (upstream
 **`localhost:30500`** — the in-cluster Zot, which is how the kubelet pulls every image
 lab 07, lab 09 and the Console *build*. tbx's mirror refuses to proxy a loopback or private
 authority (403 out of `validateResolvedAuthority` → `namespaceIPBlocked`,
-`internal/mirror/manager.go`, `serveCatchAll` / `routeCatchAllRequest`), and `skipFallback: true` forbids the
+`internal/mirror/manager.go`), and `skipFallback: true` forbids the
 direct pull that would otherwise rescue it. Every first-party image would have landed in
 `ImagePullBackOff`, on the tbx substrate only, from module 07 onward.
 

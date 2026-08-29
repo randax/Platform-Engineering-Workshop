@@ -90,12 +90,13 @@ Conference WiFi carries keystrokes, not gigabytes. The setup downloads roughly 7
 container images (7.7 GB on x86-64). **Run steps 1–3 at home, on a network you trust:**
 
 ```bash
-# 0. OPTIONAL, and only on Apple Silicon macOS or Linux with KVM: real Talos VMs.
-#    Skip it and you get the Docker substrate, which runs the same workshop.
-#    The tbx BINARY arrives with step 1 (dev-setup.sh installs the version
-#    pinned in mise.toml); what only you can do is the privileged helper:
-#      tbx system install && tbx doctor        # macOS, after step 1; it asks
-#                                              # for your password itself
+# 0. OPTIONAL — done right AFTER step 1 — and only on Apple Silicon macOS or
+#    Linux with KVM: real Talos VMs. Skip it and you get the Docker substrate,
+#    which runs the same workshop. The tbx BINARY arrives with step 1
+#    (dev-setup.sh installs the version pinned in mise.toml); what only you can
+#    do is the privileged helper:
+#      tbx system install && tbx doctor        # macOS; it asks for your
+#                                              # password itself
 #    (Linux: no `system install` — that is the macOS launchd installer; set up
 #     the systemd helper per talos-box's docs/linux.md. A Homebrew
 #     `randax/tap/tbx` also works but is not pinned — keep ONE tbx on PATH, or

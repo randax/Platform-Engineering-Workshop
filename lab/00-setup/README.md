@@ -32,7 +32,8 @@ From the repository root:
    ```bash
    ./scripts/dev-setup.sh          # step 1, installs tbx among the rest
    tbx system install              # macOS, one-time; asks for your password
-   tbx doctor                      # all PASS? you are on the VM substrate
+   tbx doctor                      # no FAIL? you are on the VM substrate
+                                   # (SKIPs before a cluster exists, and WARNs, are fine)
    ```
 
    (Linux: skip `system install` — it is the macOS launchd installer — and set up

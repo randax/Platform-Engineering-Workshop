@@ -31,10 +31,10 @@ same way module 07 seeds busybox:
 # docker/kind substrate — from the crane mirror on the host, offline:
 crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine \
   zot.cloudbox.k8s.test/library/golang:1.25-alpine
-# tbx substrate — the same warmed bytes via tbxd's catch-all port, offline;
-# <gateway> is your cluster's 172.30.<n>.1 (lab 08's README derives it from
-# `tbx status`):
-crane copy --insecure <gateway>:5059/public.ecr.aws/docker/library/golang:1.25-alpine \
+# tbx substrate — the same warmed bytes via tbxd's catch-all port on your
+# cluster's gateway (172.30.<n>.1), offline:
+MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5059"
+crane copy --insecure "$MIRROR/public.ecr.aws/docker/library/golang:1.25-alpine" \
   zot.cloudbox.k8s.test/library/golang:1.25-alpine
 ```
 Online, `public.ecr.aws/docker/library/golang:1.25-alpine` is the source either way.
