@@ -162,9 +162,13 @@ through this API?)
 
 ## Going deeper
 
-- **Upgrade Postgres by changing one line.** Create a second database at `version: "17"`,
-  wait for it, then bump that line to `"18"` and push. CNPG performs an in-place major
-  upgrade behind *your* API — the developer asked for a version, not for a migration plan.
+- **Upgrade Postgres by changing one line.** On a *throwaway* database — never `my-db`,
+  and never one with data you want — create it at `version: "17"`, wait for it, then bump
+  that line to `"18"` and push. CNPG attempts an in-place major upgrade behind *your* API:
+  watch for the `<name>-pg-1-major-upgrade` Job and follow its logs. If it fails, the
+  cluster stays in `Upgrading Postgres major version` and the fix is to delete the XR and
+  start again — which is itself the lesson. A major version is not a config value you can
+  take back, and the platform that offers it as one owes its users a way out.
   Prove it landed: `kubectl -n demo exec <cluster>-1 -c postgres -- psql -U postgres -tAc
   "select version()"`. This is the half of "managed service" the lab otherwise skips: day-1
   provisioning is easy, and day-2 lifecycle through the same declarative API is what people

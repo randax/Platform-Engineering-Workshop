@@ -228,7 +228,9 @@ git instead?
   actually do about it (`kubectl -n demo describe cluster console-db-pg`, look at the
   events)? You granted `patch` in module 08 and have never used it until now — every verb
   in that Role is a capability you handed over deliberately, and this is the one that lets
-  a form change infrastructure someone else's database is running on.
+  a form change infrastructure someone else's database is running on. Resize it back to
+  `small` when you have read the events — `medium` is a second instance, and modules 09 and
+  10 want that memory.
 
 <p align="center">
   <img src="../../docs/screenshots/console-new-function-dark.png" alt="Cloudbox Console — the New function modal: name, source, optional env vars and a keep-warm toggle; builds the image in-cluster and deploys it as a Knative Service" width="80%" />

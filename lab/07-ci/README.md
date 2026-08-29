@@ -185,16 +185,16 @@ That's the sovereignty argument in one answer.
 
 ## Going deeper
 
-- **Rebuild `:v1` and watch nothing happen.** Change `app/index.html`, submit the same
-  workflow again so it pushes `hello-site:v1` a second time, and refresh the page. It is
+- **Rebuild `:v1` and watch nothing happen.** Change `app/index.html`, push it to Gitea
+  (the build clones from there, not from your laptop), submit the same workflow again so it
+  pushes `hello-site:v1` a second time, and refresh the page. It is
   unchanged. Ask Zot what it thinks: `curl -s
   http://zot.cloudbox.k8s.test/v2/hello-site/manifests/v1 -H 'Accept:
   application/vnd.oci.image.manifest.v1+json' -I | grep -i docker-content-digest` — a new
   digest, same tag. Then `kubectl -n demo get pod -l app=hello-site -o
   jsonpath='{.items[0].status.containerStatuses[0].imageID}'` — the node still runs the old
-  one, because `imagePullPolicy: IfNotPresent` plus an unchanged tag means it never looks.
-  Roll forward properly by building `:v2` and updating the Deployment through git. A tag is
-  a lie you tell yourself; a digest is a fact. Module 08's Redeploy mints a fresh tag for
+  one: Kubernetes defaults a non-`:latest` tag to `IfNotPresent`, and an unchanged tag means
+  it never looks again. A tag is a lie you tell yourself; a digest is a fact. Module 08's Redeploy mints a fresh tag for
   exactly this reason, and module 10 pins digests for it too.
 
 - Change `index.html` (v2!), push to Gitea, build `:v2`, and roll `hello-site` to it via
