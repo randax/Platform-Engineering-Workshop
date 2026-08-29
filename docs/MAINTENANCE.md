@@ -218,13 +218,12 @@ has on PATH. Bumping it means all three of:
    Also re-check the version STRING: `tbx_version_check()` in `scripts/lib.sh` parses
    field 2 of `tbx version` and both `install.sh --check` and the tbx preflight compare it
    to `TBX_VERSION`.
-3. **Re-pin as soon as a release contains `053aecb`.** At v0.1.1 the Linux
-   `bridge-netfilter` doctor check turns an unprivileged `iptables -S FORWARD`
-   (exit 4) into a FAIL, so detection silently falls back to docker on hosts
-   where iptables cannot be inspected without privileges; `053aecb` makes it a
-   WARN with a sudo remediation. When the pin moves past it, drop the
-   "best-effort at v0.1.1" wording from the README's platform matrix and retire
-   the matching `docs/HAZARDS.md` entry.
+3. **The `053aecb` doctor caveat is closed.** Before v0.1.3 the Linux
+   `bridge-netfilter` doctor check turned an unprivileged `iptables -S FORWARD`
+   (exit 4) into a FAIL, so detection silently fell back to docker; the pin moved
+   past the fix (WARN with a sudo remediation) on 2026-08-29 and the README
+   "best-effort" wording and the matching `docs/HAZARDS.md` trap were retired
+   with it. Kept here so nobody re-adds the caveat from an old rehearsal note.
 4. **Re-run a full tbx rehearsal.** There is **no CI for this substrate** —
    `bootstrap-test.yaml` runs Docker on a GitHub runner and always will. A tbx pin that
    passes `check-consistency.sh` has been proven to agree with itself and nothing more.

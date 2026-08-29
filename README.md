@@ -165,7 +165,7 @@ means a hungry browser can shrink your cluster mid-module. Close the zoo anyway.
 | Platform | Substrate | Support |
 |---|---|---|
 | macOS, Apple Silicon | tbx (Docker if `tbx doctor` fails) | fully supported |
-| Linux, amd64/arm64 with KVM | tbx (Docker otherwise) | fully supported on Docker; **tbx is best-effort at the pinned v0.1.1** |
+| Linux, amd64/arm64 with KVM | tbx (Docker if `tbx doctor` fails) | fully supported |
 | macOS, Intel | Docker | fully supported |
 | Windows via WSL2 | Docker | best-effort — pair up if it fights you |
 | GitHub Codespaces / devcontainer | Docker | the lifeboat, tested weekly in CI |
@@ -196,18 +196,6 @@ CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh
 
 A machine with no record — a fresh laptop, CI — is unaffected: the override is simply the
 answer there.
-
-**Linux + tbx, the fine print.** Detection gates on `tbx doctor`, and at the pinned
-v0.1.1 one of its Linux checks turns a *permission* problem into a verdict: with
-`br_netfilter` active it runs `iptables -S FORWARD`, and an unprivileged shell's exit 4
-becomes `FAIL inspect FORWARD policy` rather than "could not tell". On such a host
-detection quietly falls back to Docker — which works, and is why this is best-effort
-rather than broken. If you want the VMs anyway and you have checked the FORWARD policy
-yourself, run `sudo iptables -S FORWARD` once to see the real answer and then force the
-substrate: `CLOUDBOX_SUBSTRATE=tbx ./scripts/create-cluster.sh` (add
-`CLOUDBOX_ALLOW_TBX_DRIFT=1` if you are on a newer tbx than the pin). Upstream fixed it
-in `053aecb` — WARN with a sudo remediation — so this note retires with the first tbx
-release that contains it.
 
 **Half-installed tbx.** If `tbx` is on your PATH but its helper daemon is not running, the
 docker path cannot ask it whether a `cloudbox` cluster exists there. It continues anyway

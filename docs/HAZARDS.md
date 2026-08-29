@@ -85,27 +85,6 @@ touches it, and on the docker substrate it behaves exactly as before.
 **Retired by:** a multi-arch CNOE image (re-check with the same `crane` sweep at
 pin-bump time), or dropping the component.
 
-## TRAP — on Linux, `tbx doctor` at v0.1.1 can call a permission problem a FAIL
-
-Detection gates on `tbx doctor`'s exit code (`substrate_detect`, `scripts/lib.sh`),
-which is the right gate — but at the **pinned v0.1.1** one Linux check answers the
-wrong question. `linuxBridgeNetfilterFinding` (`cmd/tbx/doctor_platform_linux.go`
-at the tag) runs `iptables -S FORWARD` when `br_netfilter` is active, and turns
-*any* error from it into `FAIL inspect FORWARD policy: exit status 4` — exit 4
-being what an unprivileged `iptables` returns when it cannot talk to the kernel.
-"I could not look" is reported as "I looked and it is broken".
-
-The blast radius is small and self-healing: the FAIL makes detection fall back to
-the docker substrate, which runs the identical workshop. That is why the README's
-matrix now calls Linux+tbx **best-effort at v0.1.1** rather than fully supported.
-The workaround, for someone who has checked their FORWARD policy themselves
-(`sudo iptables -S FORWARD`): force the substrate with `CLOUDBOX_SUBSTRATE=tbx`
-(plus `CLOUDBOX_ALLOW_TBX_DRIFT=1` if their tbx is newer than the pin).
-
-**Retired by:** a tbx release containing upstream `053aecb`, which makes that
-check WARN with a sudo remediation instead of FAIL. `docs/MAINTENANCE.md`'s tbx
-pin section says to re-pin when one exists.
-
 ## LIVE — tbx VM memory is a moving ceiling, and it is unrehearsed
 
 New on **2026-08-24** with the talos-box substrate (`docs/talos-box-vs-docker.md`,
