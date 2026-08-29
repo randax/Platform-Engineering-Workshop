@@ -64,6 +64,20 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    If the mirror isn't reachable on any substrate, `docker.io/library/busybox:1.37.0`
    is always a valid source — but then you're online.
 
+   **If that copy hangs** — no output, no error, just nothing — do not wait it out.
+   `crane` probes HTTPS before HTTP, and a registry that accepts the connection
+   without answering leaves it retrying `net/http: TLS handshake timeout` with
+   nothing on screen. Ctrl-C and give it a deadline, so a bad source fails in
+   seconds instead of eating the module:
+
+   ```bash
+   # same copy, but it gives up instead of hanging (issue #215)
+   ( mise x crane@0.21.9 -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
+       "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0 & \
+     pid=$!; ( sleep 45; kill "$pid" 2>/dev/null ) & wait "$pid" ) \
+     || echo "the mirror did not answer — use docker.io/library/busybox:1.37.0 as the source instead"
+   ```
+
    That's the platform-team move: you decide what base images exist in your cloud.
 4. Submit a build with [`workflow-run.yaml`](workflow-run.yaml) and follow it to
    `Succeeded`. Then prove the artifact is real: ask Zot's API what's in the registry
