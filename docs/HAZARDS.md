@@ -96,8 +96,8 @@ host quietly pads.
 **The same 6 GiB reserve is also a hard admission gate, and it nearly shipped as "tbx
 does not work on a 16 GB Mac".** `tbx up` does not merely warn about overcommit — it
 **errors** when planned VM memory exceeds host RAM minus that reserve, unless you pass
-`-force` (upstream `internal/daemon/balloon.go:174-202`, reserve default
-`internal/balloon/manager.go:108-119`). A 16 GB Mac is 16384 MiB, so the budget is
+`-force` (upstream `internal/daemon/balloon.go` `checkOvercommit`, reserve default
+`internal/balloon/manager.go` `DefaultConfig`). A 16 GB Mac is 16384 MiB, so the budget is
 **10240 MiB**, and the flat `4GiB + 8GiB = 12288 MiB` pair exceeded it on **every machine
 at the published minimum spec**. Nothing in the workshop would have started; the review
 that caught it was reading upstream, not running it.
@@ -118,11 +118,16 @@ sizes the guest kernel boots with, but `tbxd` runs an **active balloon manager**
 pressure and inflates the guests' virtio balloons when host free memory drops below a
 **6 GiB reserve**, taking memory back from a running node down to a **1 GiB per-node
 floor**, and deflating on release — with, since tbx v0.1.4, a 256 MiB deadband, a
-one-minute minimum between retargets, and a **pressure latch**: while host swap is above
-80% used (clears at 70%) or the compressor is busy, reclaimed memory is deliberately
-*held* even after free memory recovers (upstream `internal/balloon/manager.go`,
-`ReconcileSnapshot`). A guest that stays small after the host has calmed down is that
-latch, not a stuck balloon — `tbx status` prints the pressure notice while it is armed.
+one-minute minimum between retargets, and a **pressure latch**: it arms when host swap
+reaches 80% used, or the compressor holds ≥ 20% of RAM / 4 GiB, or macOS reports
+warning-or-worse pressure, and clears only when swap is below 70% *and* the compressor
+below 15% / 3 GiB *and* pressure is normal; while armed, reclaimed memory is
+deliberately *held* even after free memory recovers (upstream
+`internal/balloon/manager.go`, `ReconcileSnapshot`). A guest that stays small after the
+host has calmed down is that latch, not a stuck balloon. Do not expect `tbx status` to
+say so: its pressure notice is a separate ≥ 80%-swap advisory, silent for a latch armed
+by the compressor or in the 70–80% band — `pressureLatched=true` in `~/.talosbox/tbxd.log`
+is the honest signal (Rehearsal 7 saw it arm on compressor alone, swap at 19%).
 (Upstream `docs/SPEC.md` "balloon"; the Linux host-free sampler is not implemented, so
 the policy is presently inactive there.) We opt into it deliberately — `substrate_create()` patches
 `machine.kernel.modules: [virtio_balloon]` into the guests
@@ -180,7 +185,7 @@ dies in somebody's datacenter.
 check `route -n get`s each running cluster's gateway and first live node IP and fails if
 the interface is neither a bridge/vmnet interface nor `lo0`, with the detail "a VPN/ZTNA
 client has captured the cluster subnet" (`cmd/tbx/doctor_routes.go:35-84`,
-`cmd/tbx/doctor.go:302-317`; remediation in upstream `docs/macos.md:84`: "Disconnect or
+`cmd/tbx/doctor.go`, the `routes` findings; remediation in upstream `docs/macos.md:84`: "Disconnect or
 split-exclude the VPN/ZTNA client that captured `172.30.0.0/16`, then restart the
 cluster"). The trap is *when* we ask:
 
@@ -375,12 +380,12 @@ this section and not in a post-mortem.
 the machine config as a bonus layer, on the reasoning that "explicit entries win over `*`
 in containerd, so this only covers registries our list does not name" — which is true, and
 was the wrong thing to conclude from. What that patch renders (upstream
-`internal/manifests/manifests.go:218-231`) is a `RegistryMirrorConfig` for `"*"` with
+`internal/manifests/manifests.go`, the catch-all `RegistryMirrorConfig`) is one for `"*"` with
 **`skipFallback: true`**, and the registries our list does not name include
 **`localhost:30500`** — the in-cluster Zot, which is how the kubelet pulls every image
 lab 07, lab 09 and the Console *build*. tbx's mirror refuses to proxy a loopback or private
 authority (403 out of `validateResolvedAuthority` → `namespaceIPBlocked`,
-`internal/mirror/manager.go:313-327` and `:667-680`), and `skipFallback: true` forbids the
+`internal/mirror/manager.go`, `serveCatchAll` / `routeCatchAllRequest`), and `skipFallback: true` forbids the
 direct pull that would otherwise rescue it. Every first-party image would have landed in
 `ImagePullBackOff`, on the tbx substrate only, from module 07 onward.
 
@@ -419,7 +424,8 @@ conclusion drawn from them was wrong — for the second time on this one topic.
 
 **Fixed by** issue #206: `scripts/substrate/tbx.sh` keeps the eight explicit registries
 and `skipFallback: false`, with the endpoint `http://${CLOUDBOX_HOST_GATEWAY}:${TBX_MIRROR_PORT}`
-(`versions.env`, the one place `5059` is written). `/v2/` is curl-proved at the gateway
+(`versions.env`, the one place `5059` is *configured*; docs and lab READMEs quote the
+literal the way lab 07 quotes `5055`). `/v2/` is curl-proved at the gateway
 before it is baked into the machine config. `cloudbox-init.sh` warms that store with
 `tbx cache warm` over a generated `[mirror]`-only list (`images_mirror_refs`, `lib.sh` —
 `images.txt` as-is fails tbx's ref validation on its section headers), `install.sh
@@ -1085,7 +1091,7 @@ Everything that runs *inside* the container — `curl`, `kubectl`, every
 another machine is the shape of the problem; the fix would be a per-service
 path prefix, which no other substrate needs.
 
-## RETIRED — module 08's golang base was online-only on tbx (fixed by tbx v0.1.4)
+## RESOLVED — module 08's golang base was online-only on tbx (fixed by tbx v0.1.4)
 
 `lab/08-portal`'s deploy-from-source walkthrough (and `apps/demo-app`'s own
 README) has the attendee `crane copy` the golang builder base into Zot at run
@@ -1101,12 +1107,12 @@ were the per-registry listeners on the gateway — docker.io `:5055`
 `:5058`; `public.ecr.aws` sat only behind the `?ns=` catch-all, which crane
 cannot name, so the README sent tbx attendees to `public.ecr.aws` online.
 
-**Retired by** talos-box v0.1.4 (randax/talos-box#499): the catch-all port
+**Retired by:** talos-box v0.1.4 (randax/talos-box#499): the catch-all port
 `:5059` (`TBX_MIRROR_PORT`) also answers a **path form**,
 `<gateway>:5059/public.ecr.aws/docker/library/golang:1.25-alpine`, sharing the
 cache with containerd's `?ns=` form and serving a warmed image after
-`tbx mirror offline on`. Module 08's README and `apps/demo-app/Dockerfile` now
-use it; the re-pin to `docker.io/library/golang` this entry once weighed is no
+`tbx mirror offline on`. Module 08's README, `apps/demo-app`'s README and Dockerfile
+comment, and adventure 1's trap list now use it; the re-pin to `docker.io/library/golang` this entry once weighed is no
 longer needed. CI (`bootstrap-test.yaml`) still copies from `public.ecr.aws`
 on a runner with internet — it proves the pipeline, not the offline story;
 Rehearsal 7 in `docs/REHEARSALS.md` is where the path form was proven.

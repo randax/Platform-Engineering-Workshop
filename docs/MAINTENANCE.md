@@ -222,7 +222,8 @@ is the runtime assertion. Bumping it means all four of:
 3. **The `053aecb` doctor caveat is closed.** Before v0.1.3 the Linux
    `bridge-netfilter` doctor check turned an unprivileged `iptables -S FORWARD`
    (exit 4) into a FAIL, so detection silently fell back to docker; the pin moved
-   past the fix (WARN with a sudo remediation) on 2026-08-29 and the README
+   past the fix (WARN with a sudo remediation) when it went to v0.1.3 (released
+   2026-08-28, pinned here 2026-08-29) and the README
    "best-effort" wording and the matching `docs/HAZARDS.md` trap were retired
    with it. Kept here so nobody re-adds the caveat from an old rehearsal note.
 4. **Re-run a full tbx rehearsal.** There is **no CI for this substrate** —

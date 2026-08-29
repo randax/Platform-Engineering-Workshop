@@ -448,7 +448,7 @@ mirror_host_endpoint() {
 # announcing one.
 substrate_doctor_reason() {
   if ! have tbx; then
-    echo "tbx is not installed (brew install randax/tap/tbx, or the release tarball on Linux)"
+    echo "tbx is not installed (./scripts/dev-setup.sh installs the pinned one)"
     return 0
   fi
   # The platform gate detection applies, in words — asked of the same predicate
@@ -710,7 +710,7 @@ tbx_version_check() {
     warn "tbx is ${found:-unreadable}, pinned is ${TBX_VERSION} — allowed by CLOUDBOX_ALLOW_TBX_DRIFT=1"
     return 0
   fi
-  "${report}" "tbx version drift: this machine has ${found:-an unreadable version}, the workshop is pinned to ${TBX_VERSION} (scripts/versions.env). Install the pin (brew install randax/tap/tbx, or the matching release tarball), set CLOUDBOX_ALLOW_TBX_DRIFT=1 to proceed unpinned, or use the docker substrate: CLOUDBOX_SUBSTRATE=docker"
+  "${report}" "tbx version drift: this machine has ${found:-an unreadable version}, the workshop is pinned to ${TBX_VERSION} (scripts/versions.env). Install the pin with ./scripts/dev-setup.sh (mise) and make sure no other tbx sits earlier on PATH (a Homebrew one, say — 'tbx doctor' names them), set CLOUDBOX_ALLOW_TBX_DRIFT=1 to proceed unpinned, or use the docker substrate: CLOUDBOX_SUBSTRATE=docker"
 }
 
 # tbx_cluster_absent <name> — is there a tbx cluster of this name?

@@ -28,9 +28,15 @@ the builder base is pulled **from your own Zot registry** — seed it once, the
 same way module 07 seeds busybox:
 
 ```sh
-crane copy --insecure public.ecr.aws/docker/library/golang:1.25-alpine \
+# docker/kind substrate — from the crane mirror on the host, offline:
+crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine \
+  zot.cloudbox.k8s.test/library/golang:1.25-alpine
+# tbx substrate — the same warmed bytes via tbxd's catch-all port, offline
+# (gateway is 172.30.<n>.1; lab 08's README derives it from `tbx status`):
+crane copy --insecure 172.30.0.1:5059/public.ecr.aws/docker/library/golang:1.25-alpine \
   zot.cloudbox.k8s.test/library/golang:1.25-alpine
 ```
+Online, `public.ecr.aws/docker/library/golang:1.25-alpine` is the source either way.
 
 This repo is seeded into the in-cluster Gitea by `scripts/seed-gitea.sh` and
 lives in the platform repo under `apps/demo-app`.

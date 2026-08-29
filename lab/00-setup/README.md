@@ -31,11 +31,15 @@ From the repository root:
 
    ```bash
    ./scripts/dev-setup.sh          # step 1, installs tbx among the rest
-   sudo tbx system install         # one-time, needs your password
+   tbx system install              # macOS, one-time; asks for your password
    tbx doctor                      # all PASS? you are on the VM substrate
    ```
 
-   Skip the `sudo` step and nothing breaks: `tbx doctor` fails, and the scripts put you
+   (Linux: skip `system install` — it is the macOS launchd installer — and set up
+   the systemd helper per talos-box's `docs/linux.md`. On either OS, never
+   `sudo tbx …`: sudo's PATH can pick a different tbx than yours.)
+
+   Skip the helper step and nothing breaks: `tbx doctor` fails, and the scripts put you
    on Talos-in-Docker instead. Everyone else — Windows/WSL2, Codespaces, or any machine
    `tbx doctor` is unhappy with — runs the identical workshop on Talos-in-Docker. The
    scripts decide for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you
@@ -98,7 +102,7 @@ says which of the two you are in.
 hostnames. Run `./scripts/install.sh --write-hosts` when you are ready — do **not** re-run
 `create-cluster.sh`, which will refuse to create over the cluster you already have.
 
-**`tbx doctor` fails right after `sudo tbx system install`?** Give it a minute and run it
+**`tbx doctor` fails right after `tbx system install`?** Give it a minute and run it
 again. The helper needs a moment to write `/etc/resolver/k8s.test` and settle its network
 wiring, and doctor run in the same breath as the install reports `FAIL resolver` and
 `FAIL forwarding` for state that is already on its way — in one rehearsal `sysctl` showed

@@ -124,7 +124,7 @@ else
   if tbx_doctor_ok; then
     ok "tbx doctor passes"
   else
-    fail "tbx doctor reports problems — run 'tbx doctor' to see them (install with 'brew install randax/tap/tbx' + 'sudo tbx system install'), or use CLOUDBOX_SUBSTRATE=docker"
+    fail "tbx doctor reports problems — run 'tbx doctor' to see them (helper missing? 'tbx system install' on macOS, the systemd helper on Linux), or use CLOUDBOX_SUBSTRATE=docker"
   fi
 fi
 
@@ -138,7 +138,7 @@ fi
 
 # --- Required CLIs ---------------------------------------------------------
 # tbx is only required on the substrate that uses it — dev-setup.sh does not
-# install it (it needs a privileged one-time `sudo tbx system install`), so
+# install it (it needs a privileged one-time `tbx system install` on macOS), so
 # demanding it on the docker substrate would fail every Windows/WSL2 attendee.
 TOOLS="talosctl kubectl helm cilium jq git curl"
 if [ "$SUBSTRATE" = tbx ]; then TOOLS="$TOOLS tbx"; fi
@@ -152,7 +152,7 @@ for tool in $TOOLS; do
     ok "$tool found ($(command -v "$tool"))"
   else
     if [ "$tool" = tbx ]; then
-      fail "tbx not found in PATH — 'brew install randax/tap/tbx' (macOS) or the release tarball (Linux), then 'sudo tbx system install'; or use CLOUDBOX_SUBSTRATE=docker"
+      fail "tbx not found in PATH — run ./scripts/dev-setup.sh (mise installs the pinned tbx), then 'tbx system install' (macOS) or the systemd helper (Linux); or use CLOUDBOX_SUBSTRATE=docker"
     else
       fail "$tool not found in PATH — run ./scripts/dev-setup.sh, then restart your shell (mise activation)"
     fi

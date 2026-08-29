@@ -78,7 +78,8 @@ module-10-adjacent punchline — kill your worker mid-event and watch the replay
 - **Go base images**: in-cluster builds must `FROM` your own registries
   (the image mirror — `localhost:5001` on docker, which holds every registry's images;
   on tbx the host reaches docker.io at `172.30.<n>.1:5055`, ghcr.io `:5056`, quay.io `:5057`,
-  registry.k8s.io `:5058`, and nothing else host-side — or Zot :30500) — Docker Hub is rate-limited at the venue. The
+  registry.k8s.io `:5058`, and every other warmed registry through the catch-all's path
+  form, `172.30.<n>.1:5059/<registry>/<repo>:<tag>` — or Zot :30500) — Docker Hub is rate-limited at the venue. The
   mirror's image list is `scripts/images.txt`; if the base you want isn't
   there, build `FROM` busybox/static, or vendor the base at home.
 - **Cluster-local ksvc URLs** (pipeline services) don't resolve from your

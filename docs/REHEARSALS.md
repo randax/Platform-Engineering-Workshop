@@ -258,6 +258,56 @@ randax/talos-box#484 on a curated cluster to split "substrate property" from
 offline, and the mirror-through-tbx path did not exist yet. Rehearsal 7 is the
 first run that can retire any of that.
 
+## Rehearsal 7 — the full tbx path on the pinned release (2026-08-29)
+
+The run that PR #223's bump of talos-box to **v0.1.4** owed under
+`docs/MAINTENANCE.md` step 4. Apple Silicon, 32 GB, 10 CPUs, macOS with two LLM
+review agents and a Codex run sharing the laptop for most of it. First run with
+the images served from **tbxd's own mirror** (issue #206) — no Docker involved —
+and the first to reach modules 09 and 10 on tbx.
+
+| | rehearsal 7 (tbx v0.1.4) |
+|---|---|
+| `cloudbox-init.sh --yes` — 76 refs into tbx's mirror (`--jobs` default 8) + the Talos disk image | 76 warmed, 0 failed |
+| `install.sh --check` | all ✅ except the 40 GB free-disk floor (36 GB) |
+| `create-cluster.sh` — VMs, config, bootstrap, Cilium, both nodes `Ready`, VIP | **2 min 05 s** |
+| `bootstrap-gitops.sh` | 1 min 03 s |
+| `seed-gitea.sh` | 8 s |
+| labs 02–10, `solve.sh` then `verify.sh` each | 02 · 9 s, 03 · 67 s, 04 · 54 s, 05 · 67 s, 06 · 79 s, 07 · 46 s (second attempt), 08 · 45 s, 09 · 57 s, 10 · 120 s (inject → solve → verify) |
+| manual interventions | **0** — one lab re-run, see below |
+| ingress VIP | 30/30 probes answered afterwards; one blackout during the reboot below |
+
+**Everything on the path is offline-capable now.** Module 08's golang base —
+the one `public.ecr.aws` image on the list — is reachable host-side through the
+catch-all port's path form, new in v0.1.4:
+`curl -I http://172.30.0.1:5059/v2/public.ecr.aws/docker/library/golang/manifests/1.25-alpine`
+→ 200, still 200 after `tbx mirror offline on` (an uncached tag → 404), and
+`crane manifest --insecure 172.30.0.1:5059/public.ecr.aws/docker/library/golang:1.25-alpine`
+returns the index. That retires the module-08 trap in `docs/HAZARDS.md`.
+
+**The reboot.** During lab 07's `crane copy` to Zot the VIP reset connections
+at 22:01:55 and the copy died with `network is unreachable`; `tbx status`
+then showed `cloudbox-cp-1` in the new **`rebooted`** phase — Talos
+`boot_time` changed at 20:02:18Z while the VM process stayed up. tbxd's log
+at 22:02:21 has the host compressor at **6.8 GiB (from 1.1 GiB ten minutes
+earlier) and `pressureLatched=true`**, with 12.7 GB host-free, swap 19% and
+no balloon reclaim; the guest's own logs only show the new boot. Cause not
+captured — a host under compressor pressure from the co-resident agents is
+the leading suspect, and it is the shape `docs/HAZARDS.md`'s "moving
+ceiling" entry warns about. The cluster recovered by itself (etcd single
+node, kubelet `healthy`), lab 07 passed on a plain re-run, and `lab/01`'s
+grader — fixed in the same PR to count `rebooted` as configured — would
+have failed this healthy cluster on the old `phase == "configured"` test.
+`tbx doctor` reported the reboot as a WARN (exit 0), as its contract says.
+
+**What it does not say.** Nothing was run with the mirror offline except the
+path-form probe; the venue-shaped "warm at home, `tbx mirror offline on`,
+create" sequence is still unrehearsed end to end. Peak node RSS at the
+module-10 end state was not measured (the LIVE memory-ceiling hazard stays
+open). The host was over the disk floor: `tbx doctor` FAILs `host-pressure`
+at 95% data-volume use — a rule v0.1.3 already had — which on a fuller disk
+would have flipped detection to docker before any of this ran.
+
 ## What testing this taught us
 
 These are the lessons that generalise. Each one was paid for.
