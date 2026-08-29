@@ -36,17 +36,14 @@ from module 05 to any door is a supported move, not a cheat.
 
 ## Door 0 — the marked trail
 
-The original stretch modules, in order. Rehearsed, hinted, each with a
+Modules 07, 08 and 10 — the three the guided day does not reach (06 and 09 are core now).
+In order, rehearsed, hinted. Rehearsed, hinted, each with a
 `verify.sh` and a visible win:
 
-- **[Module 06 — Serverless](../lab/06-serverless/)**: Knative; curl a URL and
-  watch the pod appear from zero.
 - **[Module 07 — CI on your terms](../lab/07-ci/)**: your cluster builds its own
   images — Gitea → BuildKit → Zot, no external service touched.
 - **[Module 08 — The Console](../lab/08-portal/)**: a real cloud console whose
   entire source you can read; create a database from a form.
-- **[Module 09 — The capstone](../lab/09-capstone/)**: the Bruktby picture
-  pipeline — upload → event → scale-from-zero resizer → one trace in Grafana.
 - **[Module 10 — Day-2 ops](../lab/10-day2-ops/)**: an in-cluster AI agent
   diagnoses live faults; you fact-check it.
 

@@ -26,7 +26,7 @@ metadata:
   name: my-app
   namespace: default
 spec:
-  image: ghcr.io/knative/helloworld-go:latest   # pre-pulled; swap for your own later
+  image: ghcr.io/knative/helloworld-go@sha256:c2b7412fbea6f1ef24a0cac60698e88df7ae3c4278e42d0cb34fe7d4b2641bba   # by digest: upstream only publishes :latest, so that is what the mirror holds
   replicas: { min: 0, max: 2 }
 ```
 
@@ -68,7 +68,9 @@ module-10-adjacent punchline — kill your worker mid-event and watch the replay
   *and the thumbnail still appears* (you broke nothing).
 - Level 2: `crane ls localhost:30500/<repo> --insecure` lists your tag and the
   running pod's image is your Zot URL.
-- Level 3: `nats stream info` shows your consumer's ack floor advancing.
+- Level 3: the Console's **Streams** page shows your consumer's ack floor advancing.
+  (There is no `nats` CLI on this laptop — not in `mise.toml`, not in the NATS image. The
+  Streams page is the shipped way to watch JetStream, and it works offline.)
 
 ## Known traps
 

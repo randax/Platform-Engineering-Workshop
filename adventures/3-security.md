@@ -58,8 +58,8 @@ in your Zot (`cosign sign --key cosign.key localhost:30500/...`), then verify �
 and verify an *unsigned* image to see the refusal. Zot stores the signature as
 a normal OCI artifact; find it with `crane ls`. Stretch: add the sign step to
 the `build-and-push` WorkflowTemplate so the platform signs everything it
-builds, and admission-gate on it (Kyverno's `verifyImages`) — images for that
-are in the final prework refresh.
+builds, and admission-gate on it (Kyverno's `verifyImages`). That last step is an
+at-home one: no admission controller is in the mirror, so it needs the internet.
 
 **Arc 4 — audit the platform itself.** The builds namespace is PSA-privileged
 (rootless BuildKit needs it — module 07 explains). Is that label on anything
@@ -74,6 +74,20 @@ what you'd tighten first and why.
 - `hubble observe --verdict DROPPED` during an upload shows nothing — no rule
   is being brute-forced past.
 - `cosign verify` passes on your built image and fails on an unsigned one.
+
+**Arc 5 — see the map, not just the log lines.** `hubble observe` is one terminal's
+worth of truth. Turn on Hubble Relay and the UI — the images are already in your mirror,
+pinned for exactly this — and watch Arc 1's default-deny paint edges red in a picture the
+whole table can read:
+
+```bash
+helm upgrade cilium scripts/manifests/cilium-1.20.0.tgz -n kube-system --reuse-values \
+  --set hubble.relay.enabled=true --set hubble.ui.enabled=true
+kubectl -n kube-system port-forward svc/hubble-ui 12000:80
+```
+
+Observe-then-enforce needs a map the whole team can see; policy that only one person can
+read in a CLI stays one person's knowledge.
 
 ## Known traps
 
@@ -92,6 +106,10 @@ what you'd tighten first and why.
 - cosign in Zot: `--insecure-ignore-tlog` and `--allow-insecure-registry` — no
   public transparency log on an air-gapped laptop, and that's fine; you're the
   root of trust here.
+
+- **`--reuse-values` is not optional.** Cilium here is Helm-managed, not GitOps-managed,
+  and the workshop's Talos-specific values live only in that release. Drop the flag and you
+  reset them — and lose the cluster's networking. Copy the invocation; don't retype it.
 
 ## At home
 
