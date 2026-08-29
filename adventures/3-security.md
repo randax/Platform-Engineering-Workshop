@@ -75,8 +75,7 @@ what you'd tighten first and why.
   is being brute-forced past.
 - `cosign verify` passes on your built image and fails on an unsigned one.
 
-**Arc 5. See the map, not just the log lines.** `hubble observe` gives you one
-terminal's worth of truth. Turn on Hubble Relay and the UI, whose images are already in
+**Arc 5. See the map.** `hubble observe` gives you one terminal's worth of truth. Turn on Hubble Relay and the UI, whose images are already in
 your mirror, and watch Arc 1's default-deny paint edges red in a picture the whole table
 can read:
 

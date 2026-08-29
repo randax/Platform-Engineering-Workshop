@@ -36,7 +36,7 @@ from module 05 to any door is a supported move, not a cheat.
 
 ## Door 0 — the marked trail
 
-Modules 07, 08 and 10 — the three the guided day does not reach (06 and 09 are core now).
+Modules 07, 08 and 10, the three the guided day does not reach. 06 and 09 are core now.
 Rehearsed, hinted, each with a `verify.sh` and a visible win:
 
 - **[Module 07 — CI on your terms](../lab/07-ci/)**: your cluster builds its own

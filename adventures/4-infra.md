@@ -24,7 +24,7 @@ talosctl --context cloudbox get machineconfig -o yaml | less
 Find three deliberate choices in that config: the CNI is `none` (Cilium came by
 Helm — module 01), the kubelet's image, and KubePrism on `localhost:7445`
 (which is why Cilium's `k8sServiceHost` is `localhost` — check
-`cilium_install` in `scripts/lib.sh` — create-cluster.sh is a dispatcher now). Talos has **no SSH and no shell**; everything
+`cilium_install` in `scripts/lib.sh`, since create-cluster.sh is a dispatcher now). Talos has **no SSH and no shell**; everything
 you just did went through an authenticated API. That's the security model.
 
 ## The build
