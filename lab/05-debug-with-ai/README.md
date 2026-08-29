@@ -3,16 +3,16 @@
 ## The goal
 
 At the end of this module you have taken at least two injected faults from *symptom* to
-*verified root cause* to *fix* — and for at least one of them you have written down a
+*verified root cause* to *fix*. For at least one of them you have written down a
 diagnosis (yours or an AI agent's), then **proved or falsified it against the live
 cluster before acting**. `./verify.sh` confirms every injected fault is actually fixed.
 
 ## Why this matters
 
-Installing things teaches less per minute than debugging things — and in 2026, "debugging"
+Installing things teaches less per minute than debugging things, and in 2026 "debugging"
 usually starts with asking an assistant. Assistants are excellent at Kubernetes triage and
 *confidently wrong* just often enough to hurt. The skill of the decade is not prompting;
-it is **verification**: treating every diagnosis — human or machine — as a hypothesis and
+it is **verification**: treating every diagnosis, human or machine, as a hypothesis and
 designing the one observation that would kill it. Fair warning: one fault below was
 designed so that the obvious AI answer is plausible and wrong.
 
@@ -34,7 +34,7 @@ Four faults, in increasing order of deviousness. Each gets its own namespace
 ./restore.sh clean   # delete all fault namespaces when done
 ```
 
-Each fault dir has `description.md` — **that's the spoiler**, don't open it until you've
+Each fault dir has `description.md`. **That's the spoiler**, don't open it until you've
 committed to a diagnosis. `fix.yaml`/`fix.sh` is the canonical repair.
 
 ## The task
@@ -43,17 +43,17 @@ For each fault you take on (do at least 1 and 4; all four if time allows):
 
 1. `./inject.sh <n>`, then look at the namespace. Find the *symptom* first
    (`get all`, logs) before hunting causes.
-2. **Write down a one-sentence diagnosis** before fixing anything. Literally write it —
+2. **Write down a one-sentence diagnosis** before fixing anything. Literally write it:
    sticky note, scratch file, whatever. "The pod can't X because Y."
 3. **Verify it**: what would you observe on the live cluster if your sentence were true?
-   Go observe exactly that. If the observation disagrees, your diagnosis is dead —
-   write a new one. (This loop is the module.)
-4. Fix it — live edit, `kubectl apply`, whatever you like. Re-check the symptom.
+   Go observe exactly that. If the observation disagrees, your diagnosis is dead.
+   Write a new one. (This loop is the module.)
+4. Fix it: live edit, `kubectl apply`, whatever you like. Re-check the symptom.
 5. `./verify.sh` when you're done with all your faults.
 
 ### With an AI agent (recommended for at least fault 4)
 
-Give an agent read-only eyes on your cluster and make it do step 1–2 for you — then *you*
+Give an agent read-only eyes on your cluster and make it do step 1–2 for you, then *you*
 do step 3 on its answer:
 
 ```bash
@@ -64,7 +64,7 @@ KUBECONFIG=$PWD/ai-readonly.kubeconfig claude    # or kubectl-ai, k8sgpt analyze
 A prompt that works well: *"Something is wrong in namespace faultlab-04. Investigate and
 give me: (1) your root-cause hypothesis in one sentence, (2) the exact kubectl commands
 whose output would prove it, (3) your confidence."* Then run those commands yourself,
-against the real cluster, and pass verdict. The deliverable is not the fix — it's the
+against the real cluster, and pass verdict. The deliverable is not the fix. It's the
 sentence **"the agent claimed X; I checked Y; the claim was right/wrong because Z."**
 
 No agent handy? Pair up: one of you plays "confident AI", states a diagnosis from the
@@ -75,7 +75,7 @@ manifests alone; the other falsifies it against the cluster.
 <details>
 <summary>Hint 1: A triage order that almost always works</summary>
 
-1. `kubectl -n <ns> get all` — what's *not* green?
+1. `kubectl -n <ns> get all`: what's *not* green?
 2. Pod not Running/Ready → `kubectl describe pod` and read the **Events** bottom-up,
    then `kubectl logs` (add `--previous` after crashes).
 3. Pod `Pending` → it's a scheduling/resources/volumes problem, not a code problem.
@@ -100,7 +100,7 @@ kubectl -n kube-system exec ds/cilium -c cilium-agent -- \
 <details>
 <summary>Hint 3: How to interrogate an AI agent properly</summary>
 
-Don't ask "how do I fix it?" — you'll get a fix for *its* hypothesis, not necessarily
+Don't ask "how do I fix it?". You'll get a fix for *its* hypothesis, not necessarily
 your cluster. Ask for a **falsifiable claim + the evidence that would prove it**. If the
 agent proposes a fix that "can't hurt anyway": that's a smell. In this module, one fault
 punishes exactly that reflex. Fixes that don't follow from a verified cause aren't fixes;
@@ -128,7 +128,7 @@ removes the namespaces. (CI runs `solve.sh` = inject everything, restore everyth
 ```
 
 For every fault namespace that exists it checks the *outcome* (the workload actually
-works — availability, DB readiness, and for fault 4: repeated connection attempts, so a
+works: availability, DB readiness, and for fault 4 repeated connection attempts, so a
 half-fixed trap still fails), and that your platform (demo apps, ArgoCD health) survived
 the session.
 
@@ -140,7 +140,7 @@ you'd applied the fix for the wrong diagnosis?
 
 ## Going deeper
 
-- Re-run fault 4 pointing your agent at the cluster *with* read access and ask it again —
+- Re-run fault 4 pointing your agent at the cluster *with* read access and ask it again:
   does live access change its answer versus manifest-only reasoning? (This is the whole
   argument for agentic tooling with real cluster eyes, and for keeping it read-only.)
 - Design your own fault for your neighbor: same contract (`issue.yaml`, `fix.yaml`,

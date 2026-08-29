@@ -3,22 +3,22 @@
 ## The goal
 
 At the end of this module your platform exposes its own API: developers write a 10-line
-`WorkshopDatabase` resource and get a whole stack — a Postgres cluster *and* an S3 bucket
-— provisioned, wired, and lifecycle-managed. You prove it by pushing exactly such a
-10-liner and running `./verify.sh`.
+`WorkshopDatabase` resource and get a whole stack provisioned, wired, and
+lifecycle-managed: a Postgres cluster *and* an S3 bucket. You prove it by pushing exactly
+such a 10-liner and running `./verify.sh`.
 
 ## Why this matters
 
-Module 03 made *you* capable of provisioning databases — but your developers shouldn't
+Module 03 made *you* capable of provisioning databases. Your developers shouldn't
 need to know CNPG, storage classes, or RustFS endpoints. Platform engineering is building
 the **abstraction**: you define an API (`WorkshopDatabase`) and an implementation
 (Crossplane Composition), developers consume the API. This is precisely what `aws rds
-create-db-instance` is — except you own both sides of it now.
+create-db-instance` is, except you own both sides of it now.
 
 ⚠️ **A word about training data (yours and your AI's):** this is Crossplane **v2**.
-Claims are gone — you create namespaced XRs directly. Compositions are pipeline-mode only
+Claims are gone: you create namespaced XRs directly. Compositions are pipeline-mode only
 and emit *plain Kubernetes resources* (a CNPG `Cluster`, a `Job`) directly, no
-provider-kubernetes wrapping. Most tutorials online — and most LLM answers — still
+provider-kubernetes wrapping. Most tutorials online, and most LLM answers, still
 describe v1. If you see `kind: Claim`, `claimNames`, or `resources:` at the top level of
 a Composition, you're reading the past.
 
@@ -29,8 +29,8 @@ a Composition, you're reading the past.
 
 2. **Ship your platform API.** This lab dir contains the two halves under
    [`platform/`](platform/):
-   - [`xrd.yaml`](platform/xrd.yaml) — *what* developers may ask for (read the schema!)
-   - [`composition.yaml`](platform/composition.yaml) — *how* it's implemented
+   - [`xrd.yaml`](platform/xrd.yaml): *what* developers may ask for (read the schema!)
+   - [`composition.yaml`](platform/composition.yaml): *how* it's implemented
 
    Deliver them via your repo as a new component + Application (template:
    [`platform-api-app.yaml`](platform-api-app.yaml)). Confirm the XRD becomes
@@ -74,22 +74,22 @@ kubectl -n demo get cluster,job,pods                 # the real things it made
 crossplane beta trace workshopdatabase my-db -n demo # the whole tree, if crossplane CLI is installed
 ```
 
-`SYNCED True / READY False` while the database boots is normal — readiness bubbles up
+`SYNCED True / READY False` while the database boots is normal: readiness bubbles up
 from the CNPG cluster's own Ready condition. Give it 2–3 minutes.
 </details>
 
 <details>
-<summary>Hint 3: It's stuck — where do I look?</summary>
+<summary>Hint 3: It's stuck. Where do I look?</summary>
 
 In dependency order:
 
-1. `kubectl -n crossplane-system get pods` — is Crossplane itself up?
-2. `kubectl get functions.pkg.crossplane.io` — is `function-patch-and-transform` Healthy?
-3. `kubectl -n demo describe workshopdatabase my-db` — composition errors land in events.
+1. `kubectl -n crossplane-system get pods`: is Crossplane itself up?
+2. `kubectl get functions.pkg.crossplane.io`: is `function-patch-and-transform` Healthy?
+3. `kubectl -n demo describe workshopdatabase my-db`: composition errors land in events.
    "cannot compose resources" usually means the function name in the Composition doesn't
    match the installed Function.
 4. RBAC: if events say *forbidden*, Crossplane lacks rights on the composed kind
-   (`postgresql.cnpg.io` / `batch`) — the crossplane catalog app ships that ClusterRole;
+   (`postgresql.cnpg.io` / `batch`). The crossplane catalog app ships that ClusterRole;
    is it synced?
 5. The composed pieces themselves: `kubectl -n demo describe cluster my-db-pg`,
    `kubectl -n demo logs job/my-db-bucket`.
@@ -131,32 +131,32 @@ the Composition exists; `my-db` is Synced *and* Ready; the composed CNPG cluster
 ## One rule the schema cannot enforce for you
 
 Module 08's `Application` XR composes a Knative Service whose URL is
-`<name>-<namespace>.kn.cloudbox.k8s.test` — **name and namespace share one DNS label**, so
+`<name>-<namespace>.kn.cloudbox.k8s.test`: **name and namespace share one DNS label**, so
 they have to fit in 63 characters together, and a hyphen in the *namespace* makes the split
 ambiguous (`web-api` in `team` and `web` in `api-team` compose the same hostname).
 
 The XRD caps `metadata.name` at 40, and that is as far as a schema can go. A CRD validation
 rule cannot check the pair: Kubernetes exposes only `metadata.name` and
-`metadata.generateName` to CEL — "no other metadata properties are accessible" — so
+`metadata.generateName` to CEL, "no other metadata properties are accessible", so
 `self.metadata.namespace` is not a thing a rule can read. (Crossplane also copies
 `x-kubernetes-validations` only from the XRD's `spec` and `status` sub-schemas; a root-level
 rule never reaches the generated CRD at all.) The Console enforces the pair in code and
 refuses hyphens in project names; `kubectl apply` of a hand-written XR does not.
-Keep namespaces short and hyphen-free — see [docs/HAZARDS.md](../../docs/HAZARDS.md).
+Keep namespaces short and hyphen-free. See [docs/HAZARDS.md](../../docs/HAZARDS.md).
 
 ## Going further: the golden path
 
-This lab ships one more example you have not used — `examples/my-application.yaml`, an
+This lab ships one more example you have not used: `examples/my-application.yaml`, an
 `Application` XR that composes a workload, a database and a bucket from a single manifest.
 That is the shape [Nav's nais.yaml](https://nais.io) has at national scale, and it is the
 warm-up for **adventure door 1** (`adventures/1-app-dev.md`), which starts exactly there.
-Deploy it now if you are ahead, or leave it for the doors — either way, it is the answer to
+Deploy it now if you are ahead, or leave it for the doors. Either way, it is the answer to
 "what would this look like if my whole app were one file?".
 
 ## Explain-back
 
 Tell your neighbor: your teammate asks "why not just give developers the CNPG YAML from
-module 03 — it was only 30 lines?" Give the two strongest answers you have. (Think:
+module 03? It was only 30 lines." Give the two strongest answers you have. (Think:
 what can you change later without touching developers? what can developers *not* do
 through this API?)
 
@@ -175,8 +175,8 @@ through this API?)
   laptop only has so much RAM.
 
 - Edit `my-database.yaml` to `size: medium` (or `large`) via git. Watch the **one knob**
-  ripple: the CNPG cluster gains replicas (2, then 3 — HA) and storage, all from one word.
-  Then try `size: xlarge` — where does the rejection come from? That's your API's T-shirt
+  ripple: the CNPG cluster gains replicas (2, then 3, HA) and storage, all from one word.
+  Then try `size: xlarge`. Where does the rejection come from? That's your API's T-shirt
   enum doing policy. The developer never sees a CNPG field; the platform team owns what a
   size *means* in the Composition. That's the facade (PRD-0006).
 - Delete `my-database.yaml` from the repo and push. Watch Crossplane tear down the whole
