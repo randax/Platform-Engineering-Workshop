@@ -278,7 +278,7 @@ func BuildWorkshopDatabase(ns, name, size, version string) ([]byte, error) {
 		return nil, fmt.Errorf("size must be small, medium or large, got %q", size)
 	}
 	if version == "" {
-		version = "16"
+		version = "18"
 	}
 	xr := map[string]any{
 		"apiVersion": xrAPI,
@@ -322,7 +322,7 @@ func (k *Client) ResizeWorkshopDatabase(ctx context.Context, ns, name, size, ver
 		return fmt.Errorf("size must be small, medium or large, got %q", size)
 	}
 	if version == "" {
-		version = "16"
+		version = "18"
 	}
 	body, err := json.Marshal(map[string]any{"spec": map[string]any{"size": size, "version": version}})
 	if err != nil {

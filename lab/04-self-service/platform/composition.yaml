@@ -63,9 +63,10 @@ spec:
                 transforms:
                   - type: map
                     map:
-                      "15": ghcr.io/cloudnative-pg/postgresql:15.8
-                      "16": ghcr.io/cloudnative-pg/postgresql:16.4
-                      "17": ghcr.io/cloudnative-pg/postgresql:17.0
+                      "15": ghcr.io/cloudnative-pg/postgresql:15.14-system-trixie
+                      "16": ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
+                      "17": ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+                      "18": ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: metadata.name

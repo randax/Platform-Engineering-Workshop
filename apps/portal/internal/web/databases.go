@@ -6,11 +6,11 @@ package web
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	_ "github.com/lib/pq"
 	"html/template"
 	"net/http"
-	"database/sql"
-	_ "github.com/lib/pq"
 
 	"cloudbox.io/portal/internal/kube"
 	"cloudbox.io/portal/internal/metrics"
@@ -62,7 +62,7 @@ func fetchDatabases(ctx context.Context, s *Server, ns string, fl flash) (databa
 	if err != nil {
 		return databasesData{}, err
 	}
-	
+
 	data := databasesData{Clusters: clusters, Databases: dbs, Namespace: ns, Flash: fl}
 	if health, err := s.Kube.NamespaceWorkloads(ctx); err == nil && health["observability"].Ready > 0 && s.Prom != nil {
 		data.Telemetry = true
@@ -194,7 +194,7 @@ func handleDatabaseQuery(s *Server, w http.ResponseWriter, r *http.Request) {
 	host := clusterName + "-rw." + ns + ".svc.cluster.local"
 
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=require", user, pass, host, dbname)
-	
+
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		s.render(w, "query-result", map[string]any{"Error": "Failed to open connection: " + err.Error()})

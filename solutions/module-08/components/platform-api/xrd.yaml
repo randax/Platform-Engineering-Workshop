@@ -45,8 +45,8 @@ spec:
                   description: >-
                     The PostgreSQL major version. The platform maps this to the
                     specific approved and patched container image.
-                  enum: ["15", "16", "17"]
-                  default: "16"
+                  enum: ["15", "16", "17", "18"]
+                  default: "18"
                 size:
                   type: string
                   description: >-

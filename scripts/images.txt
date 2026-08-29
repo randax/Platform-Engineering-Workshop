@@ -67,6 +67,13 @@ ghcr.io/cloudnative-pg/cloudnative-pg:1.28.4
 # Default postgres image compiled into CNPG 1.28.4 (pkg/versions/versions.go);
 # also pinned explicitly by the Backstage database in gitops/
 ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+# The other majors the platform API offers (spec.version 15/16/17). Same
+# -system-trixie flavour as the default above, and the newest patch release of
+# each: the 15.8/16.4/17.0 the composition used to name are not published in
+# this flavour at all, so that mapping could never have pulled.
+ghcr.io/cloudnative-pg/postgresql:15.14-system-trixie
+ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
+ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
 # RustFS — Docker Hub only (no GHCR mirror upstream); prerelease by design, see
 # RESEARCH.md §2. rc.2 carries the fix for the rc.1 scanner log flood
 # (rustfs/rustfs#5927), re-measured in gitops/components/rustfs/VENDOR.md.
