@@ -209,6 +209,15 @@ production grade?
 
 ## Going deeper
 
+- **Cron is just another event source.** Nothing about the Broker cares that a human
+  uploaded a photo — it routes facts, whoever states them. Prove it with a `PingSource`
+  (the `pingsource-mt-adapter` has been running in `knative-eventing` since you enabled it,
+  doing nothing): schedule one for `* * * * *` that posts a `dev.cloudbox.image.uploaded`
+  CloudEvent naming a key already in `originals/`, point its `sink` at the Broker, and
+  watch the resizer wake on the tick with no uploader involved. Delete it when you have
+  seen it — a per-minute resize is a poor houseguest. The uploader was never special; it
+  was just the first thing that had something to say.
+
 - **Second consumer, zero coupling.** Add another Trigger on the same
   `dev.cloudbox.image.uploaded` type pointing at a new ksvc (start from module 06's
   `hello` — its logs will show the CloudEvent POSTs). Note what you did *not* have to

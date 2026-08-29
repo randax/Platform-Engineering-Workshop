@@ -222,6 +222,14 @@ git instead?
 
 ## Going deeper
 
+- **Resize from the form, then find the permission that allowed it.** On a database's
+  detail page, use the Resize action to move `console-db` from `small` to `medium`. Then
+  work backwards: which verbs in `portal-access.yaml` made that possible, and what did CNPG
+  actually do about it (`kubectl -n demo describe cluster console-db-pg`, look at the
+  events)? You granted `patch` in module 08 and have never used it until now — every verb
+  in that Role is a capability you handed over deliberately, and this is the one that lets
+  a form change infrastructure someone else's database is running on.
+
 <p align="center">
   <img src="../../docs/screenshots/console-new-function-dark.png" alt="Cloudbox Console — the New function modal: name, source, optional env vars and a keep-warm toggle; builds the image in-cluster and deploys it as a Knative Service" width="80%" />
 </p>

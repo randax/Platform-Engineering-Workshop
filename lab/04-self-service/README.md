@@ -162,6 +162,15 @@ through this API?)
 
 ## Going deeper
 
+- **Upgrade Postgres by changing one line.** Create a second database at `version: "17"`,
+  wait for it, then bump that line to `"18"` and push. CNPG performs an in-place major
+  upgrade behind *your* API — the developer asked for a version, not for a migration plan.
+  Prove it landed: `kubectl -n demo exec <cluster>-1 -c postgres -- psql -U postgres -tAc
+  "select version()"`. This is the half of "managed service" the lab otherwise skips: day-1
+  provisioning is easy, and day-2 lifecycle through the same declarative API is what people
+  are actually buying. The images for 15, 16, 17 and 18 are all pre-pulled, so it works
+  offline. Delete the extra database afterwards — a laptop only has so much RAM.
+
 - Edit `my-database.yaml` to `size: medium` (or `large`) via git. Watch the **one knob**
   ripple: the CNPG cluster gains replicas (2, then 3 — HA) and storage, all from one word.
   Then try `size: xlarge` — where does the rejection come from? That's your API's T-shirt
