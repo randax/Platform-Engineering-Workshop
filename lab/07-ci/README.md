@@ -52,22 +52,14 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
      "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
    ```
 
-   **On tbx this copy does not work today, and the reason is worth knowing.** The
-   mirror speaks plain HTTP. `crane` tries HTTPS first even with `--insecure`, and a
-   plain-HTTP listener accepts the connection and then says nothing — so instead of
-   failing over, crane sits there repeating `net/http: TLS handshake timeout`. A
-   registry that *refuses* TLS outright (Zot, behind the ingress) fails fast and the
-   fallback works; one that accepts and waits does not. So on tbx, take the source
-   from Docker Hub instead:
-
-   ```bash
-   mise x crane@0.21.9 -- crane copy --platform "linux/${NODE_ARCH}" \
-     docker.io/library/busybox:1.37.0 zot.cloudbox.k8s.test/library/busybox:1.37.0
-   ```
-
-   That is 4 MB and the one moment in module 07 that needs the internet — everything
-   after it, including the build itself, stays inside your cluster. On docker/kind the
-   mirror command above works as written and nothing leaves the laptop.
+   This works the same on tbx: the mirror speaks plain HTTP, `crane --insecure` tries
+   HTTPS first, gets an immediate non-TLS answer (~10 ms) and falls back to HTTP. Nothing
+   in module 07 needs the internet on either substrate. If `crane` instead sits repeating
+   `net/http: TLS handshake timeout`, the mirror's listener accepted the connection but
+   nothing answered — that is a stalled `tbxd`, not the mirror design: check
+   `curl -m5 http://<gateway>:5055/v2/` and `tbx system status`, and
+   `tbx system restart` if the daemon is wedged (randax/talos-box#498 tracks the
+   observability gap).
 
    If the mirror isn't reachable on any substrate, `docker.io/library/busybox:1.37.0`
    is always a valid source — but then you're online.
