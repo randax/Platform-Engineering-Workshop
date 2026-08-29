@@ -119,15 +119,18 @@ pressure and inflates the guests' virtio balloons when host free memory drops be
 **6 GiB reserve**, taking memory back from a running node down to a **1 GiB per-node
 floor**, and deflating on release — with, since tbx v0.1.4, a 256 MiB deadband, a
 one-minute minimum between retargets, and a **pressure latch**: it arms when host swap
-reaches 80% used, or the compressor holds ≥ 20% of RAM / 4 GiB, or macOS reports
-warning-or-worse pressure, and clears only when swap is below 70% *and* the compressor
-below 15% / 3 GiB *and* pressure is normal; while armed, reclaimed memory is
+reaches 80% used, or the compressor holds ≥ 20% of RAM (a 4 GiB absolute stands in only
+when total RAM is unreadable), or macOS reports warning-or-worse pressure, and clears only
+when swap is below 70% *and* the compressor below 15% (3 GiB in the same fallback) *and*
+pressure is normal; while armed, reclaimed memory is
 deliberately *held* even after free memory recovers (upstream
 `internal/balloon/manager.go`, `ReconcileSnapshot`). A guest that stays small after the
 host has calmed down is that latch, not a stuck balloon. Do not expect `tbx status` to
 say so: its pressure notice is a separate ≥ 80%-swap advisory, silent for a latch armed
 by the compressor or in the 70–80% band — `pressureLatched=true` in `~/.talosbox/tbxd.log`
-is the honest signal (Rehearsal 7 saw it arm on compressor alone, swap at 19%).
+is the honest signal (Rehearsal 7 saw it armed with the compressor at 6.6 GiB on a 32 GB
+host — over 20% on its own — and swap at 19%; the log line does not print the macOS
+pressure state, so that third trigger cannot be excluded).
 (Upstream `docs/SPEC.md` "balloon"; the Linux host-free sampler is not implemented, so
 the policy is presently inactive there.) We opt into it deliberately — `substrate_create()` patches
 `machine.kernel.modules: [virtio_balloon]` into the guests

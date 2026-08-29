@@ -50,7 +50,7 @@ cd lab/00-setup && ./verify.sh
 <!--
 The task: run the pre-flight, fix what it flags (most common: Docker not running, or Docker's memory limit below 10 GB), and run the module's verify.sh. No timer on this one — it runs underneath the next four sections.
 
-Substrate, said once so the room isn't confused by its neighbour's terminal: the scripts pick real Talos VMs (talos-box) where `tbx doctor` passes — Apple Silicon and Linux with KVM — and Talos-in-Docker everywhere else. `cat ~/.cloudbox/substrate` says which one a machine got, `CLOUDBOX_SUBSTRATE=docker` forces the fallback, and every module after 01 is identical on both. Anyone who skipped the prework's step 0 (`tbx system install && tbx doctor` after dev-setup.sh — tbx itself comes pinned via mise) is not stuck: they get the Docker path.
+Substrate, said once so the room isn't confused by its neighbour's terminal: the scripts pick real Talos VMs (talos-box) where `tbx doctor` passes — Apple Silicon and Linux with KVM — and Talos-in-Docker everywhere else. `cat ~/.cloudbox/substrate` says which one a machine got, `CLOUDBOX_SUBSTRATE=docker` forces the fallback, and every module after 01 is identical on both. Anyone who skipped the prework's step 0 (`tbx system install && tbx doctor` after dev-setup.sh on macOS, the systemd helper on Linux — tbx itself comes pinned via mise) is not stuck: they get the Docker path.
 
 Say the one prework line that pays off later: the optional OpenCode Zen key from lab/00-setup's README is what door 0's module 10 needs for its second beat. Anyone who skipped it should grab it now, while there's WiFi to spare.
 

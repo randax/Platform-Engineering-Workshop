@@ -137,8 +137,9 @@ else
 fi
 
 # --- Required CLIs ---------------------------------------------------------
-# tbx is only required on the substrate that uses it — dev-setup.sh does not
-# install it (it needs a privileged one-time `tbx system install` on macOS), so
+# tbx is only required on the substrate that uses it — dev-setup.sh installs
+# the binary (mise), but the substrate also needs the privileged helper (a
+# one-time `tbx system install` on macOS, the systemd units on Linux), so
 # demanding it on the docker substrate would fail every Windows/WSL2 attendee.
 TOOLS="talosctl kubectl helm cilium jq git curl"
 if [ "$SUBSTRATE" = tbx ]; then TOOLS="$TOOLS tbx"; fi

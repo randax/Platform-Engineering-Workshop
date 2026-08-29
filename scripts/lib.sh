@@ -724,8 +724,8 @@ tbx_version_check() {
 # a destroy erases state it could not see:
 #   * the cluster does not exist — `cluster.Load` cannot read its state file
 #     (upstream internal/cluster/store.go:63-70, the ONLY site whose wrapper
-#     says "read cluster state"), reached from the daemon's status op
-#     (internal/daemon/operations.go:1445-1449). The message is
+#     says "read cluster state"), reached from the daemon's status op via
+#     `cluster.Load` (internal/daemon/operations.go). The message is
 #     "read cluster state: open <dir>/<state file>: no such file or directory".
 #   * tbxd is not reachable — the CLI dials a unix socket
 #     (cmd/tbx/client.go:268, wrapped in dialError), and a MISSING SOCKET reads
@@ -790,7 +790,7 @@ tbx_local_evidence() {
 # that verb, `usage: tbx cache list [-o json] [<image-ref>]`). It returns
 # CacheListResult.images[], each entry carrying schematic/version/architecture
 # and the `incomplete` marker upstream sets for a combination with leftovers but
-# no usable image (internal/daemon/operations.go:422-443). Matching on
+# no usable image (the cache-list op in internal/daemon/operations.go). Matching on
 # architecture is the point: the cache is keyed schematic/version/ARCH, and the
 # old check globbed the version directory alone — so an amd64 disk pulled on a
 # Colima VM read as "cached" on an arm64 host whose VMs cannot boot it.
@@ -798,11 +798,11 @@ tbx_local_evidence() {
 # FALLBACK, when that command cannot be asked (no tbx binary, no jq, or a daemon
 # that will not answer — `cache list` is an RPC to tbxd): the on-disk layout,
 # ${HOME}/.talosbox/cache/<schematic>/<version>/<arch>/disk.raw
-# (internal/imagecache/cache.go:172). Cache.Ensure MkdirAll's that directory
-# before downloading (cache.go:163-168), so the FILE is asserted, not the
-# directory; disk.raw is published by temp-file-plus-rename (cache.go:394-417),
-# so its presence means complete. The legacy <schematic>/<version>/disk.raw
-# layout (cache.go:181) carries no architecture at all — it is accepted, and
+# (internal/imagecache/cache.go, `diskPath`). Cache.Ensure MkdirAll's that
+# directory before downloading, so the FILE is asserted, not the directory;
+# disk.raw is published by temp-file-plus-rename (the os.Rename sites in
+# cache.go), so its presence means complete. The legacy
+# <schematic>/<version>/disk.raw layout carries no architecture at all — it is accepted, and
 # TBX_CACHE_SOURCE says the arch could not be verified.
 #
 # Neither source is asked about the SCHEMATIC. Ours is talos-box's own default,
@@ -859,7 +859,7 @@ cloudbox_local_evidence() {
 # tbx_host_memory_mib — the host's physical RAM in MiB, or nothing when this
 # platform has no probe we trust. Deliberately the SAME sources tbxd reads, so
 # our arithmetic and its overcommit gate cannot disagree about the host:
-#   macOS  sysctl hw.memsize (bytes)   — internal/balloon/hostmem_darwin.go:17-23
+#   macOS  sysctl hw.memsize (bytes)   — internal/balloon/hostmem_darwin.go, HostTotalMiB
 #   Linux  /proc/meminfo MemTotal (kB) — tbxd has no Linux probe at all
 #          (internal/balloon/hostmem_stub.go), so nothing to disagree with.
 # Prints nothing rather than dying: it runs inside $( ), and the caller treats

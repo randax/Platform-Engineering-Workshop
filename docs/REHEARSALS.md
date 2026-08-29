@@ -76,7 +76,8 @@ therefore a checklist, not a result. Timings are blank on purpose: the owner
 fills them in on the day, the way the four numbers in the table above were filled
 in.
 
-`sudo tbx system install` is a **one-time privileged prerequisite** — it installs
+`tbx system install` (it sudo-s itself; the checklist below was written as `sudo tbx …`
+before upstream documented that form as PATH-unsafe) is a **one-time privileged prerequisite** — it installs
 the helper that does the VM and network wiring. It is not part of any script and
 nobody should discover it at the venue.
 
@@ -110,7 +111,7 @@ substrates and step 8 cannot pass.
 *Retires:* TRAP — the pinned portal image predates `KNATIVE_DOMAIN`. *Guards
 against:* TRAP — the release/pin publish window.
 
-**1. Install the helper.** `sudo tbx system install && tbx doctor` → **all PASS**.
+**1. Install the helper.** `tbx system install && tbx doctor` → **all PASS**.
 
 **2. Prework.** `./scripts/cloudbox-init.sh` → ends with `talos-disk=yes ·
 tbx-doctor=pass`. Confirm the disk image is really there, not just its directory:
@@ -269,44 +270,53 @@ and the first to reach modules 09 and 10 on tbx.
 | | rehearsal 7 (tbx v0.1.4) |
 |---|---|
 | `cloudbox-init.sh --yes` — 76 refs into tbx's mirror (`--jobs` default 8) + the Talos disk image | 76 warmed, 0 failed |
-| `install.sh --check` | all ✅ except the 40 GB free-disk floor (36 GB) |
-| `create-cluster.sh` — VMs, config, bootstrap, Cilium, both nodes `Ready`, VIP | **2 min 05 s** |
+| `install.sh --check` | all ✅ except the 40 GB free-disk floor (36 GB free — under it) |
+| `create-cluster.sh` — VMs, config, bootstrap, Cilium, both nodes `Ready`, VIP (= lab 01; its `verify.sh` passed on the fresh cluster, both nodes `configured`) | **2 min 05 s** |
 | `bootstrap-gitops.sh` | 1 min 03 s |
 | `seed-gitea.sh` | 8 s |
 | labs 02–10, `solve.sh` then `verify.sh` each | 02 · 9 s, 03 · 67 s, 04 · 54 s, 05 · 67 s, 06 · 79 s, 07 · 46 s (second attempt), 08 · 45 s, 09 · 57 s, 10 · 120 s (inject → solve → verify) |
-| manual interventions | **0** — one lab re-run, see below |
-| ingress VIP | 30/30 probes answered afterwards; one blackout during the reboot below |
+| manual recovery actions | **0** (the cluster healed itself); lab re-runs: **1** (07, see below) |
+| ingress VIP | 30/30 one-second probes answered once the node was back; unreachable from the host during the reboot below |
 
-**Everything on the path is offline-capable now.** Module 08's golang base —
-the one `public.ecr.aws` image on the list — is reachable host-side through the
-catch-all port's path form, new in v0.1.4:
+**Module 08's mirror path is offline-proven** (the rest of the offline story is
+not — see below). Its golang base — the one `public.ecr.aws` image on the
+list — is reachable host-side through the catch-all port's path form, new in
+v0.1.4 (gateway `172.30.0.1` here because this cluster got subnet index 0;
+lab 08 derives it from `tbx status`):
 `curl -I http://172.30.0.1:5059/v2/public.ecr.aws/docker/library/golang/manifests/1.25-alpine`
 → 200, still 200 after `tbx mirror offline on` (an uncached tag → 404), and
 `crane manifest --insecure 172.30.0.1:5059/public.ecr.aws/docker/library/golang:1.25-alpine`
-returns the index. That retires the module-08 trap in `docs/HAZARDS.md`.
+returns the index. That resolves the module-08 trap in `docs/HAZARDS.md`.
 
-**The reboot.** During lab 07's `crane copy` to Zot the VIP reset connections
-at 22:01:55 and the copy died with `network is unreachable`; `tbx status`
-then showed `cloudbox-cp-1` in the new **`rebooted`** phase — Talos
-`boot_time` changed at 20:02:18Z while the VM process stayed up. tbxd's log
-at 22:02:21 has the host compressor at **6.8 GiB (from 1.1 GiB ten minutes
-earlier) and `pressureLatched=true`**, with 12.7 GB host-free, swap 19% and
-no balloon reclaim; the guest's own logs only show the new boot. Cause not
-captured — a host under compressor pressure from the co-resident agents is
-the leading suspect, and it is the shape `docs/HAZARDS.md`'s "moving
-ceiling" entry warns about. The cluster recovered by itself (etcd single
-node, kubelet `healthy`), lab 07 passed on a plain re-run, and `lab/01`'s
-grader — fixed in the same PR to count `rebooted` as configured — would
-have failed this healthy cluster on the old `phase == "configured"` test.
-`tbx doctor` reported the reboot as a WARN (exit 0), as its contract says.
+**The reboot.** (Times below are local, CEST = UTC+2, except where marked Z.)
+During lab 07's `crane copy` to Zot the VIP reset connections at 22:01:55
+and the copy died with `network is unreachable`; `tbx status` then showed
+`cloudbox-cp-1` in the new **`rebooted`** phase — Talos `boot_time` changed
+at 20:02:18Z (22:02:18 local) while the VM process stayed up. **Cause not
+captured**: the guest's own logs only show the new boot. Concurrent evidence,
+recorded not diagnosed: tbxd's balloon line at 22:02:21 read
+`compressor=6808MiB` (6.6 GiB; the 21:52 line had 1091 MiB), `hostFree=12698`
+(12.4 GiB), `swapUsed=19%`, `pressureLatched=true`, balloon target unchanged
+at 4096 MiB — so the latch had armed but had reclaimed nothing, and the host
+was busy with two LLM review agents and a Codex run at the time. The cluster
+recovered by itself (etcd single node, kubelet `healthy`), lab 07 passed on a
+plain re-run, and `lab/01`'s grader — fixed in the same PR to count `rebooted`
+as configured — would have failed this healthy cluster on the old
+`phase == "configured"` test. `tbx doctor` afterwards: `WARN talos-services`
+for the reboot (a WARN never fails doctor), but the run as a whole exited
+**non-zero** on `FAIL host-pressure: talosbox data volume is 95% used` — the
+disk, see below, not the reboot.
 
 **What it does not say.** Nothing was run with the mirror offline except the
 path-form probe; the venue-shaped "warm at home, `tbx mirror offline on`,
 create" sequence is still unrehearsed end to end. Peak node RSS at the
 module-10 end state was not measured (the LIVE memory-ceiling hazard stays
-open). The host was over the disk floor: `tbx doctor` FAILs `host-pressure`
-at 95% data-volume use — a rule v0.1.3 already had — which on a fuller disk
-would have flipped detection to docker before any of this ran.
+open). And the host was **under** the 40 GB disk floor throughout: by the end
+`tbx doctor` FAILed `host-pressure` at 95% data-volume use — a rule v0.1.3
+already had — which is a detection-flipping FAIL: had it tripped before
+`create-cluster.sh`, this run would have landed on docker without a word
+beyond the preflight's ❌. The 40 GB floor in `install.sh --check` is what
+stands between an attendee and that.
 
 ## What testing this taught us
 

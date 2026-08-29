@@ -62,8 +62,9 @@ shellcheck = "0.11.0"
 # everything else instead of arriving via brew or a hand-fetched tarball. The
 # `exe=` hint is required: the repo is talos-box, the binary is tbx.
 #
-# This installs the BINARY only. The VM substrate also needs `tbx system
-# install` (a one-time privileged helper daemon) — lab/00-setup covers it. Skip
+# This installs the BINARY only. The VM substrate also needs the privileged
+# helper daemon — `tbx system install` on macOS (it sudo-s itself), the systemd
+# units on Linux — lab/00-setup covers it. Skip
 # that step and `tbx doctor` fails, substrate-decide.sh picks docker, and the
 # workshop runs identically on the fallback.
 "github:randax/talos-box[exe=tbx]" = "0.1.4"

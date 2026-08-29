@@ -116,8 +116,8 @@ allowed while `git` is not — and a blocked `git` does not fail, it waits forev
 `talosctl`) once, or run the workshop with the firewall in silent-allow mode.
 
 **"tbx is installed but cannot be inspected"?** That is a half-installed talos-box: the
-binary is on your PATH but its helper daemon has never run (`sudo tbx system install` not
-done, or the service is down). On the docker substrate the create continues by itself when
+binary is on your PATH but its helper daemon has never run (`tbx system install` not
+done on macOS / the systemd helper not set up on Linux, or the service is down). On the docker substrate the create continues by itself when
 this machine has never made a tbx cluster — there is nothing it could collide with. If you
 *have* used tbx here before, it stops instead, because two clusters called `cloudbox` is a
 mess you would meet an hour later: either fix tbx (`tbx doctor`), or, if you know its VMs
