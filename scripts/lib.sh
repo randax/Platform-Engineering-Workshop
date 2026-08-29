@@ -448,7 +448,7 @@ mirror_host_endpoint() {
 # announcing one.
 substrate_doctor_reason() {
   if ! have tbx; then
-    echo "tbx is not installed (brew install randax/tap/tbx, or the release tarball on Linux)"
+    echo "tbx is not installed (./scripts/dev-setup.sh installs the pinned one)"
     return 0
   fi
   # The platform gate detection applies, in words — asked of the same predicate
@@ -683,21 +683,20 @@ require_identity_match() { # <desired>
 # check_fail in install.sh --check). Lives in lib.sh, not in substrate/tbx.sh,
 # so --check can make the assertion without sourcing a create backend.
 #
-# Nothing asserted this before: check 10 in check-consistency.sh keeps
-# versions.env and mise.toml agreeing with EACH OTHER, and says in its own
-# comment that asserting the actual binary is the preflight's job — because tbx
-# has no mise backend yet (upstream #95/#96/#101), so mise installs and enforces
-# nothing. An attendee who ran `brew upgrade` gets whatever the tap has today,
-# and the cluster-yaml schema and the `tbx manifests` sections we render are
-# exactly the parts that move between versions.
+# Check 10 in check-consistency.sh keeps versions.env and mise.toml agreeing
+# with EACH OTHER, and mise's github backend installs that pin — but mise
+# enforces nothing about what is on PATH at run time: an attendee who installed
+# from the Homebrew tap, or ran `brew upgrade`, gets whatever the tap has today,
+# and the cluster-yaml schema and `tbx status` shape are exactly the parts that
+# move between versions. This is the assertion that catches that.
 #
-# `tbx version` prints "tbx v0.1.3 (darwin/arm64, daemon protocol N, …)"; take field 2 and accept
-# a bare "0.1.3" too. An unreadable answer is a mismatch, not a pass.
+# `tbx version` prints "tbx vX.Y.Z (darwin/arm64, daemon protocol N, …)"; take field 2 and accept
+# a bare "X.Y.Z" too. An unreadable answer is a mismatch, not a pass.
 # CLOUDBOX_ALLOW_TBX_DRIFT=1 is the documented escape hatch for whoever is
 # deliberately testing a newer tbx before the pin moves.
 tbx_version_check() {
   local report="$1" found
-  # Field 2 of "tbx v0.1.3 (darwin/arm64, daemon protocol N, …)". The field-1 fallback covers a
+  # Field 2 of "tbx vX.Y.Z (darwin/arm64, daemon protocol N, …)". The field-1 fallback covers a
   # future `tbx version` that prints the bare version, so a cosmetic upstream
   # change reads as drift-to-investigate rather than "unreadable" on every run.
   found="$(tbx version 2>/dev/null \
@@ -711,7 +710,7 @@ tbx_version_check() {
     warn "tbx is ${found:-unreadable}, pinned is ${TBX_VERSION} — allowed by CLOUDBOX_ALLOW_TBX_DRIFT=1"
     return 0
   fi
-  "${report}" "tbx version drift: this machine has ${found:-an unreadable version}, the workshop is pinned to ${TBX_VERSION} (scripts/versions.env). Install the pin (brew install randax/tap/tbx, or the matching release tarball), set CLOUDBOX_ALLOW_TBX_DRIFT=1 to proceed unpinned, or use the docker substrate: CLOUDBOX_SUBSTRATE=docker"
+  "${report}" "tbx version drift: this machine has ${found:-an unreadable version}, the workshop is pinned to ${TBX_VERSION} (scripts/versions.env). Install the pin with ./scripts/dev-setup.sh (mise) and make sure no other tbx sits earlier on PATH (a Homebrew one, say — 'tbx doctor' names them), set CLOUDBOX_ALLOW_TBX_DRIFT=1 to proceed unpinned, or use the docker substrate: CLOUDBOX_SUBSTRATE=docker"
 }
 
 # tbx_cluster_absent <name> — is there a tbx cluster of this name?
@@ -725,8 +724,8 @@ tbx_version_check() {
 # a destroy erases state it could not see:
 #   * the cluster does not exist — `cluster.Load` cannot read its state file
 #     (upstream internal/cluster/store.go:63-70, the ONLY site whose wrapper
-#     says "read cluster state"), reached from the daemon's status op
-#     (internal/daemon/operations.go:1445-1449). The message is
+#     says "read cluster state"), which the daemon's `status` handler
+#     (internal/daemon/operations.go) calls for a named cluster. The message is
 #     "read cluster state: open <dir>/<state file>: no such file or directory".
 #   * tbxd is not reachable — the CLI dials a unix socket
 #     (cmd/tbx/client.go:268, wrapped in dialError), and a MISSING SOCKET reads
@@ -766,7 +765,7 @@ tbx_cluster_absent() {
 #                                      (render_tbx_cluster_file, tbx.sh:129-156)
 #   ~/.talosbox/clusters/<name>      — upstream's own state directory, one per
 #                                      cluster, holding cluster.json
-#                                      (internal/cluster/store.go:14-22, const
+#                                      (internal/cluster/store.go, const
 #                                      stateFile = "cluster.json")
 # None of the three present means nothing this machine ever created with tbx can
 # be running, whatever tbxd says about itself.
@@ -791,7 +790,7 @@ tbx_local_evidence() {
 # that verb, `usage: tbx cache list [-o json] [<image-ref>]`). It returns
 # CacheListResult.images[], each entry carrying schematic/version/architecture
 # and the `incomplete` marker upstream sets for a combination with leftovers but
-# no usable image (internal/daemon/operations.go:422-443). Matching on
+# no usable image (the cache-list op in internal/daemon/operations.go). Matching on
 # architecture is the point: the cache is keyed schematic/version/ARCH, and the
 # old check globbed the version directory alone — so an amd64 disk pulled on a
 # Colima VM read as "cached" on an arm64 host whose VMs cannot boot it.
@@ -799,11 +798,11 @@ tbx_local_evidence() {
 # FALLBACK, when that command cannot be asked (no tbx binary, no jq, or a daemon
 # that will not answer — `cache list` is an RPC to tbxd): the on-disk layout,
 # ${HOME}/.talosbox/cache/<schematic>/<version>/<arch>/disk.raw
-# (internal/imagecache/cache.go:172). Cache.Ensure MkdirAll's that directory
-# before downloading (cache.go:163-168), so the FILE is asserted, not the
-# directory; disk.raw is published by temp-file-plus-rename (cache.go:394-417),
-# so its presence means complete. The legacy <schematic>/<version>/disk.raw
-# layout (cache.go:181) carries no architecture at all — it is accepted, and
+# (internal/imagecache/cache.go, `diskPath`). Cache.Ensure MkdirAll's that
+# directory before downloading, so the FILE is asserted, not the directory;
+# disk.raw is published by temp-file-plus-rename (the os.Rename sites in
+# cache.go), so its presence means complete. The legacy
+# <schematic>/<version>/disk.raw layout carries no architecture at all — it is accepted, and
 # TBX_CACHE_SOURCE says the arch could not be verified.
 #
 # Neither source is asked about the SCHEMATIC. Ours is talos-box's own default,
@@ -860,7 +859,7 @@ cloudbox_local_evidence() {
 # tbx_host_memory_mib — the host's physical RAM in MiB, or nothing when this
 # platform has no probe we trust. Deliberately the SAME sources tbxd reads, so
 # our arithmetic and its overcommit gate cannot disagree about the host:
-#   macOS  sysctl hw.memsize (bytes)   — internal/balloon/hostmem_darwin.go:17-23
+#   macOS  sysctl hw.memsize (bytes)   — internal/balloon/hostmem_darwin.go, HostTotalMiB
 #   Linux  /proc/meminfo MemTotal (kB) — tbxd has no Linux probe at all
 #          (internal/balloon/hostmem_stub.go), so nothing to disagree with.
 # Prints nothing rather than dying: it runs inside $( ), and the caller treats
@@ -1759,7 +1758,8 @@ remove_hosts_block() {
 # copies pre-pulled docker.io images out of: `crane copy --insecure
 # $(mirror_host_source)/library/busybox:1.37.0 zot…` in module 07's solve and
 # post.sh (catch-up's venue path). (Module 08's golang base is a public.ecr.aws
-# ref and is NOT reachable this way on tbx — its README copies it online there.)
+# ref, which this listener does not serve; on tbx its README uses the catch-all
+# port's path form instead — `<gateway>:TBX_MIRROR_PORT/public.ecr.aws/…`.)
 # On docker/kind
 # that is the crane container on localhost:MIRROR_PORT, which stores every
 # registry's images under the registry-stripped path. On tbx there is no such

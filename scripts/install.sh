@@ -238,11 +238,12 @@ fi
 # preflight that passes. A machine that cannot create a cluster read as ready.
 if [[ "${SUBSTRATE}" == "tbx" ]]; then
   if ! have tbx; then
-    check_fail "substrate is tbx but the 'tbx' binary is not on PATH — install talos-box (brew install randax/tap/tbx && sudo tbx system install), or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
+    check_fail "substrate is tbx but the 'tbx' binary is not on PATH — install talos-box the pinned way: ./scripts/dev-setup.sh, then 'tbx system install' (macOS; it re-runs itself under sudo) or, on Linux, the systemd helper from upstream docs/linux.md at the ${TBX_VERSION} tag (mise ships only the binaries); or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
   else
     # The pin this laptop will actually run. check-consistency.sh check 10 only
-    # proves versions.env and mise.toml agree with each other — mise has no tbx
-    # backend to install from, so the binary on PATH is unasserted until here.
+    # proves versions.env and mise.toml agree with each other, and mise installs
+    # that pin — but a Homebrew tbx earlier on PATH wins, so the binary that
+    # will actually run is unasserted until here.
     tbx_version_check check_fail
     # `tbx doctor` is the tbx substrate's real preflight: helper, resolver, DNS
     # wiring, forwarding, routes, host pressure, mirror health, image access.
@@ -257,7 +258,15 @@ if [[ "${SUBSTRATE}" == "tbx" ]]; then
       printf '%s\n' "${TBX_DOCTOR_OUT}"
       check_fail "'tbx doctor' reports problems (above) — fix them, or run the docker substrate: CLOUDBOX_SUBSTRATE=docker"
     else
-      ok "tbx doctor is clean"
+      # A clean run can still carry WARN lines (host pressure, a rebooted
+      # node, two tbx binaries on PATH). They never fail the gate — doctor's
+      # contract is FAIL-only for the exit code — but hiding them behind
+      # "clean" is how an attendee learns about swap at the venue.
+      if printf '%s\n' "${TBX_DOCTOR_OUT}" | grep '^WARN'; then
+        ok "tbx doctor passes, with the WARN lines above"
+      else
+        ok "tbx doctor is clean"
+      fi
     fi
   fi
   # The one pinned image with no arm64 build. tbx VMs are native — nothing

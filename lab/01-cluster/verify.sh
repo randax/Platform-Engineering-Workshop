@@ -49,8 +49,12 @@ fi
 if [ "$SUBSTRATE" = tbx ]; then
   # `tbx status <cluster> -o json` prints a JSON ARRAY of ClusterStatus even for
   # one named cluster, so normalise before reading .nodes[].
+  # A node that Talos rebooted in place while its VM process stayed up (the
+  # stall recovery in this lab's hints, module 05's faults) reports "rebooted"
+  # for 15 minutes; upstream counts it as configured (Phase.Configured in
+  # internal/daemon/phase.go) and so does this grader.
   TBX_JSON="$(tbx status cloudbox -o json 2>/dev/null || true)"
-  NODES="$(printf '%s' "$TBX_JSON" | jq -r '(if type == "array" then ((map(select(.name == "cloudbox")) | first) // {}) else . end) | [(.nodes // [])[] | select(.phase == "configured")] | length' 2>/dev/null || echo 0)"
+  NODES="$(printf '%s' "$TBX_JSON" | jq -r '(if type == "array" then ((map(select(.name == "cloudbox")) | first) // {}) else . end) | [(.nodes // [])[] | select(.phase == "configured" or .phase == "rebooted")] | length' 2>/dev/null || echo 0)"
   case "$NODES" in ''|*[!0-9]*) NODES=0 ;; esac
   if [ "$NODES" -ge 2 ]; then
     ok "cloudbox Talos VMs are running and configured (${NODES})"

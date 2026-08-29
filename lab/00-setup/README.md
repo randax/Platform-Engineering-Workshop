@@ -31,11 +31,15 @@ From the repository root:
 
    ```bash
    ./scripts/dev-setup.sh          # step 1, installs tbx among the rest
-   sudo tbx system install         # one-time, needs your password
-   tbx doctor                      # all PASS? you are on the VM substrate
+   tbx system install              # macOS, one-time; asks for your password
+   tbx doctor                      # no FAIL? you are on the VM substrate
+                                   # (SKIPs before a cluster exists, and WARNs, are fine)
    ```
 
-   Skip the `sudo` step and nothing breaks: `tbx doctor` fails, and the scripts put you
+   (Linux: mise ships only the three binaries; the helper is a systemd unit set (units, sysusers, polkit rule) that talos-box's docs/linux.md installs from a source checkout — check out the tag pinned as `TBX_VERSION` in `scripts/versions.env` so daemon and helper match the pinned client, and do not run `system install` there (it is the macOS launchd installer). On either OS, never
+   `sudo tbx …`: sudo's PATH can pick a different tbx than yours.)
+
+   Skip the helper step and nothing breaks: `tbx doctor` fails, and the scripts put you
    on Talos-in-Docker instead. Everyone else — Windows/WSL2, Codespaces, or any machine
    `tbx doctor` is unhappy with — runs the identical workshop on Talos-in-Docker. The
    scripts decide for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you
@@ -98,7 +102,7 @@ says which of the two you are in.
 hostnames. Run `./scripts/install.sh --write-hosts` when you are ready — do **not** re-run
 `create-cluster.sh`, which will refuse to create over the cluster you already have.
 
-**`tbx doctor` fails right after `sudo tbx system install`?** Give it a minute and run it
+**`tbx doctor` fails right after `tbx system install`?** Give it a minute and run it
 again. The helper needs a moment to write `/etc/resolver/k8s.test` and settle its network
 wiring, and doctor run in the same breath as the install reports `FAIL resolver` and
 `FAIL forwarding` for state that is already on its way — in one rehearsal `sysctl` showed
@@ -112,8 +116,8 @@ allowed while `git` is not — and a blocked `git` does not fail, it waits forev
 `talosctl`) once, or run the workshop with the firewall in silent-allow mode.
 
 **"tbx is installed but cannot be inspected"?** That is a half-installed talos-box: the
-binary is on your PATH but its helper daemon has never run (`sudo tbx system install` not
-done, or the service is down). On the docker substrate the create continues by itself when
+binary is on your PATH but its helper daemon has never run (`tbx system install` not
+done on macOS / the systemd helper not set up on Linux, or the service is down). On the docker substrate the create continues by itself when
 this machine has never made a tbx cluster — there is nothing it could collide with. If you
 *have* used tbx here before, it stops instead, because two clusters called `cloudbox` is a
 mess you would meet an hour later: either fix tbx (`tbx doctor`), or, if you know its VMs

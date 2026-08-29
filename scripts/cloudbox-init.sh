@@ -187,10 +187,10 @@ tbx_warm_mirror() {
       return 0
     fi
     if ! grep -q '^summary:' "${out}"; then
-      die "could not ask tbxd to warm the store (above) — is the helper running and current? 'tbx doctor' (sudo tbx system install if it never was)"
+      die "could not ask tbxd to warm the store (above) — is the helper running and current? 'tbx doctor' (tbx system install on macOS, the systemd helper on Linux, if it never was)"
     fi
     # Retry ONLY what failed. `tbx cache warm` re-resolves every tag in the list
-    # upstream on each pass, so a second pass over all 73 refs is 73 more
+    # upstream on each pass, so a second pass over all 76 refs is 76 more
     # registry round-trips to fix two — and a rehearsal proved what that costs:
     # Docker Hub answered `429 TOOMANYREQUESTS`, which then broke images that
     # were ALREADY cached (busybox, which local-path-provisioner's helper pod

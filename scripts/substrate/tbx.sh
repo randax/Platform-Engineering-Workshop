@@ -26,7 +26,7 @@ substrate_preflight() {
   # into the machine config; without curl that proof cannot run, and a venue
   # cluster whose nodes cannot reach their only image source is what it guards.
   need curl "The tbx substrate proves the image mirror is reachable with curl before creating the cluster."
-  need tbx "Install talos-box: 'brew install randax/tap/tbx && sudo tbx system install' (macOS) or the release tarball + systemd helper (Linux). Or run the docker substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
+  need tbx "install talos-box the pinned way: ./scripts/dev-setup.sh, then tbx system install (macOS; it re-runs itself under sudo) or, on Linux, the systemd helper from upstream docs/linux.md at the pinned tag (mise ships only the binaries). Or run the docker substrate: CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh"
   # `tbx doctor` exits non-zero on any FAIL finding. It checks the helper, the
   # resolver, DNS wiring, forwarding, routes, host pressure, mirror health and
   # image access — all of which the workshop needs and none of which a bare
@@ -53,7 +53,9 @@ substrate_preflight() {
        # the whole cluster and 20 minutes of re-create; `tbx cluster start|resume
        # <name>` (cmd/tbx/main.go) brings the same one back. Phases come from
        # `tbx status -o json`: stopped | suspended | unreachable | maintenance |
-       # configured (internal/daemon/phase.go). WHICH verb matters:
+       # configured | rebooted (internal/daemon/phase.go; `rebooted` is a
+       # configured node whose Talos boot identity changed while the VM
+       # process stayed up, held for 15 min). WHICH verb matters:
        # tbx_restart_verb picks `resume` for a suspended cluster, because
        # `start` cold-boots it and discards the saved memory.
        if tbx_cluster_all_stopped; then
@@ -238,7 +240,7 @@ render_tbx_cluster_file() {
 # one named cluster (cmd/tbx/main.go:661-670 unmarshals into []ClusterStatus
 # and encodes that) — hence the normaliser below, which also tolerates a bare
 # object in case a later tbx unwraps it. A missing cluster is an error from
-# `cluster.Load` (internal/daemon/operations.go:1446-1449), so a non-zero exit
+# `cluster.Load` in the daemon's `status` handler (internal/daemon/operations.go), so a non-zero exit
 # is what "no such cluster" looks like — which is what preflight and destroy
 # key on.
 tbx_cluster_json() {
@@ -259,9 +261,9 @@ tbx_node_ip() { # <control-plane|worker>
 # tbx_cluster_all_stopped — 0 when the cluster has nodes and NONE of them is
 # running. `stopped` and `suspended` are the two phases with no VM behind them
 # (internal/daemon/phase.go: PhaseStopped, PhaseSuspended, and Phase.Stopped()
-# treats them as one); `unreachable`, `maintenance` and `configured` all mean a
-# VM is up. Empty or unreadable status is NOT "all stopped" — an absent answer
-# must never turn into advice to start something.
+# treats them as one); `unreachable`, `maintenance`, `configured` and `rebooted`
+# all mean a VM is up. Empty or unreadable status is NOT "all stopped" — an
+# absent answer must never turn into advice to start something.
 tbx_cluster_all_stopped() {
   local verdict
   verdict="$(tbx_cluster_json | jq -r '

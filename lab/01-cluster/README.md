@@ -184,11 +184,12 @@ tbx node stop  cloudbox cloudbox-worker-1             # or cloudbox-cp-1
 tbx node start cloudbox cloudbox-worker-1
 ```
 
-then keep watching `kubectl get nodes -w`. (A later talos-box release is expected
-to make `tbx status cloudbox` say "stalled" directly — randax/talos-box#482 — but
-the recovery stays `tbx node stop` + `start`; on the release this workshop pins
-(`TBX_VERSION` in `scripts/versions.env`) the `service` command is the honest
-signal.)
+then keep watching `kubectl get nodes -w`. (`tbx status cloudbox` also names a
+stalled service directly, and `tbx doctor` FAILs on one — randax/talos-box#482 —
+so either is a shortcut to the same verdict; the `service` command above is the
+one that shows the byte count. The recovery is the same either way. After an
+in-guest reboot the node shows as `rebooted` in `tbx status` for 15 minutes;
+that is a configured node, not a problem.)
 </details>
 
 <details>
