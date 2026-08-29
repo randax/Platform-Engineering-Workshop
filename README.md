@@ -103,7 +103,8 @@ cd Platform-Engineering-Workshop
 tbx system install && tbx doctor   # asks for your password itself; "no FAIL" is the bar
 #     (Linux with KVM: mise ships only the binaries — the helper is a systemd unit
 #      set that talos-box's docs/linux.md installs from a source checkout; check out
-#      the v0.1.4 tag so daemon and helper match the pinned client, and do NOT run
+#      the tag pinned as TBX_VERSION in scripts/versions.env so daemon and helper
+#      match the pinned client, and do NOT run
 #      `system install` there. A Homebrew `randax/tap/tbx` also works but is not
 #      pinned — keep ONE tbx/tbxd/tbx-helper triad on PATH, or `tbx doctor` warns.
 #      Never `sudo tbx …`: sudo's PATH may find a different tbx; use

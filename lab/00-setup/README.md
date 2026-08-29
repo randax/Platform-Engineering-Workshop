@@ -36,7 +36,7 @@ From the repository root:
                                    # (SKIPs before a cluster exists, and WARNs, are fine)
    ```
 
-   (Linux: mise ships only the three binaries; the helper is a systemd unit set (units, sysusers, polkit rule) that talos-box's docs/linux.md installs from a source checkout — check out the v0.1.4 tag so daemon and helper match the pinned client, and do not run `system install` there (it is the macOS launchd installer). On either OS, never
+   (Linux: mise ships only the three binaries; the helper is a systemd unit set (units, sysusers, polkit rule) that talos-box's docs/linux.md installs from a source checkout — check out the tag pinned as `TBX_VERSION` in `scripts/versions.env` so daemon and helper match the pinned client, and do not run `system install` there (it is the macOS launchd installer). On either OS, never
    `sudo tbx …`: sudo's PATH can pick a different tbx than yours.)
 
    Skip the helper step and nothing breaks: `tbx doctor` fails, and the scripts put you
