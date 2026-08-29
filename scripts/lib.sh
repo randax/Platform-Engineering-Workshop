@@ -691,13 +691,13 @@ require_identity_match() { # <desired>
 # and the cluster-yaml schema and the `tbx manifests` sections we render are
 # exactly the parts that move between versions.
 #
-# `tbx version` prints "tbx v0.1.3 (darwin/arm64, daemon protocol N, …)"; take field 2 and accept
-# a bare "0.1.3" too. An unreadable answer is a mismatch, not a pass.
+# `tbx version` prints "tbx v0.1.4 (darwin/arm64, daemon protocol N, …)"; take field 2 and accept
+# a bare "0.1.4" too. An unreadable answer is a mismatch, not a pass.
 # CLOUDBOX_ALLOW_TBX_DRIFT=1 is the documented escape hatch for whoever is
 # deliberately testing a newer tbx before the pin moves.
 tbx_version_check() {
   local report="$1" found
-  # Field 2 of "tbx v0.1.3 (darwin/arm64, daemon protocol N, …)". The field-1 fallback covers a
+  # Field 2 of "tbx v0.1.4 (darwin/arm64, daemon protocol N, …)". The field-1 fallback covers a
   # future `tbx version` that prints the bare version, so a cosmetic upstream
   # change reads as drift-to-investigate rather than "unreadable" on every run.
   found="$(tbx version 2>/dev/null \

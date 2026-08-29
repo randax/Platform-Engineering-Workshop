@@ -66,7 +66,7 @@ shellcheck = "0.11.0"
 # install` (a one-time privileged helper daemon) — lab/00-setup covers it. Skip
 # that step and `tbx doctor` fails, substrate-decide.sh picks docker, and the
 # workshop runs identically on the fallback.
-"github:randax/talos-box[exe=tbx]" = "0.1.3"
+"github:randax/talos-box[exe=tbx]" = "0.1.4"
 # node — only for the Slidev presentation
 node = "24"
 

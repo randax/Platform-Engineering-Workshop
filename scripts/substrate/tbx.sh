@@ -259,8 +259,8 @@ tbx_node_ip() { # <control-plane|worker>
 # tbx_cluster_all_stopped — 0 when the cluster has nodes and NONE of them is
 # running. `stopped` and `suspended` are the two phases with no VM behind them
 # (internal/daemon/phase.go: PhaseStopped, PhaseSuspended, and Phase.Stopped()
-# treats them as one); `unreachable`, `maintenance` and `configured` all mean a
-# VM is up. Empty or unreadable status is NOT "all stopped" — an absent answer
+# treats them as one); `unreachable`, `maintenance`, `configured` and `rebooted`
+# (v0.1.4) all mean a VM is up. Empty or unreadable status is NOT "all stopped" — an absent answer
 # must never turn into advice to start something.
 tbx_cluster_all_stopped() {
   local verdict
