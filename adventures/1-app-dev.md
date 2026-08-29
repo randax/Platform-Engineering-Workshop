@@ -32,7 +32,7 @@ spec:
 
 Push it through Gitea, then look at what one manifest bought you: a
 scale-from-zero Knative Service with a URL
-(`http://my-app.default.127.0.0.1.sslip.io:31080`), its own Postgres
+(`http://my-app-default.kn.cloudbox.k8s.test`), its own Postgres
 (a `WorkshopDatabase` XR underneath — composition-of-compositions), and an S3
 bucket `my-app-data`. That's a nais.yaml-shaped experience you built yourself in
 module 04. Read `gitops/components/application-xr/composition.yaml` and find

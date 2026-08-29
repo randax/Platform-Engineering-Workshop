@@ -144,6 +144,15 @@ rule never reaches the generated CRD at all.) The Console enforces the pair in c
 refuses hyphens in project names; `kubectl apply` of a hand-written XR does not.
 Keep namespaces short and hyphen-free — see [docs/HAZARDS.md](../../docs/HAZARDS.md).
 
+## Going further: the golden path
+
+This lab ships one more example you have not used — `examples/my-application.yaml`, an
+`Application` XR that composes a workload, a database and a bucket from a single manifest.
+That is the shape [Nav's nais.yaml](https://nais.io) has at national scale, and it is the
+warm-up for **adventure door 1** (`adventures/1-app-dev.md`), which starts exactly there.
+Deploy it now if you are ahead, or leave it for the doors — either way, it is the answer to
+"what would this look like if my whole app were one file?".
+
 ## Explain-back
 
 Tell your neighbor: your teammate asks "why not just give developers the CNPG YAML from
