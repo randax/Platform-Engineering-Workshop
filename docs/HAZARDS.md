@@ -96,8 +96,8 @@ host quietly pads.
 **The same 6 GiB reserve is also a hard admission gate, and it nearly shipped as "tbx
 does not work on a 16 GB Mac".** `tbx up` does not merely warn about overcommit — it
 **errors** when planned VM memory exceeds host RAM minus that reserve, unless you pass
-`-force` (upstream `internal/daemon/balloon.go:174-202`, reserve default
-`internal/balloon/manager.go:108-119`). A 16 GB Mac is 16384 MiB, so the budget is
+`-force` (upstream `internal/daemon/balloon.go` `checkOvercommit`, reserve default
+`internal/balloon/manager.go` `DefaultConfig`). A 16 GB Mac is 16384 MiB, so the budget is
 **10240 MiB**, and the flat `4GiB + 8GiB = 12288 MiB` pair exceeded it on **every machine
 at the published minimum spec**. Nothing in the workshop would have started; the review
 that caught it was reading upstream, not running it.
@@ -117,9 +117,22 @@ A VM's memory is soft in the *other* direction. `TBX_CP_MEMORY="4GiB"` and
 sizes the guest kernel boots with, but `tbxd` runs an **active balloon manager**: on macOS it samples host memory
 pressure and inflates the guests' virtio balloons when host free memory drops below a
 **6 GiB reserve**, taking memory back from a running node down to a **1 GiB per-node
-floor**, and deflating on release (upstream `docs/SPEC.md:319-328` and the closed G3 gate
-at `:595-600`; the Linux host-free sampler is not implemented yet, so the policy is
-presently inactive there). We opt into it deliberately — `substrate_create()` patches
+floor**, and deflating on release — with, since tbx v0.1.4, a 256 MiB deadband, a
+one-minute minimum between retargets, and a **pressure latch**: it arms when host swap
+reaches 80% used, or the compressor holds ≥ 20% of RAM (a 4 GiB absolute stands in only
+when total RAM is unreadable), or macOS reports warning-or-worse pressure, and clears only
+when swap is below 70% *and* the compressor below 15% (3 GiB in the same fallback) *and*
+pressure is normal; while armed, reclaimed memory is
+deliberately *held* even after free memory recovers (upstream
+`internal/balloon/manager.go`, `ReconcileSnapshot`). A guest that stays small after the
+host has calmed down is that latch, not a stuck balloon. Do not expect `tbx status` to
+say so: its pressure notice is a separate ≥ 80%-swap advisory, silent for a latch armed
+by the compressor or in the 70–80% band — `pressureLatched=true` in `~/.talosbox/tbxd.log`
+is the honest signal (Rehearsal 7 saw it armed with the compressor at 6.6 GiB on a 32 GB
+host — over 20% on its own — and swap at 19%; the log line does not print the macOS
+pressure state, so that third trigger cannot be excluded).
+(Upstream `docs/SPEC.md` "balloon"; the Linux host-free sampler is not implemented, so
+the policy is presently inactive there.) We opt into it deliberately — `substrate_create()` patches
 `machine.kernel.modules: [virtio_balloon]` into the guests
 (the `balloon_patch` in `substrate_create()`, `scripts/substrate/tbx.sh:313-319`), because without the module loaded the balloon device
 is inert and the overcommit story stops working.
@@ -144,6 +157,68 @@ the three numbers it decided on). Watch modules 08–10, where the pod count pea
 the measured numbers landing in `scripts/versions.env` (up, or down) — ideally on a laptop
 with the usual conference-day tab collection open, since an idle-host measurement says
 nothing about what the balloon will do at the venue.
+
+## LIVE — tbxd can panic the macOS kernel, and the v0.1.4 bump does not fix it
+
+New on **2026-08-30**, on a rehearsal host that is *not* the one Rehearsal 7 ran on.
+Two macOS kernel panics 18 minutes apart, each a hard reset of the laptop with no
+warning and no chance to save anything. Both name `tbxd` as the panicked task:
+
+```
+panic(cpu 17 caller 0x…): Kernel tag check fault (expected tagged address: 0xfefffe29f784b028)
+Panicked task 0xf8fffe230a7e5c88: 6034 pages, 24 threads: pid 74954: tbxd
+```
+
+The second, on a fully upgraded v0.1.4 (client, daemon *and* privileged helper), is
+the same fault with a different KASLR slide and the same register fingerprint
+(`x2=0x13e`, `x5=0x3a980`); the panicked task holds the Virtualization.framework
+guest threads — `com.apple.virtualization.thread.cpu-0..15` and
+`raw-disk-image-io-0..7`. The first came during cluster teardown or create; the
+second came during `scripts/create-cluster.sh`. **Upgrading v0.1.3 → v0.1.4 did not
+fix it**, which is the whole point of this entry: the obvious remedy is already
+spent. Filed upstream.
+
+Host: Mac17,7, macOS 26.6.2 (25G83), Darwin 25.6.0 `xnu-12377.161.14~5`, 128 GB.
+A "kernel tag check fault" is MTE catching a pointer-tag mismatch in *kernel*
+memory — userspace cannot legitimately cause one, so this is a bug on the far side
+of Virtualization.framework that tbxd provokes. It is not a tbx bug you can work
+around by configuring tbx differently.
+
+**This is host-specific, not universal.** Rehearsal 7 ran the whole workshop on tbx
+v0.1.4 the same week — 2 min 05 s create, ten modules green, zero manual recoveries
+— on Apple Silicon with 32 GB and 10 CPUs. So the default stays `tbx`. What differs
+between the two hosts (chip generation, macOS build, 128 GB vs 32 GB, the host
+pressure each was under) is exactly what is unknown, and the sample is two machines.
+
+**How you would notice.** You do not get a diagnostic — the laptop resets. Afterwards
+`ls -lt /Library/Logs/DiagnosticReports/*.panic` has a fresh file, and
+`tr ',' '\n' < <that file> | grep 'Panicked task'` names `tbxd`. Suspect it if a
+machine reboots during `create-cluster.sh`, `destroy-cluster.sh`, or any lab that
+stops and starts a node (lab 01's stall-recovery hint does exactly that).
+
+**What to do on an affected machine.** Uninstall tbx rather than fight it: boot out
+`dev.talosbox.helper` (`sudo launchctl bootout system/dev.talosbox.helper`, then
+remove `/Library/LaunchDaemons/dev.talosbox.helper.plist`) and `mise uninstall` the
+binary. `scripts/substrate-decide.sh` then picks docker on its own, which is the
+fallback working as designed — no repo change, no flag. Keep `~/.talosbox/cache`;
+it is inert without the binary and expensive to re-warm.
+
+**Removing the helper is the guard that holds; removing the binary is not.**
+`dev-setup.sh` runs `mise install`, and `mise.toml` pins tbx, so the binary comes
+straight back the next time anyone sets the workshop up — observed within the hour,
+daemon and all. That is fine: the binary is inert and `tbxd` alone has not panicked
+anything. VMs are the hazard, and VMs need the privileged helper, which `mise`
+cannot reinstall (it takes an admin prompt). So boot out the helper and leave the
+pin alone rather than fighting mise.
+
+**On the day.** An attendee whose laptop panics has lost their whole environment, so
+this outranks a slow cluster: put them on docker and move on, do not debug it in the
+room. If a second attendee machine panics, flip `CLOUDBOX_SUBSTRATE_DEFAULT` to
+`docker` for everyone rather than collecting a third data point.
+
+**Retired by:** an upstream fix released and surviving a full rehearsal on the
+panicking host — not on a host that never reproduced it, which proves nothing.
+
 
 ## LIVE — L2 failover on macOS takes 40-50 s
 
@@ -175,14 +250,15 @@ dies in somebody's datacenter.
 check `route -n get`s each running cluster's gateway and first live node IP and fails if
 the interface is neither a bridge/vmnet interface nor `lo0`, with the detail "a VPN/ZTNA
 client has captured the cluster subnet" (`cmd/tbx/doctor_routes.go:35-84`,
-`cmd/tbx/doctor.go:302-317`; remediation in upstream `docs/macos.md:84`: "Disconnect or
+`cmd/tbx/doctor.go`, the `routes` findings; remediation in upstream `docs/macos.md:84`: "Disconnect or
 split-exclude the VPN/ZTNA client that captured `172.30.0.0/16`, then restart the
 cluster"). The trap is *when* we ask:
 
 - **Detection runs doctor before any cluster exists.** `substrate_detect()`
   (`substrate_detect_into()` / `substrate_detect()`, `scripts/lib.sh:247-259`) uses `tbx doctor`'s exit code to choose the substrate, and at
-  that moment `routes` is a `SKIP` — "no clusters exist" (`cmd/tbx/doctor.go:270-277`), as
-  it also is for a cluster that exists but is stopped (`:293-300`). So a VPN'd laptop
+  that moment `routes` is a `SKIP` — "no clusters exist" (`cmd/tbx/doctor.go`, the
+  `doctorFinding{level: "SKIP", check: "routes", …}` block), as it also is for a cluster
+  that exists but is stopped. So a VPN'd laptop
   passes detection cleanly and gets sent down the tbx path.
 - **`routes` covers the gateway and node IPs, not the ingress VIP.** The workshop's
   hostnames all resolve to `172.30.<n>.200`, which is in the same subnet — so in practice
@@ -369,12 +445,12 @@ this section and not in a post-mortem.
 the machine config as a bonus layer, on the reasoning that "explicit entries win over `*`
 in containerd, so this only covers registries our list does not name" — which is true, and
 was the wrong thing to conclude from. What that patch renders (upstream
-`internal/manifests/manifests.go:218-231`) is a `RegistryMirrorConfig` for `"*"` with
+`internal/manifests/manifests.go`, the catch-all `RegistryMirrorConfig`) is one for `"*"` with
 **`skipFallback: true`**, and the registries our list does not name include
 **`localhost:30500`** — the in-cluster Zot, which is how the kubelet pulls every image
 lab 07, lab 09 and the Console *build*. tbx's mirror refuses to proxy a loopback or private
 authority (403 out of `validateResolvedAuthority` → `namespaceIPBlocked`,
-`internal/mirror/manager.go:313-327` and `:667-680`), and `skipFallback: true` forbids the
+`internal/mirror/manager.go`), and `skipFallback: true` forbids the
 direct pull that would otherwise rescue it. Every first-party image would have landed in
 `ImagePullBackOff`, on the tbx substrate only, from module 07 onward.
 
@@ -413,7 +489,8 @@ conclusion drawn from them was wrong — for the second time on this one topic.
 
 **Fixed by** issue #206: `scripts/substrate/tbx.sh` keeps the eight explicit registries
 and `skipFallback: false`, with the endpoint `http://${CLOUDBOX_HOST_GATEWAY}:${TBX_MIRROR_PORT}`
-(`versions.env`, the one place `5059` is written). `/v2/` is curl-proved at the gateway
+(`versions.env`, the one place `5059` is *configured*; docs and lab READMEs quote the
+literal the way lab 07 quotes `5055`). `/v2/` is curl-proved at the gateway
 before it is baked into the machine config. `cloudbox-init.sh` warms that store with
 `tbx cache warm` over a generated `[mirror]`-only list (`images_mirror_refs`, `lib.sh` —
 `images.txt` as-is fails tbx's ref validation on its section headers), `install.sh
@@ -1148,32 +1225,31 @@ Everything that runs *inside* the container — `curl`, `kubectl`, every
 another machine is the shape of the problem; the fix would be a per-service
 path prefix, which no other substrate needs.
 
-## TRAP — module 08's golang base is offline on docker, online-only on tbx
+## RESOLVED — module 08's golang base was online-only on tbx (fixed by tbx v0.1.4)
 
 `lab/08-portal`'s deploy-from-source walkthrough (and `apps/demo-app`'s own
 README) has the attendee `crane copy` the golang builder base into Zot at run
-time. Since the adventures landed (issue #193) that image IS on
-`scripts/images.txt` — `public.ecr.aws/docker/library/golang:1.25-alpine@sha256:…`,
-digest-pinned — so on **docker/kind** the copy reads
-`localhost:5001/docker/library/golang:1.25-alpine` from the crane mirror and
-needs no internet.
+time. That image is on `scripts/images.txt` —
+`public.ecr.aws/docker/library/golang:1.25-alpine@sha256:…`, digest-pinned — so
+on **docker/kind** the copy reads `localhost:5001/docker/library/golang:1.25-alpine`
+from the crane mirror and needs no internet.
 
-On **tbx** it does. tbx's store is keyed by registry, and the slices the host
-can reach with a plain `crane` (no `?ns=`) are the per-registry listeners on the
-gateway — docker.io `:5055` (`TBX_MIRROR_DOCKERIO_PORT`), ghcr.io `:5056`,
-quay.io `:5057`, registry.k8s.io `:5058` (upstream `MirrorPorts`); everything
-else, `public.ecr.aws` included, is only behind the `?ns=` catch-all, which crane
-cannot name. Module 08's README therefore tells a tbx
-attendee to copy it from `public.ecr.aws` directly — a going-deeper path most
-will not take, and the lab says to do it at home if the venue's WiFi is hostile.
+On **tbx** it used to need one. tbx's store is keyed by registry, and up to
+v0.1.3 the only slices the host could reach with a plain `crane` (no `?ns=`)
+were the per-registry listeners on the gateway — docker.io `:5055`
+(`TBX_MIRROR_DOCKERIO_PORT`), ghcr.io `:5056`, quay.io `:5057`, registry.k8s.io
+`:5058`; `public.ecr.aws` sat only behind the `?ns=` catch-all, which crane
+cannot name, so the README sent tbx attendees to `public.ecr.aws` online.
 
-**What to keep true.** Everything on the core path stays offline (principle 2);
-this is a stretch path. Re-pinning the base as `docker.io/library/golang` would
-make it offline on tbx too through `:5055` — at the price of a second copy of
-the same bytes on the docker path — measure before deciding. CI
-(`bootstrap-test.yaml`) runs the same `crane copy` on a runner that does have the
-internet, which is why the deploy-from-source job proves the pipeline but not
-the offline story.
+**Retired by:** talos-box v0.1.4 (randax/talos-box#499): the catch-all port
+`:5059` (`TBX_MIRROR_PORT`) also answers a **path form**,
+`<gateway>:5059/public.ecr.aws/docker/library/golang:1.25-alpine`, sharing the
+cache with containerd's `?ns=` form and serving a warmed image after
+`tbx mirror offline on`. Module 08's README, `apps/demo-app`'s README and Dockerfile
+comment, and adventure 1's trap list now use it; the re-pin to `docker.io/library/golang` this entry once weighed is no
+longer needed. CI (`bootstrap-test.yaml`) still copies from `public.ecr.aws`
+on a runner with internet — it proves the pipeline, not the offline story;
+Rehearsal 7 in `docs/REHEARSALS.md` is where the path form was proven.
 
 ## TRAP — recovery tooling that lies is worse than recovery tooling that breaks
 
@@ -1555,8 +1631,8 @@ are all `stopped`/`suspended` — a reboot, a `tbx down` — is not that state: 
 is a cluster waiting to be started, and destroying it costs the attendee
 everything they built plus 20 minutes. Both now read the node phases from `tbx
 status -o json` (`stopped` | `suspended` | `unreachable` | `maintenance` |
-`configured`, `internal/daemon/phase.go`; `PhaseSuspended` is a stopped node
-with saved memory) and, when nothing is running, say
+`configured` | `rebooted`, `internal/daemon/phase.go`; `PhaseSuspended` is a stopped node
+with saved memory, `rebooted` a configured one whose Talos rebooted in place) and, when nothing is running, say
 
     tbx cluster start|resume cloudbox
     ./scripts/create-cluster.sh --refresh-endpoint

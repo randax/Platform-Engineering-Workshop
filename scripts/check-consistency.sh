@@ -405,7 +405,7 @@ fi
 # --- 10. the tbx pin agrees between versions.env and mise.toml ----------------
 # Same rule as check 3, for the substrate that is not Docker. dev-setup.sh
 # installs only what mise.toml lists, so a drifted pin means an attendee runs a
-# tbx whose cluster-yaml schema or `tbx manifests` sections we never tested.
+# tbx whose cluster-yaml schema or `tbx status` shape we never tested.
 before_fail=${FAILURES}
 tbx_mise="$(mise_pin 'ubi:randax/talos-box')"
 if [[ -z "${tbx_mise}" ]]; then
@@ -415,8 +415,9 @@ if [[ -z "${tbx_mise}" ]]; then
   tbx_mise="$(sed -nE 's|^"github:randax/talos-box\[exe=tbx\]"[[:space:]]*=[[:space:]]*"([^"]+)".*|\1|p' mise.toml | head -1)"
 fi
 if [[ -z "${tbx_mise}" ]]; then
-  # Fallback pin form: tbx has no published mise backend yet (upstream #95/#96/
-  # #101), so mise.toml may carry it as a commented pin next to the install note.
+  # Fallback pin form: no REGISTRY backend publishes tbx (upstream #95/#96/#101;
+  # the github backend above is what installs it), so mise.toml MAY carry it as
+  # a commented pin next to the install note if that entry is ever dropped.
   # In this form mise installs and enforces nothing — this check only keeps
   # versions.env and the mise.toml comment line in agreement with each other;
   # it cannot assert what binary is actually on PATH. That assertion is

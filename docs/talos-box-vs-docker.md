@@ -281,7 +281,7 @@ This is the argument that decides it. VERIFIED on both sides.
 | Linux amd64/arm64 with KVM | ✅ | ✅ tier one — but packages unpublished; source or tarball only (`README.md:56-60`, release assets are three `.tar.gz`, no `.deb`/`.rpm`) |
 | **Windows + WSL2** | ⚠️ best effort (`README.md:138-143`) | ❌ out of scope today (`docs/SPEC.md:26`); prototype-stage (#456) |
 | Windows without WSL2 | ⚠️ (Docker Desktop w/ Hyper-V) | ❌ — a native Windows backend is explicitly out of scope (#456, "Out of scope") |
-| Corporate laptop, no admin rights | Docker Desktop still needs an admin install, but often already present | ❌ blocked: **`sudo tbx system install`** registers a root launchd daemon; talos-box's own analysis rates MDM/EDR blocking of that path "**high likelihood at strict orgs**" (`docs/corporate-lockdown-analysis.md:82-99`) |
+| Corporate laptop, no admin rights | Docker Desktop still needs an admin install, but often already present | ❌ blocked: **`tbx system install` (self-sudo)** registers a root launchd daemon; talos-box's own analysis rates MDM/EDR blocking of that path "**high likelihood at strict orgs**" (`docs/corporate-lockdown-analysis.md:82-99`) |
 | Corporate laptop, full-tunnel VPN | works (all traffic is loopback/NodePort) | ⚠️ `172.30.0.0/16` capture blackholes host→cluster with doctor still green (`docs/corporate-lockdown-analysis.md:54-76`) |
 
 Mitigations that exist: `v0.1.1` binaries **are** Developer-ID signed and submitted for
@@ -429,7 +429,7 @@ Ordered; each line names the risk it retires. None of this should start before S
 3. **Can Codespaces give `/dev/kvm`?** *Retires:* the lifeboat question (§2f). If no,
    the lifeboat permanently stays Docker-mode — which is an acceptable answer, but it
    must be a decided one.
-4. **Corporate-laptop dry run** on an MDM-managed machine: `sudo tbx system install`
+4. **Corporate-laptop dry run** on an MDM-managed machine: `tbx system install` (self-sudo)
    under Jamf/Intune, plus a full-tunnel VPN with `172.30.0.0/16`. *Retires:* talos-box
    gate G4 and risk #2/#3 of its own lockdown analysis — and tells us how many attendees
    would be locked out.

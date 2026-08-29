@@ -185,14 +185,15 @@ the Console's SSE stream, ArgoCD's watches). On a bump, confirm
 ### The `tbx` pin is a special case
 
 `TBX_VERSION` in `scripts/versions.env` pins the talos-box binary — the primary
-substrate's *entire* implementation. It is not installed by mise (no backend publishes
-it yet: upstream #95/#96/#101), so nothing enforces at runtime what an attendee actually
-has on PATH. Bumping it means all three of:
+substrate's *entire* implementation. mise installs it (the
+`github:randax/talos-box[exe=tbx]` entry — goreleaser tarballs, no tap needed), but mise
+enforces nothing about what is on PATH at run time: an attendee who installed from the
+Homebrew tap has whatever the tap serves, so `tbx_version_check()` in `scripts/lib.sh`
+is the runtime assertion. Bumping it means all four of:
 
-1. **Bump the `mise.toml` comment in the same commit.** The pin lives as the commented
-   `# tbx = "…"` line next to the install note; `check-consistency.sh` check 10 compares
-   it to `TBX_VERSION` and fails if they drift. That comment is the only other copy —
-   do not add a third.
+1. **Bump the `mise.toml` entry in the same commit.** `check-consistency.sh` check 10
+   compares it to `TBX_VERSION` and fails if they drift. That entry is the only other
+   copy — do not add a third (comments included: use `vX.Y.Z` in examples).
 2. **Re-read upstream before trusting the flags.** `scripts/substrate/tbx.sh` drives
    `tbx up -f`, `tbx status -o json`, `tbx version` and
    `tbx cluster destroy <cluster> --force`, and `cloudbox-init.sh` drives
@@ -201,8 +202,13 @@ has on PATH. Bumping it means all three of:
    ref validation is what `images_mirror_refs` in `lib.sh` feeds). Since #206 the tbx
    nodes pull through tbx's OWN mirror: `TBX_MIRROR_PORT` in `versions.env` mirrors
    `CatchAllPort` in upstream `internal/manifests/manifests.go`, and the catch-all's
-   `?ns=` routing lives in `internal/mirror/manager.go` (`serveCatchAll`). If the port
-   or the routing moves, every tbx create dies at the curl proof in `tbx.sh` — re-read
+   `?ns=` routing lives in `internal/mirror/manager.go` (`serveCatchAll`), with the
+   host-side PATH form (`routeCatchAllRequest`, `/v2/<registry>/<repo>…`) next to it —
+   that form is what `lab/08-portal`, `apps/demo-app` and adventure 1 send a host
+   `crane` to, and nothing in the scripts proves it (the curl proof hits `/v2/` only),
+   so re-read it by hand on every bump or those four documents silently go
+   online-only again. If the port
+   or the `?ns=` routing moves, every tbx create dies at the curl proof in `tbx.sh` — re-read
    both on every bump. Verbs quoted to attendees that must still exist: `tbx cache
    prune --mirror`, `tbx mirror offline on|off`, `tbx node start|stop <cluster> <node>`
    (lab 01, destroy-cluster.sh, cloudbox-init.sh). Read upstream `internal/config/config.go` for
@@ -221,7 +227,8 @@ has on PATH. Bumping it means all three of:
 3. **The `053aecb` doctor caveat is closed.** Before v0.1.3 the Linux
    `bridge-netfilter` doctor check turned an unprivileged `iptables -S FORWARD`
    (exit 4) into a FAIL, so detection silently fell back to docker; the pin moved
-   past the fix (WARN with a sudo remediation) on 2026-08-29 and the README
+   past the fix (WARN with a sudo remediation) when it went to v0.1.3 (released
+   2026-08-28, pinned here 2026-08-29) and the README
    "best-effort" wording and the matching `docs/HAZARDS.md` trap were retired
    with it. Kept here so nobody re-adds the caveat from an old rehearsal note.
 4. **Re-run a full tbx rehearsal.** There is **no CI for this substrate** —

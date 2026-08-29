@@ -10,10 +10,9 @@
 # offline:
 #   crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine \
 #     zot.cloudbox.k8s.test/library/golang:1.25-alpine
-# On tbx this base is NOT reachable from the mirror host-side (it is a
-# public.ecr.aws image; tbx's :5055 listener serves docker.io only), so copy it
-# online from public.ecr.aws/docker/library/golang:1.25-alpine — see the module
-# 08 README and docs/HAZARDS.md.
+# On tbx the same warmed bytes are served by tbxd's catch-all port in its
+# path form, `<gateway>:5059/public.ecr.aws/docker/library/golang:1.25-alpine`
+# (the :5055 listener is docker.io-only) — see the module 08 README.
 # The base is on the pre-pull list (scripts/images.txt) since the adventure
 # refresh (issue #193): door 1 made in-cluster Go builds a first-class path, so
 # every attendee pays the ~59 MB once, at home. Pre-refresh pulls can still
