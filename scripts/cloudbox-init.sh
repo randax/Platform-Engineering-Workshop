@@ -189,10 +189,28 @@ tbx_warm_mirror() {
     if ! grep -q '^summary:' "${out}"; then
       die "could not ask tbxd to warm the store (above) — is the helper running and current? 'tbx doctor' (sudo tbx system install if it never was)"
     fi
-    [[ "${attempt}" == "1" ]] && warn "tbx cache warm reported failures (the ✗ lines above) — one more pass over the list in 10s"
-    [[ "${attempt}" == "1" ]] && sleep 10
+    # Retry ONLY what failed. `tbx cache warm` re-resolves every tag in the list
+    # upstream on each pass, so a second pass over all 73 refs is 73 more
+    # registry round-trips to fix two — and a rehearsal proved what that costs:
+    # Docker Hub answered `429 TOOMANYREQUESTS`, which then broke images that
+    # were ALREADY cached (busybox, which local-path-provisioner's helper pod
+    # needs) and stalled Gitea's PVC halfway through module 02. The narrow
+    # retry asks for the misses and nothing else.
+    if [[ "${attempt}" == "1" ]]; then
+      local failed
+      failed="$(mktemp)"
+      sed -n 's/^✗ \([^ ]*\) failed.*/\1/p' "${out}" | sort -u > "${failed}"
+      if [[ -s "${failed}" ]]; then
+        warn "tbx cache warm reported $(wc -l < "${failed}" | tr -d ' ') failure(s) (the ✗ lines above) — retrying just those in 10s"
+        cp "${failed}" "${list}"
+      else
+        warn "tbx cache warm failed without naming a ref — retrying the whole list in 10s"
+      fi
+      rm -f "${failed}"
+      sleep 10
+    fi
   done
-  die "tbx cache warm still reports failures (the ✗ lines above). Re-run this script to retry — already-warmed images are skipped."
+  die "tbx cache warm still reports failures (the ✗ lines above). Warm just those refs — 'tbx cache warm <file-with-those-refs>' — rather than re-running this script over all ${#mirror_images[@]}: every pass re-resolves each tag upstream, and hammering the registries for images you already have is how a rate limit takes out the ones that were fine."
 }
 
 total=$(( ${#host_images[@]} + ${#mirror_images[@]} ))
