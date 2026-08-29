@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/randax/Platform-Engineering-Workshop/compare/apps-v0.3.0...apps-v0.4.0) (2026-08-29)
+
+
+### Features
+
+* **platform-api:** make the Postgres version selector real, on all four majors ([77335df](https://github.com/randax/Platform-Engineering-Workshop/commit/77335dfee9ba554827a5dd12fe9fcf9d8fe06599))
+
+
+### Bug Fixes
+
+* **portal,lab-07:** bill for the databases that exist, and never hang silently on a base image ([ded6eee](https://github.com/randax/Platform-Engineering-Workshop/commit/ded6eee46b0cc414e6fa6f96af1b92302887cb57))
+
 ## [0.3.0](https://github.com/randax/Platform-Engineering-Workshop/compare/apps-v0.2.2...apps-v0.3.0) (2026-08-27)
 
 

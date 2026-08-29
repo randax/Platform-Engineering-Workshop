@@ -17,9 +17,9 @@ pre-pulled by `cloudbox-init.sh`:
 
 <!-- x-release-please-start-version -->
 ```
-ghcr.io/randax/cloudbox-portal:v0.3.0
-ghcr.io/randax/cloudbox-uploader:v0.3.0
-ghcr.io/randax/cloudbox-resizer:v0.3.0
+ghcr.io/randax/cloudbox-portal:v0.4.0
+ghcr.io/randax/cloudbox-uploader:v0.4.0
+ghcr.io/randax/cloudbox-resizer:v0.4.0
 ```
 <!-- x-release-please-end-version -->
 
