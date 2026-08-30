@@ -24,6 +24,7 @@ the run scratchpads referenced from each hazard entry.
 | [10](rehearsals/10-tbx-kernel-panic-v014.md) | 2026-08-30 | tbx v0.1.4 | **aborted: second panic, 18 min later** — the upgrade remedy spent; tbx off that host |
 | [11](rehearsals/11-docker-first-full-run.md) | 2026-08-30 | docker | 00–09 for real on PR #222; the module 08 storage trap, adventure 3's inert default-deny, the `curl -4` fix |
 | [12](rehearsals/12-docker-merged-main.md) | 2026-08-30 | docker | merged main at the resource floor, all eleven `verify.sh` exit 0; lab 08's verify graded on the lying `status.phase` |
+| [13](rehearsals/13-adventures-and-recovery.md) | 2026-08-30 | docker | adventures + recovery tooling, no happy path; ArgoCD's silent give-up after 5 retries, `catch-up.sh` proven idempotent |
 
 ## The 240-minute budget is not the constraint
 
