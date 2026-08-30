@@ -158,7 +158,7 @@ the measured numbers landing in `scripts/versions.env` (up, or down) — ideally
 with the usual conference-day tab collection open, since an idle-host measurement says
 nothing about what the balloon will do at the venue.
 
-## LIVE — tbxd can panic the macOS kernel, and the v0.1.4 bump does not fix it
+## LIVE — tbxd can panic the macOS kernel, and no released version fixes it
 
 New on **2026-08-30**, on a rehearsal host that is *not* the one Rehearsal 7 ran on.
 Two macOS kernel panics 18 minutes apart, each a hard reset of the laptop with no
@@ -216,8 +216,33 @@ this outranks a slow cluster: put them on docker and move on, do not debug it in
 room. If a second attendee machine panics, flip `CLOUDBOX_SUBSTRATE_DEFAULT` to
 `docker` for everyone rather than collecting a third data point.
 
+**Third panic, 2026-08-30 23:44:05, and it is the informative one.** v0.1.5 ships
+two mitigations for this, both aimed at the memory balloon: `TBX_DISABLE_BALLOON`
+to launch guests with no balloon device, and parking the balloon manager during
+teardown. Upstream calls the first "the first thing to try if the host itself
+panics during cluster teardown". We tried it. With the balloon confirmed off in
+both `tbxd.log` and `tbx doctor`, a full cycle ran — create 4m40s, a GitOps stack
+installed on top, three lab verifiers, teardown reporting success in 12s — and the
+host panicked **71 seconds after teardown said it was done**.
+
+So the balloon is not the cause. With the KASLR slide removed, all three panics are
+the *same instruction*: pc offset `0x4698e4`, caller `0x9a1da8`, `esr 0x96000011`
+(a synchronous tag check fault), `far` at offset `+0x28` of a tagged object every
+time — across v0.1.3, v0.1.4 and v0.1.5, with the balloon on and off. That leaves
+the `FileHandleNetworkDeviceAttachment` vmnet path as the main remaining suspect,
+which is hypothesis 2 of upstream #513. Evidence posted there.
+
+The pattern across all three: it fires around **VM lifecycle transitions**, never in
+steady state. One 58s into a create, one at or just after teardown, one 71s after
+teardown returned. A cluster that is merely *running* has been fine for minutes.
+
+**Do not read the successful cycle as progress.** Everything worked, and the laptop
+still reset a minute later. On the day that is worse than failing loudly: an
+attendee would have a green cluster, then no machine.
+
 **Retired by:** an upstream fix released and surviving a full rehearsal on the
 panicking host — not on a host that never reproduced it, which proves nothing.
+Three versions have now been tried on this one, so "bump it and see" is spent.
 
 
 ## LIVE — L2 failover on macOS takes 40-50 s
