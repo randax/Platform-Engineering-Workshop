@@ -21,11 +21,11 @@ the run scratchpads referenced from each hazard entry.
 | [7](rehearsals/07-tbx-pinned-release.md) | 2026-08-29 | tbx v0.1.4 | full path to module 10, 0 manual recoveries; the self-healed VM reboot |
 | [8](rehearsals/08-agy-participant-run.md) | 2026-08-29 | tbx | an outside agent (agy) completed 00–09 unaided; tbx-mirror and prework finds |
 | [9](rehearsals/09-tbx-kernel-panic-v013.md) | 2026-08-30 | tbx v0.1.3 | **aborted: tbxd panicked the macOS kernel** — host hard reset, 0 modules |
-| 14 | 2026-08-30 | tbx v0.1.5 | [balloon disabled, and it panicked anyway](rehearsals/14-tbx-v015-balloon-disabled.md) |
 | [10](rehearsals/10-tbx-kernel-panic-v014.md) | 2026-08-30 | tbx v0.1.4 | **aborted: second panic, 18 min later** — the upgrade remedy spent; tbx off that host |
 | [11](rehearsals/11-docker-first-full-run.md) | 2026-08-30 | docker | 00–09 for real on PR #222; the module 08 storage trap, adventure 3's inert default-deny, the `curl -4` fix |
 | [12](rehearsals/12-docker-merged-main.md) | 2026-08-30 | docker | merged main at the resource floor, all eleven `verify.sh` exit 0; lab 08's verify graded on the lying `status.phase` |
 | [13](rehearsals/13-adventures-and-recovery.md) | 2026-08-30 | docker | adventures + recovery tooling, no happy path; ArgoCD's silent give-up after 5 retries, `catch-up.sh` proven idempotent |
+| [14](rehearsals/14-tbx-v015-balloon-disabled.md) | 2026-08-30 | tbx v0.1.5 | **third panic**: full cycle clean, host died 71 s after teardown — the balloon ruled out |
 
 ## The 240-minute budget is not the constraint
 
