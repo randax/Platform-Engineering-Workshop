@@ -73,7 +73,9 @@ a queue appears. That's the whole job, miniaturized.
   machine. The cert-manager/Strimzi images ship in the final prework refresh.
   Check with `crane manifest --insecure localhost:5001/<image>` on docker, or
   on tbx `tbx cache list <fully-qualified-ref>` (the bare listing only counts
-  blobs), e.g. `tbx cache list quay.io/jetstack/cert-manager-controller:v1.19.1`.
+  blobs), e.g. `tbx cache list quay.io/jetstack/cert-manager-controller:v1.19.2`
+  (the pin lives in `scripts/images.txt`; quote it exactly or the check finds nothing
+  and you will think the image was never warmed).
   If they can't be found, you're on the online path; consider the NATS-flavored
   apex instead (zero new images).
 - One namespace per component, declared in the component's own manifests.

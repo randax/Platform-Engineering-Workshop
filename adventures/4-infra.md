@@ -56,8 +56,14 @@ controller. The Helm release is yours (vendored chart, `scripts/manifests/`):
 
 ```bash
 helm upgrade cilium scripts/manifests/cilium-1.20.0.tgz -n kube-system \
-  --reuse-values --set gatewayAPI.enabled=true
+  --server-side=false --reuse-values --set gatewayAPI.enabled=true
 ```
+
+`--server-side=false` is not optional: helm 4 defaults to server-side apply, and
+every call site in `scripts/lib.sh` passes this flag deliberately (see the note in
+`scripts/versions.env`). Leaving it off changes how the CNI release is applied on
+the one path `helm template` cannot exercise, on a cluster whose networking you
+are in the middle of editing.
 
 Traps section first, then: a `Gateway` + an `HTTPRoute` to the Console, and
 retire one NodePort. Pair with door 2's cert-manager for HTTPS and you've

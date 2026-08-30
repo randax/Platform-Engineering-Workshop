@@ -1129,6 +1129,42 @@ blackholes DNS is exactly where it would reappear, and the workshop is offline-f
 **Retired by:** nothing needs retiring. The `-4` is correct regardless of whether the
 stall ever recurs; this entry exists so it is not deleted by someone tidying flags.
 
+## LIVE — delete a namespace and ArgoCD gives up permanently, in silence
+
+Found by the third rehearsal, which broke things on purpose to see what the
+platform would say. Most damage self-heals in **5-10 seconds**: delete a Deployment
+ArgoCD owns, or scale one to zero, and it is simply back. Corrupt a manifest and
+push, and the Application's conditions name the offending file and line. Both are
+the platform working.
+
+Deleting a **namespace** is different. The sync fails, ArgoCD retries on the
+`retry: limit: 5` every Application carries (5s backoff, factor 2, 3m cap), and
+then it **stops trying and stays stopped**. The rehearsal confirmed it idle 23
+minutes later with the namespace still gone. `selfHeal` does not rescue it: there
+is no new revision to react to, and the retry budget is spent. Nothing in the UI
+announces "I have given up" — the Application simply sits there.
+
+**The recovery is trivial once you know**: trigger a sync by hand (the **Sync**
+button, or `argocd app sync <name>`). The rehearsal measured full recovery in
+**8 seconds**. All the cost is in realising you must.
+
+**Why this one matters on the day.** It is the most plausible attendee accident in
+the room: `kubectl delete ns` is a reflex for "let me start that bit over", and it
+is the one destructive act the platform does not silently undo. An attendee who
+does it at 14:30 gets a component that never comes back and no explanation, and
+will reasonably conclude the platform is broken rather than waiting.
+
+**How you would notice.** A missing namespace, an Application that is not
+progressing, and — the tell — a `lastTransitionTime` on its condition that is
+minutes or hours old rather than seconds. Compare against a component that is
+merely slow, where the timestamp keeps moving.
+
+**Retired by:** either raising the retry budget for the app-of-apps children, or
+surfacing "retries exhausted" somewhere an attendee looks. Neither is obviously
+right: a bigger budget hides real failures behind a longer wait, and the honest
+fix may simply be that facilitators know the Sync button exists. Left as a
+documented trap on purpose.
+
 ## LIVE — growing a database silently never completes, and three layers report success
 
 `local-path` is the workshop's only StorageClass and it does **not** set

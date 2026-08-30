@@ -64,6 +64,12 @@ module-10-adjacent punchline. Kill your worker mid-event and watch the replay.
 ## You know it works when…
 
 - Warm-up: `kubectl get application my-app` is Ready and the URL serves.
+  On the docker substrate the URL will **not** resolve from your browser yet:
+  `/etc/hosts` lists the cluster hostnames one by one and has no wildcard, so a
+  hostname you just created is not in it. The app is fine; your resolver is not.
+  Prove it with `curl --resolve <host>:80:127.0.0.1 http://<host>/`, or add the
+  name to the marked hosts block. On tbx the resolver answers the whole
+  `*.${KNATIVE_DOMAIN}` wildcard and this does not arise.
 - Level 1: upload a photo in the Gallery → your service's logs show the event,
   *and the thumbnail still appears* (you broke nothing).
 - Level 2: `crane ls localhost:30500/<repo> --insecure` lists your tag and the
