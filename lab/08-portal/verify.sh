@@ -85,10 +85,21 @@ else
   fi
   PG_PHASE="$(kubectl -n demo get cluster console-db-pg \
     -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-  if [ "$PG_PHASE" = "Cluster in healthy state" ]; then
-    ok "composed CNPG cluster console-db-pg is healthy — the form made a real database"
-  else
+  # Do NOT grade on status.phase alone. This module's own "Going deeper" task
+  # teaches that CNPG keeps reporting "Cluster in healthy state" while a resize
+  # it cannot perform blocks the whole reconcile — so an attendee who leaves
+  # console-db mid-resize would otherwise be told everything is fine by the very
+  # field the lesson calls a liar. Compare what is ready against what is wanted.
+  PG_READY="$(kubectl -n demo get cluster console-db-pg \
+    -o jsonpath='{.status.readyInstances}' 2>/dev/null || true)"
+  PG_WANT="$(kubectl -n demo get cluster console-db-pg \
+    -o jsonpath='{.spec.instances}' 2>/dev/null || true)"
+  if [ "$PG_PHASE" != "Cluster in healthy state" ]; then
     fail "CNPG cluster console-db-pg is '${PG_PHASE:-missing}' — kubectl -n demo describe cluster console-db-pg"
+  elif [ -n "$PG_WANT" ] && [ "${PG_READY:-0}" != "$PG_WANT" ]; then
+    fail "console-db-pg says healthy but only ${PG_READY:-0}/${PG_WANT} instances are ready — a resize it cannot finish is blocking the reconcile; kubectl -n demo describe cluster console-db-pg"
+  else
+    ok "composed CNPG cluster console-db-pg is healthy — the form made a real database"
   fi
 fi
 
