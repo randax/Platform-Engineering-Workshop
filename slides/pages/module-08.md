@@ -24,7 +24,7 @@ image: /console/monitoring-dark.png
 
 # A portal is just REST calls
 
-- ~6k lines of Go + htmx you can read end to end
+- ~8k lines of Go + htmx you can read end to end
 - Reads the K8s API with a ServiceAccount token
 - A scoped read-only role — the surfaces it renders, not read-all
 - The DB form? Creates a `WorkshopDatabase`
@@ -39,7 +39,7 @@ Shown → a component's live <strong>Monitoring</strong> page: per-component met
 </div>
 
 <!--
-Demystification slide. The industry reflex is "portal = Backstage = big adoption project". But mechanically, a portal is a web app making REST calls to the Kubernetes API — and the Cloudbox Console proves it in ~6k lines of plain Go and htmx (one vendored .js file, no build step, no framework), small enough to read end to end.
+Demystification slide. The industry reflex is "portal = Backstage = big adoption project". But mechanically, a portal is a web app making REST calls to the Kubernetes API — and the Cloudbox Console proves it in ~8k lines of plain Go and htmx (one vendored .js file, no build step, no framework), small enough to read end to end.
 
 Walk the architecture in one breath: internal/kube/client.go authenticates with nothing but the pod's mounted ServiceAccount token; a scoped read-only ClusterRole covers the surfaces it renders — the ArgoCD apps, CNPG clusters, ksvcs, and pods/nodes/events/workloads it lists, not read-all (check it: kubectl describe clusterrole portal-read); internal/kube/resources.go lists ArgoCD Applications, CNPG Clusters, and Knative Services as dynamic resources; the "New database" form POST in internal/web/databases.go builds a WorkshopDatabase object and creates it — about 20 lines that replace a whole portal product's scaffolder, because module 04's XRD and Composition already did the hard part.
 

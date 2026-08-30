@@ -87,7 +87,7 @@ Say it plainly: "Four hours ago this was a shopping list of things you pay for. 
     Photos in, listings out — on a platform <em>they run</em>:
     <br>• data stays in Norway, provably
     <br>• no per-photo egress bill; scales to zero when quiet
-    <br>• every component open-source and pinned — nobody can discontinue them
+    <br>• every component open-source and pinned: nobody can take back what already runs
   </div>
 </div>
 

@@ -42,7 +42,7 @@ The tagline to plant: "Today, you are Bruktby's platform team. Your job for the 
 <div class="grid grid-cols-1 gap-3 mt-2">
   <div v-click class="story"><span class="tag">PRICE</span> &nbsp;Every listing photo is stored, then re-served on every browse. Storage + egress became Bruktby's biggest line item — and the renewal email wanted more.</div>
   <div v-click class="story"><span class="tag">JURISDICTION</span> &nbsp;A big B2B partner asked one question: <em>can you prove our users' data never leaves Norway?</em> Post-Schrems II, "EU region" wasn't an answer.</div>
-  <div v-click class="story"><span class="tag">ROADMAP</span> &nbsp;The managed object-store they built on got <strong>relicensed</strong> out from under them. The floor moved. (You'll meet this one for real in module 03.)</div>
+  <div v-click class="story"><span class="tag">ROADMAP</span> &nbsp;The object store they built on had its open-source edition <strong>discontinued</strong> out from under them. The floor moved. (You'll meet this one for real in module 03.)</div>
 </div>
 
 <div v-click class="mt-6 text-xl opacity-80">
@@ -54,7 +54,7 @@ These are the three ways ANY cloud stops being yours, told through Bruktby so th
 
 - Price: the bill is a decision you don't make. For an image-heavy app it's brutal — you pay to store every photo and pay again in egress every time someone scrolls the listings. Then the enterprise-agreement renegotiation email arrives. You absorb it; you didn't decide it.
 - Jurisdiction: your data, someone else's law. For a Norwegian audience this lands hard — CLOUD Act, Schrems II, Datatilsynet. The B2B-partner framing is the realistic trigger: one procurement questionnaire asks "where does the data physically live?" and "EU region of a US company" no longer passes. Hans can speak from government experience here.
-- Roadmap: the software under you can be discontinued or taken proprietary. This is the MinIO story, and it's real — we deliberately tee it up here and pay it off in module 03. Don't spoil the name yet; just plant that the floor can move.
+- Roadmap: the open-source edition you depend on can be discontinued while the vendor moves to a proprietary product. This is the MinIO story, and it's real — we deliberately tee it up here and pay it off in module 03. Don't spoil the name yet; just plant that the floor can move.
 
 Transition: "The usual answer is 'that's the price of the cloud.' Bruktby tried a different answer — and so will you. What if the cloud primitives themselves — the database, the bucket, the thumbnailer, the self-service API — are things you can just... run?"
 -->
