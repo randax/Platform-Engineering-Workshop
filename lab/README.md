@@ -72,8 +72,9 @@ has a suggested prompt). An AI-generated fix you can't explain isn't done yet.
 ## Getting help in the room
 
 - 🟩 **Green sticky note** on your screen — "I'm fine / done".
-- 🟥 **Red/pink sticky note** — "stuck, please come by"; keep working on something else,
-  a helper will find you. No hand-raising required.
+- 🟥 **Red/pink sticky note** — "stuck, please come by"; keep working on something else
+  (next hint layer, or a neighbor). One of the two presenters sweeps the room during
+  labs, so a red waits a few minutes. Still beats hand-raising.
 - Pair freely. If your laptop fails pre-flight, pair up or use the devcontainer/Codespaces
   lifeboat (see [module 00](00-setup/)).
 - When the room drifts apart, the presenter walks the solution on screen to re-sync —

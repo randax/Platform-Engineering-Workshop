@@ -49,8 +49,11 @@ Rehearsed, hinted, each with a `verify.sh` and a visible win:
 Fast finishers: walk the trail, then come back and pick a door. The doors
 assume nothing beyond module 05 but get richer with each module you have.
 
-## For helpers
+## Getting unstuck
 
-Each briefing's **Known traps** section is your cheat-sheet for that door. The
-supportable answer to "is this possible?" is usually "yes, and here's the trap
-you're about to hit", not "here's the solution". Open-endedness is the design.
+The briefings are self-service by design: two presenters cannot staff five
+doors. Each briefing's **Known traps** section is the first responder — read it
+before you start, not after you're stuck. Second responder: a neighbor on the
+same door. The supportable answer to "is this possible?" is usually "yes, and
+here's the trap you're about to hit", not "here's the solution".
+Open-endedness is the design.

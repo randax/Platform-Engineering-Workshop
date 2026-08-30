@@ -31,7 +31,10 @@ layout: cover
 <div class="pt-4 text-lg opacity-90">JavaZone 2026 · 4-hour hands-on workshop</div>
 
 <div class="coverlogos">
-  <Logo name="talos" size="1.4rem"/><Logo name="cilium" size="1.4rem"/><Logo name="gitea" size="1.4rem"/><Logo name="argocd" size="1.4rem"/><Logo name="cloudnativepg" size="1.4rem"/><Logo name="crossplane" size="1.4rem"/><Logo name="knative" size="1.4rem"/><Logo name="nats" size="1.4rem"/><Logo name="grafana" size="1.4rem"/><Logo name="opentelemetry" size="1.4rem"/>
+  <div class="coverlogos-track">
+    <div class="coverlogos-set"><Logo name="talos" size="1.4rem"/><Logo name="cilium" size="1.4rem"/><Logo name="gitea" size="1.4rem"/><Logo name="argocd" size="1.4rem"/><Logo name="cloudnativepg" size="1.4rem"/><Logo name="crossplane" size="1.4rem"/><Logo name="knative" size="1.4rem"/><Logo name="nats" size="1.4rem"/><Logo name="grafana" size="1.4rem"/><Logo name="opentelemetry" size="1.4rem"/></div>
+    <div class="coverlogos-set" aria-hidden="true"><Logo name="talos" size="1.4rem"/><Logo name="cilium" size="1.4rem"/><Logo name="gitea" size="1.4rem"/><Logo name="argocd" size="1.4rem"/><Logo name="cloudnativepg" size="1.4rem"/><Logo name="crossplane" size="1.4rem"/><Logo name="knative" size="1.4rem"/><Logo name="nats" size="1.4rem"/><Logo name="grafana" size="1.4rem"/><Logo name="opentelemetry" size="1.4rem"/></div>
+  </div>
 </div>
 
 <div class="pt-6 text-sm leading-relaxed opacity-80">
@@ -42,7 +45,7 @@ layout: cover
 <div class="callout mt-8 mx-auto max-w-130">
   <strong>Did you run the prework?</strong><br>
   <code>./scripts/install.sh --check</code> must be all green.<br>
-  Not green? Start <strong>now</strong> — or grab a helper.
+  Not green? Start <strong>now</strong> — or grab one of us.
 </div>
 
 <div class="abs-br m-6 text-sm opacity-60">
@@ -55,7 +58,7 @@ Welcome! While people trickle in, this slide does the most important job of the 
 - Introduce yourselves briefly: Øyvind (NextGenTel, GDG Bergen) and Hans (platform engineer in the Norwegian Government, CNCF Ambassador, co-host of Plattformpodden).
 - Point at the callout: "If you haven't run the three prework scripts, start `./scripts/cloudbox-init.sh` RIGHT NOW — it pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
 - Repo URL is at the bottom — it's public, everything (labs, solutions, slides) lives there, and it will keep working after today.
-- Helpers: point them out, explain the sticky notes briefly (more on that in a few slides).
+- Staffing: it's the two of you and nobody else — say so, and explain the sticky notes briefly (more in a few slides).
 
 Timing: ~10 minutes for the cover + "why", then module 00's GO slide puts hands on keyboards at minute 10. The pre-flight runs in the background while the concept sections play; we triage it just before module 01.
 -->

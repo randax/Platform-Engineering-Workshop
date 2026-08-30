@@ -41,7 +41,7 @@ adventures/  open-ended endgame briefings (issue #193) — NO verify.sh by desig
              the adventures exemption in docs/PRINCIPLES.md before "fixing" that
 apps/        first-party Go apps: cloudbox-portal (Console, module 08), uploader +
              resizer (picture pipeline, module 09) — built to GHCR by build-images.yaml
-docs/        RESEARCH.md · PRINCIPLES.md · STACK.md · HELPERS.md · IDP-PRINCIPLES.md
+docs/        RESEARCH.md · PRINCIPLES.md · STACK.md · RUNBOOK.md · IDP-PRINCIPLES.md
              MAINTENANCE.md (pin-rot runbook)
              prd/ (PRDs + DR design records) · screenshots/
 slides/      Slidev deck

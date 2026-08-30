@@ -936,7 +936,7 @@ still the open decision above.
 **Found in the 2026-08-18 recovery pass, fixed in `a40852a`.** The single worst
 finding of five rehearsals, because of *who* reaches it.
 
-`scripts/kind-fallback.sh` is the documented Plan B: the thing a helper points
+`scripts/kind-fallback.sh` is the documented Plan B: the thing a presenter points
 someone at when Talos-in-Docker will not run on their laptop. It ran
 `helm repo add cilium https://helm.cilium.io` **at run time** — so on venue WiFi,
 reached by someone whose cluster has already failed, it timed out and exited 1
@@ -2476,7 +2476,7 @@ container context with `docker run … docker.io/library/busybox:1.37.0`, which 
 in `images.txt`'s `[mirror]` section but **not `[host]`**, so `cloudbox-init.sh`
 never `docker pull`s it. Invisible in the documented order (the first `--check` at
 home warms the host cache), but it bites anyone whose first `--check` is offline —
-including a helper debugging an attendee's laptop in the room. Adding the ~2 MB
+including a presenter debugging an attendee's laptop in the room. Adding the ~2 MB
 image to `[host]` closes it, at the cost of touching the pin surface.
 
 ## TRAP — digest-pinned refs must keep the full multi-arch index

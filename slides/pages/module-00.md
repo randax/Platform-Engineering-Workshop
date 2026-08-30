@@ -10,7 +10,7 @@ transition: view-transition
 <div class="modlogos"><Logo name="docker" label size="2.6rem"/> <Logo name="kubernetes" label size="2.6rem"/></div>
 
 <!--
-This is the safety net, not the plan — the prework email asked everyone to do this at home. Module 00 therefore gets no slot of its own: the check itself takes nine seconds, and what needs time is FIXING what it flags — which wants a helper, not the room's attention.
+This is the safety net, not the plan — the prework email asked everyone to do this at home. Module 00 therefore gets no slot of its own: the check itself takes nine seconds, and what needs time is FIXING what it flags — which wants 1:1 triage on the floor, not the room's attention.
 
 So release the room to run it here, at minute 10, and keep talking. The concept sections that follow (what · platforms · stack · how) are deliberately zero-keyboard, so the pre-flight, the image pull and the presenter all run in parallel. Triage happens just before module 01.
 
@@ -56,7 +56,7 @@ Say the one prework line that pays off later: the optional OpenCode Zen key from
 
 Already green because you did the prework? Perfect — you have a free half hour: skim lab/01-cluster/README.md, or help a neighbor. Helping a neighbor is the fastest way to learn this material.
 
-Triage guidance for presenters/helpers: image pulls not done is the only unfixable-in-room problem (bandwidth) — those people pair up or go to Codespaces immediately. Everything else (memory limits, missing tools) is a 2-minute fix.
+Triage guidance: image pulls not done is the only unfixable-in-room problem (bandwidth) — those people pair up or go to Codespaces immediately. Everything else (memory limits, missing tools) is a 2-minute fix.
 
 At the triage checkpoint just before module 01, ~90% green is enough to start — stragglers keep pulling in the background and module 01 doesn't need the images immediately.
 -->

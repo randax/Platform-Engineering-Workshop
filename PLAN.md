@@ -172,10 +172,11 @@ docs/             RESEARCH.md · PRINCIPLES.md
 - [x] Catch-up flow per module (replace-not-overlay, convergence wait, chained post-steps)
 - [ ] Git tags per module (nice-to-have; solutions/ + catch-up.sh already cover recovery)
 
-### Phase 4 — Slides + helpers (mid-August)
+### Phase 4 — Slides + floor plan (mid-August)
 - [x] Slidev rewrite: 55 slides, per-module framing, presenter notes, offline-safe,
       visually reviewed via PNG export (publish to Pages: issue #13)
-- [ ] Recruit 4–8 helpers (CNCF/GDG networks); helper cheat-sheet of known failure modes
+- [x] Staffing settled: no helpers — the two presenters run the room; docs/RUNBOOK.md is
+      the two-person floor runbook of known failure modes
 
 ### Phase 5 — Rehearse + harden (last 2 weeks of August)
 - [ ] Two timed full dry-runs (one on a clean machine, one driven by a guinea pig,
@@ -195,7 +196,7 @@ docs/             RESEARCH.md · PRINCIPLES.md
 | Risk | Mitigation |
 |---|---|
 | Attendees hit broken prereqs **today** | Phase 0 this week; support channel in README |
-| Half the room can't run locally (2022 precedent) | Pre-flight gate + decision-1 fallback path + helpers |
+| Half the room can't run locally (2022 precedent) | Pre-flight gate + docker/kind fallback + Codespaces lifeboat + pairing + `catch-up.sh` |
 | Docker Hub NAT rate-limit | Everything on GHCR, pinned; optional room registry mirror (registry-pi pattern) |
 | RustFS immature | Explicit switch triggers mid-Aug → SeaweedFS; one-values-file change |
 | BuildKit/Knative on Talos unrehearsed | Phase 1 spikes before any lab depends on them |
@@ -203,7 +204,7 @@ docs/             RESEARCH.md · PRINCIPLES.md
 | Overrun | Soft timeboxes + `catch-up.sh`; the door block is the buffer and shrinks first; the close never moves; cut by dry-run data |
 | Speaker illness | Both speakers rehearse *all* modules; slides + labs self-contained |
 | Version drift July→Sept | Pin everything now; weekly CI bootstrap; re-verify pins late Aug |
-| Unknown headcount (30 vs 80) | Ask organizers now; helper count scales with cap |
+| Unknown headcount (30 vs 80) | Ask organizers now; staffing is fixed at two, so self-service (hints, question backlog, pairing, `catch-up.sh`) absorbs the cap |
 | **Substrate swap eight days out (accepted, gated).** The analysis in `docs/talos-box-vs-docker.md` recommended against it; the owner proceeded | The fallback is first-class and CI-proven, plus a hard go-live gate on Aug 31 that flips the default back with a one-line change (`CLOUDBOX_SUBSTRATE_DEFAULT` in `scripts/versions.env`) |
 
 ## 6. Decisions (made 2026-07-13, Hans)

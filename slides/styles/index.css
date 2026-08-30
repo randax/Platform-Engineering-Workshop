@@ -285,7 +285,20 @@
 .arch.done .delivers{color:var(--jz-run);font-style:normal;font-weight:700;}
 
 /* Cover: a subtle band of the tools you'll run today. */
-.coverlogos{display:flex;flex-wrap:wrap;justify-content:center;gap:0.5rem 0.6rem;margin:1.3rem auto 0;max-width:50rem;}
+/* Cover logo marquee. The track holds the set TWICE and slides left by exactly one
+   set width, so copy 2 lands where copy 1 started and the loop has no seam. The
+   trailing padding on each set is what makes -50% exact: without it the gap
+   between the two copies is counted once instead of twice and the row drifts. */
+.coverlogos{overflow:hidden;margin:1.3rem auto 0;max-width:50rem;
+  -webkit-mask:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);
+  mask:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);}
+.coverlogos-track{display:flex;width:max-content;animation:coverlogos-scroll 34s linear infinite;}
+.coverlogos-set{display:flex;flex:none;align-items:center;gap:0.6rem;padding-right:0.6rem;}
+@keyframes coverlogos-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* A logo row that never stops is motion nobody asked for; honour the OS setting. */
+@media (prefers-reduced-motion:reduce){.coverlogos-track{animation:none;}
+  .coverlogos{-webkit-mask:none;mask:none;}
+  .coverlogos-set:nth-child(2){display:none;}}
 
 /* "The stack — and why" layer tables (consolidated; was duplicated per slide). */
 .stack table{font-size:0.82rem;width:100%;border-collapse:collapse;}

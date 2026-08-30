@@ -72,19 +72,20 @@ THE LAB-LAUNCH RITUAL (same every module — presenter discipline, researched no
 
 - <span class="svgi i-sticky-note" style="color:var(--jz-run)"></span> green sticky — "I'm fine"
 - <span class="svgi i-sticky-note" style="color:#e5484d"></span> red sticky — "come by, please"
-- Helpers roam; no hand-raising needed
+- Two of us, no helper crew — one walks the floor during labs
+- Red up? Keep working: next hint layer, or a neighbor
 - Recurring questions land on the front wall — answered for everyone at each re-sync
 - Pairing is encouraged — arguably better
 - Laptop says no? Devcontainer lifeboat
 
 <!--
-Point out the helpers by name and location. The sticky-note protocol means nobody sits blocked with a hand in the air: red sticky up, keep poking at something else, a helper finds you.
+Say the staffing plainly: it's the two of us, no helper crew. The sticky protocol survives because it batches well — a raised hand blocks you, a sticky doesn't. Be honest about latency: during each lab one of us anchors the projector and the other walks the floor, so a red sticky gets picked up on the next pass, not in thirty seconds. While waiting: next hint layer, verify.sh output, or the neighbor who's already green.
 
 Pairing: the whole workshop works as a pair on one machine — you'll talk through more and type less. If your pre-flight fails, pair up or use the devcontainer: the repo ships a .devcontainer that runs identical content in GitHub Codespaces (4 cores / 16 GB machine). Acknowledge the irony out loud — the lifeboat for the sovereignty workshop is Microsoft's cloud, which is exactly why it's the lifeboat and not the boat.
 
 When the room drifts apart, we'll walk the solution on screen to re-sync. That's normal, not falling behind.
 
-The question backlog, explained to the room: when a helper answers the same question twice, it goes on a sticky on the front wall; at each walk-the-solution the lead triages them aloud — "three of you hit X, here's the answer for everyone". It turns 1:1 helper answers into whole-room teaching. Helpers: docs/HELPERS.md has your side of this (zones, patrol pattern, sticky-count checkpoints).
+The question backlog, explained to the room: when either of us answers the same question twice, it goes on a sticky on the front wall; at each walk-the-solution the presenter triages them aloud — "three of you hit X, here's the answer for everyone". With two of us this is load-bearing, not nice-to-have: we cannot answer the same question fifteen times 1:1. Our side of the floor plan is docs/RUNBOOK.md.
 -->
 
 ---
@@ -105,7 +106,7 @@ The goal was never "typed the commands yourself". It's a running platform PLUS y
 1. verify.sh and the explain-back are the finish line, not the last command an agent ran.
 2. When an assistant tells you something about YOUR cluster, check it against the cluster before acting. Module 05 exists to make that instinct permanent — including one fault where the obvious AI answer is plausible and wrong. That's a promise, not a threat.
 
-The tutor line, said with a smile and total honesty: the repo's CLAUDE.md/AGENTS.md asks agents to coach rather than solve — Socratic questions, next hint layer, no pasted solutions. It's advisory and they can bypass it; the point isn't enforcement, it's that a workshop your agent completes teaches your agent. One carve-out to state explicitly, because it's the opposite rule: broken environments (Docker or tbx, mise, half-pulled images) are fair game for full AI firepower — nobody came here to learn yak-shaving. Helpers apply the same split: coach on lab content, fix machines outright.
+The tutor line, said with a smile and total honesty: the repo's CLAUDE.md/AGENTS.md asks agents to coach rather than solve — Socratic questions, next hint layer, no pasted solutions. It's advisory and they can bypass it; the point isn't enforcement, it's that a workshop your agent completes teaches your agent. One carve-out to state explicitly, because it's the opposite rule: broken environments (Docker or tbx, mise, half-pulled images) are fair game for full AI firepower — nobody came here to learn yak-shaving. We apply the same split on the floor: coach on lab content, fix machines outright.
 -->
 
 ---

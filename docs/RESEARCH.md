@@ -166,6 +166,8 @@ Measure the real assembled stack once in the spike — several figures are estim
 - **Staffing:** 1 helper per 8–10 attendees on top of 2 instructors (Carpentries) — recruit
   4–8 helpers (CNCF/GDG networks; workshop helpers get conference access). Two-color sticky
   notes for silent help requests.
+  *Note 2026-08-31: not followed — the event runs with the two presenters and no helpers.
+  docs/RUNBOOK.md (né HELPERS.md) carries the two-person floor plan that replaced this.*
 - **Checkpoints:** git tag/branch per module + `solutions/` directory + everything public.
 - **JavaZone 2026:** Sept 2–3, NOVA Spektrum, Lillestrøm; workshop day historically the
   Tuesday before (likely Sept 1) at Rebel Oslo, 240-min morning slot; sign-up first-come

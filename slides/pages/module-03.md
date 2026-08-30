@@ -79,7 +79,7 @@ The task in three beats, all through the git loop from module 02:
 
 Wins to celebrate: the psql prompt (module win #1) and a presigned URL opening in a browser (win #2 — "you just handed out a download link with zero AWS").
 
-Helper notes: the most common stall is pushing the Cluster manifest to the wrong directory — the README asks "where did module 02 put demo-namespace manifests?" on purpose. Presigned URL failures are usually a clock-skew or wrong-endpoint issue; hints cover both.
+Floor notes: the most common stall is pushing the Cluster manifest to the wrong directory — the README asks "where did module 02 put demo-namespace manifests?" on purpose. Presigned URL failures are usually a clock-skew or wrong-endpoint issue; hints cover both.
 
 BREAK after this module — 10 minutes, and the day's only scheduled one (from the pivot onward the room is self-paced). Announce it now so people pace themselves.
 -->
@@ -90,14 +90,14 @@ layout: fact
 
 # Break
 
-10 minutes — back at :XX
+10 minutes. Back at `:XX`
 
 <!--
 First break, roughly the 2-hour mark. Fill in the actual return time on the projector (or say it twice).
 
 While people are away, this is a good moment to bring the Cloudbox Console's Workshop page up on the projector — by now most rows for 00–03 should be turning green across the room.
 
-Helpers: sweep for red stickies during the break; break time is catch-up time for anyone behind, and catch-up.sh 3 gets them fully current in ~2 minutes.
+Split the break: one of us does the projector prep below, the other sweeps for red stickies — break time is catch-up time, and catch-up.sh 3 gets anyone fully current in ~2 minutes.
 
 Presenter prep during this break: pre-enable backstage.yaml from the catalog on the projector cluster NOW — its first boot is slow (~2 GB image + a CNPG database) and door 0's Backstage demo needs it warm.
 -->

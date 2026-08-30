@@ -166,7 +166,7 @@ layout: cover
 <!--
 Final slide — leave it up during the protected tinkering time and the goodbyes.
 
-Thank the helpers by name; they carried the room. Thank JavaZone.
+Thank JavaZone, and thank the room — with two of us up front, the neighbors who helped neighbors carried the day.
 
 Invitations to end on:
 - "The cluster on your laptop is not a demo — it's yours. Keep it. Break it. Rebuild it with catch-up."

@@ -1,55 +1,56 @@
-# Helper cheat-sheet — Cloud on Your Terms (JavaZone 2026)
+# Floor runbook — Cloud on Your Terms (JavaZone 2026)
 
-You're roaming a room of ~30–80 people building a Kubernetes platform on their
-laptops. This is the field guide: how the day flows, how attendees signal for
-help, and — the useful part — the failures we've actually seen and their fixes.
+Two people run this room: Øyvind and Hans, both presenting. There is no helper
+crew — the planned 4–8 recruits (docs/RESEARCH.md) did not materialize, so this
+file went from helper cheat-sheet to a runbook for whichever of us is on the
+floor. The failure modes below are unchanged; the staffing model around them is.
 
-Target ratio: **1 helper per 8–10 attendees**, plus the two speakers. If the
-room is bigger than your helper count can cover, pair attendees up early.
+The math is blunt: two people, ~30–80 attendees. We cannot patrol zones or
+answer every question 1:1. What covers the room instead: layered hints in every
+lab, `catch-up.sh`, the question backlog, attendees pairing up, and ruthless
+triage from us.
 
 ## How help works
 
 Two-color sticky notes on the laptop lid:
 - **Green up** = "I'm fine / done with this module."
-- **Red up** = "I'm stuck — come find me." (No hand-raising; you scan the room.)
+- **Red up** = "I'm stuck — come find me." (No hand-raising; we scan the room.)
+
+During each lab, one of us presents and anchors the projector; the other walks
+the floor. A red sticky gets picked up on the next pass, not instantly — the
+slide and the lab README say what to do while waiting (next hint layer, ask a
+neighbor).
 
 When you reach a red note: **don't take the keyboard first.** Ask "what did the
 last command say?" — the labs are built so the error text usually names the
 problem. Reading it together is the lesson.
 
-## Zones, patrol, and the question backlog
+**Triage hard.** With two of us, a stall that needs more than ~3 minutes of
+debugging gets `catch-up.sh <module>` or a pairing, not a debugging session —
+the queue behind you is invisible but real.
 
-These three mechanics are borrowed from Carpentries practice (see Wilson,
-*Ten Quick Tips for Delivering Programming Lessons*) — they're what makes
-1 helper per 8–10 people actually work:
+## The question backlog
 
-- **You own a zone.** Before the workshop starts, each helper takes a fixed
-  block of ~6–8 seats and keeps it all day. Nobody outside a zone means nobody
-  is unwatched; you'll also learn your people's pace, which makes stuck-ness
-  visible earlier.
-- **Patrol, don't perch.** Circulate continuously through your zone watching
-  *screens*, not stickies — a red sticky is a request, but a terminal that
-  hasn't changed in five minutes is a fact. Intervene early; waiting for the
-  sticky means catching people after the frustration, not before it.
-- **Count greens at each checkpoint.** When the lead calls a mid-lab
-  checkpoint ("hands up if verify passes"), report your zone's green count —
-  that's how the walk-the-solution timing gets decided from data instead of
-  front-of-room vibes.
-- **Feed the question backlog.** The second time you answer the same question,
-  write it on a sticky and put it on the front wall. The lead triages the wall
-  aloud at every walk-the-solution — your 1:1 answer becomes whole-room
-  teaching, and you stop answering it a third time.
+The one Carpentries mechanic that gets *more* valuable with fewer people (see
+Wilson, *Ten Quick Tips for Delivering Programming Lessons*): the second time
+either of us answers the same question, it goes on a sticky on the front wall.
+At each walk-the-solution the presenter triages the wall aloud — "three of you
+hit X, here's the answer for everyone". Two people cannot answer the same
+question fifteen times; the wall means we never have to.
 
-## The adventure hour: door ownership
+Count greens before each walk-the-solution — the floor person calls the rough
+green share, and that decides the timing instead of front-of-room vibes.
 
-Each `adventures/` door has a **named owner** (assigned before the workshop,
-written on the front wall during the pitch). If you own a door: read your
-briefing's *Known traps* section in advance — it was written as your
-cheat-sheet — and treat the warm-up as sacred: it's the ~15-minute visible win
-that guarantees nobody hits the closing hard-stop empty-handed. Helpers without
-a door float across zones as usual. When the hard-stop signal comes (10 minutes
-before the end), help the room actually stop — the close is part of the
-workshop, not an optional outro.
+## The adventure hour
+
+Five doors, two of us, one anchored to the projector: the doors are
+**self-service by design**. Each briefing's *Known traps* section was written
+to be read by attendees before they need it — point people there first, then
+at a neighbor on the same door. The floor person floats; nobody owns a door.
+The warm-ups are sacred: each delivers a visible win in ~15 minutes so nobody
+hits the closing hard-stop empty-handed. When the hard-stop signal comes
+(10 minutes before the end), help the room actually stop — the close is part
+of the workshop, not an optional outro.
 
 ## The shape of the day
 
@@ -170,7 +171,7 @@ it, by name.
 - *Cluster wedged* → `catch-up.sh <module> --rebuild`.
 - *Docker Hub rate-limit errors mid-run* → the room shares one venue IP.
   Everything should come from the local mirror; if something's pulling from
-  docker.io live, it's an image we missed pre-pulling — flag it to the speakers.
+  docker.io live, it's an image we missed pre-pulling — note it, that's a repo bug.
 
 ## What to tell people about AI
 

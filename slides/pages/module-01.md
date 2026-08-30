@@ -67,7 +67,7 @@ Then the investigation questions in the README: what is the management plane if 
 
 Explain-back at the end: "tell your neighbor what is MISSING from these nodes, and why that's a feature."
 
-Presenter/helper notes:
+Presenter notes:
 - Talos v1.13 pinned (never 1.12.x — known-bad in Docker); node memory limits are raised in the script.
 - Expect a mixed room: `cat ~/.cloudbox/substrate` says which one a machine got. The lab's "break a node" bonus is branched per substrate (`tbx node stop|start`, or `docker pause|unpause`); everything else is plain kubectl/talosctl and identical.
 - If the substrate won't cooperate on someone's machine (rare), don't debug past ~10 minutes: `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh` is the first fallback, and kind-fallback.sh gives them kind+Cilium as the last one — they rejoin from module 02 with everything else identical.

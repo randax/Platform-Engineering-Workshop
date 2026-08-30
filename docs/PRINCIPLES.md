@@ -51,8 +51,9 @@ The rules we hold ourselves to while building this workshop. Grounded in
     (≥10 GB to Docker), 32 GB recommended; `install.sh --check` verifies everything and
     says so plainly. A supported-platform matrix (macOS/Linux fully; Windows via WSL2
     best-effort — pair up if it fails) beats silent Windows suffering.
-13. **The room is for humans, not content delivery.** 1 helper per ~8–10 attendees on top
-    of 2 instructors; sticky-note help signals; walk the solution on screen to re-sync;
+13. **The room is for humans, not content delivery.** Two presenters and no helper crew,
+    so the room supports itself: sticky-note help signals, a front-wall question backlog
+    answered to everyone, pairing encouraged, walk the solution on screen to re-sync;
     protect the last 30 minutes for open-ended tinkering and weird questions. Slides exist
     to frame labs, never to compete with them.
 14. **Pin everything, rehearse the unknowns.** Exact versions in mise.toml, scripts, and

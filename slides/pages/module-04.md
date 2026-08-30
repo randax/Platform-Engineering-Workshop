@@ -81,7 +81,7 @@ Watching the stack unfold is the win: kubectl get workshopdatabase, then the Clu
 
 Explain-back: "walk your neighbor through what happened between your 10-line YAML and the running Postgres — name each controller that acted." (ArgoCD delivered it, Crossplane composed it, CNPG realized it.)
 
-Helper note: the classic failure is an XRD that never goes ESTABLISHED because of a schema typo — kubectl describe xrd shows why. And anyone pattern-matching from v1 tutorials will trip exactly as the warning slide predicted; that's a teachable moment, not a bug.
+Floor note: the classic failure is an XRD that never goes ESTABLISHED because of a schema typo — kubectl describe xrd shows why. And anyone pattern-matching from v1 tutorials will trip exactly as the warning slide predicted; that's a teachable moment, not a bug.
 
 This module's API is load-bearing later: module 08's portal form creates exactly these WorkshopDatabase resources.
 -->

@@ -68,5 +68,5 @@ The two beats to narrate during the demo:
 1. The workflow's build step is just a pod — show it in kubectl get pods -n builds while it runs.
 2. The registry answer: curl Zot's /v2/_catalog and there's the image. "Your registry. Your build. No Docker Hub, no GitHub Actions, no external anything."
 
-Helper note for self-paced attempts: workflow stuck in Pending is usually the PSA label question from the README; build failures inside BuildKit are the deep end — that's what restore/`catch-up.sh 7` and the demo recording are for.
+Floor note for self-paced attempts: workflow stuck in Pending is usually the PSA label question from the README; build failures inside BuildKit are the deep end — that's what restore/`catch-up.sh 7` and the demo recording are for.
 -->

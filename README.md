@@ -380,7 +380,7 @@ Open Source Maintainer
 ## Getting help
 
 - **Before the workshop:** open an issue on this repo; broken prereqs are our bug, not yours.
-- **During the workshop:** helpers roam the room; sticky notes signal silently.
+- **During the workshop:** sticky notes signal silently (red = stuck); the two presenters cover the room, and recurring questions get answered to everyone.
 - **After:** everything here is public and pinned. `git tag javazone-2026` is the state we shipped.
 
 ## License
