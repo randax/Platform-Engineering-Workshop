@@ -45,14 +45,14 @@ check_app() { # <name>
 }
 
 # --- Gitea -------------------------------------------------------------------
-if curl -fsS --max-time 5 "${GITEA_HOST_URL}/api/healthz" >/dev/null 2>&1 \
-   || curl -fsS --max-time 5 "${GITEA_HOST_URL}/" >/dev/null 2>&1; then
+if curl -4 -fsS --max-time 5 "${GITEA_HOST_URL}/api/healthz" >/dev/null 2>&1 \
+   || curl -4 -fsS --max-time 5 "${GITEA_HOST_URL}/" >/dev/null 2>&1; then
   ok "Gitea answers on ${GITEA_HOST_URL}"
 else
   fail "Gitea not reachable at ${GITEA_HOST_URL} — did ./scripts/bootstrap-gitops.sh run? kubectl -n gitea get pods"
 fi
 
-if curl -fsS --max-time 5 -u gitea_admin:cloudbox123 \
+if curl -4 -fsS --max-time 5 -u gitea_admin:cloudbox123 \
      "${GITEA_HOST_URL}/api/v1/repos/cloudbox/platform" >/dev/null 2>&1; then
   ok "repo cloudbox/platform exists in Gitea"
 else
@@ -60,7 +60,7 @@ else
 fi
 
 # --- ArgoCD ------------------------------------------------------------------
-if curl -fsS --max-time 5 -o /dev/null "${ARGOCD_HOST_URL}/" 2>/dev/null; then
+if curl -4 -fsS --max-time 5 -o /dev/null "${ARGOCD_HOST_URL}/" 2>/dev/null; then
   ok "ArgoCD UI answers at ${ARGOCD_HOST_URL}"
 else
   fail "ArgoCD UI not reachable at ${ARGOCD_HOST_URL} — kubectl -n argocd get pods,svc"

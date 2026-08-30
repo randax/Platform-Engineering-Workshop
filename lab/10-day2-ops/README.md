@@ -10,24 +10,24 @@ healthy. `./verify.sh` proves both the repository and the live rollout.
 ## Prerequisites and interface contract
 
 This is a stretch module. Its only prerequisites are the cluster module and the GitOps
-module (module 02) — you need Gitea + ArgoCD running and the `demo` Application
-(`gitops/apps/demo.yaml`, watching `gitops/components/demo/` in your platform repo) from
-module 02 already enabled. Module 10 needs nothing from the build/serverless/portal
+module (module 02): Gitea + ArgoCD running and the `demo` Application
+(`gitops/apps/demo.yaml`, watching `gitops/components/demo/` in your platform repo)
+already enabled. Module 10 needs nothing from the build/serverless/portal
 stretch modules (06-09).
 
 The workload this module breaks, `demo-web`, is **owned by this lab, not hand-copied by
-you**: the first time you run `./inject.sh 1`, `./inject.sh 2`, or `./inject.sh 3`, it seeds
+you**: the first run of `./inject.sh 1`, `./inject.sh 2`, or `./inject.sh 3` seeds
 `gitops/components/demo/demo-web.yaml` (a plain Deployment + Service running the same
-pre-pulled `ghcr.io/knative/helloworld-go` image module 06 uses — no in-cluster build
+pre-pulled `ghcr.io/knative/helloworld-go` image module 06 uses, no in-cluster build
 required) into your `cloudbox/platform` repo and pushes it, then asks you to wait for
 ArgoCD and run the same scenario again to actually inject the fault. A push to
-`cloudbox/platform:main` is the deploy trigger throughout — there is no BuildKit or
+`cloudbox/platform:main` is the deploy trigger throughout. There is no BuildKit or
 rebuild step in this exercise.
 
 `cloudbox/demo-app` (the repo `scripts/seed-gitea.sh` seeds from `apps/demo-app`) is
-**not** used by this module — it is Go source for module 07's separate in-cluster build
-golden path and carries no deploy manifests. If you find yourself investigating it while
-working this scenario, that's a dead end (see the scenario's spoiler once you're stuck).
+**not** used by this module. It is Go source for module 07's separate in-cluster build
+golden path and carries no deploy manifests. Investigating it while working this
+scenario is a dead end (see the scenario's spoiler once you're stuck).
 
 ## Why this matters
 
@@ -39,12 +39,12 @@ it before acting.
 These scenarios are the human-only path; no agent is required. The operating model still
 applies: **the agent gets eyes; Git keeps the hands**. Whether a human or agent finds the
 cause, `git revert` and push is the only durable write path. A live `kubectl edit` is not
-a repair—ArgoCD self-healing will restore whatever Git says.
+a repair: ArgoCD self-healing will restore whatever Git says.
 
-Work through at least one scenario by hand first — that's where the triage muscle memory
-lives. Once you've done that, "Escalate to the agent" below reruns the same kind of
-investigation through Kagent, the platform's own read-only agent, in two beats: a fully
-offline model that flails, then a one-line `ModelConfig` change that fixes it.
+Work through at least one scenario by hand first. That's where the triage muscle memory
+lives. Then "Escalate to the agent" below reruns the same investigation
+through Kagent, the platform's own read-only agent, in two beats: a fully
+offline model that flails, then a one-field `ModelConfig` change that fixes it.
 
 ## The setup
 
@@ -73,14 +73,14 @@ guarantee you rely on is gone.
 ./restore.sh clean   # revert every currently injected scenario
 ```
 
-The scenario directory has `description.md`—**that is the spoiler**. Do not open it
+The scenario directory has `description.md`. **That is the spoiler.** Do not open it
 until you have committed to a diagnosis. `fix.sh` is the canonical scripted repair.
 
 ## The task
 
 The guided path below uses scenario 1; scenarios 2 and 3 follow the same observe,
-diagnose, prove, and Git-revert loop using their own setup-table commands and hints —
-with one twist in scenario 3, where step 2 has no failure to find and the observation
+diagnose, prove, and Git-revert loop using their own setup-table commands and hints.
+The twist in scenario 3: step 2 has no failure to find, and the observation
 you need is of a *healthy* pod. Its hints say so up front.
 
 1. Run `./inject.sh 1`. The first run only seeds the `demo-web` baseline and tells you to
@@ -125,7 +125,7 @@ exits tells you what the application could not do.
 
 Inspect the Deployment's container environment and recent rollout, then compare them
 with the last few commits to `gitops/components/demo/demo-web.yaml` in a clone of
-`cloudbox/platform` (**not** `cloudbox/demo-app` — that repo is unrelated Go source for
+`cloudbox/platform` (**not** `cloudbox/demo-app`: that repo is unrelated Go source for
 a different module, see the "Prerequisites" section above):
 
 ```bash
@@ -138,11 +138,11 @@ git show <suspicious-sha>
 ```
 
 > `mise trust` is not ceremony: the clone carries this repo's `mise.toml`, and mise
-> refuses to load an untrusted config — so **every mise-installed tool run from inside
+> refuses to load an untrusted config, so **every mise-installed tool run from inside
 > the clone fails** until you trust it, and `kubectl` is one of those. Recent mise says
 > so loudly (`mise ERROR … are not trusted`, exit 1); older ones just **exit 0 with
-> empty output**, which is the worst failure mode there is.
-> A command that prints nothing and succeeds is the worst failure mode there is.
+> empty output**. A command that prints nothing and succeeds is the worst failure mode
+> there is.
 
 The image still pulls. Look for configuration that controls what address the Go HTTP
 server listens on.
@@ -167,13 +167,13 @@ pushes the new commit. `./solve.sh` reverts every scenario that is currently inj
 The app is still serving and nothing is crashing, yet the release is not live: one new
 `demo-web` pod never becomes Ready and `kubectl -n demo rollout status deploy/demo-web`
 never returns. Find why that pod cannot start, connect it to one Git diff, and repair it
-through a forward revert—not a live edit.
+through a forward revert, not a live edit.
 </details>
 
 <details>
 <summary>Hint 2: Notice what evidence is missing</summary>
 
-`RESTARTS` is 0 and `kubectl -n demo logs <new-pod>` gives you nothing — not even a
+`RESTARTS` is 0 and `kubectl -n demo logs <new-pod>` gives you nothing, not even a
 previous state. What does the *absence* of both tell you about how far the pod got?
 
 ```bash
@@ -188,7 +188,7 @@ that class of failure in exactly one place.
 <details>
 <summary>Hint 3: Read the Events, then the resource budget</summary>
 
-Describe the stuck pod and read Events bottom-up — the container runtime names the cause
+Describe the stuck pod and read Events bottom-up. The container runtime names the cause
 in its own words. Then inspect the `web` container's configured memory allocation in the
 Git-managed Deployment:
 
@@ -202,7 +202,7 @@ git show <suspicious-sha>
 ```
 
 The commit's own message tells you where its number came from. Ask what that number left
-out — a memory limit is the budget your container is *created* inside, not just a cap on
+out: a memory limit is the budget your container is *created* inside, not just a cap on
 your program once it runs.
 </details>
 
@@ -222,13 +222,13 @@ pushes the new commit. `./solve.sh` reverts every scenario that is currently inj
 **Read this before you inject it:** this one does **not** break your cluster. The pods go
 Ready and stay Ready. Your job is to find what the release gave away, prove where the
 image actually came from, and revert it anyway. If you are waiting for a red pod, you
-will wait forever — that is the exercise, not a bug.
+will wait forever. That is the exercise, not a bug.
 
 <details>
 <summary>Hint 1: Establish the goal without a symptom</summary>
 
 A release landed and everything is green. Decide what you would have to check to be sure
-the release was *safe*, not merely working, then check it — and repair whatever you find
+the release was *safe*, not merely working, then check it, and repair whatever you find
 through a forward revert, not a live edit.
 </details>
 
@@ -248,7 +248,7 @@ image that fast. Which of the things you built in module 00 and 01 could have an
 `docker.io` request, and why would it answer for a registry it never fetched from?
 (On docker, `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5001/v2/...` and
 `docker logs cloudbox-mirror | tail` are both fair game; on tbx the mirror is talos-box's
-and keyed by registry, so the answer is the *opposite* — see the scenario briefing.)
+and keyed by registry, so the answer is the *opposite*: see the scenario briefing.)
 </details>
 
 <details>
@@ -282,33 +282,33 @@ pushes the new commit. `./solve.sh` reverts every scenario that is currently inj
 
 Every scenario above has a fourth rung on the escalation ladder, beyond the three hints:
 Kagent, the platform's own read-only agent, streaming a live investigation into a "Case
-file" on the demo component's page in the Console. This is the module's second half — the
+file" on the demo component's page in the Console. This is the module's second half: the
 same fault, worked twice, with one field changed in between.
 
 **Say the honest-spec line out loud before you start:** beat 1 runs a real model on your
 host, *beside* the whole running cluster. That needs the **32 GB "comfortable" spec from
-module 00**. On the **16 GB minimum spec, treat beat 1 as optional** — skip straight to
+module 00**. On the **16 GB minimum spec, treat beat 1 as optional**: skip straight to
 "Beat 2" below. That is not a lesser path; it costs no extra RAM, and it's the one that
 actually fits your machine.
 
-Concretely, measured on 2026-08-18 (32 GB M1 Max, 16 GB of it inside Colima, all 21 apps
+Measured on 2026-08-18 (32 GB M1 Max, 16 GB of it inside Colima, all 21 apps
 and 76 pods running): `qwen3:1.7b` at this repo's `num_ctx: 16384` costs **3.4 GB**
-outside the VM — 1.4 GiB of weights and **1.8 GiB of KV cache** — and ten investigations
+outside the VM, 1.4 GiB of weights and **1.8 GiB of KV cache**. Ten investigations
 took **31–106 s** of wall clock each.
 
 That is a deliberate climb-down from the chart's own defaults, and the arithmetic is the
-whole reason. The chart ships `qwen3:4b` at `num_ctx: 64000`, which `ollama ps` reports
+reason. The chart ships `qwen3:4b` at `num_ctx: 64000`, which `ollama ps` reports
 as **12 GB**: 2.6 GiB of weights and **9.0 GiB of KV cache**. On a 32 GB laptop with a
-16 GB Colima VM that leaves about 4 GB for macOS itself, and the machine spends the
-investigation swapping. **The weights were never the problem — the context window was
-75% of the footprint.** Shrinking it to 16384 gives back 7.2 GiB for free, and 16384 is a
-floor rather than a preference: a single `k8s_get_events` result on this cluster is
-~8.2 k tokens on its own, so 8192 overflows the moment the agent reads one.
+16 GB Colima VM that leaves about 4 GB for macOS, and the machine spends the
+investigation swapping. **The weights were never the problem. The context window was
+75% of the footprint.** Shrinking it to 16384 gives back 7.2 GiB, and 16384 is a
+floor, not a preference: a single `k8s_get_events` result on this cluster is
+~8.2 k tokens, so 8192 overflows the moment the agent reads one.
 
 ### Enable Kagent and point it at your platform
 
-If you haven't already, turn the capability on the same way as every other one in this
-workshop — copy the catalog entry into `gitops/apps/` and push:
+If you haven't already, turn the capability on the same way as every other one:
+copy the catalog entry into `gitops/apps/` and push:
 
 ```bash
 git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
@@ -321,24 +321,23 @@ git push
 Wait for `kubectl -n argocd get application kagent` to report `Synced`/`Healthy`, then
 check what shipped: `kubectl -n kagent get modelconfig default-model-config -o yaml`. It
 defaults to host-side Ollama running `qwen3:1.7b`, reached at whatever "the host" means on
-your substrate — see the check below.
+your substrate. See the check below.
 
 **Expect `kagent-controller` to CrashLoopBackOff ~3 times on the way there, and leave it
 alone.** It runs its database migration at startup, and it starts before the
 `kagent-postgresql` Service has endpoints (`connect: no route to host`), so it dies and
-comes back — 1/1 within ~40–90 s in the 2026-08-17 rehearsal. This is a real day-2 texture
-worth two minutes of attention: a restart count is not a diagnosis, and *ordering*
-failures self-heal in a way *configuration* failures never do. If it is still restarting
-after ~3 minutes, then read the logs.
+comes back: 1/1 within ~40–90 s in the 2026-08-17 rehearsal. This is real day-2 texture:
+a restart count is not a diagnosis, and *ordering* failures self-heal in a way
+*configuration* failures never do. Still restarting after ~3 minutes? Read the logs.
 
 **"The host" is not one address, and you do not hand-edit it.** It is
 `host.docker.internal` on the macOS/WSL2 docker substrate, `10.5.0.1`
 (`TALOS_SUBNET_GATEWAY`) on the native-Linux docker substrate, and the cluster gateway
-`172.30.<n>.1` inside a talos-box VM — the same
-host-vs-cluster addressing problem the image mirror solved for you in module 00 — the
+`172.30.<n>.1` inside a talos-box VM. This is the same host-vs-cluster addressing
+problem the image mirror solved for you in module 00, back for a second reason: the
 `cloudbox-mirror` container on docker, tbx's mirror on the cluster gateway on tbx (see
-`mirror_host_endpoint()` and `cloudbox_host_gateway()` in `scripts/lib.sh`) — showing up a
-second time for a second reason. It is already handled, in two halves:
+`mirror_host_endpoint()` and `cloudbox_host_gateway()` in `scripts/lib.sh`).
+It is already handled, in two halves:
 `bootstrap-gitops.sh` resolved the address for your machine back in module 00 and recorded
 it in configmap `kagent/cloudbox-host`, and the `kagent-ollama-host` PostSync hook you just
 synced patched the `ModelConfig` with it the moment ArgoCD created it. The kagent
@@ -349,9 +348,9 @@ kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.ollam
 ```
 
 That should be your host's address, not necessarily the `host.docker.internal` that git
-carries. If it is not — the hook's log says why
+carries. If it is not, the hook's log says why
 (`kubectl -n kagent logs job/kagent-ollama-host -c render-patch`, the container that
-makes the decision) — the same patch by hand:
+makes the decision). The same patch by hand:
 
 ```bash
 kubectl -n kagent patch modelconfig default-model-config --type merge \
@@ -363,7 +362,7 @@ that needs nothing: those runtimes proxy `host.docker.internal` through to the h
 loopback. Verified on 2026-08-17 under Colima (`vmType: vz`): a pod resolved
 `host.docker.internal` to `192.168.5.2` and got `{"version":"0.32.14"}` back from
 `/api/version` with no `OLLAMA_HOST` change at all. A plain bridge or a VM gateway does
-not proxy anything, so an Ollama bound to `127.0.0.1` is unreachable — start it as
+not proxy anything, so an Ollama bound to `127.0.0.1` is unreachable. Start it as
 `OLLAMA_HOST=0.0.0.0 ollama serve` (or set that in its systemd unit) and confirm from
 inside the cluster before blaming kagent:
 
@@ -373,10 +372,10 @@ kubectl -n gitea exec deploy/gitea -c gitea -- wget -qO- \
   "http://$(kubectl -n kagent get cm cloudbox-host -o jsonpath='{.data.gateway}'):11434/api/version"
 ```
 
-Ollama itself needs to be running on your host with `qwen3:1.7b` pulled — `cloudbox-init.sh`
-did that during module 00, *if* Ollama was already installed when you ran it; if it wasn't,
-the script warned and skipped the pull rather than failing. Confirm before you blame the
-cluster:
+Ollama itself needs to be running on your host with `qwen3:1.7b` pulled.
+`cloudbox-init.sh` did that during module 00 *if* Ollama was already installed when you
+ran it; if not, the script warned and skipped the pull rather than failing. Confirm
+before you blame the cluster:
 
 ```bash
 ollama list | grep qwen3     # ~1.4 GB; ollama pull qwen3:1.7b if it is missing
@@ -388,47 +387,46 @@ Pick any scenario above and inject it (or reuse one you already have live). In t
 Console, open **Components → demo** and click **Open investigation**. Watch the
 tool-call log stream.
 
-Worth noticing before you click: for the first two minutes the component reads
+Before you click: for the first two minutes the component reads
 **Rolling out**, not Degraded, and there is no Diagnostics panel yet. That is
-correct — a Deployment surges, so the previous version is still serving and the
+correct. A Deployment surges, so the previous version is still serving and the
 ready count still looks full. The console waits for the rollout to stop *making
 progress* before calling it degraded, rather than guessing from a count that
 cannot see the problem. It is the same trap the agent is about to fall into.
 
-Don't grade it on whether it gets the right answer — it mostly won't. A local ≤4B model
+Don't grade it on whether it gets the right answer. It mostly won't. A local ≤4B model
 is fine at *issuing* tool calls and falls off a cliff the moment an investigation has to
 **carry state across** several (get → describe → logs → events → hypothesis), which every
-real fault requires. **Write down exactly how it fails** — a loop that repeats the same
-call, a thread it drops after the third one, a hypothesis stated with no evidence behind
-it, a malformed follow-up. That sentence is beat 1's deliverable, not a diagnosis — same
+real fault requires. **Write down exactly how it fails**: a loop that repeats the same
+call, a hypothesis stated with no evidence behind it, a malformed follow-up. That sentence is beat 1's deliverable, not a diagnosis. Same
 spirit as module 05's "the agent claimed X" exercise.
 
 For calibration, here is what `qwen3:1.7b` did across ten Console investigations on the
-rehearsal machine (scenario 1 injected, 2026-08-18). It calls tools *enthusiastically* —
+rehearsal machine (scenario 1 injected, 2026-08-18). It calls tools *enthusiastically*,
 4 to 26 of them per run, all real, all answered. The failure is never "it didn't try";
 it is what happens to the evidence afterwards:
 
 - **breadth instead of depth.** One run issued `k8s_get_resources(all_namespaces=true)`
-  nineteen times, walking every resource *type* in the cluster — services, pods,
-  deployments, configmaps, secrets, pv, pvc, events, nodes — and never once asked the
+  nineteen times, walking every resource *type* in the cluster: services, pods,
+  deployments, configmaps, secrets, pv, pvc, events, nodes. It never once asked the
   crashing pod for its logs, where the answer is one line long;
 - **it narrates the evidence instead of reading it.** Verdicts come back as a
   *description of the JSON it just downloaded* ("this is a Kubernetes event log, here is
   what each field means") while `demo-web` is crashlooping the whole time;
 - **it diagnoses its own tooling.** One run's entire hypothesis was that a `k8s_get_resources`
-  call had failed and "the issue is likely localized to your environment" — a real
+  call had failed and "the issue is likely localized to your environment", a real
   finding about nothing, in place of the fault it was asked about;
-- **it addresses things that don't exist** — a pod name passed as a `Deployment`, or a
-  `demo` pod looked up in namespace `default` — takes `tool error:` back, and carries on
-  as if the call had returned.
+- **it addresses things that don't exist.** A pod name passed as a `Deployment`, or a
+  `demo` pod looked up in namespace `default`, takes `tool error:` back, and it carries
+  on as if the call had returned.
 
-Roughly one run in ten it *does* land on the real cause (`PORT=8080-canary`) — it reaches
+Roughly one run in ten *does* land on the real cause (`PORT=8080-canary`): it reaches
 `k8s_get_pod_logs`, and the answer is right there in the first line of output. Even then,
 read the verdict carefully: the run that got it right also asserted that "the Service is
 configured to use 8080-canary", which is simply false. **A correct headline with an
 invented supporting fact is the most dangerous output on this page**, and finding it is
-worth more than the diagnosis. Yours will differ in the details; the shape — real tool
-calls, then evidence that goes unread — is the point.
+worth more than the diagnosis. Yours will differ in the details; the shape is the point:
+real tool calls, then evidence that goes unread.
 
 > **If the Case file ends on "The investigation didn't complete"**, that is the model
 > generating without stopping: `kagent-controller` 0.9.12 cuts the A2A stream at a
@@ -436,9 +434,9 @@ calls, then evidence that goes unread — is the point.
 > it (runs of 9,000+ tokens in a single turn were measured). The ModelConfig's
 > `num_predict: "1200"` is what bounds each turn; if you removed it, put it back.
 
-> **Watching from the agent side.** The Console renders this run — the Case file shows
+> **Watching from the agent side.** The Console renders this run: the Case file shows
 > `tool_call → tool_result → message → verdict`, with the tool's real output collapsed
-> under the one-line read. If you want to see the same run from underneath, or the Case
+> under the one-line read. To see the same run from underneath, or if the Case
 > file is not available to you, both the model request and the tool call are in one log:
 >
 > ```bash
@@ -450,25 +448,25 @@ calls, then evidence that goes unread — is the point.
 > ```
 >
 > (Until cloudbox-portal v0.2.1 the Console could not read kagent 0.9.12's frames at all
-> and reported "the agent responded in a format this console doesn't recognize" — which
-> was wrong twice over, since the run had succeeded and the version was the pinned one.
+> and reported "the agent responded in a format this console doesn't recognize", which
+> was wrong twice over: the run had succeeded and the version was the pinned one.
 > If you see that message, your portal image predates v0.2.1.)
 
 ### Beat 2: one `ModelConfig` push, and it actually diagnoses
 
-Beat 2 is this module's **documented exception to the offline-after-pre-pull rule** —
+Beat 2 is this module's **documented exception to the offline-after-pre-pull rule**,
 the one place in the workshop that needs the venue network (decided and recorded in the
 module spec: small local models genuinely can't do multi-step triage, and on 16 GB
 machines beat 1 doesn't fit at all). If the network is down, beat 1 still works on
 32 GB machines, and the module's scenario path needs no network anywhere.
 
 Sign up for a free [OpenCode Zen](https://opencode.ai/auth) key during module 00 prep if
-you haven't yet (see that module's README). "Free" here is explicit and time-boxed —
+you haven't yet (see that module's README). "Free" here is explicit and time-boxed:
 Zen's free models are labeled **"for a limited time."** If they're gone by the time you
 read this, skip straight to the fallback paragraph below.
 
-Create the Secret imperatively — an API key is the one thing in this whole workshop that
-never goes in Git (and `read -s` below keeps it out of your shell history too):
+Create the Secret imperatively. An API key is the one thing in this whole workshop that
+never goes in Git, and `read -s` below keeps it out of your shell history too:
 
 ```bash
 read -rsp 'OpenCode API key: ' OPENCODE_API_KEY; echo
@@ -478,7 +476,7 @@ unset OPENCODE_API_KEY
 ```
 
 (The prompt hides what you type. If you paste nothing, `kubectl` happily creates the
-Secret with an **empty** key and beat 2 fails later with an opaque auth error — check
+Secret with an **empty** key and beat 2 fails later with an opaque auth error. Check
 with `kubectl -n kagent get secret kagent-zen -o jsonpath='{.data}'` if in doubt.)
 
 Then switch the *same* ModelConfig, via git, to Zen's OpenAI-compatible endpoint. Pick
@@ -509,7 +507,7 @@ git push
 
 Wait for ArgoCD to converge (`kubectl -n argocd get application kagent`), then open a new
 investigation on the same fault (if you skipped beat 1, inject any scenario from the
-setup table first). Same evidence, same read-only tool server — now the
+setup table first). Same evidence, same read-only tool server. Now the
 verdict comes with a real hypothesis and an explicit kill-test. Verify that kill-test
 against the live cluster yourself, then fix the fault the only way this module ever fixes
 anything: `git revert` and push.
@@ -517,17 +515,17 @@ anything: `git revert` and push.
 The switch itself is fast and observable, which is the platform lesson underneath the
 model lesson: on 2026-08-17 a one-field push reached
 `kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.model}'`
-**within 20 s**, and kagent rolled a new `k8s-agent` pod to pick it up — the same
+**within 20 s**, and kagent rolled a new `k8s-agent` pod to pick it up. The same
 git-is-the-write-path mechanic as every scenario above, applied to the agent's own brain.
-(What that rehearsal could not check was Zen's endpoint itself — no key. The mechanism was
+(That rehearsal could not check Zen's endpoint itself, having no key. The mechanism was
 proven by switching between two *local* Ollama models and watching the second one answer.)
 
 **No Zen key, or the free tier is gone?** Same shape, your own key. Create the Secret the
-same way (`kubectl create secret generic kagent-byo -n kagent --from-literal="API_KEY=$YOUR_KEY"`
-— one line, quoted), then set `apiKeySecret: kagent-byo` / `apiKeySecretKey: API_KEY` in
+same way (`kubectl create secret generic kagent-byo -n kagent --from-literal="API_KEY=$YOUR_KEY"`,
+one line, quoted), then set `apiKeySecret: kagent-byo` / `apiKeySecretKey: API_KEY` in
 the ModelConfig and either `provider: Anthropic` with a current Claude model and
-`anthropic: {}`, or `provider: OpenAI` with a current GPT model and `openAI: {}` — no
-`baseUrl` needed for either; that field only exists to redirect the generic OpenAI
+`anthropic: {}`, or `provider: OpenAI` with a current GPT model and `openAI: {}`. Neither
+needs `baseUrl`; that field only exists to redirect the generic OpenAI
 provider at Zen's endpoint instead of OpenAI's own. Full field reference:
 [kagent supported providers](https://kagent.dev/docs/kagent/supported-providers).
 
@@ -538,7 +536,7 @@ provider at Zen's endpoint instead of OpenAI's own. Full field reference:
 ```
 
 The check fails while Git still contains the poisoned value, and next to that FAIL it
-prints which live symptom it found — a `CrashLoopBackOff` (1), a pod the runtime refuses
+prints which live symptom it found: a `CrashLoopBackOff` (1), a pod the runtime refuses
 to start (2), or, for scenario 3, a perfectly healthy pod running a `docker.io/`
 reference. It never asks you to wait for a symptom that cannot arrive.
 
@@ -550,7 +548,7 @@ cannot bypass the platform's Git-only write path.
 ## Explain-back
 
 Tell your neighbor which observation connected the failure to the exact Git diff, and why
-reverting Git is safer here than editing the live Deployment—even if the live edit appears
+reverting Git is safer here than editing the live Deployment, even if the live edit appears
 to work for a minute. If you ran scenario 3, tell them instead why a green cluster was not
 evidence that the release was good.
 

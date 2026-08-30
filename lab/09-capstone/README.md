@@ -6,25 +6,25 @@ At the end of this module your platform runs an event-driven picture pipeline: y
 photo into the Cloudbox Console's Gallery, and a resizer service *that is not running*
 wakes from zero, makes a thumbnail and a metadata file, and goes back to sleep. You prove
 it three ways: pods appearing in a `-w` watch, the thumbnail landing in the gallery and
-in S3, and — the flourish — the whole chain as a single trace in Grafana.
+in S3, and, for the flourish, the whole chain as a single trace in Grafana.
 
 <p align="center">
   <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console — a component's Monitoring page: CPU/memory sparklines and a live log tail from the OTel stack" width="80%" />
 </p>
 
-<p align="center"><em>Look at what you built: the Cloudbox Console surfaces per-component metrics and a live log tail straight from the OTel stack (VictoriaMetrics / VictoriaLogs / VictoriaTraces) — the same telemetry that renders your upload as one end-to-end trace in Grafana.</em></p>
+<p align="center"><em>Look at what you built: the Cloudbox Console surfaces per-component metrics and a live log tail straight from the OTel stack (VictoriaMetrics / VictoriaLogs / VictoriaTraces), the same telemetry that renders your upload as one end-to-end trace in Grafana.</em></p>
 
 **Prerequisites:** this capstone builds on modules 03 (RustFS), 06 (Knative Serving)
-and 08 (the portal) — have them green, or jump straight here with
+and 08 (the portal). Have them green, or jump straight here with
 `./scripts/catch-up.sh 8`.
 
 ## Why this matters
 
 This is the capstone because it uses *everything you built today*, at once: GitOps
 delivers it (02), RustFS stores it (03), Knative scales it from zero (06), the portal
-fronts it (08), and the observability stack you enable on-demand right here — the
-Victoria stack + OTel Collector — watches it end to end. The one new piece is
-**Knative Eventing**: a Broker and Triggers — the open-source shape of S3 events → SQS →
+fronts it (08), and the Victoria stack + OTel Collector, enabled
+on-demand right here, watches it end to end. The one new piece is
+**Knative Eventing**: a Broker and Triggers, the open-source shape of S3 events → SQS →
 Lambda. The uploader doesn't know the resizer exists; it emits a fact
 (`dev.cloudbox.image.uploaded`, as a CloudEvent) and the Broker routes it to whoever
 subscribed. That decoupling is the whole point of event-driven architecture, and today it
@@ -32,11 +32,11 @@ runs on your laptop, readable end to end.
 
 ## The task
 
-1. Enable **two** catalog apps: `knative-eventing.yaml` (the event mesh — Broker/Trigger
+1. Enable **two** catalog apps: `knative-eventing.yaml` (the event mesh: Broker/Trigger
    machinery in ns `knative-eventing`) and `picture-pipeline.yaml` (ns `pipeline`: a
-   Broker, two cluster-local Knative Services — `uploader`, `resizer` — a Trigger, and a
+   Broker, two cluster-local Knative Services, `uploader` and `resizer`, a Trigger, and a
    Job that creates the `images` bucket). Wait until
-   `kubectl -n pipeline get broker,trigger,ksvc` is all Ready — then note the pod count
+   `kubectl -n pipeline get broker,trigger,ksvc` is all Ready, then note the pod count
    in ns `pipeline`: with no traffic, both ksvcs sit at **zero**.
 2. **The moment.** Two terminals:
    - `kubectl -n pipeline get pods -w`
@@ -45,20 +45,20 @@ runs on your laptop, readable end to end.
    Watch the uploader pod cold-start to receive the file, then the *resizer* appear from
    nowhere to handle the event. Nothing called it. The first upload is the slow one: both
    services start from zero (image pull + boot), so the thumbnail can take up to ~a minute
-   to land — the gallery shows "original uploaded, waiting for the resizer…" until it does.
+   to land. The gallery shows "original uploaded, waiting for the resizer…" until it does.
    Count the actors between your browser and that second pod.
 3. **Find the results.** Both views of the same bucket:
    - the Gallery (refresh) shows the thumbnail + its metadata (dimensions, dominant color);
    - raw S3: `originals/`, `thumbs/`, and `meta/<key>.json` under bucket `images`
-     (`s5cmd ls` against `http://s3.cloudbox.k8s.test` — module 03 muscle memory; hint 3 has the exact lines).
-4. **Inspect the plumbing.** `kubectl -n pipeline get broker,trigger` — find what the
-   Trigger filters on. Then read the resizer's logs and find the `ce-type`, `ce-source`,
+     (`s5cmd ls` against `http://s3.cloudbox.k8s.test`, module 03 muscle memory; hint 3 has the exact lines).
+4. **Inspect the plumbing.** Run `kubectl -n pipeline get broker,trigger` and find what
+   the Trigger filters on. Then read the resizer's logs and find the `ce-type`, `ce-source`,
    `ce-id` headers: a CloudEvent is just an HTTP POST with five headers. Where did your
    image bytes go, and what actually traveled through the Broker?
-5. **The flourish.** Observability is an on-demand capability — enable the Victoria stack +
+5. **The flourish.** Observability is an on-demand capability. Enable the Victoria stack +
    OTel Collector from the catalog first (hint 5 has the files), then find the upload's trace
-   in Grafana at **http://grafana.cloudbox.k8s.test** → Explore → **VictoriaTraces** and see the chain —
-   portal → uploader → broker → resizer — as one waterfall. Hint 5 if the Jaeger trace view is
+   in Grafana at **http://grafana.cloudbox.k8s.test** → Explore → **VictoriaTraces**: the chain
+   portal → uploader → broker → resizer as one waterfall. Hint 5 if the Jaeger trace view is
    new to you.
 6. Run `./verify.sh`.
 
@@ -88,18 +88,18 @@ module 06). Both can go in one push.
 
 Follow the event, hop by hop:
 
-1. Did the uploader get the file? `kubectl -n pipeline logs -l serving.knative.dev/service=uploader -c user-container --tail=20`
-   — it logs the S3 key and the Broker's answer (expect `202 Accepted`).
+1. Did the uploader get the file? `kubectl -n pipeline logs -l serving.knative.dev/service=uploader -c user-container --tail=20`.
+   It logs the S3 key and the Broker's answer (expect `202 Accepted`).
 2. Is the Trigger Ready and pointing at the resizer?
-   `kubectl -n pipeline describe trigger resize-on-upload` — check the filter
+   `kubectl -n pipeline describe trigger resize-on-upload`: check the filter
    (`type: dev.cloudbox.image.uploaded`) and subscriber. If it stays `NotReady` with reason
-   `BrokerNotConfigured`, it reconciled before the broker was Ready and latched — once the
+   `BrokerNotConfigured`, it reconciled before the broker was Ready and latched. Once the
    broker and both ksvcs are Ready, nudge it to re-reconcile with any harmless annotation
    change: `kubectl -n pipeline annotate trigger/resize-on-upload cloudbox.io/rereconcile="$(date +%s)" --overwrite`
    (exactly what `solve.sh` does).
 3. The Broker's delivery side lives in ns `knative-eventing`:
    `kubectl -n knative-eventing logs deploy/mt-broker-filter --tail=20` and
-   `deploy/imc-dispatcher` — delivery errors (and retries) land there.
+   `deploy/imc-dispatcher`. Delivery errors (and retries) land there.
 </details>
 
 <details>
@@ -112,7 +112,7 @@ s5cmd --endpoint-url http://s3.cloudbox.k8s.test ls s3://images/thumbs/
 s5cmd --endpoint-url http://s3.cloudbox.k8s.test cat s3://images/meta/<key>.json
 ```
 
-The metadata JSON (dimensions, dominant color) is the resizer's proof of work — the
+The metadata JSON (dimensions, dominant color) is the resizer's proof of work. The
 gallery page renders exactly this file. No S3 client installed? The in-cluster pattern
 from module 03's hint 4 works verbatim (endpoint
 `http://rustfs-svc.rustfs.svc.cluster.local:9000`).
@@ -122,25 +122,25 @@ prints `date size basename` **relative to the prefix**, so `ls --show-fullpath` 
 gives you whole keys (`s3://images/thumbs/…`); and `ls` on a prefix with nothing in it
 exits **1** with `no object found`, which here means "the resizer hasn't landed yet",
 not "something is broken". The apps on either side of this bucket use `minio-go`, not a
-CLI — same API, three different clients, and RustFS cannot tell them apart. That is the
+CLI. Same API, three different clients, and RustFS cannot tell them apart. That is the
 whole claim of S3 compatibility, tested rather than asserted.
 </details>
 
 <details>
 <summary>Hint 4: Prove the decoupling (what the explain-back is about)</summary>
 
-Scale the resizer away and upload anyway. The Trigger keeps retrying delivery — watch
+Scale the resizer away and upload anyway. The Trigger keeps retrying delivery: watch
 `kubectl -n knative-eventing logs deploy/imc-dispatcher -f` while the resizer is gone,
 then let it come back and see the event land. Then ask the uncomfortable question: this
-Broker is backed by an **in-memory** channel — what happens to waiting events if the
-`imc-dispatcher` pod itself restarts? (That's why production brokers ride on Kafka —
+Broker is backed by an **in-memory** channel. What happens to waiting events if the
+`imc-dispatcher` pod itself restarts? (That's why production brokers ride on Kafka,
 and why this one deliberately doesn't; it's a lab.)
 </details>
 
 <details>
 <summary>Hint 5: Enabling observability, then finding the trace in Grafana</summary>
 
-The Victoria observability stack is an on-demand capability — enable it from the catalog
+The Victoria observability stack is an on-demand capability. Enable it from the catalog
 first (all five Applications go in one push):
 
 ```bash
@@ -183,7 +183,7 @@ kubectl -n pipeline logs -l serving.knative.dev/service=resizer -c user-containe
 cd "$WORKSHOP/lab/09-capstone" && ./verify.sh
 ```
 
-(No browser? `solve.sh` uploads a test PNG with plain `curl` through the portal — the
+(No browser? `solve.sh` uploads a test PNG with plain `curl` through the portal. The
 gallery form is just a multipart POST.)
 </details>
 
@@ -195,29 +195,29 @@ gallery form is just a multipart POST.)
 
 It checks: both apps Healthy (Synced is the happy path; sync is advisory); the eventing control plane and Broker data plane
 are up; Broker `default` and Trigger `resize-on-upload` are Ready; both ksvcs are Ready;
-bucket `images` exists; and — if anything has been uploaded — that every batch of
+bucket `images` exists; and, if anything has been uploaded, that every batch of
 originals has produced at least one matching thumbnail. The upload itself needs a human
 (or `solve.sh`): the machinery is verifiable, the *moment* is yours.
 
 ## Explain-back
 
 Tell your neighbor: why does the uploader POST an event to a Broker instead of just
-calling the resizer's URL — what breaks, and what becomes possible, under each design?
+calling the resizer's URL? What breaks, and what becomes possible, under each design?
 (Think: adding a third consumer; deploying a broken resizer.) And when the resizer is
-down, *where exactly* does the event wait — and what would take that waiting event to
+down, *where exactly* does the event wait, and what would take that waiting event to
 production grade?
 
 ## Going deeper
 
 - **Second consumer, zero coupling.** Add another Trigger on the same
   `dev.cloudbox.image.uploaded` type pointing at a new ksvc (start from module 06's
-  `hello` — its logs will show the CloudEvent POSTs). Note what you did *not* have to
+  `hello`, whose logs will show the CloudEvent POSTs). Note what you did *not* have to
   change: the uploader.
 - **Policy at the edge.** Make the uploader reject files over 5 MB with a `413`
-  (`apps/uploader/main.go` — it's a few lines around the multipart read), rebuild with
+  (`apps/uploader/main.go`, a few lines around the multipart read), rebuild with
   module 07's in-cluster pipeline, roll it out via git.
 - **Sepia.** Fork `apps/resizer` into a sepia-filter service writing `sepia/<key>`,
-  subscribe it with its own Trigger — a second opinion on every upload, built entirely
+  subscribe it with its own Trigger: a second opinion on every upload, built entirely
   from parts you own.
 - You built S3-events → queue → function on a laptop. Sketch which managed products
   this replaces on your cloud bill, and what you'd genuinely still pay for.

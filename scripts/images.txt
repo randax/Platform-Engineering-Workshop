@@ -232,5 +232,9 @@ quay.io/strimzi/kafka:0.49.0-kafka-4.1.0@sha256:7a08fc4adddd559469921a200763c566
 # Cilium 1.20.0 pin (relay) / its matching UI release. The CLI inside the
 # cilium agent needs none of these; the pretty map does.
 quay.io/cilium/hubble-relay:v1.20.0@sha256:2ca16981c7eb98df0ba9c9d18896bb9ca628b5cbd40dc9801339f4741f91ee94
-quay.io/cilium/hubble-ui:v0.13.2@sha256:9e37c1296b802830834cc87342a9182ccbb71ffebb711971e849221bd9d59392
-quay.io/cilium/hubble-ui-backend:v0.13.2@sha256:a034b7e98e6ea796ed26df8f4e71f83fc16465a19d166eff67a03b822c0bfa15
+# v0.13.5, and the digests matter: the vendored Cilium 1.20.0 chart sets
+# useDigest: true, so it pulls THESE bytes and nothing else. The mirror held
+# v0.13.2 — different digests — which meant door 3's Hubble UI ImagePullBackOff'd
+# offline while the briefing promised it was pre-pulled.
+quay.io/cilium/hubble-ui:v0.13.5@sha256:f7d514fc54d784ed6df9d58cf0e97648b143f92b766dd1780ed3fc845bd4c516
+quay.io/cilium/hubble-ui-backend:v0.13.5@sha256:fac0c300ae119274edca11fd89b1ad23c788792d8bc4ea2ba631c709e8d3c688

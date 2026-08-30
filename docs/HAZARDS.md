@@ -1101,6 +1101,75 @@ perfectly correct, on the one file where following bad advice is expensive. **Th
 are the contract; the comments are commentary.** A new question about this block belongs
 on one side of that line, explicitly.
 
+## TRAP — a 5 s AAAA stall turns every `verify.sh` into a liar; the `-4` is load-bearing
+
+Observed 2026-08-30 on a rehearsal host: `curl http://gitea.cloudbox.k8s.test/` took
+**exactly 5.004 s** to resolve, every time, while `curl -4` on the same name answered in
+1 ms and `host -t AAAA` returned NXDOMAIN in 0.12 s. The workshop hostnames have only an
+A record (the `/etc/hosts` block writes one address), so the delay is the AAAA half of
+`getaddrinfo` stalling — not DNS being slow, since a direct query is fast.
+
+That number matters because the lab verifiers used `curl --max-time 5`. The probe expired
+**on the boundary**, so three modules failed with messages that blamed the attendee's
+work: `Zot not answering`, `hello-site not in Zot catalog ({}) — did the push step
+succeed?`, `cloudbox/platform repo missing in Gitea`. Every one of those services was
+healthy and answering; proven by IP with a `Host:` header, and by `curl -4`. An attendee
+would have gone debugging a CI pipeline that worked.
+
+Every `curl` in `lab/*/verify.sh` now passes **`-4`**. These names resolve to one IPv4
+address on both substrates — loopback on docker, the node address on tbx — so there is
+never an IPv6 answer worth waiting for. **Do not remove it as noise.** Raising the
+timeout instead would only trade a false failure for a five-second stall per probe.
+
+Why the stall happens at all is unresolved (a per-application firewall and a VPN
+extension are both live on the affected host, and `host` bypasses the resolver path
+`curl` uses). It has not been reproduced on another machine — but a venue network that
+blackholes DNS is exactly where it would reappear, and the workshop is offline-first.
+
+**Retired by:** nothing needs retiring. The `-4` is correct regardless of whether the
+stall ever recurs; this entry exists so it is not deleted by someone tidying flags.
+
+## LIVE — growing a database silently never completes, and three layers report success
+
+`local-path` is the workshop's only StorageClass and it does **not** set
+`allowVolumeExpansion`, so Kubernetes forbids growing any PVC it provisioned. Every
+`WorkshopDatabase` size is backed by it (`small` 1Gi, `medium` 5Gi, `large` 10Gi in
+`gitops/components/platform-api/composition.yaml`), so **resizing any database upward —
+from the Console, from the platform API, or by editing the XR — can never finish.**
+
+What makes this a hazard rather than a limitation is that nothing says so. CNPG retries
+about every 24 s forever with
+
+```
+error while changing PVC storage requirement ... requests={storage:5Gi} oldRequests={storage:1Gi}
+error="persistentvolumeclaims \"…\" is forbidden: only dynamically provisioned pvc can be
+resized and the storageclass that provisions the pvc must support resize"
+```
+
+while `status.phase` keeps reading **`Cluster in healthy state`**, the XR keeps reporting
+the size that was asked for, and the Console's form reports success. The one reconcile
+error also blocks the *whole* Cluster update, so a `medium`'s second instance never
+arrives either — `readyInstances` stays at 1 against `spec.instances: 2`. The truth is
+only in `describe cluster` events and the cnpg-system operator log.
+
+It is one-way in a nastier sense than "storage only grows": shrinking back afterwards is
+refused with `can't shrink existing storage`, compared against the size that was never
+actually reached. A resize that did nothing still costs the ability to undo it.
+
+**How you would notice.** A database that says `medium` and healthy with one pod and a
+1Gi PVC. `kubectl -n <ns> get cluster <name> -o custom-columns=PHASE:.status.phase,READY:.status.readyInstances,WANT:.spec.instances`
+is the quick tell.
+
+Module 08's "Going deeper" now teaches this deliberately rather than tripping over it —
+it is a genuinely good lesson about `status.phase` not being a health check — so **do not
+"fix" the lab by removing the resize step.** The open design question is whether the
+platform should refuse the resize up front (it can read its own StorageClass), surface
+`readyInstances` next to the claimed size, or decouple size from storage entirely.
+
+**Retired by:** a StorageClass that supports expansion, or the platform API refusing a
+storage change it cannot deliver. Setting `allowVolumeExpansion: true` on local-path is
+**not** a fix on its own — verify an actual grow completes before believing it.
+
 ## TRAP — module 04's Crossplane Function is fetched by Crossplane, not by the mirror
 
 **Pre-existing, deliberate, and not on `images.txt` — recorded here because two

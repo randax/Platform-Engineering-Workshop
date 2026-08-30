@@ -65,7 +65,7 @@ fi
 # which is exactly what it did to a rehearsal, the day after that redirect
 # landed. What we care about is that the front door answers, not which page it
 # answers with.
-HTTP_CODE="$(curl -sL -o /dev/null -w '%{http_code}' --max-time 10 "${PORTAL_HOST_URL}/" 2>/dev/null || echo 000)"
+HTTP_CODE="$(curl -4 -sL -o /dev/null -w '%{http_code}' --max-time 10 "${PORTAL_HOST_URL}/" 2>/dev/null || echo 000)"
 if [ "$HTTP_CODE" = "200" ]; then
   ok "Cloudbox Console answers at ${PORTAL_HOST_URL}"
 else
