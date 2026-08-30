@@ -1,11 +1,29 @@
 # Rehearsals — what the day actually costs, and what testing it taught us
 
-Three full end-to-end rehearsals ran on 2026-08-17/18, all on Apple Silicon +
-Colima. This is the timing envelope they produced and the lessons that outlived
-them. `docs/HAZARDS.md` is what to be afraid of; this is how we found it.
+Every end-to-end run of this workshop gets a record. The per-rehearsal records
+live in `docs/rehearsals/`, one file each, indexed below; this file keeps the
+timing envelope the early runs produced and the lessons that generalise across
+all of them. `docs/HAZARDS.md` is what to be afraid of; this is how we found it.
 
 Raw records (per-stage logs, evidence files) are not in the repo — they live in
 the run scratchpads referenced from each hazard entry.
+
+## Index
+
+| # | date | substrate | outcome |
+|---|------|-----------|---------|
+| [1](rehearsals/01-warm-mirror-first-pass.md) | 2026-08-17 | docker (Colima) | warm mirror, 11/11 green, ~16 min script time; 3 blockers, 2 invisible to CI |
+| [2](rehearsals/02-cold-start-rebuild.md) | 2026-08-17 | docker (Colima) | cold start, 11/11 on two clusters incl. `--rebuild`; the `catch-up.sh` deadlock |
+| [3](rehearsals/03-cold-mirror-uncapped.md) | 2026-08-17/18 | docker (Colima) | cold mirror, uncapped nodes, 10/11 (host disk); the 36-node-cluster context near-miss |
+| [4](rehearsals/04-brand-new-colima-vm.md) | 2026-08-18 | docker (fresh Colima VM) | from zero, 11/11 **twice**; two recovery-path blockers, one self-inflicted |
+| [5](rehearsals/05-substrate-split-checklist.md) | (planned) | tbx | the substrate-split checklist — steps, not results; timings blank on purpose |
+| [6](rehearsals/06-first-tbx-end-to-end.md) | 2026-08-28 | tbx | first VM run, labs 01–08 in ~1 h 33 min; the crane-hop image-pull stall |
+| [7](rehearsals/07-tbx-pinned-release.md) | 2026-08-29 | tbx v0.1.4 | full path to module 10, 0 manual recoveries; the self-healed VM reboot |
+| [8](rehearsals/08-agy-participant-run.md) | 2026-08-29 | tbx | an outside agent (agy) completed 00–09 unaided; tbx-mirror and prework finds |
+| [9](rehearsals/09-tbx-kernel-panic-v013.md) | 2026-08-30 | tbx v0.1.3 | **aborted: tbxd panicked the macOS kernel** — host hard reset, 0 modules |
+| [10](rehearsals/10-tbx-kernel-panic-v014.md) | 2026-08-30 | tbx v0.1.4 | **aborted: second panic, 18 min later** — the upgrade remedy spent; tbx off that host |
+| [11](rehearsals/11-docker-first-full-run.md) | 2026-08-30 | docker | 00–09 for real on PR #222; the module 08 storage trap, adventure 3's inert default-deny, the `curl -4` fix |
+| [12](rehearsals/12-docker-merged-main.md) | 2026-08-30 | docker | merged main at the resource floor, all eleven `verify.sh` exit 0; lab 08's verify graded on the lying `status.phase` |
 
 ## The 240-minute budget is not the constraint
 
@@ -66,262 +84,6 @@ Two numbers worth carrying into the room:
 - **The s5cmd swap costs ~1:00–1:45 per storage module**, because it takes the
   in-cluster pod branch rather than a preinstalled binary. That is the attendee
   path and better coverage; it is not free.
-
-## Rehearsal 5 — the substrate split (planned)
-
-Rehearsals 1–4 all ran Talos-in-Docker. The substrate split adds a second machine
-substrate — real Talos VMs via [talos-box](https://github.com/randax/talos-box) —
-and **not one line of that path has been run end to end.** Everything below is
-therefore a checklist, not a result. Timings are blank on purpose: the owner
-fills them in on the day, the way the four numbers in the table above were filled
-in.
-
-`tbx system install` (it sudo-s itself; upstream's README says never a PATH-dependent
-`sudo tbx …`) is a **one-time privileged prerequisite** — it installs
-the helper that does the VM and network wiring. It is not part of any script and
-nobody should discover it at the venue.
-
-Each step names the `docs/HAZARDS.md` entry it retires, so a green run can be
-turned into edits there rather than into a feeling.
-
-| # | Step | Time | Result |
-|---|------|------|--------|
-| 0 | portal release + re-mirror (below) | | |
-| 1 | `tbx system install` / `tbx doctor` | | |
-| 2 | prework: `cloudbox-init.sh`, `install.sh --check` | | |
-| 3 | `create-cluster.sh` | | |
-| 4 | registry mirror reaches the VMs | | |
-| 5 | bootstrap + seed, ingress on the hostname | | |
-| 6 | labs 01–06 | | |
-| 7 | module 07 (registry + in-cluster build) | | |
-| 8 | modules 08/09 (Console, picture pipeline) | | |
-| 9 | module 10 (kagent + Ollama) | | |
-| 10 | destroy → create → `catch-up --rebuild 07` | | |
-| 11 | full-tunnel VPN | | |
-| 12 | offline | | |
-| 13 | docker path on the same Mac | | |
-| 14 | `bootstrap-test.yaml` | | |
-
-**0. Publish the portal image first.** Merge the branch, let `release-please` open
-its release PR (it rewrites every pinned ref — pins are never hand-edited), merge
-that, wait for `build-images` to finish, verify every ref in `scripts/images.txt`
-resolves with the `crane manifest` loop, then re-run `./scripts/cloudbox-init.sh`
-to re-mirror. Until this is done the Console's function URLs are wrong on both
-substrates and step 8 cannot pass.
-*Retires:* TRAP — the pinned portal image predates `KNATIVE_DOMAIN`. *Guards
-against:* TRAP — the release/pin publish window.
-
-**1. Install the helper.** `tbx system install && tbx doctor` → **exit 0, no FAIL**
-(checks that need a cluster — `routes`, `system-dns`, `inter-cluster`, `talos-services` —
-`SKIP` until one exists; a WARN never fails doctor).
-
-**2. Prework.** `./scripts/cloudbox-init.sh` → ends with `talos-disk=yes ·
-tbx-doctor=pass`. Confirm the disk image is really there, not just its directory:
-
-    find ~/.talosbox/cache -path '*v1.13.8/*disk.raw'
-
-must be non-empty. Then `./scripts/install.sh --check` → exit 0. Note whether the
-Ollama bind warning fired.
-*Retires:* the offline half of LIVE — Ollama binds to loopback (the warning path),
-and confirms the disk-cache assertion added after an interrupted `tbx cache pull`
-left a directory behind.
-
-**3. Create the cluster.** `time ./scripts/create-cluster.sh`. Expect: the subnet
-line; both nodes in maintenance within **≤300 s**; `Ingress VIP: 172.30.<n>.200`;
-and **no** ".200 is not conventional" warning. Record wall-clock — this is the
-number the 240-minute budget cares about, and there is no prior measurement for it.
-*Retires:* TRAP — `.200` resolves before anything owns it.
-
-**4. The mirror actually reaches the VMs.** `talosctl -n <cp> get registries`
-shows the eight explicit entries pointing at `http://172.30.<n>.1:5059` (tbx's own
-mirror, issue #206 — the `:5001` crane container of rehearsals 5–6 is docker-only
-now); the worker's kubelet logs show pulls from that address; `tbx cache list`
-(and `tbx doctor`'s mirror-health line) show them served from `~/.talosbox/cache`.
-No Docker is involved on this substrate — this is the step that proves it.
-
-**5. Bootstrap and seed.** `./scripts/bootstrap-gitops.sh && ./scripts/seed-gitea.sh`,
-then `dig +short gitea.cloudbox.k8s.test` → the `.200` VIP, and
-`curl -I http://gitea.cloudbox.k8s.test` → 200. Watch the git push for Envoy 413s
-or timeouts. Gitea's UI clone box shows the in-cluster URL — use the hostname.
-
-**6. Labs 01–06.** `solve.sh` then `verify.sh` for each. Lab 06 must pass **via its
-own URL**, not the fallback — and that URL is now
-`http://hello-demo.kn.cloudbox.k8s.test/`, one label, from the `domain-template`
-curation. Then do the thing the fixed rules exist for: create a ksvc in a namespace
-nobody listed (`kubectl create ns scratch` + any ksvc) and confirm it answers on tbx
-with no extra Ingress rule. On docker it will not resolve — that is expected and
-documented; `curl -H "Host: …" http://localhost/` must still answer.
-*Retires:* RESOLVED — a Knative Service in a namespace nobody listed had no route.
-
-**7. Module 07.** `./scripts/catch-up.sh 07 && (cd lab/07-ci && ./verify.sh)`. The
-`crane copy` goes to `zot.cloudbox.k8s.test` through the ingress; the in-cluster
-build pushes and pulls `localhost:30500` from a real node. Both halves matter —
-they are the two sides of the hostname/NodePort split, and the node-side half is
-specifically what tbx's catch-all `"*"` mirror would have broken (see the RESOLVED
-entry in `docs/HAZARDS.md`). **CI does not prove this**: `bootstrap-test.yaml` builds
-the first-party images locally as `v0.1.0` while the manifests pin `v0.2.2`, so the
-cluster silently falls back to GHCR and the offline first-party image path is never
-exercised on any runner. This step is the only place it is.
-*Retires:* the tbx half of the catch-all mirror — the one path a green CI run cannot
-speak to.
-*Retires:* the tbx half of the catch-up clone-URL fix — `catch-up.sh` used to
-clone the platform repo from a NodePort that only exists on docker.
-
-**8. Modules 08 and 09.** `http://portal.cloudbox.k8s.test` loads; upload a
-picture; the presigned URL is `http://s3.cloudbox.k8s.test/...` **and loads** (a
-`SignatureDoesNotMatch` means the Host rewrite is wrong, not the credentials);
-Console app URLs read `<name>-<namespace>.kn.cloudbox.k8s.test` — which is what proves
-step 0 landed.
-*Retires:* TRAP — the pinned portal image predates `KNATIVE_DOMAIN`.
-
-**9. Module 10.** `OLLAMA_HOST=0.0.0.0 ollama serve`; enable kagent; then
-
-    kubectl -n kagent logs job/kagent-ollama-host -c render-patch     # shows 172.30.<n>.1:11434
-    argocd app sync kagent
-    kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.ollama.host}'
-
-The last value must be **unchanged** after the sync. Record `tbx status` and the
-VM's RSS at this end state — that is what the `TBX_*` memory pins should be
-corrected against.
-*Retires:* LIVE — Ollama binds to loopback · WATCH — three settings have to agree
-for the Ollama host to survive selfHeal · WATCH — `bootstrap-gitops.sh` creates
-namespace `kagent` before ArgoCD owns it · and gives LIVE — tbx VM memory is a
-moving ceiling its first real number.
-
-**10. The recovery path.** `./scripts/destroy-cluster.sh --purge-mirror &&
-./scripts/create-cluster.sh`, then `./scripts/catch-up.sh --rebuild 07`. Rehearsals
-2 and 4 both found blockers here and nowhere else.
-
-**11. VPN.** With a full-tunnel VPN connected: `tbx doctor` (expect a `routes`
-FAIL), `curl http://gitea.cloudbox.k8s.test`. Document exactly what the attendee
-sees.
-*Retires:* TRAP — a full-tunnel VPN blackholes 172.30.0.0/16.
-
-**12. Offline.** Wi-Fi off: destroy, create and bootstrap must all succeed from the
-mirror and the cached disk image. This is the hard requirement, on a substrate
-that has never been asked.
-*Observe, do not fix:* enable the **crossplane** Application with the WiFi still ON, and
-write down that you did. `function-patch-and-transform` is fetched by Crossplane's package
-manager, not through the node's registry mirror, so it is the one component that cannot
-come up offline (HAZARDS — "module 04's Crossplane Function is fetched by Crossplane").
-Then turn the WiFi off and confirm everything *else* — including a fresh
-`catch-up.sh 04` — still converges.
-
-**13. The docker path, same Mac.** `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh`
-→ **one** sudo prompt, and it comes **last**, after the cluster is Ready; `grep -c cloudbox
-/etc/hosts`; `curl http://argocd.cloudbox.k8s.test`; any `destroy-cluster.sh` leaves
-`/etc/hosts` **byte-identical** to what it was before (for a newline-terminated file — the
-awk rewrite terminates its last line). Also **decline** the password once: the cluster must
-finish and stay up, and `./scripts/install.sh --write-hosts` must then write the block.
-Repeat under Colima if it is available on the machine.
-*Retires:* TRAP — /etc/hosts needs sudo · LIVE — host port 80 is the only
-privileged port the workshop binds.
-
-**14. CI.** `gh workflow run bootstrap-test.yaml` — both jobs green.
-
-**15. The gate.** Keep `CLOUDBOX_SUBSTRATE_DEFAULT="tbx"` **only if steps 3–12
-pass**. Otherwise flip it to `docker` in `scripts/versions.env:69` by **Aug 31** and
-ship tbx as the opt-in path. The decision is a date, not a judgement call, because
-the alternative is discovering the answer in the room.
-
-## Rehearsal 6 — first end-to-end on tbx (2026-08-28)
-
-The first run of the VM substrate through the labs, on Apple Silicon, with the
-container images still served from the crane container on `localhost:5001`
-(reached from the VMs over the Colima hop — the arrangement issue #206 has since
-replaced with tbx's own mirror). Eight labs, one cluster.
-
-| | rehearsal 6 (tbx) |
-|---|---|
-| `create-cluster.sh` — VMs up, config applied, etcd bootstrapped | **94 s** |
-| both nodes `Ready` | **~6 min** |
-| eight labs (01–08), wall clock | **~1 h 33 min** |
-| manual interventions | **1** — a node reboot after a stalled image pull |
-| ingress VIP | short blackouts from the host, mitigated with retries in the git helper |
-
-**The stall.** Both nodes sat `NotReady` well past the Cilium rollout; `talosctl
-service kubelet` (and `etcd` on the control plane) showed `Preparing` with a byte
-count that stopped moving on a ~60 MiB blob. The pull path was Talos VM → vmnet
-→ macOS → Colima VM → registry container, and a manual reboot of the node
-restarted the pull and the cluster came up. That is the cost recorded in
-`docs/HAZARDS.md` under the mirror entry, and the reason the tbx substrate now
-pulls through tbxd's mirror on the gateway address (issue #206) and lab 01
-carries the stall-recovery paragraph (issue #207). talos-box's stall signal
-(randax/talos-box#482) is what lets `create-cluster.sh` do that reboot itself
-(issue #208, blocked on v0.1.2).
-
-**The VIP.** `172.30.<n>.200` dropped off for seconds at a time from the host;
-the git helper was patched to retry and the labs went on. Cause unknown — issue
-#209 is the 30-minute hammer-and-correlate experiment (Cilium L2 lease
-renewals, `bpf.hostLegacyRouting`, `k8sClientRateLimit`), paired with
-randax/talos-box#484 on a curated cluster to split "substrate property" from
-"our values".
-
-**What it does not say.** Modules 09 and 10 were not reached, nothing was run
-offline, and the mirror-through-tbx path did not exist yet. Rehearsal 7 is the
-first run that can retire any of that.
-
-## Rehearsal 7 — the full tbx path on the pinned release (2026-08-29)
-
-The run that PR #223's bump of talos-box to **v0.1.4** owed under
-`docs/MAINTENANCE.md` step 4. Apple Silicon, 32 GB, 10 CPUs, macOS with two LLM
-review agents and a Codex run sharing the laptop for most of it. First run with
-the images served from **tbxd's own mirror** (issue #206) — no Docker involved —
-and the first to reach modules 09 and 10 on tbx.
-
-| | rehearsal 7 (tbx v0.1.4) |
-|---|---|
-| `cloudbox-init.sh --yes` — 76 refs into tbx's mirror (`--jobs` default 8) + the Talos disk image | 76 warmed, 0 failed |
-| `install.sh --check` | all ✅ except the 40 GB free-disk floor (36 GB free — under it) |
-| `create-cluster.sh` — VMs, config, bootstrap, Cilium, both nodes `Ready`, VIP (= lab 01; its `verify.sh` passed on the fresh cluster, both nodes `configured`) | **2 min 05 s** |
-| `bootstrap-gitops.sh` | 1 min 03 s |
-| `seed-gitea.sh` | 8 s |
-| labs 02–10, `solve.sh` then `verify.sh` each | 02 · 9 s, 03 · 67 s, 04 · 54 s, 05 · 67 s, 06 · 79 s, 07 · 46 s (second attempt), 08 · 45 s, 09 · 57 s, 10 · 120 s (inject → solve → verify) |
-| manual recovery actions | **0** (the cluster healed itself); lab re-runs: **1** (07, see below) |
-| ingress VIP | 30/30 one-second probes answered once the node was back; unreachable from the host during the reboot below |
-
-**Module 08's mirror path is offline-proven** (the rest of the offline story is
-not — see below). Its golang base — the `public.ecr.aws` image on the list
-that a host-side `crane` has to read — is reachable host-side through the catch-all port's path form, new in
-v0.1.4 (gateway `172.30.0.1` here because this cluster got subnet index 0;
-lab 08 derives it from `tbx status`):
-`curl -I http://172.30.0.1:5059/v2/public.ecr.aws/docker/library/golang/manifests/1.25-alpine`
-→ 200, still 200 after `tbx mirror offline on` (an uncached tag → 404), and
-`crane manifest --insecure 172.30.0.1:5059/public.ecr.aws/docker/library/golang:1.25-alpine`
-returns the index. That resolves the module-08 trap in `docs/HAZARDS.md`.
-
-**The reboot.** (Times below are local, CEST = UTC+2, except where marked Z.)
-During lab 07's `crane copy` to Zot the VIP reset connections at 22:01:55
-and the copy died with `network is unreachable`; `tbx status` then showed
-`cloudbox-cp-1` in the new **`rebooted`** phase, `tbx doctor` WARNed
-"rebooted at 2026-08-29T20:02:27Z" (when tbxd *observed* the change), and
-tbxd.log's own line has Talos `boot_time` moving from epoch 1788033115 to
-1788033738 = 20:02:18Z (22:02:18 local) while the VM process stayed up. **Cause not
-captured**: the guest's own logs only show the new boot. Concurrent evidence,
-recorded not diagnosed: tbxd's balloon line at 22:02:21 read
-`compressor=6808MiB` (6.6 GiB; the 21:52 line had 1091 MiB), `hostFree=12698`
-(12.4 GiB), `swapUsed=19%`, `pressureLatched=true`, and the control plane's
-balloon target (the line is per VM) unchanged at 4096 MiB — so the latch had
-armed but had reclaimed nothing from that node, and the host
-was busy with two LLM review agents and a Codex run at the time. The cluster
-recovered by itself (etcd single node, kubelet `healthy`), lab 07 passed on a
-plain re-run, and `lab/01`'s grader — fixed in the same PR to count `rebooted`
-as configured — would have failed this healthy cluster on the old
-`phase == "configured"` test. `tbx doctor` afterwards: `WARN talos-services`
-for the reboot (a WARN never fails doctor), but the run as a whole exited
-**non-zero** on `FAIL host-pressure: talosbox data volume is 95% used` — the
-disk, see below, not the reboot.
-
-**What it does not say.** Nothing was run with the mirror offline except the
-path-form probe; the venue-shaped "warm at home, `tbx mirror offline on`,
-create" sequence is still unrehearsed end to end. Peak node RSS at the
-module-10 end state was not measured (the LIVE memory-ceiling hazard stays
-open). And the host was **under** the 40 GB disk floor throughout: by the end
-`tbx doctor` FAILed `host-pressure` at 95% data-volume use — a rule v0.1.3
-already had — which is a detection-flipping FAIL: had it tripped before
-`create-cluster.sh`, detection would have chosen docker and said so with
-doctor's first FAIL line (`tbx not used: …`), next to the preflight's own ❌
-for the 40 GB floor. The two floors guard the same disk from two sides.
 
 ## What testing this taught us
 
@@ -397,6 +159,11 @@ HTTP 429 as upstream drift, a preflight probe pulling an image it had told the
 attendee not to need, a version row reading `ok` because it resolved the wrong
 endpoint. A check that cries wolf gets ignored, and then it protects nothing.
 
+Rehearsals 11 and 12 re-earned this one from both sides in a single night: three
+lab verifiers failed healthy modules over a curl AAAA stall, and lab 08's own
+`verify.sh` graded a wedged database healthy off the same `status.phase` field
+its lesson calls a liar.
+
 ### Verify the mechanism, not just the outcome
 
 Module 05's re-injected faults were fixed on the strength of a wrong explanation
@@ -419,3 +186,12 @@ every one of them caught real mistakes in the hand-off: a count of contexts, whi
 rehearsal failed which module, a download figure quoted as a disk figure, a "same
 byte four times" that was three. The measurements were sound each time. The prose
 about them was not.
+
+### What rehearsals 9 and 10 added: a substrate can take the host with it
+
+Every failure before 2026-08-30 cost a cluster at worst. The tbxd kernel panics
+cost the *machine* — twice, on two releases, with no warning — and the remedy
+was not a fix but a retreat that worked: uninstall the substrate, let detection
+choose docker, keep testing. A rehearsal that ends in a kernel panic is still a
+rehearsal, and recording it as one is what turned "the laptop rebooted" into a
+hazard entry with an on-the-day playbook.
