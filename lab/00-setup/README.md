@@ -35,16 +35,16 @@ From the repository root:
                                    # (SKIPs before a cluster exists, and WARNs, are fine)
    ```
 
-   (Linux: mise ships only the three binaries; the helper is a systemd unit set (units, sysusers, polkit rule) that talos-box's docs/linux.md installs from a source checkout — check out the tag pinned as `TBX_VERSION` in `scripts/versions.env` so daemon and helper match the pinned client, and do not run `system install` there (it is the macOS launchd installer). On either OS, never
+   (Linux: mise ships only the three binaries; the helper is a systemd unit set (units, sysusers, polkit rule) that talos-box's docs/linux.md installs from a source checkout. Check out the tag pinned as `TBX_VERSION` in `scripts/versions.env` so daemon and helper match the pinned client, and do not run `system install` there (it is the macOS launchd installer). On either OS, never
    `sudo tbx …`: sudo's PATH can pick a different tbx than yours.)
 
    Skip the helper step and nothing breaks: `tbx doctor` fails, and the scripts put you
-   on Talos-in-Docker instead. Everyone else — Windows/WSL2, Codespaces, or any machine
-   `tbx doctor` is unhappy with — runs the identical workshop on Talos-in-Docker. The
+   on Talos-in-Docker instead. Everyone else runs the identical workshop on
+   Talos-in-Docker: Windows/WSL2, Codespaces, or any machine `tbx doctor` is unhappy with. The
    scripts decide for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you
    want to. On macOS, tbx runs its VMs on Virtualization.framework by default; if that
    framework acts up on your machine, `brew install qemu` (macOS 15+) and create with
-   `CLOUDBOX_TBX_HYPERVISOR=qemu` instead — the README's substrate section has the
+   `CLOUDBOX_TBX_HYPERVISOR=qemu` instead. The README's substrate section has the
    details, including why an existing cluster must be destroyed to switch. **On tbx you do not need Docker at all**: the VMs pull every image through
    talos-box's own mirror, which `cloudbox-init.sh` fills with `tbx cache warm`. On
    Talos-in-Docker the mirror is a container, so Docker is required there.
@@ -120,7 +120,7 @@ allowed while `git` is not. A blocked `git` does not fail, it waits forever agai
 **"tbx is installed but cannot be inspected"?** That is a half-installed talos-box: the
 binary is on your PATH but its helper daemon has never run (`tbx system install` not
 done on macOS / the systemd helper not set up on Linux, or the service is down). On the docker substrate the create continues by itself when
-this machine has never made a tbx cluster — there is nothing it could collide with. If you
+this machine has never made a tbx cluster, since there is nothing it could collide with. If you
 *have* used tbx here before, it stops instead, because two clusters called `cloudbox` is a
 mess you would meet an hour later. Either fix tbx (`tbx doctor`), or, if you know its VMs
 are not running, re-run with `CLOUDBOX_IGNORE_TBX=1 ./scripts/create-cluster.sh`.

@@ -1,4 +1,4 @@
-# Door 4 — Infra: the metal layer on your terms
+# Door 4, infra: the metal layer on your terms
 
 **You came for:** Talos and Cilium themselves, the layer everything else stood
 on all day without you looking at it. Zero new images: this door runs on what

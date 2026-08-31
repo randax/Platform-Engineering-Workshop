@@ -1,10 +1,10 @@
-# Maintenance — keeping the pins honest
+# Maintenance: keeping the pins honest
 
 Everything in this repo is pinned (principle 14). Pins rot. This is the runbook
 for the rot, written so the recurring work is *reading a report*, not
 re-researching the stack.
 
-Read this before doing a "re-verify the versions" pass — it exists precisely so
+Read this before doing a "re-verify the versions" pass. It exists precisely so
 that pass costs an hour, not an afternoon.
 
 ## The five mechanized checks
@@ -19,10 +19,10 @@ that pass costs an hour, not an afternoon.
 
 A green `bootstrap-test.yaml` means *the workshop works on Linux, on one cluster,
 with no timing races*. Three rehearsals each found blockers it cannot see by
-construction — see [`REHEARSALS.md`](REHEARSALS.md).
+construction; see [`REHEARSALS.md`](REHEARSALS.md).
 
 Dependencies inside our own code (Go modules, the Slidev deck, GitHub Actions)
-are Dependabot's job — see `.github/dependabot.yml`.
+are Dependabot's job; see `.github/dependabot.yml`.
 
 Nothing in this list is part of the attendee flow. `check-upstream.sh` and
 `check-vendor-drift.sh`'s guard 1 need internet by design; everything attendees
@@ -47,7 +47,7 @@ Status column: `ok` · `pre` (only the prerelease moved) · `patch` · `minor` �
 
 ## What the report is *not*
 
-It is not a to-do list. Being behind upstream is a fact, not a defect — a
+It is not a to-do list. Being behind upstream is a fact, not a defect. A
 workshop that runs offline on 80 laptops values *proven* over *latest*. The
 default answer to a `patch` row three weeks before the event is "no".
 
@@ -57,7 +57,7 @@ current versions with a full rehearsal behind them.
 
 ## Adding something to the report
 
-Add a row to `scripts/upstream.list`. It holds **no version numbers** — each row
+Add a row to `scripts/upstream.list`. It holds **no version numbers**: each row
 says where the pin *lives* (`env:` / `mise:` / `image:` / `chart:` / `file:`)
 and where upstream *is* (`github-release` / `github-tag` / `helm-index` /
 `registry-tag`). The file's header documents every field.
@@ -79,45 +79,45 @@ file cannot silently retire a check.
 
 `gitops/components/*/VENDOR.md` is what step 2 above tells you to trust. It was
 not trustworthy: **11 of 19 were found wrong**, every one by accident while
-doing something else — a missing PSA `privileged` label that hangs every PVC, a
+doing something else. A missing PSA `privileged` label that hangs every PVC, a
 missing `config-domain` entry that 404s every Knative URL, config keys that a
 literal re-vendor silently drops. They all rotted the same way: accurate when
 written, stale at the next bump, because nothing ever compared them to
 anything. `scripts/check-vendor-drift.sh` is that comparison. Two guards:
 
-**Guard 1 — the re-render gate** (strong; network + helm; `vendor-drift.yaml`).
+**Guard 1, the re-render gate** (strong; network + helm; `vendor-drift.yaml`).
 For every file whose VENDOR.md carries a ```` ```curation ```` block with a
 `render` recipe, it reproduces the pristine upstream artifact and diffs it. Every
 hunk must have an `allow  <file>  <id>  <why>` line, where `<id>` is a digest of
-the hunk's *changed lines only* — so a curation keeps its id when upstream moves
+the hunk's *changed lines only*, so a curation keeps its id when upstream moves
 it around, and identical curations (the halved requests, repeated per Deployment)
 share one line. Two ways to fail:
 
-- an **unlisted hunk** — undocumented curation, or upstream moved under us;
-- an **`allow` line whose hunk has vanished** — the curation it documents was
+- an **unlisted hunk**: undocumented curation, or upstream moved under us;
+- an **`allow` line whose hunk has vanished**: the curation it documents was
   lost in a re-vendor. That is the failure mode that produced most of the 11.
 
 Components with no reproducible upstream artifact (the hand-written ones) have
 no `render` recipe and are covered by guard 2 instead.
 
-**Guard 2 — the token-coverage lint** (weak but broad; offline; `ci.yaml`).
-Every file *not* covered by guard 1 has its load-bearing knobs extracted —
-nodePorts, container/service ports, env var names, image refs, resource
+**Guard 2, the token-coverage lint** (weak but broad; offline; `ci.yaml`).
+Every file *not* covered by guard 1 has its load-bearing knobs extracted
+(nodePorts, container/service ports, env var names, image refs, resource
 requests/limits, `pod-security.kubernetes.io/*` and other slash-keys, probe
-paths and hostPaths, RBAC resources, volume shapes, readiness checks — and each
+paths and hostPaths, RBAC resources, volume shapes, readiness checks) and each
 token must appear *somewhere* in that component's VENDOR.md. Incidental tokens
 get an `ignore <token>  <why>` line in the same block; use it sparingly, with a
 reason, rather than loosening the extraction.
 
 **Read the honest limits before trusting a green run.** The guard-1 allowlists
-were bootstrapped from the tree as it stood — that day's diff *was* the accepted
-curation — so green means "nothing changed since", not "someone audited it". And
+were bootstrapped from the tree as it stood (that day's diff *was* the accepted
+curation), so green means "nothing changed since", not "someone audited it". And
 guard 2 proves a knob is *mentioned*, not that the sentence next to it is
 correct or current. The script prints both caveats on every run.
 
 ## Doing a bump
 
-1. **Change the pin where it actually lives** — `scripts/versions.env`,
+1. **Change the pin where it actually lives**: `scripts/versions.env`,
    `mise.toml`, `scripts/images.txt`, or the component's rendered manifest.
    Never in two places: if `check-consistency.sh` compares them, it will tell
    you which pair drifted.
@@ -125,14 +125,14 @@ correct or current. The script prints both caveats on every run.
    `gitops/components/*/VENDOR.md` carries its own re-vendor recipe *and* the
    workshop curation to re-apply afterwards (halved resource requests, NodePort
    services, repointed images). Re-applying that curation is the part that
-   actually takes judgment — the VENDOR.md exists so it is not re-derived from
+   actually takes judgment; the VENDOR.md exists so it is not re-derived from
    scratch each time.
 
    **Trust the re-render for *what* changed and the VENDOR.md for *why*.**
    `./scripts/check-vendor-drift.sh --only <component>` re-runs the recipe and
    diffs it against the vendored file: that diff, not the prose, is the
    authority on what actually differs from upstream. The prose is the authority
-   on why each difference is there — and it is only as good as the person who
+   on why each difference is there, and it is only as good as the person who
    last wrote it. If the two disagree, the diff is right and the prose needs
    fixing. Workflow after a bump:
 
@@ -149,11 +149,11 @@ correct or current. The script prints both caveats on every run.
 3. **Re-pin the images the new version ships.** For a chart:
    `helm template … | grep image:`. For a release YAML: read the digests out of
    it. Everything deployed must appear in `scripts/images.txt` or
-   `check-consistency.sh` fails — that is the offline guarantee. A **tag** pin
+   `check-consistency.sh` fails; that is the offline guarantee. A **tag** pin
    must publish both linux/amd64 and linux/arm64 (cloudbox-init.sh mirrors tag
    pins per-arch and errors on an index missing the host's platform), unless
-   the repo is listed in `MIRROR_ARCH_EXEMPT` in `versions.env` — deliberately
-   single-arch, runs emulated (Backstage);
+   the repo is listed in `MIRROR_ARCH_EXEMPT` in `versions.env` (deliberately
+   single-arch, runs emulated: Backstage);
    `images-gate.yaml` enforces this, so an upstream that drops an arch shows up
    in the weekly report, not on an attendee's laptop.
 4. **`./scripts/check-consistency.sh`** must be green before the PR.
@@ -172,11 +172,11 @@ of our ingresses carry `ingress.cilium.io/request-timeout: "0s"`. Both are
 default route timeout applies to every hostname in the workshop (`git push`,
 the Console's SSE stream, ArgoCD's watches). On a bump, confirm
 
-* the flag still exists and still means what it means —
+* the flag still exists and still means what it means:
   `operator/pkg/ingress/cell.go`, and note that
   `operator/pkg/model/ingestion/ingress.go` SKIPS the flag when it is zero, so
   "0" is not "no timeout" there;
-* the annotation is still parsed — `operator/pkg/ingress/annotations/annotations.go`;
+* the annotation is still parsed: `operator/pkg/ingress/annotations/annotations.go`;
 * the flag still renders:
   `helm template cilium scripts/manifests/cilium-<v>.tgz --set ingressController.enabled=true --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" | grep ingress-default-request-timeout`.
 
@@ -184,42 +184,42 @@ the Console's SSE stream, ArgoCD's watches). On a bump, confirm
 
 ### The `tbx` pin is a special case
 
-`TBX_VERSION` in `scripts/versions.env` pins the talos-box binary — the primary
+`TBX_VERSION` in `scripts/versions.env` pins the talos-box binary, the primary
 substrate's *entire* implementation. mise installs it (the
-`github:randax/talos-box[exe=tbx]` entry — goreleaser tarballs, no tap needed), but mise
+`github:randax/talos-box[exe=tbx]` entry: goreleaser tarballs, no tap needed), but mise
 enforces nothing about what is on PATH at run time: an attendee who installed from the
 Homebrew tap has whatever the tap serves, so `tbx_version_check()` in `scripts/lib.sh`
 is the runtime assertion. Bumping it means all four of:
 
 1. **Bump the `mise.toml` entry in the same commit.** `check-consistency.sh` check 10
    compares it to `TBX_VERSION` and fails if they drift. That entry is the only other
-   copy — do not add a third (comments included: use `vX.Y.Z` in examples).
+   copy. Do not add a third (comments included: use `vX.Y.Z` in examples).
 2. **Re-read upstream before trusting the flags.** `scripts/substrate/tbx.sh` drives
    `tbx up -f`, `tbx status -o json`, `tbx version` and
    `tbx cluster destroy <cluster> --force`, and `cloudbox-init.sh` drives
    `tbx cache pull --talos-version` and `tbx cache warm <list>` (`install.sh --check`
-   drives `tbx cache warm --check [--deep] <list>`; `cmd/tbx/cache_warm.go` — its
+   drives `tbx cache warm --check [--deep] <list>`; `cmd/tbx/cache_warm.go`, whose
    ref validation is what `images_mirror_refs` in `lib.sh` feeds). Since #206 the tbx
    nodes pull through tbx's OWN mirror: `TBX_MIRROR_PORT` in `versions.env` mirrors
    `CatchAllPort` in upstream `internal/manifests/manifests.go`, and the catch-all's
    `?ns=` routing lives in `internal/mirror/manager.go` (`serveCatchAll`), with the
-   host-side PATH form (`routeCatchAllRequest`, `/v2/<registry>/<repo>…`) next to it —
-   that form is what `lab/08-portal`, `apps/demo-app` and adventure 1 send a host
+   host-side PATH form (`routeCatchAllRequest`, `/v2/<registry>/<repo>…`) next to it.
+   That form is what `lab/08-portal`, `apps/demo-app` and adventure 1 send a host
    `crane` to, and nothing in the scripts proves it (the curl proof hits `/v2/` only),
    so re-read it by hand on every bump or those four documents silently go
    online-only again. If the port
-   or the `?ns=` routing moves, every tbx create dies at the curl proof in `tbx.sh` — re-read
-   both on every bump. Verbs quoted to attendees that must still exist: `tbx cache
+   or the `?ns=` routing moves, every tbx create dies at the curl proof in `tbx.sh`, so
+   re-read both on every bump. Verbs quoted to attendees that must still exist: `tbx cache
    prune --mirror`, `tbx mirror offline on|off`, `tbx node start|stop <cluster> <node>`
    (lab 01, destroy-cluster.sh, cloudbox-init.sh). Read upstream `internal/config/config.go` for
    cluster-yaml schema changes (our `scripts/substrate/cloudbox.tbx.yaml.tmpl` is a
    projection of it). Since v0.1.6 that schema includes `clusters[].hypervisor`
    (`vz | qemu`, validated by `hypervisor.ParseName` in upstream
-   `internal/hypervisor/registry.go`, immutable after create) — `render_tbx_cluster_file`
+   `internal/hypervisor/registry.go`, immutable after create); `render_tbx_cluster_file`
    injects it from `CLOUDBOX_TBX_HYPERVISOR` and hardcodes the same two names, so
-   re-check `ParseName` on every bump or our validation drifts from tbx's. We deliberately consume **no** `tbx manifests` section any more —
-   `balloon` was deprecated into an error, and the `mirrors` catch-all turned out to be
-   actively harmful (see `docs/HAZARDS.md`) — so a section rename upstream is no longer
+   re-check `ParseName` on every bump or our validation drifts from tbx's. We deliberately consume **no** `tbx manifests` section any more
+   (`balloon` was deprecated into an error, and the `mirrors` catch-all turned out to be
+   actively harmful, see `docs/HAZARDS.md`), so a section rename upstream is no longer
    something that can break us silently. Two things upstream *can* still move under us:
    the `tbx status -o json` shape, and `checkOvercommit`'s reserve in
    `internal/balloon/manager.go` (mirrored as `TBX_HOST_RESERVE_GIB` in `versions.env`;
@@ -235,12 +235,12 @@ is the runtime assertion. Bumping it means all four of:
    2026-08-28, pinned here 2026-08-29) and the README
    "best-effort" wording and the matching `docs/HAZARDS.md` trap were retired
    with it. Kept here so nobody re-adds the caveat from an old rehearsal note.
-4. **Re-run a full tbx rehearsal.** There is **no CI for this substrate** —
+4. **Re-run a full tbx rehearsal.** There is **no CI for this substrate**;
    `bootstrap-test.yaml` runs Docker on a GitHub runner and always will. A tbx pin that
    passes `check-consistency.sh` has been proven to agree with itself and nothing more.
 
 Nothing vendored depends on the tbx version: talos-box supplies no manifests we keep
-(its curated `cni:` is deliberately *not* used — we install Cilium ourselves on both
+(its curated `cni:` is deliberately *not* used; we install Cilium ourselves on both
 substrates, which check 10 also asserts). So there is nothing to re-vendor, and
 `check-upstream.sh` tracks the release via the `tbx` row in `scripts/upstream.list`.
 
@@ -248,8 +248,8 @@ substrates, which check 10 also asserts). So there is nothing to re-vendor, and
 
 `ghcr.io/randax/cloudbox-{portal,uploader,resizer,grafana}` are ours, so they do
 not appear in the upstream report. Their release path is in
-[`scripts/README.md`](../scripts/README.md) — conventional commit →
-release-please PR → merge → tag → GHCR publish, with the pinned refs updated by
+[`scripts/README.md`](../scripts/README.md): conventional commit,
+release-please PR, merge, tag, GHCR publish, with the pinned refs updated by
 release-please itself.
 
 ## Before the event
@@ -263,8 +263,8 @@ The pre-event re-verify pass is the one time the answer to the report is
 - [ ] `./scripts/check-vendor-drift.sh` green, and every VENDOR.md diff it
       produced actually read (that diff is the re-vendor's real changelog)
 - [ ] `bootstrap-test.yaml` green on the full module range
-- [ ] One real prework run on a clean machine: `dev-setup.sh` →
-      `cloudbox-init.sh` → `install.sh --check`
+- [ ] One real prework run on a clean machine: `dev-setup.sh`, then
+      `cloudbox-init.sh`, then `install.sh --check`
 - [ ] Refresh the "verified <date>" headers in `scripts/versions.env`,
       `scripts/images.txt`, `docs/RESEARCH.md`, `docs/STACK.md`
 - [ ] Tag `javazone-2026`

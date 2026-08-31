@@ -1,4 +1,4 @@
-# Module 07 (stretch) — CI on your terms: build inside the cluster
+# Module 07 (stretch): CI on your terms, build inside the cluster
 
 ## The goal
 
@@ -17,11 +17,11 @@ laptop's cloud.
 CI is the last thing teams believe they can self-host ("we need GitHub Actions!").
 But a build is just a pod with elevated filesystem tricks: BuildKit replaced the archived
 Kaniko as the 2026 in-cluster answer, and a registry is a single binary (Zot, CNCF).
-Once *build → push → deploy* closes inside your platform, the loop is fully yours.
+Once build, push, and deploy all close inside your platform, the loop is fully yours.
 
 ## The task
 
-1. Enable **two** catalog apps: `zot.yaml` (registry, NodePort 30500) and
+1. Enable two catalog apps: `zot.yaml` (registry, NodePort 30500) and
    `argo-workflows.yaml` (workflow engine + the `build-and-push` WorkflowTemplate in
    ns `builds`, a namespace labeled PSA-privileged because rootless BuildKit needs an
    unconfined seccomp profile; find that label and understand why it's there).
@@ -29,7 +29,7 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    contains it (it was seeded with the whole workshop repo). Notice the `FROM` line:
    it pulls the base image from *your* Zot, not from Docker Hub. Your platform builds
    FROM your own registry, fully offline.
-3. **Seed the base image**: copy busybox into YOUR registry (host-side, through Zot's
+3. Seed the base image: copy busybox into YOUR registry (host-side, through Zot's
    ingress hostname). `crane copy` doesn't read your local docker. It's a registry-to-registry
    copy. Source it from your own image mirror, which already has it from the
    pre-pull, so this step needs no internet either (Docker Hub is rate-limited at the
@@ -64,7 +64,7 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    If the mirror isn't reachable on any substrate, `docker.io/library/busybox:1.37.0`
    is always a valid source, but then you're online.
 
-   **If that copy hangs**, no output, no error, just nothing, do not wait it out.
+   If that copy hangs, no output, no error, just nothing, do not wait it out.
    `crane` probes HTTPS before HTTP, and a registry that accepts the connection
    without answering leaves it retrying `net/http: TLS handshake timeout` with
    nothing on screen. Ctrl-C and give it a deadline, so a bad source fails in
@@ -174,13 +174,13 @@ cd "$WORKSHOP/lab/07-ci" && ./verify.sh
 ```
 
 It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is advisory); Zot's API answering at `http://zot.cloudbox.k8s.test`;
-at least one `build-hello-site-*` workflow **Succeeded**; the `hello-site` image present
+at least one `build-hello-site-*` workflow `Succeeded`; the `hello-site` image present
 in Zot's catalog; and the hello-site Deployment Available and serving the page.
 
 ## Explain-back
 
-Tell your neighbor: list every network hop in your pipeline (git clone from ? → build
-runs where? → push to ? → kubelet pulls from ?). How many of those left your laptop?
+Tell your neighbor: list every network hop in your pipeline. Git clone from where? The
+build runs where? Push to where? Kubelet pulls from where? How many of those left your laptop?
 That's the sovereignty argument in one answer.
 
 ## Going deeper

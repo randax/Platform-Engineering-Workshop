@@ -1,10 +1,11 @@
-# Module 06 (stretch) — Serverless: scale from zero, on your hardware
+# Module 06 (stretch): serverless, scale from zero, on your hardware
 
 ## The goal
 
-At the end of this module a Knative Service runs on your platform with **zero pods**
+At the end of this module a Knative Service runs on your platform with *zero pods*
 until you `curl` it, at which point a pod cold-starts, answers, and a minute later is
-gone again. You prove it by watching the pod count go 0 → 1 → 0 around a 200 response.
+gone again. You prove it by watching the pod count go 0, then 1, then 0 around a 200
+response.
 
 ## Why this matters
 
@@ -64,11 +65,11 @@ Kubernetes Ingress wildcard host matches exactly one label. That is what lets a 
 `*.kn.cloudbox.k8s.test` rule serve every namespace anyone invents. Ask the cluster rather
 than assuming, though: `.status.url` is the published truth.
 
-On the **docker** substrate `/etc/hosts` cannot hold a wildcard, so only the ksvc names
+On the docker substrate `/etc/hosts` cannot hold a wildcard, so only the ksvc names
 `install.sh --print-hosts` lists resolve. For a ksvc you invent yourself, teach it the
 name: `./scripts/install.sh --add-hosts <first label>`, e.g. `--add-hosts hello-demo`.
 It remembers it, so a later rewrite of the block keeps it. Or skip the name entirely:
-`curl -H "Host: <the ksvc host>" http://localhost/`. On **tbx** the resolver answers the
+`curl -H "Host: <the ksvc host>" http://localhost/`. On tbx the resolver answers the
 wildcard, so anything you create just works.
 </details>
 

@@ -1,8 +1,8 @@
-# Rehearsal 8 — an outside agent plays attendee, on tbx (2026-08-29, afternoon)
+# Rehearsal 8: an outside agent plays attendee, on tbx (2026-08-29, afternoon)
 
 The first rehearsal not driven by this repo's own maintainer or Claude: the
-`agy` CLI (Google's Antigravity agent) was handed the participant prompt —
-"run through the workshop, be eager, do all optional tasks" — and left to work
+`agy` CLI (Google's Antigravity agent) was handed the participant prompt,
+"run through the workshop, be eager, do all optional tasks", and left to work
 the labs on the tbx substrate. Host: the 128 GB Mac17,7 laptop (the one the
 kernel panics later hit, not the rehearsal-7 machine). It reported completion
 of modules 00–09 at 18:02 local and wrote its own final report, which is the
@@ -16,7 +16,7 @@ predate the surviving conversation).
 ## Setup
 
 - Substrate: tbx (real Talos VMs), images from tbx's mirror.
-- Driver: agy, autonomous, participant role — not the maintainer.
+- Driver: agy, autonomous, participant role, not the maintainer.
 - Mirror state: warm, with one gap (below).
 
 ## Results
@@ -58,7 +58,7 @@ told you to add") and read the portal source to judge extensibility
 ## What it proved, and what it does not say
 
 A capable agent given only the repo's own prose gets from nothing to the
-module 09 capstone on tbx without a maintainer in the loop — the
+module 09 capstone on tbx without a maintainer in the loop: the
 outcome-oriented lab design carrying a reader who is not us. It does not
 speak to timings (self-reported), to the verify contract (exit codes
 unrecorded), or to module 10, which it did not attempt.

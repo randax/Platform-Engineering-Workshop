@@ -1,4 +1,4 @@
-# Module 09 (capstone) — The picture pipeline: everything, wired together
+# Module 09 (capstone): the picture pipeline, everything wired together
 
 ## The goal
 
@@ -9,7 +9,7 @@ it three ways: pods appearing in a `-w` watch, the thumbnail landing in the gall
 in S3, and, for the flourish, the whole chain as a single trace in Grafana.
 
 <p align="center">
-  <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console — a component's Monitoring page: CPU/memory sparklines and a live log tail from the OTel stack" width="80%" />
+  <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console: a component's Monitoring page: CPU/memory sparklines and a live log tail from the OTel stack" width="80%" />
 </p>
 
 <p align="center"><em>Look at what you built: the Cloudbox Console surfaces per-component metrics and a live log tail straight from the OTel stack (VictoriaMetrics / VictoriaLogs / VictoriaTraces), the same telemetry that renders your upload as one end-to-end trace in Grafana.</em></p>
@@ -32,12 +32,12 @@ runs on your laptop, readable end to end.
 
 ## The task
 
-1. Enable **two** catalog apps: `knative-eventing.yaml` (the event mesh: Broker/Trigger
+1. Enable two catalog apps: `knative-eventing.yaml` (the event mesh: Broker/Trigger
    machinery in ns `knative-eventing`) and `picture-pipeline.yaml` (ns `pipeline`: a
    Broker, two cluster-local Knative Services, `uploader` and `resizer`, a Trigger, and a
    Job that creates the `images` bucket). Wait until
    `kubectl -n pipeline get broker,trigger,ksvc` is all Ready, then note the pod count
-   in ns `pipeline`: with no traffic, both ksvcs sit at **zero**.
+   in ns `pipeline`: with no traffic, both ksvcs sit at *zero*.
 2. **The moment.** Two terminals:
    - `kubectl -n pipeline get pods -w`
    - open **http://portal.cloudbox.k8s.test/gallery** and upload any JPEG/PNG.
@@ -118,9 +118,9 @@ from module 03's hint 4 works verbatim (endpoint
 `http://rustfs-svc.rustfs.svc.cluster.local:9000`).
 
 Two `s5cmd` details worth knowing, because `verify.sh` depends on both: plain `ls`
-prints `date size basename` **relative to the prefix**, so `ls --show-fullpath` is what
+prints `date size basename` *relative to the prefix*, so `ls --show-fullpath` is what
 gives you whole keys (`s3://images/thumbs/…`); and `ls` on a prefix with nothing in it
-exits **1** with `no object found`, which here means "the resizer hasn't landed yet",
+exits `1` with `no object found`, which here means "the resizer hasn't landed yet",
 not "something is broken". The apps on either side of this bucket use `minio-go`, not a
 CLI. Same API, three different clients, and RustFS cannot tell them apart. That is the
 whole claim of S3 compatibility, tested rather than asserted.
@@ -132,7 +132,7 @@ whole claim of S3 compatibility, tested rather than asserted.
 Scale the resizer away and upload anyway. The Trigger keeps retrying delivery: watch
 `kubectl -n knative-eventing logs deploy/imc-dispatcher -f` while the resizer is gone,
 then let it come back and see the event land. Then ask the uncomfortable question: this
-Broker is backed by an **in-memory** channel. What happens to waiting events if the
+Broker is backed by an *in-memory* channel. What happens to waiting events if the
 `imc-dispatcher` pod itself restarts? (That's why production brokers ride on Kafka,
 and why this one deliberately doesn't; it's a lab.)
 </details>

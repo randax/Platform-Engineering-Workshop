@@ -1,17 +1,17 @@
-# DR-0004 — The platform's write model: two planes
+# DR-0004: The platform's write model, two planes
 
 **Type:** Decision record · **Status:** Accepted (2026-07-17) · **Applies to:** the Cloudbox Console, the labs, and the slides
 
 ## Decision
 
-The platform has **two write planes**, split by *audience* — and we make that split explicit rather than mixing it per-action:
+The platform has **two write planes**, split by *audience*, and we make that split explicit rather than mixing it per-action:
 
 > **Git changes the platform. The console uses the platform. `kubectl` inspects both.**
 
 | Plane | Path | Who / what | Why this path |
 |---|---|---|---|
-| **Platform plane — GitOps** | `git push → Gitea → ArgoCD → cluster` | the platform *operator*: installing capabilities, the catalog, **RBAC / capability grants**, cluster infra | low-frequency, high-blast-radius changes that want audit + rollback + a declarative source of truth. This is where GitOps *earns its cost*. You drive it with **git on the CLI**, and the console **reflects** it (Components / Access pages light up). The console never sends you to Gitea's web UI. |
-| **Tenant plane — Console-direct** | `form → k8s API` (no git) | the platform *user*: create a database, deploy a function/app, make a bucket, **create a project** | high-frequency, low-blast-radius self-service that wants *instant* feedback. Straight to the API server, `kubectl create`–style — which is exactly what the console's database/function/app create forms already do. |
+| **Platform plane, GitOps** | `git push → Gitea → ArgoCD → cluster` | the platform *operator*: installing capabilities, the catalog, **RBAC / capability grants**, cluster infra | low-frequency, high-blast-radius changes that want audit + rollback + a declarative source of truth. This is where GitOps *earns its cost*. You drive it with **git on the CLI**, and the console **reflects** it (Components / Access pages light up). The console never sends you to Gitea's web UI. |
+| **Tenant plane, console-direct** | `form → k8s API` (no git) | the platform *user*: create a database, deploy a function/app, make a bucket, **create a project** | high-frequency, low-blast-radius self-service that wants *instant* feedback. Straight to the API server, `kubectl create`-style, which is exactly what the console's database/function/app create forms already do. |
 | **Inspect / escape hatch** | `kubectl` | anyone, debugging either plane | orthogonal to both; modules 01–05 build this muscle. |
 
 ## Context
@@ -29,20 +29,20 @@ Criteria, from a developer's point of view: directness (hops per action), feedba
 | Teaching honesty | ✅ real portals hit an API | ⚠️ a portal that can't act is weak | ✅ real but heavyweight |
 | Portal privilege | ⚠️ scoped write per resource | ✅ read-only | ⚠️ needs a Gitea token |
 
-**Model C loses despite being clever:** it pays git's latency + moving parts on the one thing a console is uniquely good at — immediate self-service — to buy an audit trail a **single-user disposable lab does not need**. Right pattern, wrong workshop. **Model A wins** on the criteria a developer actually feels (directness, feedback, "it just worked").
+**Model C loses despite being clever:** it pays git's latency + moving parts on the one thing a console is uniquely good at, immediate self-service, to buy an audit trail a **single-user disposable lab does not need**. Right pattern, wrong workshop. **Model A wins** on the criteria a developer actually feels (directness, feedback, "it just worked").
 
 ## Consequence for RBAC-sensitive actions (projects)
 
 The only reason to reach for the git frontend was "the portal can't create namespaces without cluster-admin." Model A resolves it by separating **capability** from **action**:
 
-- **Capability grant = GitOps.** The attendee hands the portal a *scoped* `ClusterRole` (create namespaces; create `RoleBinding`s that bind **only** the pre-existing tenant grant) via the same one-time "hand the portal its keys" git step already used for databases/functions. Explicit, auditable, scoped — the security lesson is intact.
+- **Capability grant = GitOps.** The attendee hands the portal a *scoped* `ClusterRole` (create namespaces; create `RoleBinding`s that bind **only** the pre-existing tenant grant) via the same one-time "hand the portal its keys" git step already used for databases/functions. Explicit, auditable, scoped: the security lesson is intact.
 - **Action = Console-direct.** "New project" `POST`s a `Namespace` + one `RoleBinding`; it appears instantly.
 
 **Grant via git; act via console.** The portal never becomes cluster-admin, and there is no Gitea round-trip in the hot path.
 
 ## What stays
 
-The GitOps-vs-console-write *contrast* remains a **module 08 "going deeper" teaching beat** ("here's the other way, and its trade-offs") — an optional lens, not the default write path. GitOps is not diminished; it is placed where it earns its keep (the platform layer), and the console is placed where it earns its keep (self-service).
+The GitOps-vs-console-write *contrast* remains a **module 08 "going deeper" teaching beat** ("here's the other way, and its trade-offs"), an optional lens, not the default write path. GitOps is not diminished; it is placed where it earns its keep (the platform layer), and the console is placed where it earns its keep (self-service).
 
 ## Implications
 
@@ -50,8 +50,8 @@ The GitOps-vs-console-write *contrast* remains a **module 08 "going deeper" teac
 - **PRD-0011 (projects):** revised to console-direct create behind a scoped, git-delivered `ClusterRole` grant (was: Gitea-API-backed). See the issue.
 - **Slides/docs:** state the two-plane model explicitly (module 08); it is already *true today* (database/function creates are console-direct).
 
-## Amendment — the scaffold bridge (PRD-0012)
+## Amendment: the scaffold bridge (PRD-0012)
 
 The one **deliberate exception** to "no console→Gitea write path": the New-application form can *start an app from a template* (`source=template`). The console calls Gitea's generate API to fork the sample into a fresh tenant repo (`cloudbox/<name>`), then builds and deploys that repo through the normal deploy-from-source path.
 
-This is consistent with the model, not a hole in it, because scaffolding a repo is **a one-time bootstrap of the developer's *own* space** — not a change to the *platform* (no capability install, no RBAC, no cluster infra). The DR-0004 boundary is about *who mutates the platform* (git, auditable, operator-driven); a tenant creating their own app repo is squarely on the self-service side. It stays a scoped, low-blast-radius write: the portal authenticates with the fixed lab `gitea_admin` creds (wired in `portal.yaml`, like the S3 creds), creates only public repos under the `cloudbox` org, and validates the name/template up front (the same anti-SSRF guard as `GiteaRepoURL`). If the portal has no Gitea creds, the option simply isn't offered. Once created, the repo is the developer's to push to — the console does not keep writing to it (the iterate loop is *build → Redeploy*, never a console commit).
+This is consistent with the model, not a hole in it, because scaffolding a repo is **a one-time bootstrap of the developer's *own* space**, not a change to the *platform* (no capability install, no RBAC, no cluster infra). The DR-0004 boundary is about *who mutates the platform* (git, auditable, operator-driven); a tenant creating their own app repo is squarely on the self-service side. It stays a scoped, low-blast-radius write: the portal authenticates with the fixed lab `gitea_admin` creds (wired in `portal.yaml`, like the S3 creds), creates only public repos under the `cloudbox` org, and validates the name/template up front (the same anti-SSRF guard as `GiteaRepoURL`). If the portal has no Gitea creds, the option simply isn't offered. Once created, the repo is the developer's to push to; the console does not keep writing to it (the iterate loop is *build → Redeploy*, never a console commit).

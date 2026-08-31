@@ -1,4 +1,4 @@
-# Module 05 — Break it, diagnose it, verify the diagnosis
+# Module 05: break it, diagnose it, verify the diagnosis
 
 ## The goal
 
@@ -11,8 +11,8 @@ cluster before acting**. `./verify.sh` confirms every injected fault is actually
 
 Installing things teaches less per minute than debugging things, and in 2026 "debugging"
 usually starts with asking an assistant. Assistants are excellent at Kubernetes triage and
-*confidently wrong* just often enough to hurt. The skill of the decade is not prompting;
-it is **verification**: treating every diagnosis, human or machine, as a hypothesis and
+*confidently wrong* just often enough to hurt. The skill of the decade is not prompting,
+it is verification: treating every diagnosis, human or machine, as a hypothesis and
 designing the one observation that would kill it. Fair warning: one fault below was
 designed so that the obvious AI answer is plausible and wrong.
 
@@ -26,7 +26,7 @@ Four faults, in increasing order of deviousness. Each gets its own namespace
 | 1 | `01-web-down` | module 01 | a deploy that never comes up |
 | 2 | `02-db-stuck` | module 03 (CNPG) | a database frozen mid-birth |
 | 3 | `03-db-unreachable` | module 01 | everything healthy, nothing connects |
-| 4 | `04-db-flaky` | module 01 | works… sometimes. **The trap.** |
+| 4 | `04-db-flaky` | module 01 | works... sometimes. The trap. |
 
 ```bash
 ./inject.sh 1        # start here
@@ -34,7 +34,7 @@ Four faults, in increasing order of deviousness. Each gets its own namespace
 ./restore.sh clean   # delete all fault namespaces when done
 ```
 
-Each fault dir has `description.md`. **That's the spoiler**, don't open it until you've
+Each fault dir has `description.md`. That's the spoiler, don't open it until you've
 committed to a diagnosis. `fix.yaml`/`fix.sh` is the canonical repair.
 
 ## The task
@@ -43,9 +43,9 @@ For each fault you take on (do at least 1 and 4; all four if time allows):
 
 1. `./inject.sh <n>`, then look at the namespace. Find the *symptom* first
    (`get all`, logs) before hunting causes.
-2. **Write down a one-sentence diagnosis** before fixing anything. Literally write it:
+2. Write down a one-sentence diagnosis before fixing anything. Literally write it:
    sticky note, scratch file, whatever. "The pod can't X because Y."
-3. **Verify it**: what would you observe on the live cluster if your sentence were true?
+3. Verify it: what would you observe on the live cluster if your sentence were true?
    Go observe exactly that. If the observation disagrees, your diagnosis is dead.
    Write a new one. (This loop is the module.)
 4. Fix it: live edit, `kubectl apply`, whatever you like. Re-check the symptom.
@@ -65,7 +65,7 @@ A prompt that works well: *"Something is wrong in namespace faultlab-04. Investi
 give me: (1) your root-cause hypothesis in one sentence, (2) the exact kubectl commands
 whose output would prove it, (3) your confidence."* Then run those commands yourself,
 against the real cluster, and pass verdict. The deliverable is not the fix. It's the
-sentence **"the agent claimed X; I checked Y; the claim was right/wrong because Z."**
+sentence "the agent claimed X; I checked Y; the claim was right/wrong because Z."
 
 No agent handy? Pair up: one of you plays "confident AI", states a diagnosis from the
 manifests alone; the other falsifies it against the cluster.
@@ -76,13 +76,13 @@ manifests alone; the other falsifies it against the cluster.
 <summary>Hint 1: A triage order that almost always works</summary>
 
 1. `kubectl -n <ns> get all`: what's *not* green?
-2. Pod not Running/Ready → `kubectl describe pod` and read the **Events** bottom-up,
+2. Pod not Running/Ready: `kubectl describe pod` and read the Events bottom-up,
    then `kubectl logs` (add `--previous` after crashes).
-3. Pod `Pending` → it's a scheduling/resources/volumes problem, not a code problem.
+3. Pod `Pending`: it's a scheduling/resources/volumes problem, not a code problem.
    Describe it; then follow whatever it references (PVC? node? quota?).
-4. Everything green but connections fail → stop staring at pods. Check `endpoints`,
-   then DNS, then network policies. Timeout ≠ refused: timeouts smell of policy/firewall,
-   refusals smell of "nothing listening there".
+4. Everything green but connections fail: stop staring at pods. Check `endpoints`,
+   then DNS, then network policies. A timeout is not a refusal: timeouts smell of
+   policy/firewall, refusals smell of "nothing listening there".
 </details>
 
 <details>
@@ -101,8 +101,8 @@ kubectl -n kube-system exec ds/cilium -c cilium-agent -- \
 <summary>Hint 3: How to interrogate an AI agent properly</summary>
 
 Don't ask "how do I fix it?". You'll get a fix for *its* hypothesis, not necessarily
-your cluster. Ask for a **falsifiable claim + the evidence that would prove it**. If the
-agent proposes a fix that "can't hurt anyway": that's a smell. In this module, one fault
+your cluster. Ask for a falsifiable claim plus the evidence that would prove it. If the
+agent proposes a fix that "can't hurt anyway", that's a smell. In this module, one fault
 punishes exactly that reflex. Fixes that don't follow from a verified cause aren't fixes;
 they're superstition with YAML.
 </details>

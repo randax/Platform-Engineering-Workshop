@@ -1,4 +1,4 @@
-# Module 08 (stretch) — The Cloudbox Console: a portal you can actually read
+# Module 08 (stretch): the Cloudbox Console, a portal you can actually read
 
 ## The goal
 
@@ -10,18 +10,18 @@ appeared. Then you read the portal's entire source code, because it's small enou
 you can.
 
 <p align="center">
-  <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console — a component's Monitoring page: CPU/memory sparklines and a live log tail" width="80%" />
+  <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console: a component's Monitoring page: CPU/memory sparklines and a live log tail" width="80%" />
 </p>
 
 <p align="center"><em>This is what you're building: the Cloudbox Console. Go + htmx, server-rendered, offline, with per-component metrics/logs/traces from your OTel stack. Light + dark themes.</em></p>
 
-It isn't just component health. Every capability you stood up gets its own
+Component health is only the start. Every capability you stood up gets its own
 page with a live **Monitoring** panel fed by the same OTel stack:
 
 <p align="center">
-  <img src="../../docs/screenshots/console-builds-monitoring-dark.png" alt="Cloudbox Console — the Builds page: BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs" width="32%" />
-  <img src="../../docs/screenshots/console-streams-monitoring-dark.png" alt="Cloudbox Console — the Streams page: JetStream messages/bytes and connections from the NATS exporter" width="32%" />
-  <img src="../../docs/screenshots/console-buckets-monitoring-dark.png" alt="Cloudbox Console — the Buckets page: RustFS pod CPU/memory" width="32%" />
+  <img src="../../docs/screenshots/console-builds-monitoring-dark.png" alt="Cloudbox Console: the Builds page: BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs" width="32%" />
+  <img src="../../docs/screenshots/console-streams-monitoring-dark.png" alt="Cloudbox Console: the Streams page: JetStream messages/bytes and connections from the NATS exporter" width="32%" />
+  <img src="../../docs/screenshots/console-buckets-monitoring-dark.png" alt="Cloudbox Console: the Buckets page: RustFS pod CPU/memory" width="32%" />
 </p>
 
 <p align="center"><em>Builds (BuildKit's resource use above the live Argo Workflows runs), Streams
@@ -116,8 +116,8 @@ The costs are real too: ~2 GB of Node.js + Postgres, YAML-heavy configuration, a
 typically a team that owns it. A portal is a *product decision*, not a default.
 
 > **Presenter demo (~5 min):** the presenter now enables `backstage.yaml` from the
-> catalog on the projector cluster and runs the classic loop: catalog → software template
-> → new Gitea repo → ArgoCD app → pods. Watch what the template wires together.
+> catalog on the projector cluster and runs the classic loop: catalog, software template,
+> new Gitea repo, ArgoCD app, pods. Watch what the template wires together.
 > That integration glue is the real work of running Backstage.
 >
 > *Presenter notes:* the CNOE image is **amd64-only**, so on an Apple Silicon laptop the
@@ -147,7 +147,7 @@ the `demo` namespace and the module-04 platform API to exist. It *is* the UI for
 </details>
 
 <details>
-<summary>Hint 2: The form did something — where did it go?</summary>
+<summary>Hint 2: The form did something. Where did it go?</summary>
 
 The form POSTs to the portal, which creates a `WorkshopDatabase` in ns `demo`. From
 there it's the module-04 machinery, so the module-04 commands apply:
@@ -243,9 +243,9 @@ git instead?
   `medium` means 5Gi and two instances; `small` was 1Gi and one. The cluster is stuck at
   one instance and 1Gi, and it will stay stuck forever. The events say why: this cluster's
   StorageClass is `local-path`, and `kubectl get sc local-path -o yaml` has no
-  `allowVolumeExpansion: true`, so Kubernetes forbids growing the PVC —
+  `allowVolumeExpansion: true`, so Kubernetes forbids growing the PVC:
   *only dynamically provisioned pvc can be resized and the storageclass that provisions
-  the pvc must support resize*. That single failure blocks the **whole** Cluster
+  the pvc must support resize*. That single failure blocks the *whole* Cluster
   reconcile, which is why the second instance never appears either. CNPG retries about
   every 24 seconds, forever, while `status.phase` keeps saying healthy.
 
@@ -256,7 +256,7 @@ git instead?
   | tail`), one layer below anything the form could show you.
 
   Now try resizing back to `small` and read the events again. CNPG refuses with
-  `can't shrink existing storage` — it compares against the 5Gi you asked for, not the
+  `can't shrink existing storage`. It compares against the 5Gi you asked for, not the
   1Gi you still have, so a resize that never happened still cost you the ability to go
   back. Storage only goes one way, and it went that way without moving. Delete
   `console-db` and recreate it `small` from the form, because modules 09 and 10 want that
@@ -269,7 +269,7 @@ git instead?
   now have the evidence to have it.
 
 <p align="center">
-  <img src="../../docs/screenshots/console-new-function-dark.png" alt="Cloudbox Console — the New function modal: name, source, optional env vars and a keep-warm toggle; builds the image in-cluster and deploys it as a Knative Service" width="80%" />
+  <img src="../../docs/screenshots/console-new-function-dark.png" alt="Cloudbox Console: the New function modal: name, source, optional env vars and a keep-warm toggle; builds the image in-cluster and deploys it as a Knative Service" width="80%" />
 </p>
 
 <p align="center"><em>The <strong>Functions</strong> page, the whole function lifecycle in one place: list, <strong>Invoke</strong> (wakes one from zero), <strong>Delete</strong>, and a build-and-deploy form that ties modules 06 + 07 together.</em></p>
@@ -320,11 +320,11 @@ git instead?
   no internet needed):
   `crane copy --insecure localhost:5001/docker/library/golang:1.25-alpine zot.cloudbox.k8s.test/library/golang:1.25-alpine`
   (on tbx the base was warmed from `public.ecr.aws`, which the `:5055` listener from
-  module 07 does not serve — use the catch-all port's path form instead, same gateway,
+  module 07 does not serve. Use the catch-all port's path form instead, same gateway,
   still offline:
   `MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5059"`
   then `crane copy --insecure "$MIRROR/public.ecr.aws/docker/library/golang:1.25-alpine" zot.cloudbox.k8s.test/library/golang:1.25-alpine`.)
-  (The golang base joined the pre-pull list with the adventure images — if your
+  (The golang base joined the pre-pull list with the adventure images. If your
   `cloudbox-init.sh` run predates that, either re-run it or fall back to the online
   source, `public.ecr.aws/docker/library/golang:1.25-alpine`.)
   The console runs the module-07 `build-and-push` Workflow (clone →

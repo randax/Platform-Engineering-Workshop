@@ -1,4 +1,4 @@
-# Adventures — the last hour is yours
+# Adventures: the last hour is yours
 
 The core path (modules 00–06 and 09) ends with a platform that works: a cluster you own,
 GitOps as the only write path, databases and buckets as a service, self-service
@@ -34,16 +34,16 @@ from module 05 to any door is supported, not a cheat.
 ./scripts/catch-up.sh 7    # e.g. everything through module 07, ~2 minutes
 ```
 
-## Door 0 — the marked trail
+## Door 0: the marked trail
 
 Modules 07, 08 and 10, the three the guided day does not reach. 06 and 09 are core now.
 Rehearsed, hinted, each with a `verify.sh` and a visible win:
 
-- **[Module 07 — CI on your terms](../lab/07-ci/)**: your cluster builds its own
+- **[Module 07: CI on your terms](../lab/07-ci/)**: your cluster builds its own
   images. Gitea → BuildKit → Zot, no external service touched.
-- **[Module 08 — The Console](../lab/08-portal/)**: a real cloud console whose
+- **[Module 08: The Console](../lab/08-portal/)**: a real cloud console whose
   entire source you can read; create a database from a form.
-- **[Module 10 — Day-2 ops](../lab/10-day2-ops/)**: an in-cluster AI agent
+- **[Module 10: Day-2 ops](../lab/10-day2-ops/)**: an in-cluster AI agent
   diagnoses live faults; you fact-check it.
 
 Fast finishers: walk the trail, then come back and pick a door. The doors
@@ -52,7 +52,7 @@ assume nothing beyond module 05 but get richer with each module you have.
 ## Getting unstuck
 
 The briefings are self-service by design: two presenters cannot staff five
-doors. Each briefing's **Known traps** section is the first responder — read it
+doors. Each briefing's **Known traps** section is the first responder. Read it
 before you start, not after you're stuck. Second responder: a neighbor on the
 same door. The supportable answer to "is this possible?" is usually "yes, and
 here's the trap you're about to hit", not "here's the solution".

@@ -9,23 +9,23 @@ Every page has a light and a `-dark` variant (the console is theme-aware via
 
 | File | What |
 |---|---|
-| `console-component-monitoring.png` | A component's **Monitoring** detail page — CPU + memory sparklines and a live log tail, sourced from the OTel stack (#56). |
-| `console-component-monitoring-mobile.png` | The same page at phone width — the rail collapses to a sticky bar (logo + ☰) so content is immediately visible. |
-| `console-mobile-nav-open.png` | Phone width with the ☰ menu tapped open — the full nav revealed (CSS-only, no JS). |
-| `console-component-locked.png` | The Monitoring page when observability isn't enabled yet — degrade-in-place hint. |
-| `console-components.png` | The Components page — per-namespace health, each linking into its Monitoring detail. |
-| `console-applications.png` | The **Applications** list — a scannable triage table (name → detail, Ready, URL, Delete). The golden path (PRD-0003) as a console action: one `Application` XR composes a workload + Postgres + S3 bucket (#28). Depth moved to the detail page below. |
-| `console-application-detail.png` | The **Application detail** page — the composition hub: **Diagnostics** (the DR-0005 cause a `describe` would show, moved off the list), the **composed resources cross-linked** to their own detail pages (Database, Bucket — walk app → its DB → back), Source + **Redeploy**, the workload's monitoring, and a Danger zone. |
-| `console-new-application.png` | The **New application** modal — the fullest form in the console: source (image, repo, or template), min/max scale, env vars, and the database/bucket dependency toggles (#28). |
-| `console-deploy-from-source.png` | The **New application** modal with **Source → Build from a repo** — the app-team golden path: point at an in-cluster Gitea repo and the platform builds it (Argo + BuildKit → Zot) and deploys it as an Application (PRD-0012). |
-| `console-scaffold-from-template.png` | The **New application** modal with **Source → Start from a template** — the scaffold bridge: the console forks the demo app into a fresh `cloudbox/<name>` repo (Gitea generate API) and then builds and deploys it (PRD-0012). |
-| `console-services.png` | The **Functions** list — a scannable triage table (name → detail, request-rate + avg-latency sparklines, scale-from-zero per Knative Service), with **Invoke**/traces/**Delete** quick actions and a **New function** button (#56, #58). |
-| `console-function-detail.png` | The **Function detail** page — parity with the Application/Database detail views: **Diagnostics** (the DR-0005 cause + cause→action hint when a revision fails), Invoke/traces/Delete actions, and the workload's monitoring (scale-from-zero, request rate, latency). |
-| `console-new-function.png` | The **New function** modal (CSS-only, no JS) — name, source, optional env vars, and a keep-warm toggle; builds source in-cluster (Argo + BuildKit) and deploys it as a scale-to-zero Knative Service (#58). |
-| `console-database-monitoring.png` | A database's detail page — CNPG connections, cache-hit ratio and size (#56), plus a **Resize** control (change the T-shirt size → Crossplane re-composes, #27) and the delete danger zone. |
-| `console-builds-monitoring.png` | The Builds page — BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs (#56). |
-| `console-streams-monitoring.png` | The Streams page — JetStream messages/bytes + connections from the NATS exporter sidecar (#56). |
-| `console-buckets-monitoring.png` | The Buckets page — RustFS pod CPU/memory (generic fallback; RustFS has no Prometheus endpoint) (#56), plus full S3 CRUD: create a bucket, upload and delete objects, delete a bucket (#26). |
+| `console-component-monitoring.png` | A component's **Monitoring** detail page; CPU + memory sparklines and a live log tail, sourced from the OTel stack (#56). |
+| `console-component-monitoring-mobile.png` | The same page at phone width; the rail collapses to a sticky bar (logo + ☰) so content is immediately visible. |
+| `console-mobile-nav-open.png` | Phone width with the ☰ menu tapped open; the full nav revealed (CSS-only, no JS). |
+| `console-component-locked.png` | The Monitoring page when observability isn't enabled yet; degrade-in-place hint. |
+| `console-components.png` | The Components page; per-namespace health, each linking into its Monitoring detail. |
+| `console-applications.png` | The **Applications** list; a scannable triage table (name → detail, Ready, URL, Delete). The golden path (PRD-0003) as a console action: one `Application` XR composes a workload + Postgres + S3 bucket (#28). Depth moved to the detail page below. |
+| `console-application-detail.png` | The **Application detail** page; the composition hub: **Diagnostics** (the DR-0005 cause a `describe` would show, moved off the list), the **composed resources cross-linked** to their own detail pages (Database, Bucket; walk app → its DB → back), Source + **Redeploy**, the workload's monitoring, and a Danger zone. |
+| `console-new-application.png` | The **New application** modal; the fullest form in the console: source (image, repo, or template), min/max scale, env vars, and the database/bucket dependency toggles (#28). |
+| `console-deploy-from-source.png` | The **New application** modal with **Source → Build from a repo**; the app-team golden path: point at an in-cluster Gitea repo and the platform builds it (Argo + BuildKit → Zot) and deploys it as an Application (PRD-0012). |
+| `console-scaffold-from-template.png` | The **New application** modal with **Source → Start from a template**; the scaffold bridge: the console forks the demo app into a fresh `cloudbox/<name>` repo (Gitea generate API) and then builds and deploys it (PRD-0012). |
+| `console-services.png` | The **Functions** list; a scannable triage table (name → detail, request-rate + avg-latency sparklines, scale-from-zero per Knative Service), with **Invoke**/traces/**Delete** quick actions and a **New function** button (#56, #58). |
+| `console-function-detail.png` | The **Function detail** page; parity with the Application/Database detail views: **Diagnostics** (the DR-0005 cause + cause→action hint when a revision fails), Invoke/traces/Delete actions, and the workload's monitoring (scale-from-zero, request rate, latency). |
+| `console-new-function.png` | The **New function** modal (CSS-only, no JS); name, source, optional env vars, and a keep-warm toggle; builds source in-cluster (Argo + BuildKit) and deploys it as a scale-to-zero Knative Service (#58). |
+| `console-database-monitoring.png` | A database's detail page; CNPG connections, cache-hit ratio and size (#56), plus a **Resize** control (change the T-shirt size → Crossplane re-composes, #27) and the delete danger zone. |
+| `console-builds-monitoring.png` | The Builds page; BuildKit's CPU/memory in the builds namespace, above the live Argo Workflows runs (#56). |
+| `console-streams-monitoring.png` | The Streams page; JetStream messages/bytes + connections from the NATS exporter sidecar (#56). |
+| `console-buckets-monitoring.png` | The Buckets page; RustFS pod CPU/memory (generic fallback; RustFS has no Prometheus endpoint) (#56), plus full S3 CRUD: create a bucket, upload and delete objects, delete a bucket (#26). |
 
 ## Regenerating
 
@@ -35,18 +35,18 @@ One command, from the repo root:
 ./scripts/screenshots.sh
 ```
 
-It does the whole flow and overwrites the files in this directory in place —
+It does the whole flow and overwrites the files in this directory in place;
 review with `git status docs/screenshots/` and commit what changed:
 
-1. **render** — a Go test (`TestGenerateScreenshots` in
+1. **render**: a Go test (`TestGenerateScreenshots` in
    `apps/portal/internal/web/component_detail_test.go`) writes the **real**
    templates + `style.css` to standalone HTML with representative mock data, so
    the shots stay faithful to the shipped UI;
-2. **shoot** — `slides/screenshots.mjs` shoots each page with headless Chromium
+2. **shoot**: `slides/screenshots.mjs` shoots each page with headless Chromium
    (light + dark, the mobile nav for the monitoring page, and every CSS-only
-   **modal** opened in each of its states — e.g. the New-application source
+   **modal** opened in each of its states, e.g. the New-application source
    picker for image / repo / template);
-3. **copy** — the canonical `console-*.png` set is copied here.
+3. **copy**: the canonical `console-*.png` set is copied here.
 
 Shots are 2× device-scale for crisp slides. Chromium comes from slides'
 `playwright-chromium` devDependency; the script installs it (and the browser) on
@@ -55,6 +55,6 @@ first run.
 **Adding a shot.** For a new *page*: add it to the `pages` list in the Go test
 **and** to the copy map in `scripts/screenshots.sh`. For a new *modal state*: add
 it to the `MODALS` config in `slides/screenshots.mjs` (keyed by the modal's
-checkbox id) and to the copy map. Keep the sample data representative — set the
+checkbox id) and to the copy map. Keep the sample data representative: set the
 fields the shot needs to show (e.g. `ScaffoldEnabled: true` for the template
 source) in the `sample*` helpers next to the pages list.

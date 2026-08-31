@@ -1,4 +1,4 @@
-# Rehearsal 14 — tbx v0.1.5 with the balloon disabled (2026-08-30)
+# Rehearsal 14: tbx v0.1.5 with the balloon disabled (2026-08-30)
 
 The test upstream asked for. talos-box v0.1.5 shipped two mitigations for the
 kernel panics of rehearsals 9 and 10, both aimed at the memory balloon:
@@ -13,7 +13,7 @@ the setting for.
 ## Setup
 
 Client, daemon and helper all on v0.1.5. The mitigation was confirmed active in two
-independent places before anything was created — `tbxd.log` printing
+independent places before anything was created: `tbxd.log` printing
 `balloon: disabled by TBX_DISABLE_BALLOON`, and `tbx doctor` printing an
 `INFO balloon` line naming #513. The workshop pins were bumped to v0.1.5 in
 `scripts/versions.env` and `mise.toml` for the duration so the preflight's version
@@ -24,10 +24,10 @@ check would pass, and reverted afterwards.
 | | |
 |---|---|
 | `TBX_DISABLE_BALLOON=1 tbx system restart` | 23:33:48, tbxd pid 62502 |
-| `create-cluster.sh` — VMs, config, bootstrap, Cilium, both nodes Ready, VIP | **4 min 40 s** |
+| `create-cluster.sh`: VMs, config, bootstrap, Cilium, both nodes Ready, VIP | **4 min 40 s** |
 | `bootstrap-gitops.sh` + `seed-gitea.sh` | 78 s combined |
 | lab 01 `verify.sh` | exit 0 |
-| lab 00 and lab 02 `verify.sh` | exit 1, both false — see below |
+| lab 00 and lab 02 `verify.sh` | exit 1, both false; see below |
 | `destroy-cluster.sh` | 12 s, reported success, `No clusters` |
 | **kernel panic** | **23:44:05, 71 s after teardown reported success** |
 
@@ -39,7 +39,7 @@ Both `verify.sh` failures were artifacts of the session, not the workshop, and a
 recorded here so nobody chases them. Lab 00 reported `host memory: 0 GB` because
 `sysctl` is not on `PATH` in the agent's tool shell; with `/usr/sbin` on `PATH` it
 reads 128 GB and exits 0. Lab 02 reported ArgoCD app `demo` missing, which is
-correct — lab 02 had not been done on this cluster, and the fresh-clone invariant
+correct: lab 02 had not been done on this cluster, and the fresh-clone invariant
 says `gitops/apps/` carries only `local-path-provisioner.yaml`.
 
 ## What it proves

@@ -58,7 +58,7 @@ layout: cover
 <div class="callout mt-5 mx-auto max-w-130">
   <strong>Did you run the prework?</strong><br>
   <code>./scripts/install.sh --check</code> must be all green.<br>
-  Not green? Start <strong>now</strong> — or grab one of us.
+  Not green? Start <strong>now</strong>, or grab one of us.
 </div>
 
 <div class="abs-br m-6 text-sm opacity-60">
@@ -69,9 +69,9 @@ layout: cover
 Welcome! While people trickle in, this slide does the most important job of the day: getting everyone to run the pre-flight check immediately.
 
 - Introduce yourselves briefly: Øyvind (NextGenTel, GDG Bergen) and Hans (platform engineer in the Norwegian Government, CNCF Ambassador, co-host of Plattformpodden).
-- Point at the callout: "If you haven't run the three prework scripts, start `./scripts/cloudbox-init.sh` RIGHT NOW — it pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
-- Repo URL is at the bottom — it's public, everything (labs, solutions, slides) lives there, and it will keep working after today.
-- Staffing: it's the two of you and nobody else — say so, and explain the sticky notes briefly (more in a few slides).
+- Point at the callout: "If you haven't run the three prework scripts, start `./scripts/cloudbox-init.sh` RIGHT NOW. It pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
+- Repo URL is at the bottom. It's public, everything (labs, solutions, slides) lives there, and it will keep working after today.
+- Staffing: it's the two of you and nobody else. Say so, and explain the sticky notes briefly (more in a few slides).
 
 Timing: ~10 minutes for the cover + "why", then module 00's GO slide puts hands on keyboards at minute 10. The pre-flight runs in the background while the concept sections play; we triage it just before module 01.
 -->
@@ -83,7 +83,7 @@ class: term-slide
 
 <div class="term">
   <div class="term-bar"><span class="d r"></span><span class="d y"></span><span class="d g"></span>
-    <span class="term-title">~ — the only three commands you need today</span></div>
+    <span class="term-title">~ · the only three commands you need today</span></div>
   <div class="term-body">
 
 <div style="--d:0.2s"><span class="p">$</span> <span class="c">git clone https://github.com/randax/Platform-Engineering-Workshop.git</span></div>

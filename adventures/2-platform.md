@@ -1,4 +1,4 @@
-# Door 2 — Platform: extend the platform itself
+# Door 2, platform: extend the platform itself
 
 **You came for:** the platform engineer's core move. Take a raw open-source
 component and turn it into a *capability*: packaged, delivered by git,
@@ -23,7 +23,7 @@ hand-written. Find: where the namespace is declared, what the catalog entry's
 artifact the manifests came from, so pin bumps stay honest). This anatomy is
 your template.
 
-## The build — tiered by machine
+## The build: tiered by machine
 
 **16 GB tier: cert-manager.** The classic first platform add: three small
 deployments, negligible RAM, and every later capability wants TLS.

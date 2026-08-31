@@ -1,8 +1,8 @@
-# Workshop slides — JavaZone 2026
+# Workshop slides · JavaZone 2026
 
 The [Slidev](https://sli.dev) deck for **Cloud on Your Terms: Building Your Own
 Cloud-Native Platform** (JavaZone 2026). The deck frames the hands-on labs in
-[`../lab/`](../lab/) — it never competes with them: short framing per module, a GO slide
+[`../lab/`](../lab/) and never competes with them: short framing per module, a GO slide
 with the verify command, and the spoken narrative in presenter notes.
 
 ## Run it
@@ -36,15 +36,15 @@ slides/
 
 ## Conventions (keep them when editing)
 
-- **Presenter notes carry the words.** Every content slide ends with an HTML comment —
+- **Presenter notes carry the words.** Every content slide ends with an HTML comment;
   that's what the speakers rehearse from. Slides stay sparse: ≤5 bullets, short lines.
 - **Offline-safe.** No external images, fonts, or CDN assets (`fonts.provider: none`;
   backgrounds are CSS gradients in `styles/index.css`). The deck must render without
   internet, like everything else in this workshop.
-- **Diagrams are Mermaid** code blocks — no image files.
+- **Diagrams are Mermaid** code blocks, no image files.
 - **Layouts** come from the seriph theme: `cover`, `section` (module dividers), `fact`
   (big statements/breaks), `two-cols`, and default.
-- **Ecosystem accuracy matters** (see `../docs/PRINCIPLES.md`, rule 15) — e.g. the
+- **Ecosystem accuracy matters** (see `../docs/PRINCIPLES.md`, rule 15). For example the
   MinIO/RustFS wording in module 03 is deliberate; don't "simplify" it.
 
 ## Deploy

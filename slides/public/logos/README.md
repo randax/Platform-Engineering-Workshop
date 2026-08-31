@@ -2,17 +2,17 @@
 
 These SVGs are **vendored on purpose**: the deck runs fully offline at the venue
 (`slides.md` sets `fonts.provider: none` and forbids CDN assets), so every logo
-is bundled at build time and served from `/logos/*.svg` — never fetched at
+is bundled at build time and served from `/logos/*.svg`, never fetched at
 runtime. Use them through the `<Logo>` component (`slides/components/Logo.vue`).
 
 ## Why logos at all
 "Cloud on Your Terms" argues these open-source projects *are* the cloud. The
-audience should **recognise** them on sight — that's the credibility payload, so
+audience should **recognise** them on sight. That's the credibility payload, so
 the "you run today" column and every module divider carry the real marks.
 
 ## Sources & licensing
 Project logos are trademarks of their respective owners, used here **nominatively**
-(to identify the technology in an educational talk) — not to imply endorsement.
+(to identify the technology in an educational talk), not to imply endorsement.
 CNCF project marks are shared under the CNCF's usage terms; the rest come from
 each project's own brand assets or a permissive icon set.
 
@@ -29,8 +29,8 @@ each project's own brand assets or a permissive icon set.
 | `gitea.svg` | Gitea | go-gitea/gitea `public/assets/img/logo.svg` |
 | `grafana.svg` | Grafana | devicon (grafana-original) |
 | `docker.svg` | Docker | devicon (docker-original) |
-| `cloudbox.svg` | Cloudbox Console (this project's own mark) | original — traced from Hans's mockup, flat isometric box + cloud |
-| `buildkit.svg` | BuildKit (Moby) | devicon (docker-original — BuildKit is a Moby project) |
+| `cloudbox.svg` | Cloudbox Console (this project's own mark) | original, traced from Hans's mockup, flat isometric box + cloud |
+| `buildkit.svg` | BuildKit (Moby) | devicon (docker-original; BuildKit is a Moby project) |
 | `talos.svg` | Talos Linux | Simple Icons |
 | `victoriametrics.svg` | VictoriaMetrics | Simple Icons |
 | `amazonwebservices.svg` | AWS (rent column, dimmed) | devicon (amazonwebservices wordmark) |
@@ -46,7 +46,7 @@ each project's own brand assets or a permissive icon set.
 | `kafka.svg` | Apache Kafka (adventure door 2) | Simple Icons |
 
 Not vendored: **RustFS** falls back to a text chip via
-`<Logo name="rustfs" text="RustFS" />` — no clean official SVG published yet
+`<Logo name="rustfs" text="RustFS" />`. No clean official SVG published yet
 (checked 2026-08-24: nothing in rustfs/rustfs or the docs site). Re-vendor when
 one appears. Zot was in this list until 2026-08-24; CNCF artwork now has it.
 

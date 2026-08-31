@@ -65,8 +65,8 @@ cp <workshop-repo>/lab/03-data/postgres-cluster.yaml gitops/components/demo/
 git add . && git commit -m "app-db postgres cluster" && git push
 ```
 
-Watch it: `kubectl -n demo get cluster app-db -w` (a CNPG cluster does init → one pod →
-healthy; first time takes a minute or two). If it sticks, `kubectl -n demo describe
+Watch it: `kubectl -n demo get cluster app-db -w` (a CNPG cluster goes from init to one
+pod to healthy; first time takes a minute or two). If it sticks, `kubectl -n demo describe
 cluster app-db` and `kubectl -n demo get pvc,events`.
 </details>
 

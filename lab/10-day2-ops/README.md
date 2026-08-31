@@ -1,4 +1,4 @@
-# Module 10 — Day-2 operations: roll back a bad release
+# Module 10: day-2 operations, roll back a bad release
 
 ## The goal
 
@@ -15,8 +15,8 @@ module (module 02): Gitea + ArgoCD running and the `demo` Application
 already enabled. Module 10 needs nothing from the build/serverless/portal
 stretch modules (06-09).
 
-The workload this module breaks, `demo-web`, is **owned by this lab, not hand-copied by
-you**: the first run of `./inject.sh 1`, `./inject.sh 2`, or `./inject.sh 3` seeds
+The workload this module breaks, `demo-web`, is owned by this lab, not hand-copied by
+you: the first run of `./inject.sh 1`, `./inject.sh 2`, or `./inject.sh 3` seeds
 `gitops/components/demo/demo-web.yaml` (a plain Deployment + Service running the same
 pre-pulled `ghcr.io/knative/helloworld-go` image module 06 uses, no in-cluster build
 required) into your `cloudbox/platform` repo and pushes it, then asks you to wait for
@@ -55,7 +55,7 @@ offline model that flails, then a one-field `ModelConfig` change that fixes it.
 | 3 | `03-dockerhub-sneaks-in` | module 02's `demo` Application | a plausible registry-migration commit that breaks nothing today and voids the offline guarantee |
 
 The three are deliberately different *shapes* of bad release, and the third one is the
-awkward one on purpose: **nothing about it is visibly broken on your laptop.** Scenario 1
+awkward one on purpose: *nothing about it is visibly broken on your laptop*. Scenario 1
 crashes loudly, scenario 2 stalls the rollout, scenario 3 goes green and still has to be
 reverted. Day-2 work includes the class of bad release whose only symptom is that a
 guarantee you rely on is gone.
@@ -73,7 +73,7 @@ guarantee you rely on is gone.
 ./restore.sh clean   # revert every currently injected scenario
 ```
 
-The scenario directory has `description.md`. **That is the spoiler.** Do not open it
+The scenario directory has `description.md`. That is the spoiler. Do not open it
 until you have committed to a diagnosis. `fix.sh` is the canonical scripted repair.
 
 ## The task
@@ -87,8 +87,8 @@ you need is of a *healthy* pod. Its hints say so up front.
    wait for ArgoCD; run it again once `kubectl -n demo rollout status deploy/demo-web`
    reports success, to actually push the bad release.
 2. Find the first visible symptom in namespace `demo`.
-3. Write a one-sentence diagnosis before changing anything: “The new pods crash because
-   X changed Y.”
+3. Write a one-sentence diagnosis before changing anything: "The new pods crash because
+   X changed Y."
 4. Verify or falsify that sentence with live evidence. Follow the pod state to Events,
    logs, the Deployment configuration, rollout history, and finally Git history as needed.
 5. Revert the commit that introduced the fault and push the revert to
@@ -138,10 +138,10 @@ git show <suspicious-sha>
 ```
 
 > `mise trust` is not ceremony: the clone carries this repo's `mise.toml`, and mise
-> refuses to load an untrusted config, so **every mise-installed tool run from inside
-> the clone fails** until you trust it, and `kubectl` is one of those. Recent mise says
-> so loudly (`mise ERROR … are not trusted`, exit 1); older ones just **exit 0 with
-> empty output**. A command that prints nothing and succeeds is the worst failure mode
+> refuses to load an untrusted config, so *every mise-installed tool run from inside
+> the clone fails* until you trust it, and `kubectl` is one of those. Recent mise says
+> so loudly (`mise ERROR … are not trusted`, exit 1); older ones just exit 0 with
+> empty output. A command that prints nothing and succeeds is the worst failure mode
 > there is.
 
 The image still pulls. Look for configuration that controls what address the Go HTTP
@@ -219,7 +219,7 @@ pushes the new commit. `./solve.sh` reverts every scenario that is currently inj
 
 ### Scenario 3: Docker Hub sneaks in
 
-**Read this before you inject it:** this one does **not** break your cluster. The pods go
+**Read this before you inject it:** this one does *not* break your cluster. The pods go
 Ready and stay Ready. Your job is to find what the release gave away, prove where the
 image actually came from, and revert it anyway. If you are waiting for a red pod, you
 will wait forever. That is the exercise, not a bug.
@@ -278,7 +278,7 @@ Mechanically, `./restore.sh 3` finds the traced registry commit, runs `git rever
 pushes the new commit. `./solve.sh` reverts every scenario that is currently injected.
 </details>
 
-## Escalate to the agent: beat 1 (flail) → beat 2 (diagnose)
+## Escalate to the agent: beat 1 flails, beat 2 diagnoses
 
 Every scenario above has a fourth rung on the escalation ladder, beyond the three hints:
 Kagent, the platform's own read-only agent, streaming a live investigation into a "Case
@@ -286,22 +286,22 @@ file" on the demo component's page in the Console. This is the module's second h
 same fault, worked twice, with one field changed in between.
 
 **Say the honest-spec line out loud before you start:** beat 1 runs a real model on your
-host, *beside* the whole running cluster. That needs the **32 GB "comfortable" spec from
-module 00**. On the **16 GB minimum spec, treat beat 1 as optional**: skip straight to
+host, *beside* the whole running cluster. That needs the 32 GB "comfortable" spec from
+module 00. On the 16 GB minimum spec, treat beat 1 as optional: skip straight to
 "Beat 2" below. That is not a lesser path; it costs no extra RAM, and it's the one that
 actually fits your machine.
 
 Measured on 2026-08-18 (32 GB M1 Max, 16 GB of it inside Colima, all 21 apps
-and 76 pods running): `qwen3:1.7b` at this repo's `num_ctx: 16384` costs **3.4 GB**
-outside the VM, 1.4 GiB of weights and **1.8 GiB of KV cache**. Ten investigations
-took **31–106 s** of wall clock each.
+and 76 pods running): `qwen3:1.7b` at this repo's `num_ctx: 16384` costs 3.4 GB
+outside the VM, 1.4 GiB of weights and 1.8 GiB of KV cache. Ten investigations
+took 31–106 s of wall clock each.
 
 That is a deliberate climb-down from the chart's own defaults, and the arithmetic is the
 reason. The chart ships `qwen3:4b` at `num_ctx: 64000`, which `ollama ps` reports
-as **12 GB**: 2.6 GiB of weights and **9.0 GiB of KV cache**. On a 32 GB laptop with a
+as 12 GB: 2.6 GiB of weights and 9.0 GiB of KV cache. On a 32 GB laptop with a
 16 GB Colima VM that leaves about 4 GB for macOS, and the machine spends the
-investigation swapping. **The weights were never the problem. The context window was
-75% of the footprint.** Shrinking it to 16384 gives back 7.2 GiB, and 16384 is a
+investigation swapping. The weights were never the problem. The context window was
+75% of the footprint. Shrinking it to 16384 gives back 7.2 GiB, and 16384 is a
 floor, not a preference: a single `k8s_get_events` result on this cluster is
 ~8.2 k tokens, so 8192 overflows the moment the agent reads one.
 
@@ -381,7 +381,7 @@ before you blame the cluster:
 ollama list | grep qwen3     # ~1.4 GB; ollama pull qwen3:1.7b if it is missing
 ```
 
-### Beat 1: watch the local model flail — and write down how
+### Beat 1: watch the local model flail, and write down how
 
 Pick any scenario above and inject it (or reuse one you already have live). In the
 Console, open **Components → demo** and click **Open investigation**. Watch the
@@ -396,8 +396,8 @@ cannot see the problem. It is the same trap the agent is about to fall into.
 
 Don't grade it on whether it gets the right answer. It mostly won't. A local ≤4B model
 is fine at *issuing* tool calls and falls off a cliff the moment an investigation has to
-**carry state across** several (get → describe → logs → events → hypothesis), which every
-real fault requires. **Write down exactly how it fails**: a loop that repeats the same
+*carry state across* several (get, describe, logs, events, hypothesis), which every
+real fault requires. Write down exactly how it fails: a loop that repeats the same
 call, a hypothesis stated with no evidence behind it, a malformed follow-up. That sentence is beat 1's deliverable, not a diagnosis. Same
 spirit as module 05's "the agent claimed X" exercise.
 
@@ -423,14 +423,14 @@ it is what happens to the evidence afterwards:
 Roughly one run in ten *does* land on the real cause (`PORT=8080-canary`): it reaches
 `k8s_get_pod_logs`, and the answer is right there in the first line of output. Even then,
 read the verdict carefully: the run that got it right also asserted that "the Service is
-configured to use 8080-canary", which is simply false. **A correct headline with an
-invented supporting fact is the most dangerous output on this page**, and finding it is
+configured to use 8080-canary", which is simply false. A correct headline with an
+invented supporting fact is the most dangerous output on this page, and finding it is
 worth more than the diagnosis. Yours will differ in the details; the shape is the point:
 real tool calls, then evidence that goes unread.
 
 > **If the Case file ends on "The investigation didn't complete"**, that is the model
 > generating without stopping: `kagent-controller` 0.9.12 cuts the A2A stream at a
-> hardcoded **180 s**, and a small model handed a large tool result will happily run past
+> hardcoded 180 s, and a small model handed a large tool result will happily run past
 > it (runs of 9,000+ tokens in a single turn were measured). The ModelConfig's
 > `num_predict: "1200"` is what bounds each turn; if you removed it, put it back.
 
@@ -454,7 +454,7 @@ real tool calls, then evidence that goes unread.
 
 ### Beat 2: one `ModelConfig` push, and it actually diagnoses
 
-Beat 2 is this module's **documented exception to the offline-after-pre-pull rule**,
+Beat 2 is this module's documented exception to the offline-after-pre-pull rule,
 the one place in the workshop that needs the venue network (decided and recorded in the
 module spec: small local models genuinely can't do multi-step triage, and on 16 GB
 machines beat 1 doesn't fit at all). If the network is down, beat 1 still works on
@@ -462,7 +462,7 @@ machines beat 1 doesn't fit at all). If the network is down, beat 1 still works 
 
 Sign up for a free [OpenCode Zen](https://opencode.ai/auth) key during module 00 prep if
 you haven't yet (see that module's README). "Free" here is explicit and time-boxed:
-Zen's free models are labeled **"for a limited time."** If they're gone by the time you
+Zen's free models are labeled "for a limited time." If they're gone by the time you
 read this, skip straight to the fallback paragraph below.
 
 Create the Secret imperatively. An API key is the one thing in this whole workshop that
@@ -476,7 +476,7 @@ unset OPENCODE_API_KEY
 ```
 
 (The prompt hides what you type. If you paste nothing, `kubectl` happily creates the
-Secret with an **empty** key and beat 2 fails later with an opaque auth error. Check
+Secret with an *empty* key and beat 2 fails later with an opaque auth error. Check
 with `kubectl -n kagent get secret kagent-zen -o jsonpath='{.data}'` if in doubt.)
 
 Then switch the *same* ModelConfig, via git, to Zen's OpenAI-compatible endpoint. Pick
@@ -515,7 +515,7 @@ anything: `git revert` and push.
 The switch itself is fast and observable, which is the platform lesson underneath the
 model lesson: on 2026-08-17 a one-field push reached
 `kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.model}'`
-**within 20 s**, and kagent rolled a new `k8s-agent` pod to pick it up. The same
+within 20 s, and kagent rolled a new `k8s-agent` pod to pick it up. The same
 git-is-the-write-path mechanic as every scenario above, applied to the agent's own brain.
 (That rehearsal could not check Zen's endpoint itself, having no key. The mechanism was
 proven by switching between two *local* Ollama models and watching the second one answer.)
@@ -557,6 +557,6 @@ evidence that the release was good.
 - Watch `kubectl -n demo get rs,pods -w` during a reinjection. Explain why the old
   ReplicaSet remains and what availability the rolling-update strategy preserves.
 - Inspect the Deployment conditions before and after its progress deadline. Distinguish
-  “available through old replicas” from “the new rollout succeeded.”
+  "available through old replicas" from "the new rollout succeeded."
 - Ask a read-only agent for a diagnosis and the command that would falsify it. Give it
   cluster eyes, but keep the revert and push in the human-controlled Git path.

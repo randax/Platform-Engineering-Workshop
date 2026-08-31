@@ -1,4 +1,4 @@
-# Door 1 — App dev: build something real on the platform
+# Door 1, app dev: build something real on the platform
 
 **You came for:** what it feels like to be a product team on a platform.
 Ship an app, get its dependencies by declaring them, never file a ticket.
@@ -38,7 +38,7 @@ bucket `my-app-data`. That's a nais.yaml-shaped experience you built yourself
 in module 04. Read `gitops/components/application-xr/composition.yaml` and
 find where each of the three came from.
 
-## The build — pick your altitude
+## The build: pick your altitude
 
 **Level 1: a second consumer on the event mesh.** The picture pipeline's
 uploader doesn't know the resizer exists; it publishes
@@ -86,10 +86,10 @@ module-10-adjacent punchline. Kill your worker mid-event and watch the replay.
   limitation, not your bug. Config via env means going one layer down to a
   plain Knative Service, or extending the composition (that's door 2 energy).
 - **Go base images**: in-cluster builds must `FROM` your own registries
-  (the image mirror — `localhost:5001` on docker, which holds every registry's images;
+  (the image mirror: `localhost:5001` on docker, which holds every registry's images;
   on tbx the host reaches docker.io at `172.30.<n>.1:5055`, ghcr.io `:5056`, quay.io `:5057`,
   registry.k8s.io `:5058`, and every other warmed registry through the catch-all's path
-  form, `172.30.<n>.1:5059/<registry>/<repo>:<tag>` — or Zot :30500) — Docker Hub is rate-limited at the venue. The
+  form, `172.30.<n>.1:5059/<registry>/<repo>:<tag>`; or Zot :30500). Docker Hub is rate-limited at the venue. The
   mirror's image list is `scripts/images.txt`; if the base you want isn't
   there, build `FROM` busybox/static, or vendor the base at home.
 - **Cluster-local ksvc URLs** (pipeline services) don't resolve from your

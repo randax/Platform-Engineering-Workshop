@@ -1,4 +1,4 @@
-# Door 3 — Security: lock it down, prove it
+# Door 3, security: lock it down, prove it
 
 **You came for:** zero trust made concrete. Default-deny that you watch break
 a real workload, least-privilege that you prove back into existence, and a
@@ -35,11 +35,11 @@ photo: watch it fail, and watch `hubble observe --verdict DROPPED` name every
 flow you just severed, **including DNS**, which is the one everyone forgets.
 
 Mind those braces. `ingress: [{}]` is a list holding **one rule that matches
-nothing** — which is what puts the endpoint in default-deny. `ingress: []` is
+nothing**, which is what puts the endpoint in default-deny. `ingress: []` is
 an **empty list of rules**, which reads like the same thing and is not: the API
 accepts it, stores it verbatim, reports no error, and enforces nothing at all.
 The tell is that everything keeps working and `hubble observe --verdict DROPPED`
-stays empty — you will hunt for the drop that never happened.
+stays empty. You will hunt for the drop that never happened.
 
 **Arc 2: earn it back, least privilege.** Restore the pipeline one rule at a
 time, DNS egress first (allow UDP 53 to kube-dns), then only the flows the

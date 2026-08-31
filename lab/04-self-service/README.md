@@ -15,7 +15,7 @@ the **abstraction**: you define an API (`WorkshopDatabase`) and an implementatio
 (Crossplane Composition), developers consume the API. This is precisely what `aws rds
 create-db-instance` is, except you own both sides of it now.
 
-⚠️ **A word about training data (yours and your AI's):** this is Crossplane **v2**.
+**A word about training data (yours and your AI's):** this is Crossplane **v2**.
 Claims are gone: you create namespaced XRs directly. Compositions are pipeline-mode only
 and emit *plain Kubernetes resources* (a CNPG `Cluster`, a `Job`) directly, no
 provider-kubernetes wrapping. Most tutorials online, and most LLM answers, still
@@ -180,12 +180,12 @@ through this API?)
   enum doing policy. The developer never sees a CNPG field; the platform team owns what a
   size *means* in the Composition. That's the facade (PRD-0006).
 - Delete `my-database.yaml` from the repo and push. Watch Crossplane tear down the whole
-  composed stack (prune → XR deleted → composed resources garbage-collected). Re-add it.
+  composed stack (prune, then XR deleted, then composed resources garbage-collected). Re-add it.
 - Add a `status` field: patch the composed cluster's readiness or connection Service name
   back onto the XR (`ToCompositeFieldPath` patches) so developers can `kubectl get wdb`
   and see where to connect.
 
-## AI assistants welcome — with the v2 warning
+## AI assistants welcome, with the v2 warning
 
 Assistants are genuinely useful for reading Compositions. But this is where training-data
 skew bites hardest: if your assistant proposes Claims or provider-kubernetes `Object`
