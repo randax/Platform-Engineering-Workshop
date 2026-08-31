@@ -15,8 +15,9 @@ flourish, the whole chain as a single trace in Grafana.
 <p align="center"><em>Per-component metrics and logs in the Console come from the same OTel
 telemetry that renders your upload as one end-to-end trace in Grafana.</em></p>
 
-**Prerequisites:** modules 03 (RustFS), 06 (Knative Serving) and 08 (the portal). Have
-them green, or jump straight here with `mise run catch-up 8`.
+**Prerequisites:** modules 03 (RustFS) and 06 (Knative Serving), plus the portal app
+running; step 1 enables it if you skipped module 08 (the module that explores it).
+Behind? Jump straight here with `mise run catch-up 8`.
 
 ## Why this matters
 
@@ -28,10 +29,11 @@ uploader doesn't know the resizer exists, it emits a CloudEvent
 
 ## The task
 
-1. Enable two catalog apps and push: `knative-eventing.yaml` (Broker/Trigger machinery,
-   ns `knative-eventing`) and `picture-pipeline.yaml` (ns `pipeline`: a Broker, two
+1. Enable the catalog apps and push: `knative-eventing.yaml` (Broker/Trigger machinery,
+   ns `knative-eventing`), `picture-pipeline.yaml` (ns `pipeline`: a Broker, two
    cluster-local ksvcs `uploader` and `resizer`, a Trigger, and a Job that creates the
-   `images` bucket). Wait for `kubectl -n pipeline get broker,trigger,ksvc` all Ready.
+   `images` bucket), and, if you skipped module 08, `portal.yaml` (the Console fronts
+   the gallery). Wait for `kubectl -n pipeline get broker,trigger,ksvc` all Ready.
    With no traffic, both ksvcs sit at zero pods.
 2. **The moment.** Two terminals:
    - `kubectl -n pipeline get pods -w`
@@ -73,6 +75,7 @@ In your Gitea clone:
 ```bash
 cp gitops/catalog/knative-eventing.yaml gitops/apps/
 cp gitops/catalog/picture-pipeline.yaml gitops/apps/
+cp gitops/catalog/portal.yaml           gitops/apps/   # skip if module 08 enabled it
 git add . && git commit -m "module 09: eventing + picture pipeline" && git push
 
 kubectl -n knative-eventing get pods        # controller, webhook, broker ingress/filter, imc-*

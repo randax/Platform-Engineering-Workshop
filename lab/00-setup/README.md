@@ -58,7 +58,8 @@ From the repository root:
 5. Run `./verify.sh` in this directory.
 
 **Hardware:** 16 GB RAM minimum, 32 GB comfortable, 40 GB free disk. On Docker, ≥10 GB
-and ≥4 CPUs *allocatable to Docker*. On Windows, run the Docker backend via WSL2.
+memory, ≥4 CPUs, and a ≥50 GB disk limit *allocatable to Docker* (Docker Desktop →
+Settings → Resources; a 32 GB disk cap fills and kills the cluster around module 05). On Windows, run the Docker backend via WSL2.
 
 ## Backend fine print (tbx)
 

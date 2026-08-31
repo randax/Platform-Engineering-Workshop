@@ -18,7 +18,7 @@ asserting cluster state cannot grade.
 ## Enable Kagent and point it at your platform
 
 ```bash
-git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
+cd ~/cloudbox-platform && git pull    # your module-02 clone (see README.md, The setup)
 cp gitops/catalog/kagent.yaml gitops/apps/
 git add gitops/apps/kagent.yaml
 git commit -m "enable kagent"
@@ -39,7 +39,7 @@ already handled for you:
 "The host" is `host.docker.internal` on the macOS/WSL2 Docker backend, `10.5.0.1`
 (`TALOS_SUBNET_GATEWAY`) on native-Linux Docker, and the cluster gateway
 `172.30.<n>.1` in a talos-box VM. You do not hand-edit it: `bootstrap-gitops.sh`
-recorded the address in configmap `kagent/cloudbox-host` in module 00, and the
+recorded the address in configmap `kagent/cloudbox-host` in module 02, and the
 `kagent-ollama-host` PostSync hook patches the ModelConfig with it (the kagent
 Application `ignoreDifferences` that one field, so selfHeal leaves the patch alone).
 Verify:

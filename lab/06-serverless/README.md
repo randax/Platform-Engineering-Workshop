@@ -1,4 +1,4 @@
-# Module 06 (stretch): serverless, scale from zero on your hardware
+# Module 06: serverless, scale from zero on your hardware
 
 ## The goal
 

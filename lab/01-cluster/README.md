@@ -108,7 +108,11 @@ type it, it differs per backend. `kubectl get nodes -o wide` shows the same addr
   `hostRoot=/sys/fs/cgroup`) and its default PodSecurity needs the agent's capability
   list spelled out. This is the documented Talos+Cilium recipe:
   https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium
-- **The command**, as `create-cluster.sh` step 3 runs it:
+- **Which backend am I on?** `cat ~/.cloudbox/substrate`. The command differs only
+  in its ending, so use your backend's block below; each is complete and
+  paste-ready, as `create-cluster.sh` step 3 runs it.
+
+**docker backend:**
 
 ```bash
 source scripts/versions.env
@@ -134,31 +138,46 @@ helm upgrade --install cilium \
   --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"
 ```
 
-(`l2announcements` and the raised rate limit are set on both backends so
-`cilium config view` reads the same everywhere; only tbx actually announces.)
-
-The last five flags are the shared **ingress** that serves every `*.cloudbox.k8s.test`
-hostname for the rest of the day; `verify.sh` checks for it. The script builds them
-from `cilium_ingress_values()` in `scripts/lib.sh`.
-
-Those two `service.*` lines are the **docker** shape. Check which backend you are on
-with `cat ~/.cloudbox/substrate`; tbx needs a different ending, a real LoadBalancer
-plus host routing so its VIP is reachable from your laptop:
+**tbx:** the same command with a LoadBalancer ending (plus host routing so the VIP
+is reachable from your laptop), then one required post step:
 
 ```bash
+source scripts/versions.env
+helm upgrade --install cilium \
+  --server-side=false \
+  "scripts/manifests/cilium-${CILIUM_VERSION}.tgz" \
+  --namespace kube-system \
+  --set ipam.mode=kubernetes \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=localhost \
+  --set k8sServicePort=7445 \
+  --set cgroup.autoMount.enabled=false \
+  --set cgroup.hostRoot=/sys/fs/cgroup \
+  --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
+  --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+  --set l2announcements.enabled=true \
+  --set k8sClientRateLimit.qps=10 \
+  --set k8sClientRateLimit.burst=20 \
+  --set ingressController.enabled=true \
+  --set ingressController.loadbalancerMode=shared \
+  --set "operator.extraArgs[0]=--ingress-default-request-timeout=24h" \
   --set ingressController.service.type=LoadBalancer \
   --set bpf.hostLegacyRouting=true
-```
 
-**On tbx, one more step.** Without a `CiliumLoadBalancerIPPool` and a
-`CiliumL2AnnouncementPolicy`, `cilium-ingress` sits in `<pending>` forever:
-
-```bash
+# REQUIRED on tbx: without a CiliumLoadBalancerIPPool and a
+# CiliumL2AnnouncementPolicy, cilium-ingress sits in <pending> forever.
+# This applies both, waits for the rollout, and proves the VIP got .200:
 mise run cluster:create -- --post-cni
 ```
 
-It applies both, waits for the rollout, and proves `cilium-ingress` got `.200`. (Don't
-re-run the bare `mise run cluster:create`; on tbx it refuses over an existing cluster.)
+(Don't re-run the bare `mise run cluster:create`; on tbx it refuses over an
+existing cluster. `l2announcements` and the raised rate limit are set on both
+backends so `cilium config view` reads the same everywhere; only tbx actually
+announces.)
+
+The ingress flags at the end of each block are the shared **ingress** that serves
+every `*.cloudbox.k8s.test` hostname for the rest of the day; `verify.sh` checks
+for it. The script builds them from `cilium_ingress_values()` in `scripts/lib.sh`.
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
   `kubectl get nodes -w` terminal.
