@@ -40,13 +40,18 @@ On Apple Silicon macOS, decide about tbx **before** step 2. Step 2 warms images 
 substrate you have at that moment, so installing the tbx helper afterwards means
 downloading them again. See [docs/SUBSTRATES.md](docs/SUBSTRATES.md).
 
+Broken prereqs are our bug, not yours: open an issue on this repo and we will fix it
+before the day.
+
 **If step 3 is all green, you are done.** If not, the output names what to fix; if it cannot
 be fixed, the [devcontainer lifeboat](#plan-b-devcontainer--codespaces) has you covered.
 Bring your laptop and its power supply.
 
 You do not create the cluster at home: these steps install tools and download images; the
 cluster is built in the room ([Get started](#get-started)). Step 1 offers to hook mise into
-your shell; say yes ([what that pins](#your-kubectl-gets-a-workshop-only-kubeconfig)).
+your shell; say yes. It pins the tools and points `KUBECONFIG` at
+`~/.kube/cloudbox.conf`, this workshop's cluster and nothing else
+([detail](docs/SUBSTRATES.md#your-kubeconfig)).
 Steps 2–3, like every command below, are mise tasks (`mise tasks` lists them all; the
 underlying scripts live in `scripts/`); step 1 stays a script because it is what installs
 mise in the first place.
@@ -55,7 +60,7 @@ mise in the first place.
 
 We run this together at the venue; it also works at home, offline, once the images are
 pre-pulled and the Helm charts are vendored, and they are, in `scripts/manifests/`
-([the offline story](#the-offline-story)).
+(a registry mirror the nodes pull through, [detail](docs/SUBSTRATES.md#the-offline-story)).
 
 The cluster runs on one of two substrates, real Talos VMs via tbx or Talos-in-Docker; the
 scripts detect which your machine supports and record the answer in `~/.cloudbox/substrate`,
@@ -82,6 +87,29 @@ broke something interesting? `mise run catch-up <module>` force-pushes that modu
 canonical state to your Gitea and lets ArgoCD converge. If neither substrate cooperates,
 `mise run cluster:fallback` builds a [kind lifeboat](docs/SUBSTRATES.md#the-kind-lifeboat) meeting the same
 contract. Everything below is reference.
+
+## Lab overview
+
+Labs live in `lab/`. Each module states an **outcome** ("make your cluster reach state X"),
+ships a `verify.sh` that checks it against the live cluster, and layers hints from gentle
+nudge to full solution. You choose how much to open.
+
+| Module | Topic | Type | Visible win |
+|---|---|---|---|
+| [00-setup](lab/00-setup) | Preflight & environment | core | `install.sh --check` all green |
+| [01-cluster](lab/01-cluster) | Talos + Cilium: you now own a cloud | core | nodes `Ready`, Cilium green |
+| [02-gitops](lab/02-gitops) | Gitea + ArgoCD, bootstrap the platform tree | core | edit → push → watch ArgoCD converge |
+| [03-data](lab/03-data) | CloudNativePG + RustFS via GitOps | core | `psql` into your own DBaaS; presigned URL works |
+| [04-self-service](lab/04-self-service) | Crossplane v2 compositions | core | one YAML → whole app stack appears |
+| [05-debug-with-ai](lab/05-debug-with-ai) | Fault injection + AI-assisted diagnosis | core | found and fixed the seeded fault |
+| [06-serverless](lab/06-serverless) | Knative Serving + Kourier | stretch | curl a scale-from-zero URL |
+| [07-ci](lab/07-ci) | Argo Workflows + BuildKit + Zot | stretch | in-cluster image build goes green |
+| [08-portal](lab/08-portal) | Cloudbox Console: a portal you can read (+ Backstage demo) | stretch | create a database from a form, prove it with kubectl |
+| [09-capstone](lab/09-capstone) | Capstone: event-driven picture pipeline (Knative Eventing) | stretch | upload a photo → watch a resizer scale from zero → thumbnail + trace |
+| [10-day2-ops](lab/10-day2-ops) | Day-2 operations: roll back a bad release | stretch | `git revert` as the durable fix, with kagent optionally assisting the diagnosis |
+
+Core modules are the plan. Stretch modules are for the fast 20%, and for your couch
+afterwards. Canonical end-states live in `solutions/`.
 
 ## What we're building
 
@@ -154,52 +182,12 @@ will get, and every module after 01 is identical on both. Force it with
 helper install and its macOS kernel-panic warning, hypervisor selection, what writes to
 `/etc/hosts` and what happens if you decline the password, and the kind lifeboat.
 
-## The offline story
-
-The offline guarantee, on both substrates, is a registry mirror the nodes pull through: on
-the Docker path a `cloudbox-mirror` container on port 5001, on the tbx path talos-box's own
-mirror (`tbx cache warm` fills `~/.talosbox/cache` and tbxd serves it to the VMs at the
-cluster gateway). On tbx, step 2 also warms the Talos disk image (`tbx cache pull`, 95 MB on
-arm64, 204 MB on amd64); step 3 asserts a complete `disk.raw` is in `~/.talosbox/cache` and
-grades the images with `tbx cache warm --check` (use `--check --deep` before you travel). At
-the venue, `tbx mirror offline on` stops tbx's mirror fetching upstream, so a missing image
-surfaces as a mirror miss rather than being quietly filled over the WiFi; the nodes keep
-`skipFallback: false`, so the pull then goes direct, slowly and visibly.
-
-One trade-off: tbx's store serves VMs only, so on a tbx laptop the Talos-in-Docker fallback
-is **not** offline-ready unless you also run `CLOUDBOX_SUBSTRATE=docker mise run init` at
-home (needs Docker, ~7.5 GB more).
-
-## Your `kubectl` gets a workshop-only kubeconfig
-
-Step 1 offers to hook [mise](https://mise.jdx.dev/) into your shell. **Say yes.** Besides
-putting the pinned tools on your PATH, it makes `KUBECONFIG` point at
-**`~/.kube/cloudbox.conf`** while you are inside this repo: this workshop's cluster and
-nothing else, so tearing it down leaves nothing for `kubectl` to silently fall through to,
-and your own contexts are never modified. `echo $KUBECONFIG` shows which file you are on.
-Decline and everything lands in `~/.kube/config` as it always did; the workshop still works,
-and the scripts refuse to touch a non-workshop context either way. Just don't do half of
-each: scripts through `mise run` / `mise exec` plus bare `kubectl` in a shell that never got
-the pin puts your cluster and your terminal on two different files.
-`./scripts/install.sh --check` tells you which side you are on.
-
-## Hardware: honest numbers
-
-| | tbx (real Talos VMs) | Docker (Talos-in-Docker) |
-|---|---|---|
-| Minimum | 16 GB RAM, 4 cores, 40 GB free | 16 GB RAM with **≥10 GB and ≥4 CPUs to Docker**, 40 GB free |
-| Comfortable | 32 GB | 32 GB |
-| What you get | real `LoadBalancer` VIPs, a real L2 segment | the same labs, the same URLs, via published ports |
-
-The full platform idles at roughly 8 GB inside the cluster; 16 GB machines fit, but close
-your Electron zoo. On Docker: OrbStack, or a Docker Desktop with a raised memory limit; WSL2
-users raise it in `.wslconfig`. On tbx the VM sizes are pins (`TBX_CP_MEMORY` /
-`TBX_WORKER_MEMORY` in `scripts/versions.env`): a boot ceiling, not a permanent reservation.
-talos-box balloons memory back out of a running node when the host comes under pressure,
-which keeps the laptop alive and means a hungry browser can shrink your cluster mid-module.
-Close the zoo anyway.
-
 ## Platform support matrix
+
+16 GB RAM, 4 cores and 40 GB free is the floor on both substrates (on Docker, with at
+least 10 GB and 4 CPUs given to Docker itself); 32 GB is comfortable, and the full
+platform idles at roughly 8 GB inside the cluster. Details, and what each substrate buys
+you, are in [docs/SUBSTRATES.md](docs/SUBSTRATES.md#hardware).
 
 | Platform | Substrate | Support |
 |---|---|---|
@@ -210,29 +198,6 @@ Close the zoo anyway.
 | GitHub Codespaces / devcontainer | Docker | the lifeboat, tested weekly in CI |
 
 On Linux, watch out for firewalld/nftables interference on either substrate.
-
-## Lab overview
-
-Labs live in `lab/`. Each module states an **outcome** ("make your cluster reach state X"),
-ships a `verify.sh` that checks it against the live cluster, and layers hints from gentle
-nudge to full solution. You choose how much to open.
-
-| Module | Topic | Type | Visible win |
-|---|---|---|---|
-| [00-setup](lab/00-setup) | Preflight & environment | core | `install.sh --check` all green |
-| [01-cluster](lab/01-cluster) | Talos + Cilium: you now own a cloud | core | nodes `Ready`, Cilium green |
-| [02-gitops](lab/02-gitops) | Gitea + ArgoCD, bootstrap the platform tree | core | edit → push → watch ArgoCD converge |
-| [03-data](lab/03-data) | CloudNativePG + RustFS via GitOps | core | `psql` into your own DBaaS; presigned URL works |
-| [04-self-service](lab/04-self-service) | Crossplane v2 compositions | core | one YAML → whole app stack appears |
-| [05-debug-with-ai](lab/05-debug-with-ai) | Fault injection + AI-assisted diagnosis | core | found and fixed the seeded fault |
-| [06-serverless](lab/06-serverless) | Knative Serving + Kourier | stretch | curl a scale-from-zero URL |
-| [07-ci](lab/07-ci) | Argo Workflows + BuildKit + Zot | stretch | in-cluster image build goes green |
-| [08-portal](lab/08-portal) | Cloudbox Console: a portal you can read (+ Backstage demo) | stretch | create a database from a form, prove it with kubectl |
-| [09-capstone](lab/09-capstone) | Capstone: event-driven picture pipeline (Knative Eventing) | stretch | upload a photo → watch a resizer scale from zero → thumbnail + trace |
-| [10-day2-ops](lab/10-day2-ops) | Day-2 operations: roll back a bad release | stretch | `git revert` as the durable fix, with kagent optionally assisting the diagnosis |
-
-Core modules are the plan. Stretch modules are for the fast 20%, and for your couch
-afterwards. Canonical end-states live in `solutions/`.
 
 ## Using AI assistants
 
@@ -300,12 +265,6 @@ Software Architect at NextGentel and Lead Organizer for GDG Bergen
 Platform maker, dream awaker | CNCF Ambassador | Google Developer Expert | Grafana Champion
 | Co-host of Plattformpodden | Platform Engineer in Norwegian Government | Open Source
 Maintainer
-
-## Getting help
-
-- **Before the workshop:** open an issue on this repo; broken prereqs are our bug, not yours.
-- **During the workshop:** sticky notes signal silently (red = stuck); the two presenters cover the room, and recurring questions get answered to everyone.
-- **After:** everything here is public and pinned. The `javazone-2026` tag will mark the state we shipped.
 
 ## License
 

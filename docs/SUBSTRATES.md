@@ -144,3 +144,48 @@ environment variable delete a live Talos cluster's hostnames. Once proved, `kind
 back into `~/.cloudbox/substrate` immediately, so a retry after a declined sudo needs no
 override at all. The teardown exits non-zero whenever anything is left; it needs Docker
 running (it asks the daemon for the containers) but neither `kind` nor `kubectl` on `PATH`.
+
+## The offline story
+
+The offline guarantee, on both substrates, is a registry mirror the nodes pull through: on
+the Docker path a `cloudbox-mirror` container on port 5001, on the tbx path talos-box's own
+mirror (`tbx cache warm` fills `~/.talosbox/cache` and tbxd serves it to the VMs at the
+cluster gateway). On tbx, step 2 also warms the Talos disk image (`tbx cache pull`, 95 MB on
+arm64, 204 MB on amd64); step 3 asserts a complete `disk.raw` is in `~/.talosbox/cache` and
+grades the images with `tbx cache warm --check` (use `--check --deep` before you travel). At
+the venue, `tbx mirror offline on` stops tbx's mirror fetching upstream, so a missing image
+surfaces as a mirror miss rather than being quietly filled over the WiFi; the nodes keep
+`skipFallback: false`, so the pull then goes direct, slowly and visibly.
+
+One trade-off: tbx's store serves VMs only, so on a tbx laptop the Talos-in-Docker fallback
+is **not** offline-ready unless you also run `CLOUDBOX_SUBSTRATE=docker mise run init` at
+home (needs Docker, ~7.5 GB more).
+
+## Your kubeconfig
+
+Step 1 offers to hook [mise](https://mise.jdx.dev/) into your shell. **Say yes.** Besides
+putting the pinned tools on your PATH, it makes `KUBECONFIG` point at
+**`~/.kube/cloudbox.conf`** while you are inside this repo: this workshop's cluster and
+nothing else, so tearing it down leaves nothing for `kubectl` to silently fall through to,
+and your own contexts are never modified. `echo $KUBECONFIG` shows which file you are on.
+Decline and everything lands in `~/.kube/config` as it always did; the workshop still works,
+and the scripts refuse to touch a non-workshop context either way. Just don't do half of
+each: scripts through `mise run` / `mise exec` plus bare `kubectl` in a shell that never got
+the pin puts your cluster and your terminal on two different files.
+`./scripts/install.sh --check` tells you which side you are on.
+
+## Hardware
+
+| | tbx (real Talos VMs) | Docker (Talos-in-Docker) |
+|---|---|---|
+| Minimum | 16 GB RAM, 4 cores, 40 GB free | 16 GB RAM with **≥10 GB and ≥4 CPUs to Docker**, 40 GB free |
+| Comfortable | 32 GB | 32 GB |
+| What you get | real `LoadBalancer` VIPs, a real L2 segment | the same labs, the same URLs, via published ports |
+
+The full platform idles at roughly 8 GB inside the cluster; 16 GB machines fit, but close
+your Electron zoo. On Docker: OrbStack, or a Docker Desktop with a raised memory limit; WSL2
+users raise it in `.wslconfig`. On tbx the VM sizes are pins (`TBX_CP_MEMORY` /
+`TBX_WORKER_MEMORY` in `scripts/versions.env`): a boot ceiling, not a permanent reservation.
+talos-box balloons memory back out of a running node when the host comes under pressure,
+which keeps the laptop alive and means a hungry browser can shrink your cluster mid-module.
+Close the zoo anyway.
