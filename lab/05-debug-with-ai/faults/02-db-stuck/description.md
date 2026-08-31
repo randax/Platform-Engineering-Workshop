@@ -1,9 +1,9 @@
-# Fault 02 — spoiler
+# Fault 02: spoiler
 
 **Symptom:** CNPG cluster `orders-db` in `faultlab-02` stuck initializing forever; its
 first pod (or init job) `Pending`.
 
-**Root cause:** `storageClass: localpath` — the class is called `local-path`. The PVC
+**Root cause:** `storageClass: localpath`; the class is called `local-path`. The PVC
 references a StorageClass that doesn't exist, so no volume is ever provisioned, so the
 pod can never schedule.
 
@@ -19,7 +19,7 @@ pod can never schedule.
 5. Cross-check reality: `kubectl get storageclass` → the real name is `local-path`.
 
 **The twist (why there's a fix.sh):** editing the Cluster's `storageClass` in place does
-NOT fix it — the PVC already exists and a PVC's storage class is immutable. You must
+NOT fix it. The PVC already exists, and a PVC's storage class is immutable. You must
 delete the cluster (and PVC) and recreate with the right class. `fix.sh` does exactly
 that. This "the obvious edit doesn't propagate" pattern is everywhere in storage.
 

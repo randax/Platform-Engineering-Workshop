@@ -1,6 +1,6 @@
-# Scenario 03 — spoiler
+# Scenario 03: spoiler
 
-**Symptom:** *almost none — and that is the scenario.* The release rolls out, the new
+**Symptom:** *almost none, and that is the scenario.* The release rolls out, the new
 pods go `1/1 Running`, `./verify.sh` reports the live workload confirmed, and the only
 thing that is wrong is what the pods are now pulling:
 
@@ -15,8 +15,8 @@ kubectl -n demo get pods -l app=demo-web \
 `ImagePullBackOff`, and a bad release is live.
 
 (That is the **docker/kind** shape, and tbx *with* internet. On tbx the pull is a
-mirror miss that falls through to the real Docker Hub — see "why nothing broke"
-below — so offline, or with `tbx mirror offline on` and no WiFi, the tbx symptom IS
+mirror miss that falls through to the real Docker Hub; see "why nothing broke"
+below. So offline, or with `tbx mirror offline on` and no WiFi, the tbx symptom IS
 `ImagePullBackOff`. `verify.sh` accepts either outcome; the lesson is the same.)
 
 **Root cause:** the release commit changed only the image registry host from `ghcr.io`
@@ -30,14 +30,14 @@ the venue. See the [root repository guide](../../../../CLAUDE.md).
 both of them things you built in module 00 and 01:
 
 1. `cloudbox-init.sh` copies every pre-pulled image into `cloudbox-mirror` under its
-   **registry-stripped repository path** — `ghcr.io/knative/helloworld-go@sha256:c2b7…`
+   **registry-stripped repository path**: `ghcr.io/knative/helloworld-go@sha256:c2b7…`
    is stored as `knative/helloworld-go`, with no record of which registry it came from.
 2. `create-cluster.sh` points the nodes' **docker.io** mirror (along with ghcr.io,
    quay.io, registry.k8s.io and the rest) at that same local registry.
 
 So `docker.io/knative/helloworld-go@sha256:c2b7…` resolves to
-`GET /v2/knative/helloworld-go/manifests/sha256:c2b7…?ns=docker.io` on your own mirror —
-and **hits**. Verified on 2026-08-17 from the mirror's access log while a node pulled the
+`GET /v2/knative/helloworld-go/manifests/sha256:c2b7…?ns=docker.io` on your own mirror,
+and it **hits**. Verified on 2026-08-17 from the mirror's access log while a node pulled the
 poisoned reference:
 
 ```
@@ -46,7 +46,7 @@ poisoned reference:
 "GET  /v2/knative/helloworld-go/blobs/sha256:d17f077a…?ns=docker.io"     200 "containerd/v2.2.6"
 ```
 
-That is not the documented `skipFallback: false` fallback to the real Docker Hub — the
+That is not the documented `skipFallback: false` fallback to the real Docker Hub: the
 pull never left your laptop. The mirror is keyed by *path*, so it answers for any
 registry host you name. The pull would also succeed with no mirror at all, as long as
 there is internet: the same digest exists on Docker Hub.
@@ -54,14 +54,14 @@ there is internet: the same digest exists on Docker Hub.
 **So where is the outage?** In the two places your laptop is not:
 
 - Any image whose path is **not** in the mirror. Change a digest, a tag, or a
-  repository path along with the registry, and there is nothing local to answer — then
+  repository path along with the registry, and there is nothing local to answer. Then
   it is Docker Hub or nothing, on shared conference WiFi, against **one** anonymous
   quota for the whole room (100 pulls / 6 hours, `docs/RESEARCH.md`).
 - Any cluster rebuilt without `cloudbox-init.sh`, or any teammate's machine with a
   differently-populated mirror. "Works here" is not a property of the manifest.
 
 This is the honest shape of most registry-policy violations: they do not fail, they
-*stop being guaranteed*. The guardrail is therefore not a crashing pod — it is the
+*stop being guaranteed*. The guardrail is therefore not a crashing pod. It is the
 repository rule (`verify.sh` requires every `image:` in this manifest to start with
 `ghcr.io/`) plus a revert.
 
@@ -77,7 +77,7 @@ repository rule (`verify.sh` requires every `image:` in this manifest to start w
    **On tbx** the story is the opposite, and arguably the better lesson. talos-box's
    mirror is keyed by *registry* (`?ns=docker.io` reads a `docker.io/` store, and
    `cloudbox-init.sh` warmed the image under `ghcr.io/`), so the poisoned reference is a
-   **miss** — and it still pulled, because the nodes' mirror entries keep
+   **miss**, and it still pulled, because the nodes' mirror entries keep
    `skipFallback: false`: the miss fell through to the real Docker Hub. The pull *time*
    in the Event is the tell (an 8 MB image over venue WiFi is not fast), and
    `tbx doctor`'s mirror line / tbxd's log show the miss. The commit was invisible
@@ -93,8 +93,8 @@ repository rule (`verify.sh` requires every `image:` in this manifest to start w
    `git log --oneline -3 -- gitops/components/demo/demo-web.yaml` reveals the recent
    registry commit; `git show <sha>` confirms that only the registry host changed.
 
-**Canonical fix:** revert the bad Git commit and push the revert — do not edit the live
-Deployment, because ArgoCD will reconcile it back to Git.
+**Canonical fix:** revert the bad Git commit and push the revert. Do not edit the live
+Deployment; ArgoCD will reconcile it back to Git.
 
 ```bash
 git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git
@@ -111,9 +111,9 @@ Or run `./restore.sh 3`, which performs that same forward `git revert` workflow.
 match this module's baseline byte-for-byte, and requires a completed, stable `demo-web`
 rollout. While the commit is present, `verify.sh` says so and reports which live symptom
 it found: the mirror-served success above, or a genuine `ImagePullBackOff` if you are on
-a machine or network where the pull really does fail. Both are the same verdict — revert.
+a machine or network where the pull really does fail. Both are the same verdict: revert.
 
 **Why `cloudbox/demo-app` is a dead end:** it is only Go SOURCE for module 07's
 in-cluster build (seeded by `scripts/seed-gitea.sh`). Nothing in Kubernetes syncs it
-directly, and it carries no deploy manifests — investigating it will not explain this
+directly, and it carries no deploy manifests; investigating it will not explain this
 symptom.

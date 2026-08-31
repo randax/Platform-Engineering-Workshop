@@ -309,7 +309,7 @@ Colima 2026-08-17). A plain bridge or VM gateway proxies nothing, so start Ollam
 inside the cluster:
 
 ```bash
-# any pod with a shell will do — the kagent images are distroless, Gitea is not
+# any pod with a shell will do; the kagent images are distroless, Gitea is not
 kubectl -n gitea exec deploy/gitea -c gitea -- wget -qO- \
   "http://$(kubectl -n kagent get cm cloudbox-host -o jsonpath='{.data.gateway}'):11434/api/version"
 ```
@@ -364,7 +364,7 @@ fact is worth more than the diagnosis.
 > cloudbox-portal v0.2.1 cannot read kagent 0.9.12's frames and wrongly reports an
 > unrecognized format.
 
-### Part 2: one `ModelConfig` push, and it actually diagnoses
+### Part 2: one `ModelConfig` push to a hosted model
 
 Part 2 is the workshop's one documented exception to the offline rule: it needs the
 network, because small local models can't do multi-step triage. If the network is
@@ -393,7 +393,7 @@ a model currently marked free at
 `deepseek-v4-flash-free`, `mimo-v2.5-free`, `nemotron-3-ultra-free`):
 
 ```bash
-cd platform && mise trust   # the same clone from above
+# in the same platform clone as above (cd back into it if you left)
 $EDITOR gitops/components/kagent/kagent.yaml   # find `kind: ModelConfig`, replace spec:
 ```
 
@@ -414,9 +414,9 @@ git push
 ```
 
 Wait for ArgoCD to converge, then open a new investigation on the same fault. Same
-evidence, same read-only tool server; now the verdict comes with a real hypothesis and
-an explicit kill-test. Verify that kill-test against the live cluster yourself, then
-`git revert` and push.
+evidence, same read-only tool server; a model that can hold the thread across tool
+calls should now return a real hypothesis and an explicit kill-test. Verify that
+kill-test against the live cluster yourself, then `git revert` and push.
 
 In rehearsal the one-field push reached the live ModelConfig within 20 s and kagent
 rolled a new `k8s-agent` pod: Git is the write path for the agent's own brain too.

@@ -7,10 +7,10 @@ Your cluster builds its own container images: an Argo Workflow runs BuildKit
 in-cluster Gitea, pushes it to your in-cluster Zot registry, and a Deployment runs it.
 Git, build, registry, deploy: all on your laptop's cloud.
 
-> **Honesty note:** this is the least-rehearsed path in the workshop (rootless
-> BuildKit on Talos is pioneer territory: nobody has published this combo). It's a
-> presenter demo first, self-paced lab second. If it fights you, watch the demo, file
-> the scars, move on.
+> **Honesty note:** rootless BuildKit on Talos is pioneer territory (nobody has
+> published this combo). It has passed our rehearsals, but it is the path most
+> sensitive to machine and runtime differences: a presenter demo first, self-paced
+> lab second. If it fights you, watch the demo, file the scars, move on.
 
 ## Why this matters
 
@@ -39,7 +39,7 @@ build → push → deploy closes inside your platform, the loop is yours.
      MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
    fi
 
-   # --platform: ONE architecture — the NODES' (node_arch asks the backend: the
+   # --platform: ONE architecture, the NODES' (node_arch asks the backend: the
    # host CPU on tbx, the Docker daemon on docker; a Rosetta shell's uname lies).
    # On tbx the warmed store only holds that arch's blobs, so a full-index copy
    # would reach for the internet.
@@ -67,7 +67,7 @@ build → push → deploy closes inside your platform, the loop is yours.
    ( mise x crane@0.21.9 -- crane copy --insecure --platform "linux/${NODE_ARCH}" \
        "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0 & \
      pid=$!; ( sleep 45; kill "$pid" 2>/dev/null ) & wait "$pid" ) \
-     || echo "the mirror did not answer — use docker.io/library/busybox:1.37.0 as the source instead"
+     || echo "the mirror did not answer; use docker.io/library/busybox:1.37.0 as the source instead"
    ```
    </details>
 4. Submit a build with [`workflow-run.yaml`](workflow-run.yaml) and follow it to
@@ -138,7 +138,7 @@ git add . && git commit -m "module 07: zot + argo-workflows" && git push
 # wait for both apps Healthy in ArgoCD
 
 # seed YOUR registry with the pre-pulled base image (host → Zot ingress),
-# from your own mirror — same MIRROR selection as step 3, one platform
+# from your own mirror, same MIRROR selection as step 3, one platform
 MIRROR=localhost:5001
 [ "$(cat ~/.cloudbox/substrate)" = tbx ] && \
   MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
