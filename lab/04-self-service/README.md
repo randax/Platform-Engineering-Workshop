@@ -134,7 +134,7 @@ must fit in 63 characters, and a hyphen in the *namespace* makes the split ambig
 The XRD caps `metadata.name` at 40, and that is as far as a schema can go: a CEL
 validation rule cannot read `metadata.namespace`. The Console enforces the pair in
 code; `kubectl apply` of a hand-written XR does not. Keep namespaces short and
-hyphen-free. Details in [docs/HAZARDS.md](../../docs/HAZARDS.md).
+hyphen-free.
 
 ## Going further: the golden path
 
