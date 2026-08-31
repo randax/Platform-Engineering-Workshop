@@ -13,28 +13,17 @@ Five minutes on mechanics, then hands on keyboards. This section is the contract
 
 # The map: one core path, then five doors
 
-```mermaid {scale: 0.62}
-flowchart LR
-  S(["00 · setup<br>running now"]) --> C1["01 Talos + Cilium<br>20 min"]
-  C1 --> C2["02 GitOps<br>20 min"]
-  C2 --> C3["03 Data<br>20 min"]
-  C3 --> C4["04 Self-service<br>20 min"]
-  C4 --> C5["05 Debug it<br>15 min"]
-  C5 --> C6["06 Serverless<br>15 min"]
-  C6 --> C9["09 Capstone<br>25 min"]
-  C9 --> D{"the last 45<br>pick a door"}
-  D --> D0["door 0 · start here<br>07 CI · 08 Console · 10 day-2"]
-  D --> D1["door 1 · app dev"]
-  D --> D2["door 2 · platform"]
-  D --> D3["door 3 · security"]
-  D --> D4["door 4 · infra"]
-  classDef core fill:#0b2b3a,stroke:#38bdf8,color:#e2e8f0;
-  classDef door fill:#10231c,stroke:#059669,color:#d1fae5;
-  classDef pick fill:transparent,stroke:#94a3b8,color:#cbd5e1;
-  class S,C1,C2,C3,C4,C5,C6,C9 core;
-  class D0,D1,D2,D3,D4 door;
-  class D pick;
-```
+| # | Module | Time |
+|---|--------|------|
+| 00 | Setup & pre-flight | running now, in the background |
+| 01 | Talos + Cilium — your own cloud | 20 min |
+| 02 | GitOps — Gitea + ArgoCD | 20 min |
+| 03 | Data — Postgres + S3 | 20 min |
+| 04 | Self-service — Crossplane v2 | 20 min |
+| 05 | Debug it (with or without AI) | 15 min |
+| 06 | Serverless — Knative | 15 min |
+| 09 | **Capstone** — the picture pipeline | 25 min |
+| — | **Five doors**, self-paced | the last 45 |
 
 <!--
 THIS TABLE IS THE DAY'S ONLY TIMELINE — every other slide's timebox is derived from it, so if a number moves, move it here first.
@@ -46,6 +35,51 @@ That leaves the last 45 for a choice of five doors. Door 0 is the one to recomme
 Expectations management, said out loud: "We planned half of what fits. If you only finish the core, you've built a real platform. The doors are for the final block — and for your couch afterwards; nothing depends on them and everything is public."
 
 Every timebox here is a soft target — we walk the solution when the timer ends regardless, and catch-up.sh absorbs the rest. The door block is deliberately the day's buffer: it grows if we run fast and shrinks if we don't. The close never moves — hard stop 10 minutes before the end, and we finish together.
+-->
+
+---
+
+# Then the day forks: five doors
+
+<div class="doors mt-5">
+  <div class="door start">
+    <div class="dnum">0</div>
+    <div class="dname">Start here</div>
+    <div class="dwhat">CI, the Console, day-2 ops</div>
+    <div class="dlogos"><Logo name="argo-workflows" size="1.1rem"/><Logo name="cloudbox" size="1.1rem"/><Logo name="kagent" size="1.1rem"/></div>
+  </div>
+  <div class="door">
+    <div class="dnum">1</div>
+    <div class="dname">App dev</div>
+    <div class="dwhat">be the product team</div>
+    <div class="dlogos"><Logo name="crossplane" size="1.1rem"/><Logo name="nats" size="1.1rem"/><Logo name="buildkit" size="1.1rem"/></div>
+  </div>
+  <div class="door">
+    <div class="dnum">2</div>
+    <div class="dname">Platform</div>
+    <div class="dwhat">author a capability</div>
+    <div class="dlogos"><Logo name="cert-manager" size="1.1rem"/><Logo name="strimzi" size="1.1rem"/><Logo name="kafka" size="1.1rem"/></div>
+  </div>
+  <div class="door">
+    <div class="dnum">3</div>
+    <div class="dname">Security</div>
+    <div class="dwhat">zero trust, for real</div>
+    <div class="dlogos"><Logo name="cilium" size="1.1rem"/><Logo name="zot" size="1.1rem"/></div>
+  </div>
+  <div class="door">
+    <div class="dnum">4</div>
+    <div class="dname">Infra</div>
+    <div class="dwhat">the metal layer</div>
+    <div class="dlogos"><Logo name="talos" size="1.1rem"/><Logo name="cilium" size="1.1rem"/></div>
+  </div>
+</div>
+
+<div class="mt-6 text-center text-base opacity-80">Take <strong>door 0</strong> unless you already know which one you want. You can switch at any time.</div>
+
+<!--
+Pitch this in under a minute, and do not sell all five equally: decision paralysis is the failure mode of a multi-track ending. Lead with door 0 as the default and name it as the default out loud, then one line each for the rest.
+
+Doors are not a commitment. Anyone can switch, and nothing later depends on which one they picked. The detail, including the known traps per door, is in adventures/ in the repo, and we come back to this at the pivot with the full briefing.
 -->
 
 ---

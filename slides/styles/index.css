@@ -539,3 +539,18 @@
 .promo img{width:100%;display:block;border-radius:0.5rem;
   border:1px solid rgba(148,163,184,0.35);box-shadow:0 14px 34px rgba(2,6,23,0.55);}
 .promo figcaption{margin-top:0.5rem;font-size:0.7rem;color:#94a3b8;}
+
+/* Five doors, as doors: tall panels side by side rather than another stack of
+   rows. Door 0 is the default, so it is the one that looks lit. */
+.doors{display:grid;grid-template-columns:repeat(5,1fr);gap:0.8rem;}
+.doors .door{display:flex;flex-direction:column;align-items:center;text-align:center;gap:0.3rem;
+  padding:1rem 0.6rem 0.9rem;border-radius:0.7rem 0.7rem 0.25rem 0.25rem;
+  border:1px solid rgba(148,163,184,0.3);border-bottom:3px solid rgba(148,163,184,0.35);
+  background:rgba(148,163,184,0.06);}
+.doors .door.start{border-color:var(--jz-accent);border-bottom-color:var(--jz-accent);
+  background:rgba(56,189,248,0.14);}
+.doors .dnum{font-size:1.5rem;font-weight:800;line-height:1;color:#94a3b8;}
+.doors .door.start .dnum{color:var(--jz-accent);}
+.doors .dname{font-size:0.86rem;font-weight:800;color:#e2e8f0;}
+.doors .dwhat{font-size:0.66rem;color:#94a3b8;line-height:1.3;min-height:2.2em;}
+.doors .dlogos{display:flex;gap:0.25rem;margin-top:0.15rem;flex-wrap:wrap;justify-content:center;}
