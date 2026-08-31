@@ -103,6 +103,38 @@ Also plug the ecosystem around this audience: CNCF meetups, GDG Bergen, and Plat
 layout: cover
 ---
 
+# One more thing
+
+<div class="cnd">
+  <img src="/images/cnd-2026.png" alt="Cloud Native Days Norway 2026 logo: a Viking longship crewed by CNCF project mascots" />
+  <div class="cndtext">
+    <div class="cndname">Cloud Native Days Norway 2026</div>
+    <div class="cndtag">Real Cases. Real People. Real Cloud Native.</div>
+    <div class="cndwhen">26–27 October 2026 · Kulturhuset i Bergen</div>
+    <div class="cndurl">2026.cloudnativedays.no</div>
+  </div>
+</div>
+
+<div class="navstats mt-6">
+  <div><b>2</b><span>days</span></div>
+  <div><b>3</b><span>tracks</span></div>
+  <div><b>9</b><span>workshops</span></div>
+</div>
+
+<!--
+The nerdiest tech conference in Norway, and the natural next step for anyone who
+enjoyed today: two days in Bergen, three tracks, nine workshops, tickets from about
+1 070 kr excluding VAT.
+
+Øyvind organises in Bergen, so say it as an invitation rather than an advert. The honest
+pitch is that everything on today's stack came from that community, and the conference is
+where you meet the people who run it in production.
+
+Details and tickets: 2026.cloudnativedays.no.
+-->
+
+---
+
 # Thank you
 
 **Your laptop. Your cloud. Your terms.**

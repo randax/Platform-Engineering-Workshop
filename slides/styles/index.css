@@ -575,3 +575,14 @@
 .slidev-layout.buildbuy{display:grid;align-content:center;}
 .buildbuy h1{margin-top:0;}
 .buildbuy ul{margin-top:0.6rem;}
+
+/* Cloud Native Days Norway, the last slide before thank-you. The mark is cropped
+   from the conference's own OpenGraph image and vendored like every other asset. */
+.cnd{display:flex;align-items:center;justify-content:center;gap:2rem;margin-top:1.6rem;}
+.cnd img{width:11rem;height:11rem;border-radius:1rem;flex:none;}
+.cndtext{text-align:left;}
+.cndname{font-size:1.9rem;font-weight:800;color:#e2e8f0;line-height:1.15;}
+.cndtag{margin-top:0.35rem;font-size:1rem;font-weight:700;color:var(--jz-accent);}
+.cndwhen{margin-top:0.6rem;font-size:0.95rem;color:#cbd5e1;}
+.cndurl{margin-top:0.5rem;font-size:0.95rem;font-weight:700;color:#e2e8f0;
+  font-family:var(--slidev-code-font-family,ui-monospace,monospace);}
