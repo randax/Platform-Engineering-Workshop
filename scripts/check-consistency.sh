@@ -713,6 +713,26 @@ else
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] || true
 
+# --- 12e. core/stretch labels agree with PLAN.md ------------------------------
+# PLAN.md's schedule table is the room's truth. Rehearsal 9 (finding 03) found
+# lab/README calling modules 06 and 09 stretch where the schedule runs them as
+# core — the median participant would have skipped the capstone the day builds
+# toward. A module PLAN.md schedules as core must read core in lab/README's
+# Type column, and vice versa.
+before_fail=${FAILURES}
+plan_core="$(awk -F'|' '/^\| [0-9]:[0-9][0-9] \|/ {
+  if ($5 ~ /core/ && match($4, /\*\*[0-9][0-9]/)) print substr($4, RSTART+2, 2)
+}' PLAN.md | sort -u | tr '\n' ' ')"
+lab_core="$(awk -F'|' '/^\| [0-9][0-9] \|/ {
+  gsub(/ /,"",$2); if ($5 ~ /core/) print $2
+}' lab/README.md | sort -u | tr '\n' ' ')"
+if [[ -n "${plan_core}" && "${plan_core}" == "${lab_core}" ]]; then
+  ok "core module set agrees between PLAN.md and lab/README.md (${plan_core% })"
+else
+  bad "core/stretch drift: PLAN.md schedules [${plan_core% }] as core, lab/README.md labels [${lab_core% }] — PLAN.md is the room's truth; fix the lab table"
+fi
+[[ "${FAILURES}" -eq "${before_fail}" ]] || true
+
 # --- 13. CI project fixtures obey the console's own project-name rule --------
 # The console refuses a project name containing '-' (kube.ValidProjectName /
 # CheckProjectName: the Knative host is "<app>-<project>" in ONE DNS label, so a

@@ -24,7 +24,8 @@ the end of the day. The full component list and why each one beat its alternativ
 Conference WiFi carries keystrokes, not gigabytes: setup pulls roughly 7.5 GB of images
 (7.7 GB on x86-64), plus a 1.4 GB local AI model for module 10 if Ollama is installed,
 so run it at home. You need Docker (Desktop, OrbStack or docker-ce)
-with at least 10 GB and 4 CPUs, unless you use tbx, which needs none. On Apple Silicon,
+with at least 10 GB memory, 4 CPUs and a 50 GB disk limit, unless you use tbx, which
+needs none. On Apple Silicon,
 decide about tbx *before* `mise run init`: it warms images for the substrate you have at that
 moment, and installing the helper afterwards downloads them twice
 ([docs/SUBSTRATES.md](docs/SUBSTRATES.md)).
