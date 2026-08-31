@@ -147,12 +147,12 @@ If the room is running late, this slide can be read in twenty seconds — it is 
 
 # Five tips, then we start
 
-<div class="grid grid-cols-2 gap-3 mt-4">
-  <div class="principle"><div class="ico"><span class="svgi i-target"></span></div><div class="name">Try before you open a hint</div><div class="tie">the labs give outcomes on purpose; a wrong guess teaches more than a right paste</div></div>
-  <div class="principle"><div class="ico"><span class="svgi i-fast-forward"></span></div><div class="name">Falling behind is designed for</div><div class="tie"><code>mise run catch-up &lt;n&gt;</code> is not failure, it is the safety net</div></div>
-  <div class="principle"><div class="ico"><span class="svgi i-book-open"></span></div><div class="name">Explain it to your neighbour</div><div class="tie">a fix you cannot explain is not finished</div></div>
-  <div class="principle"><div class="ico"><span class="svgi i-puzzle"></span></div><div class="name">Ask "why this, not that?"</div><div class="tie">every pick here beat a rejected alternative — make us defend them</div></div>
-  <div class="principle col-span-2"><div class="ico"><span class="svgi i-sparkles"></span></div><div class="name">Don't just hand it to your AI companion</div><div class="tie">agents are welcome all day, as a <strong>tutor, not a chauffeur</strong> — a lab your agent solved is a lab you didn't learn, and you can't take that home</div></div>
+<div class="tips mt-5">
+  <div class="tip"><span class="tno">1</span><span class="tt"><b>Try before you open a hint.</b> The labs give outcomes on purpose. A wrong guess teaches more than a right paste, and the hints are free and uncounted.</span></div>
+  <div class="tip"><span class="tno">2</span><span class="tt"><b>Falling behind is designed for.</b> <code>mise run catch-up &lt;n&gt;</code> is the safety net, not failure.</span></div>
+  <div class="tip"><span class="tno">3</span><span class="tt"><b>Explain it to your neighbour.</b> A fix you cannot explain is not finished.</span></div>
+  <div class="tip"><span class="tno">4</span><span class="tt"><b>Ask "why this, not that?"</b> Every pick here beat a rejected alternative. Make us defend them.</span></div>
+  <div class="tip last"><span class="tno">5</span><span class="tt"><b>Don't just hand it to your AI companion.</b> Agents are welcome all day, as a tutor rather than a chauffeur. A lab your agent solved is a lab you didn't learn, and you can't take that home.</span></div>
 </div>
 
 <div class="mt-5 text-center text-lg opacity-85">Depth beats speed. Finishing every module is <strong>not</strong> the goal.</div>
