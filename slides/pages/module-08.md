@@ -140,6 +140,7 @@ One more IA beat worth calling out: lists are for triage, detail pages are for d
 
 ---
 layout: two-cols
+class: buildbuy
 ---
 
 # Build…
@@ -172,24 +173,26 @@ Next slide: we look at Backstage live, so this isn't a straw man.
 
 ---
 
-# Interlude: Backstage, live
+# Backstage, if you outgrow this
 
-<div class="callout mt-2 mb-4">Projector demo · ~5 min · opt-in, inside the door block</div>
-
-- Catalog → template → new Gitea repo
-- → ArgoCD app → running pods
-- The template's glue is the real work
-- `backstage.yaml` stays in the catalog, try at home
+<figure class="bigshot">
+  <img src="/console/backstage-catalog.png" alt="The Backstage software catalog: services, owners and metadata across an organisation" />
+  <figcaption>The Backstage catalog. Hundreds of plugins, ownership at org scale, and an owning team to keep it fed. <span class="opacity-60">Screenshot: backstage/backstage docs, Apache-2.0.</span></figcaption>
+</figure>
 
 <!--
-Projector demo, ~5 minutes, announced at the pivot for ~3:35 and opt-in like the module-07 one. One substrate caveat for whoever drives the projector: the CNOE image is amd64-only and a tbx VM emulates nothing, so on Apple Silicon the demo cluster has to be the Docker substrate (`CLOUDBOX_SUBSTRATE=docker`); install.sh --check says so too. backstage.yaml was pre-enabled during the break after module 03. First boot is slow (~2 GB CNOE image plus a CNPG database), which is why this is a demo and not the hands-on.
+This replaces the live Backstage demo. The demo cost about five minutes of the door
+block to boot a 2 GB image and a database, and it competed with the room's own work.
 
-The loop to show: guest sign-in at http://backstage.cloudbox.k8s.test → catalog entities fed from Gitea → run a software template → chase the result through Gitea (http://gitea.cloudbox.k8s.test, a new repo appeared) → ArgoCD (http://argocd.cloudbox.k8s.test, a new Application) → pods running.
+Say the honest comparison rather than clicking through it: this is where you go when the
+Console stops fitting, and the price is the second column of the previous slide. The
+catalog and the golden-path templates are the real draw, not the UI.
 
-Narrate what to watch for: the template wires together git, CI/CD, and the catalog; that integration glue is the real, ongoing work of operating Backstage. The demo is deliberately placed AFTER attendees built the same self-service loop themselves in 04 and saw it fronted by a form minutes ago: same shape, industrial strength, industrial weight.
-
-backstage.yaml stays in the catalog, so anyone with RAM to spare can run this exact loop at home. That's the fair test of the build-vs-buy slide.
+backstage.yaml is still in the catalog. Anyone who wants it can enable it at home on the
+docker substrate, where the amd64-only image runs. Do not enable it on a tbx laptop: the
+nodes are arm64 VMs with no emulation, and it ends in exec format error.
 -->
+
 
 ---
 

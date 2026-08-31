@@ -61,3 +61,8 @@ tiny + offline).
 `local-path-provisioner` renders as a text chip (`<Logo name="localpath" text="local-path">`).
 Rancher ships no standalone mark for it, and using the Rancher logo would put the
 vendor's brand on a project that is not the vendor. A text chip is the honest option.
+
+Screenshots under `public/console/` are our own Cloudbox Console captures, except
+`backstage-catalog.png`, which is `docs/assets/software-catalog/software-catalog-home.png`
+from the Apache-2.0 backstage/backstage repository, used to show what Backstage looks
+like without booting a 2 GB image on stage.

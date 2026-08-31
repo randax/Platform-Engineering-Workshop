@@ -134,5 +134,5 @@ While people are away, this is a good moment to bring the Cloudbox Console's Wor
 
 Split the break: one of us does the projector prep below, the other sweeps for red stickies. Break time is catch-up time, and catch-up.sh 3 gets anyone fully current in ~2 minutes.
 
-Presenter prep during this break: pre-enable backstage.yaml from the catalog on the projector cluster NOW. Its first boot is slow (~2 GB image + a CNPG database) and door 0's Backstage demo needs it warm.
+No projector prep needed during this break any more: the Backstage demo is a screenshot now, so nothing has to be warmed. Use the time to sweep for red stickies.
 -->
