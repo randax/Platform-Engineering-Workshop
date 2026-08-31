@@ -555,3 +555,12 @@
   font-weight:800;color:#94a3b8;}
 .urls code{background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);
   border-radius:0.3rem;padding:0.1rem 0.4rem;color:#e2e8f0;}
+
+/* Manifest snippets. Small on purpose: the point is the SHAPE of the resource,
+   not reading it from row twelve. Every one is quoted from a file in the repo,
+   with its path underneath, so an attendee can open the real thing. */
+.snip{margin-top:0.7rem;}
+.snip pre{font-size:0.62rem!important;line-height:1.45!important;margin:0!important;}
+.snip .slidev-code{font-size:0.62rem!important;line-height:1.45!important;}
+.snipsrc{display:block;margin-top:0.3rem;font-size:0.56rem;color:#64748b;
+  font-family:var(--slidev-code-font-family,ui-monospace,monospace);}

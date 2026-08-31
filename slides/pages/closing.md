@@ -84,7 +84,7 @@ Say it plainly: "Four hours ago this was a shopping list of things you pay for. 
     The same product, on a US hyperscaler. Three bills they didn't control:
     <br>• storage + egress on every listing photo
     <br>• user data under someone else's law
-    <br>• a core service relicensed out from under them
+    <br>• a core service discontinued out from under them
   </div>
   <div class="after">
     <h3>today: owned</h3>

@@ -29,6 +29,20 @@ flowchart LR
 - You own **both** sides of the API
 - `aws rds create-db-instance`, but yours
 
+<div class="snip">
+
+```yaml
+apiVersion: platform.cloudbox.io/v1alpha1
+kind: WorkshopDatabase
+metadata:
+  name: my-db
+spec:
+  size: small     # one knob: compute, storage, HA instances
+```
+
+<span class="snipsrc">lab/04-self-service/examples/my-database.yaml</span>
+</div>
+
 <!--
 The concept: developers shouldn't need to know CNPG, storage classes, or RustFS endpoints. Platform engineering is building the abstraction. You define WHAT can be asked for (the WorkshopDatabase XRD) and HOW it's fulfilled (a Composition); developers write a 10-line resource.
 

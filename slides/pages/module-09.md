@@ -31,6 +31,26 @@ flowchart LR
 - Uploader doesn't know the resizer exists
 - It emits a **fact**; the Broker routes it
 
+<div class="snip">
+
+```yaml
+kind: Trigger
+metadata:
+  name: resize-on-upload
+spec:
+  broker: default
+  filter:
+    attributes:
+      type: dev.cloudbox.image.uploaded
+  subscriber:
+    ref:
+      kind: Service
+      name: resizer
+```
+
+<span class="snipsrc">gitops/components/picture-pipeline/picture-pipeline.yaml</span>
+</div>
+
 <!--
 The new concept is Knative Eventing: a Broker and Triggers, the open-source shape of the S3-events → SQS → Lambda pattern everyone knows from AWS.
 

@@ -59,6 +59,25 @@ git commit -am "enable rustfs" && git push
 - `gitops/apps/`: what your platform runs
 - Copy → commit → push → converge
 
+<div class="snip">
+
+```yaml
+kind: Application
+metadata:
+  name: rustfs
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  source:
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/cloudbox/platform.git
+    path: gitops/components/rustfs
+  destination:
+    namespace: rustfs
+```
+
+<span class="snipsrc">gitops/catalog/rustfs.yaml</span>
+</div>
+
 <!--
 The second mechanic to internalize, because every module from 03 onward starts with it: platform capabilities live as a catalog of ready-made ArgoCD Application manifests in gitops/catalog/. Enabling one = copying it into gitops/apps/, committing, pushing to your own Gitea. ArgoCD notices and converges.
 

@@ -9,7 +9,7 @@ transition: view-transition
 
 <div class="modlogos"><Logo name="cloudnativepg" label size="2.6rem"/> <Logo name="rustfs" label size="2.6rem"/></div>
 
-<div class="story"><span class="tag">BRUKTBY</span> &nbsp;They become their own RDS <em>and</em> S3 team: the listings database and the photo bucket, self-hosted. This module is the relicensing that forced the move.</div>
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;They become their own RDS <em>and</em> S3 team: the listings database and the photo bucket, self-hosted. This module is the discontinuation that forced the move.</div>
 
 <!--
 "Managed database" is the single most-bought cloud product, and the thing teams miss most when leaving a hyperscaler. This module makes each attendee the RDS team and the S3 team, for half an hour.
@@ -24,6 +24,26 @@ transition: view-transition
 - Provisioning, failover, backups, as K8s resources
 - Same story for S3: RustFS speaks the API
 - Less magic than the price tag suggests
+
+<div class="snip">
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: app-db
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: app
+      owner: app          # CNPG generates the secret "app-db-app"
+  storage:
+    size: 1Gi
+```
+
+<span class="snipsrc">lab/03-data/postgres-cluster.yaml</span>
+</div>
 
 <!--
 The concept: what you're buying from a hyperscaler's managed database is software that provisions, monitors, fails over, and backs up. A Kubernetes operator like CloudNativePG IS that software: the same control loop that would run behind AWS's console runs in your cluster instead. Declare a Cluster resource, get a supervised Postgres with failover and backup hooks.
