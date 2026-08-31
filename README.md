@@ -22,9 +22,11 @@ the end of the day. The full component list and why each one beat its alternativ
 ## Before the conference
 
 Conference WiFi carries keystrokes, not gigabytes: setup pulls roughly 7.5 GB of images
-(7.7 GB on x86-64), so run it at home. You need Docker (Desktop, OrbStack or docker-ce)
-with at least 10 GB and 4 CPUs, unless you use tbx, which needs none. On Apple Silicon,
-decide about tbx *before* step 2: it warms images for the substrate you have at that
+(7.7 GB on x86-64), plus a 1.4 GB local AI model for module 10 if Ollama is installed,
+so run it at home. You need Docker (Desktop, OrbStack or docker-ce)
+with at least 10 GB memory, 4 CPUs and a 50 GB disk limit, unless you use tbx, which
+needs none. On Apple Silicon,
+decide about tbx *before* `mise run init`: it warms images for the substrate you have at that
 moment, and installing the helper afterwards downloads them twice
 ([docs/SUBSTRATES.md](docs/SUBSTRATES.md)).
 
@@ -97,10 +99,10 @@ nudge to full solution. You choose how much to open.
 | [03-data](lab/03-data) | CloudNativePG + RustFS via GitOps | core | `psql` into your own DBaaS; presigned URL works |
 | [04-self-service](lab/04-self-service) | Crossplane v2 compositions | core | one YAML → whole app stack appears |
 | [05-debug-with-ai](lab/05-debug-with-ai) | Fault injection + AI-assisted diagnosis | core | found and fixed the seeded fault |
-| [06-serverless](lab/06-serverless) | Knative Serving + Kourier | stretch | curl a scale-from-zero URL |
+| [06-serverless](lab/06-serverless) | Knative Serving + Kourier | core | curl a scale-from-zero URL |
 | [07-ci](lab/07-ci) | Argo Workflows + BuildKit + Zot | stretch | in-cluster image build goes green |
 | [08-portal](lab/08-portal) | Cloudbox Console: a portal you can read (+ Backstage demo) | stretch | create a database from a form, prove it with kubectl |
-| [09-capstone](lab/09-capstone) | Capstone: event-driven picture pipeline (Knative Eventing) | stretch | upload a photo → watch a resizer scale from zero → thumbnail + trace |
+| [09-capstone](lab/09-capstone) | Capstone: event-driven picture pipeline (Knative Eventing) | core | upload a photo → watch a resizer scale from zero → thumbnail + trace |
 | [10-day2-ops](lab/10-day2-ops) | Day-2 operations: roll back a bad release | stretch | `git revert` as the durable fix, with kagent optionally assisting the diagnosis |
 
 Core modules are the plan. Stretch modules are for the fast 20%, and for your couch
@@ -125,8 +127,9 @@ screenshot is in
 
 ## Running it elsewhere
 
-The cluster runs on Talos-in-Docker by default, or on real Talos VMs with
-[talos-box](https://github.com/randax/talos-box) where the machine supports it. You do not
+The cluster runs on real Talos VMs via
+[talos-box](https://github.com/randax/talos-box) where the machine supports it, and on
+Talos-in-Docker everywhere else. You do not
 choose: the scripts detect it and `mise run preflight` prints which you will get. Which
 substrate you land on, how to pin it, the platform support matrix and the tbx helper are
 all in **[docs/SUBSTRATES.md](docs/SUBSTRATES.md)**.

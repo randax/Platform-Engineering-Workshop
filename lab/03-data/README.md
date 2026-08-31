@@ -116,8 +116,8 @@ kubectl -n demo run s3 --rm -i --restart=Never \
 (The image's `ENTRYPOINT` is the binary itself, so `--command -- /bin/sh -c` buys you a
 shell; the binary is at `/s5cmd`.)
 
-Got `s5cmd` locally (`brew install s5cmd`), or the AWS CLI, or `rclone`? Point any of
-them at the hostname instead:
+`s5cmd` is already on your PATH (dev-setup installs it, pinned via mise); the AWS CLI
+or `rclone` work the same way. Point any of them at the hostname instead:
 
 ```bash
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1

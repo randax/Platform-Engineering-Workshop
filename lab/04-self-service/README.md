@@ -139,7 +139,8 @@ hyphen-free.
 ## Going further: the golden path
 
 One example remains unused: `examples/my-application.yaml`, an `Application` XR that
-composes a workload, a database and a bucket from a single manifest. That is the shape
+composes a workload, a database and a bucket from a single manifest. It needs its own
+API first: enable `application-xr.yaml` from the catalog the same way as step 1. That is the shape
 [Nav's nais.yaml](https://nais.io) has at national scale, and adventure door 1
 (`adventures/1-app-dev.md`) starts exactly there.
 
