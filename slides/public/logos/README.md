@@ -39,6 +39,7 @@ each project's own brand assets or a permissive icon set.
 | `zot.svg` | Zot | CNCF artwork (color icon) |
 | `backstage.svg` | Backstage | CNCF artwork (color icon) |
 | `kagent.svg` | kagent | CNCF artwork (color icon) |
+| `nais.svg` | Nais (Nav's platform) | nais.io favicon; used nominatively to identify the platform |
 | `rustfs.svg` | RustFS | rustfs/console `app/icon.svg` (the square mark; the project's
   `rustfs.logo.svg` is a 6:1 wordmark and does not fit a chip) |
 | `cert-manager.svg` | cert-manager (adventure door 2) | CNCF artwork (color icon) |

@@ -37,7 +37,7 @@ const DISPLAY = {
   victoriametrics: 'VictoriaMetrics', docker: 'Docker', cloudbox: 'Cloudbox', containerd: 'containerd',
   aws: 'AWS', amazonwebservices: 'AWS', azure: 'Azure', microsoftazure: 'Azure',
   gcp: 'Google Cloud', googlecloud: 'Google Cloud',
-  rustfs: 'RustFS', kagent: 'kagent', localpath: 'local-path',
+  rustfs: 'RustFS', kagent: 'kagent', localpath: 'local-path', nais: 'Nais',
 }
 
 const file = computed(() => ALIAS[props.name] || props.name)

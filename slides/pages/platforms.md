@@ -44,7 +44,12 @@ Foreshadow: "You'll build both layers today. Modules 01–03 are the cloud. Modu
 
 # This works at national scale: Nav
 
-<div class="text-lg opacity-90 mt-2">Norway's Labour and Welfare Administration — the services a third of the country depends on — runs on a platform its own engineers built: <strong>Nais</strong> (open source, nais.io).</div>
+<div class="navlede mt-3">
+  <Logo name="nais" size="3.1rem"/>
+  <div>Norway's Labour and Welfare Administration, the services a third of the country
+  depends on, runs on a platform its own engineers built: <strong>Nais</strong>,
+  open source, <span class="opacity-70">nais.io</span>.</div>
+</div>
 
 <div class="navstats mt-6">
   <div><b>~100+</b><span>product teams served</span></div>
@@ -58,7 +63,7 @@ Foreshadow: "You'll build both layers today. Modules 01–03 are the cloud. Modu
   <div class="chev"><span class="cn">app + URL, database, bucket, queue, access policy</span><span class="cd">what the team actually gets</span></div>
 </div>
 
-<div class="mt-6 text-lg opacity-85 text-center">Sound familiar? It is the shape you build in <strong>module 04</strong>.</div>
+<div class="mt-6 text-lg opacity-85 text-center">Hold that shape. You build it yourself in <strong>module 04</strong>.</div>
 
 <!--
 [TODO Hans: replace the three headline numbers with your current firsthand figures before the workshop — these are order-of-magnitude from public Nais talks.]
@@ -84,7 +89,7 @@ Key beats:
   <div class="chev"><span class="cn">Platform as product</span><span class="cd">teams could leave, so it earns them</span><span class="cm">all of today</span></div>
 </div>
 
-<div class="mt-8 text-lg opacity-85 text-center">Each one is a decision you make yourself today.</div>
+<div class="navfoot mt-8"><Logo name="nais" size="1.5rem"/> <span>Each one is a decision you make yourself today.</span></div>
 
 <!--
 This is the map between the real world and the next four hours — each learning points at the module where the room builds its miniature version.

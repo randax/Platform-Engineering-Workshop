@@ -505,3 +505,8 @@
   background:rgba(5,150,105,0.10);border:1px solid rgba(5,150,105,0.30);}
 .navstats b{display:block;font-size:2.6rem;line-height:1;font-weight:800;color:var(--jz-run);}
 .navstats span{display:block;margin-top:0.35rem;font-size:0.78rem;color:#cbd5e1;}
+
+/* Nav lede: the mark beside the sentence that names it. */
+.navlede{display:flex;align-items:center;gap:1rem;font-size:1.05rem;opacity:0.92;}
+.navfoot{display:flex;align-items:center;justify-content:center;gap:0.7rem;
+  font-size:1.05rem;opacity:0.85;}
