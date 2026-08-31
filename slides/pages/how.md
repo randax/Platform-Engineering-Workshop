@@ -7,6 +7,31 @@ transition: view-transition
 
 <!--
 Five minutes on mechanics, then hands on keyboards. This section is the contract for the whole day — worth getting right, then never repeating.
+
+DOORS (no longer a slide of its own; the map's last row is all the room sees):
+Pitch this in under a minute, and do not sell all five equally: decision paralysis is the failure mode of a multi-track ending. Lead with door 0 as the default and name it as the default out loud, then one line each for the rest.
+
+Doors are not a commitment. Anyone can switch, and nothing later depends on which one they picked. The detail, including the known traps per door, is in adventures/ in the repo, and we come back to this at the pivot with the full briefing.
+
+THE LAB CONTRACT (no longer a slide; slide 8's five tips already told the room to try before hinting, that catch-up is the safety net, and to explain it to a neighbour):
+This is how every single module works, so learn it once:
+
+1. Each lab README says "make your cluster reach state X" and roughly where to look. It deliberately does NOT hand you 12 commands to paste — pasting teaches nothing.
+2. Hints escalate from a guiding question to the exact command, in collapsed blocks. Open as many as you need; nobody is counting and there's no penalty. The last hint is always the full solution — using it is fine, understanding it is required.
+3. verify.sh is the finish line: it runs many small checks against your RUNNING cluster (never against your files), prints a green check per pass and an actionable FAIL per miss, exits 0 when the outcome is true.
+4. catch-up.sh N force-pushes the canonical end-state for module N to your in-cluster Gitea and lets ArgoCD converge — scripted state, not hope. Broke something interesting? That's fine, catch-up exists precisely so you can experiment fearlessly. Say the destigmatizing line out loud and mean it: "catch-up is not failure — it's how the workshop is designed to absorb variance."
+
+Also mention explain-backs: at each module boundary, two minutes, tell your neighbor WHY it works. A fix you can't explain isn't done yet.
+
+THE LAB-LAUNCH RITUAL (same every module — presenter discipline, researched not vibes):
+- The GO slide STAYS PROJECTED for the entire lab. It carries the outcome, the literal first command, the verify command, and the timebox — a room of 40 self-paced people re-orients from it constantly. Never advance past it to "peek at the next section" while people work.
+- Before releasing the room, say the first two minutes aloud — the literal first command to type. Lab-start confusion is almost always "what's my first action?", not "what's the goal?".
+- Run a countdown timer next to the deck (external — stagetimer.io or similar) that changes color near the end, and ALSO call "two minutes" verbally: a silent timer fails silently.
+- State every timebox as a soft target: "we walk the solution at :35 regardless" — slower attendees relax because catch-up exists, and the walk-through is announced, not sprung.
+- One call-back signal, announced now, used identically all day (we use: timer hits zero + both speakers stand front-center). Never try to talk over 40 keyboards.
+
+PROGRESS PAGE (was its own slide): the Cloudbox Console's Workshop page shows one row per module, inferred from live cluster state rather than self-reporting. It is on the projector all day, and it becomes yours once the Console lands in module 08.
+
 -->
 
 ---
@@ -25,6 +50,8 @@ Five minutes on mechanics, then hands on keyboards. This section is the contract
 | 09 | **Capstone** — the picture pipeline | 25 min |
 | — | **Five doors**, self-paced | the last 45 |
 
+<div class="mt-5 text-center text-sm opacity-75">Live progress for the whole room, read from your cluster: <code>portal.cloudbox.k8s.test/workshop</code></div>
+
 <!--
 THIS TABLE IS THE DAY'S ONLY TIMELINE — every other slide's timebox is derived from it, so if a number moves, move it here first.
 
@@ -37,86 +64,9 @@ Expectations management, said out loud: "We planned half of what fits. If you on
 Every timebox here is a soft target — we walk the solution when the timer ends regardless, and catch-up.sh absorbs the rest. The door block is deliberately the day's buffer: it grows if we run fast and shrinks if we don't. The close never moves — hard stop 10 minutes before the end, and we finish together.
 -->
 
----
 
-# Then the day forks: five doors
 
-<div class="doors mt-5">
-  <div class="door start">
-    <div class="dnum">0</div>
-    <div class="dname">Start here</div>
-    <div class="dwhat">CI, the Console, day-2 ops</div>
-    <div class="dlogos"><Logo name="argo-workflows" size="1.1rem"/><Logo name="cloudbox" size="1.1rem"/><Logo name="kagent" size="1.1rem"/></div>
-  </div>
-  <div class="door">
-    <div class="dnum">1</div>
-    <div class="dname">App dev</div>
-    <div class="dwhat">be the product team</div>
-    <div class="dlogos"><Logo name="crossplane" size="1.1rem"/><Logo name="nats" size="1.1rem"/><Logo name="buildkit" size="1.1rem"/></div>
-  </div>
-  <div class="door">
-    <div class="dnum">2</div>
-    <div class="dname">Platform</div>
-    <div class="dwhat">author a capability</div>
-    <div class="dlogos"><Logo name="cert-manager" size="1.1rem"/><Logo name="strimzi" size="1.1rem"/><Logo name="kafka" size="1.1rem"/></div>
-  </div>
-  <div class="door">
-    <div class="dnum">3</div>
-    <div class="dname">Security</div>
-    <div class="dwhat">zero trust, for real</div>
-    <div class="dlogos"><Logo name="cilium" size="1.1rem"/><Logo name="zot" size="1.1rem"/></div>
-  </div>
-  <div class="door">
-    <div class="dnum">4</div>
-    <div class="dname">Infra</div>
-    <div class="dwhat">the metal layer</div>
-    <div class="dlogos"><Logo name="talos" size="1.1rem"/><Logo name="cilium" size="1.1rem"/></div>
-  </div>
-</div>
 
-<div class="mt-6 text-center text-base opacity-80">Take <strong>door 0</strong> unless you already know which one you want. You can switch at any time.</div>
-
-<!--
-Pitch this in under a minute, and do not sell all five equally: decision paralysis is the failure mode of a multi-track ending. Lead with door 0 as the default and name it as the default out loud, then one line each for the rest.
-
-Doors are not a commitment. Anyone can switch, and nothing later depends on which one they picked. The detail, including the known traps per door, is in adventures/ in the repo, and we come back to this at the pivot with the full briefing.
--->
-
----
-
-# The lab contract
-
-<div class="grid grid-cols-2 gap-3 mt-4">
-  <div class="principle"><div class="ico"><span class="svgi i-target"></span></div><div class="name">Outcome, not steps</div><div class="tie">the README says <em>reach state X</em></div></div>
-  <div class="principle"><div class="ico"><span class="svgi i-layers"></span></div><div class="name">Layered hints</div><div class="tie">free, collapsible, the last one is the answer</div></div>
-  <div class="principle"><div class="ico"><span class="svgi i-check" style="color:var(--jz-run)"></span></div><div class="name"><code>./verify.sh</code></div><div class="tie">checks your live cluster, green is done</div></div>
-  <div class="principle"><div class="ico"><span class="svgi i-fast-forward"></span></div><div class="name"><code>mise run catch-up &lt;n&gt;</code></div><div class="tie">jump to any module's end-state</div></div>
-</div>
-
-<div class="mt-6 text-center text-base opacity-80">
-Live progress for the whole room, read from your cluster, on the projector all day:
-<code>portal.cloudbox.k8s.test/workshop</code>
-</div>
-
-<!--
-This is how every single module works, so learn it once:
-
-1. Each lab README says "make your cluster reach state X" and roughly where to look. It deliberately does NOT hand you 12 commands to paste — pasting teaches nothing.
-2. Hints escalate from a guiding question to the exact command, in collapsed blocks. Open as many as you need; nobody is counting and there's no penalty. The last hint is always the full solution — using it is fine, understanding it is required.
-3. verify.sh is the finish line: it runs many small checks against your RUNNING cluster (never against your files), prints a green check per pass and an actionable FAIL per miss, exits 0 when the outcome is true.
-4. catch-up.sh N force-pushes the canonical end-state for module N to your in-cluster Gitea and lets ArgoCD converge — scripted state, not hope. Broke something interesting? That's fine, catch-up exists precisely so you can experiment fearlessly. Say the destigmatizing line out loud and mean it: "catch-up is not failure — it's how the workshop is designed to absorb variance."
-
-Also mention explain-backs: at each module boundary, two minutes, tell your neighbor WHY it works. A fix you can't explain isn't done yet.
-
-THE LAB-LAUNCH RITUAL (same every module — presenter discipline, researched not vibes):
-- The GO slide STAYS PROJECTED for the entire lab. It carries the outcome, the literal first command, the verify command, and the timebox — a room of 40 self-paced people re-orients from it constantly. Never advance past it to "peek at the next section" while people work.
-- Before releasing the room, say the first two minutes aloud — the literal first command to type. Lab-start confusion is almost always "what's my first action?", not "what's the goal?".
-- Run a countdown timer next to the deck (external — stagetimer.io or similar) that changes color near the end, and ALSO call "two minutes" verbally: a silent timer fails silently.
-- State every timebox as a soft target: "we walk the solution at :35 regardless" — slower attendees relax because catch-up exists, and the walk-through is announced, not sprung.
-- One call-back signal, announced now, used identically all day (we use: timer hits zero + both speakers stand front-center). Never try to talk over 40 keyboards.
-
-PROGRESS PAGE (was its own slide): the Cloudbox Console's Workshop page shows one row per module, inferred from live cluster state rather than self-reporting. It is on the projector all day, and it becomes yours once the Console lands in module 08.
--->
 
 ---
 
