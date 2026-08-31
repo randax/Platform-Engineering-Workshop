@@ -13,6 +13,27 @@ class": it must fit a **16 GB laptop**, run **fully offline** at a venue with ho
 and be **legible** enough to read in a 4-hour workshop. Change the constraints and some of
 these picks flip — reading the tradeoff is the transferable skill, not memorising the tools.
 
+## What gets built
+
+```text
+your laptop
+└── talos-box VMs, or Docker (≥10 GB allocated)
+    └── Talos v1.13.8 cluster (1 control plane + 1 worker)
+        ├── Cilium 1.20 (eBPF CNI + shared ingress)
+        ├── Gitea (in-cluster git — this is your cloud's git server)
+        ├── ArgoCD v3.5 ── app-of-apps w/ sync waves ──────┐
+        ├── CloudNativePG + demo Postgres                  │ everything below
+        ├── RustFS (S3-compatible object storage)          │ is delivered as
+        ├── Crossplane v2 (self-service compositions)      │ ArgoCD apps from
+        ├── Knative Serving + Kourier          (stretch)   │ the in-cluster
+        ├── Argo Workflows + BuildKit + Zot    (stretch)   │ Gitea
+        ├── NATS JetStream (durable messaging) (stretch)   │
+        ├── Backstage (CNOE image)             (stretch)   │
+        └── Victoria stack + OTel Collector    (on-demand) ┘
+```
+
+Stretch items are optional, and the Victoria stack is enabled from the catalog on demand.
+
 ## The table
 
 | Component | Chosen | Rejected alternative | Why |
@@ -89,7 +110,7 @@ the 262 KB annotation limit → `ServerSideApply=true`). Crossplane's compositio
 CNPG `Cluster` **directly** — the official Crossplane v2 docs use exactly this example.
 Postgres image pinned to the operator's 1.28.4 default (`postgresql:18.4-system-trixie`).
 
-### RustFS — vs. MinIO
+### [RustFS](https://rustfs.com) — vs. MinIO
 An Apache-2.0, S3-compatible object server as a single Rust binary (~90 MB idle, standalone
 mode — the chart otherwise defaults to a 4-pod distributed cluster). We reject MinIO because
 its open-source community edition was gutted through 2025–26 (console removed May 2025,

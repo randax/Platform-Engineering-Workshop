@@ -1,20 +1,23 @@
 # Cloud on Your Terms: Building Your Own Cloud-Native Platform
 
 What happens when you can no longer trust your cloud provider's pricing, jurisdiction, or
-roadmap? In four hands-on hours you build the answer on your own laptop: a complete
-cloud-native platform (Kubernetes, GitOps, databases-as-a-service, object storage,
-self-service infrastructure), all open source, all pinned, all still working after you leave
-the room. The full picture: [What we're building](#what-were-building).
+roadmap? You build your own. This is the workshop repo for JavaZone 2026: four hands-on
+hours, a complete cloud-native platform on your own laptop, all open source, all pinned,
+and still running after you leave the room. Labs, solutions and scripts are public, so you
+can finish at home.
 
-## Workshop facts
+## What we're building
 
-| | |
-|---|---|
-| **Conference** | JavaZone 2026, Sept 2–3, NOVA Spektrum, Lillestrøm |
-| **Workshop day** | The day before the main conference (see the JavaZone program for exact day and venue) |
-| **Duration** | 240 minutes (4 hours), hands-on |
-| **Speakers** | Hans Kristian Flaatten, Øyvind Randa |
-| **Repo** | Everything is public: labs, solutions, scripts. Finish at home if you want. |
+A two-node Talos Linux cluster on your laptop, with a git server and a GitOps engine
+running *inside* it. Everything else arrives the same way: capabilities live as ArgoCD
+`Application` manifests in `gitops/catalog/`, and you turn one on by copying it into
+`gitops/apps/`, committing, and pushing to your own in-cluster Gitea. Edit, push,
+converge, all day, never touching GitHub or the conference WiFi.
+
+Kubernetes, GitOps, a managed database, S3-compatible storage, a self-service
+infrastructure API, serverless, in-cluster CI, observability and a portal, delivered by
+the end of the day. The full component list and why each one beat its alternative are in
+**[docs/STACK.md](docs/STACK.md)**.
 
 ## Before the conference
 
@@ -111,43 +114,6 @@ nudge to full solution. You choose how much to open.
 Core modules are the plan. Stretch modules are for the fast 20%, and for your couch
 afterwards. Canonical end-states live in `solutions/`.
 
-## What we're building
-
-A two-node Talos Linux Kubernetes cluster on your laptop, with an in-cluster git server and
-a GitOps engine delivering the entire platform on top: real VMs via
-[talos-box](https://github.com/randax/talos-box) where your machine supports it, Docker
-containers everywhere else.
-
-```text
-your laptop
-└── talos-box VMs, or Docker (≥10 GB allocated)
-    └── Talos v1.13.8 cluster (1 control plane + 1 worker)
-        ├── Cilium 1.20 (eBPF CNI + shared ingress)
-        ├── Gitea (in-cluster git — this is your cloud's git server)
-        ├── ArgoCD v3.5 ── app-of-apps w/ sync waves ──────┐
-        ├── CloudNativePG + demo Postgres                  │ everything below
-        ├── RustFS (S3-compatible object storage)          │ is delivered as
-        ├── Crossplane v2 (self-service compositions)      │ ArgoCD apps from
-        ├── Knative Serving + Kourier          (stretch)   │ the in-cluster
-        ├── Argo Workflows + BuildKit + Zot    (stretch)   │ Gitea
-        ├── NATS JetStream (durable messaging) (stretch)   │
-        ├── Backstage (CNOE image)             (stretch)   │
-        └── Victoria stack + OTel Collector    (on-demand) ┘
-```
-
-The all-day mechanic: capabilities are a catalog of ArgoCD `Application` manifests. Copy one
-from `gitops/catalog/` into `gitops/apps/`, commit, push to *your own* in-cluster Gitea,
-watch ArgoCD converge. Edit → push → converge. That's GitOps, and it never touches GitHub or
-the conference WiFi.
-
-On object storage: we use [RustFS](https://rustfs.com), an Apache-2.0 alternative to MinIO,
-whose open-source community edition was discontinued in 2025–26 in favor of the proprietary
-AIStor. Same S3 API, licence you can live with.
-
-Every component is a deliberate choice against a rejected alternative: Talos over kubeadm,
-Cilium over kube-proxy, in-cluster Gitea over GitHub, Crossplane v2 over Helm, the Victoria
-stack over kube-prometheus-stack. Tradeoffs in **[docs/STACK.md](docs/STACK.md)**.
-
 ## The Cloudbox Console
 
 The platform's front door: a bespoke **Go + htmx** portal, server-rendered and fully
@@ -171,8 +137,8 @@ metrics): [docs/screenshots/](docs/screenshots/README.md).
 
 ## Substrates, in one paragraph
 
-The cluster runs on **Talos-in-Docker** (everyone, by default) or on **tbx** real Talos
-VMs (Apple Silicon macOS, or Linux with KVM, and only if you install its privileged
+The cluster runs on **Talos-in-Docker** (everyone, by default) or on **tbx**
+([talos-box](https://github.com/randax/talos-box)) real Talos VMs (Apple Silicon macOS, or Linux with KVM, and only if you install its privileged
 helper). You do not choose: the scripts detect it, `mise run preflight` prints which you
 will get, and every module after 01 is identical on both. Force it with
 `CLOUDBOX_SUBSTRATE=docker` or `=tbx`, or pin it for the machine as shown in
