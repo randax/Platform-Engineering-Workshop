@@ -286,7 +286,7 @@ git add . && git commit -m "grant portal: create projects (scoped)" && git push
 Create `teama`, switch to it, provision a database, and note it lands in ns `teama`.
 The console refuses hyphens in project names: a Knative URL is
 `<app>-<project>.kn.cloudbox.k8s.test`, name and namespace in one DNS label, so two
-name/project pairs could claim one hostname ([docs/HAZARDS.md](../../docs/HAZARDS.md)).
+name/project pairs could claim one hostname.
 
 **Diagnostics (DR-0005).** When something isn't Ready, its detail page shows the
 failing conditions, container states, and a next-step hint, the way `kubectl describe`
