@@ -36,6 +36,11 @@ flowchart LR
 <span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> CodeBuild + ECR · Cloud Build + Artifact Registry — the whole build-and-ship pipeline, running inside your own cluster with zero external services.
 </div>
 
+<figure class="shot">
+  <img src="/console/deploy-from-source-dark.png" alt="build and deploy from source (module 08)" />
+  <figcaption>build and deploy from source (module 08)</figcaption>
+</figure>
+
 <!--
 The concept: CI is the last thing teams believe they can't self-host ("but we need GitHub Actions!"). Strip the branding and a build is just a pod doing elevated filesystem tricks, and a registry is a single binary.
 

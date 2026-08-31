@@ -24,6 +24,11 @@ Serverless is core, not a bonus: a platform without scale-to-zero is missing a p
 - The engine behind Cloud Run's API
 - Demystified: it's a URL and a watch
 
+<figure class="shot">
+  <img src="/console/function-detail-dark.png" alt="a scaled-to-zero function (module 08)" />
+  <figcaption>a scaled-to-zero function (module 08)</figcaption>
+</figure>
+
 <!--
 The concept: "serverless" was never literally about someone else's servers — it's about not paying for idle capacity and not managing replica counts. Knative Serving is the open-source engine behind most Kubernetes serverless offerings (Cloud Run implements its API): request-driven autoscaling, revisioned deploys, and the headline trick — scale to zero.
 

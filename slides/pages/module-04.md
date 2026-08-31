@@ -29,6 +29,11 @@ flowchart LR
 - You own **both** sides of the API
 - `aws rds create-db-instance` — but yours
 
+<figure class="shot">
+  <img src="/console/new-application-dark.png" alt="the same XR, as a form (module 08)" />
+  <figcaption>the same XR, as a form (module 08)</figcaption>
+</figure>
+
 <!--
 The concept: developers shouldn't need to know CNPG, storage classes, or RustFS endpoints. Platform engineering is building the abstraction — you define WHAT can be asked for (an XRD: the WorkshopDatabase schema), and HOW it's fulfilled (a Composition), and developers just write a 10-line resource.
 

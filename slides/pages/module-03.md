@@ -25,6 +25,11 @@ transition: view-transition
 - Same story for S3: RustFS speaks the API
 - Less magic than the price tag suggests
 
+<figure class="shot">
+  <img src="/console/database-monitoring-dark.png" alt="your database, in the Console (module 08)" />
+  <figcaption>your database, in the Console (module 08)</figcaption>
+</figure>
+
 <!--
 The concept: what you're buying from a hyperscaler's managed database is software that provisions, monitors, fails over, and backs up. A Kubernetes operator like CloudNativePG IS that software — the same control loop that would run behind AWS's console runs in your cluster instead. Declare a Cluster resource, get a supervised Postgres with failover and backup hooks.
 

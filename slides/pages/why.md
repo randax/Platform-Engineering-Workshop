@@ -81,8 +81,13 @@ layout: fact
 
 Still running tomorrow. No account. No bill. No permission.
 
+<figure class="promo mt-6">
+  <img src="/console/components-full-dark.png" alt="The Cloudbox Console: every platform component, healthy, on your own laptop" />
+  <figcaption>Your platform, on your laptop, in your own console. You build this console too, in module 08.</figcaption>
+</figure>
+
 <style>
-h1 { font-size: 3.4rem !important; line-height: 1.25 !important; }
+h1 { font-size: 2.6rem !important; line-height: 1.2 !important; }
 </style>
 
 <!--

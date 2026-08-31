@@ -520,3 +520,22 @@
   border-bottom:2px solid rgba(148,163,184,0.3);}
 .twoup .col p{font-size:0.8rem;line-height:1.5;color:#cbd5e1;margin:0 0 0.6rem;}
 .twoup .col b{color:#e2e8f0;}
+
+/* Console screenshots dropped into module slides as a corner inset. Absolutely
+   positioned on purpose: these slides are already full, and a block image would
+   push their content off the bottom. The caption names the module the Console
+   itself arrives in, so an early screenshot reads as a promise rather than
+   something the room should already have. */
+.shot{position:absolute;right:1.6rem;bottom:1.4rem;width:30%;margin:0;
+  z-index:5;pointer-events:none;}
+.shot img{width:100%;display:block;border-radius:0.45rem;
+  border:1px solid rgba(148,163,184,0.35);box-shadow:0 10px 26px rgba(2,6,23,0.55);}
+.shot figcaption{margin-top:0.35rem;font-size:0.55rem;letter-spacing:0.02em;
+  color:#94a3b8;text-align:right;}
+
+/* The promise slide earns a picture: "you leave with this" is abstract until the
+   room sees the thing. Sized to leave the headline dominant. */
+.promo{margin:1.2rem auto 0;max-width:56%;}
+.promo img{width:100%;display:block;border-radius:0.5rem;
+  border:1px solid rgba(148,163,184,0.35);box-shadow:0 14px 34px rgba(2,6,23,0.55);}
+.promo figcaption{margin-top:0.5rem;font-size:0.7rem;color:#94a3b8;}
