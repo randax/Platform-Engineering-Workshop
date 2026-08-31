@@ -437,7 +437,7 @@ if [[ -f scripts/substrate/cloudbox.tbx.yaml ]]; then
 fi
 for token in __TALOS_VERSION__ __CLUSTER_NAME__ __CLOUDBOX_DOMAIN__ \
              __TBX_CP_MEMORY__ __TBX_CP_CPUS__ __TBX_WORKER_MEMORY__ \
-             __TBX_WORKER_CPUS__ __TBX_DISK_SIZE__; do
+             __TBX_WORKER_CPUS__ __TBX_DISK_SIZE__ __TBX_HYPERVISOR_LINE__; do
   grep -q -- "${token}" scripts/substrate/cloudbox.tbx.yaml.tmpl \
     || bad "scripts/substrate/cloudbox.tbx.yaml.tmpl no longer contains ${token} — a sizing value was hardcoded into the template instead of pinned in versions.env"
 done

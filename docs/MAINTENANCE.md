@@ -213,7 +213,11 @@ is the runtime assertion. Bumping it means all four of:
    prune --mirror`, `tbx mirror offline on|off`, `tbx node start|stop <cluster> <node>`
    (lab 01, destroy-cluster.sh, cloudbox-init.sh). Read upstream `internal/config/config.go` for
    cluster-yaml schema changes (our `scripts/substrate/cloudbox.tbx.yaml.tmpl` is a
-   projection of it). We deliberately consume **no** `tbx manifests` section any more —
+   projection of it). Since v0.1.6 that schema includes `clusters[].hypervisor`
+   (`vz | qemu`, validated by `hypervisor.ParseName` in upstream
+   `internal/hypervisor/registry.go`, immutable after create) — `render_tbx_cluster_file`
+   injects it from `CLOUDBOX_TBX_HYPERVISOR` and hardcodes the same two names, so
+   re-check `ParseName` on every bump or our validation drifts from tbx's. We deliberately consume **no** `tbx manifests` section any more —
    `balloon` was deprecated into an error, and the `mirrors` catch-all turned out to be
    actively harmful (see `docs/HAZARDS.md`) — so a section rename upstream is no longer
    something that can break us silently. Two things upstream *can* still move under us:

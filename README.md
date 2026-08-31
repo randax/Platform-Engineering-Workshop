@@ -185,6 +185,22 @@ scripts pick for you and remember the choice in `~/.cloudbox/substrate`; overrid
 `CLOUDBOX_SUBSTRATE=docker` or `=tbx`. On Linux, watch out for firewalld/nftables
 interference on either substrate.
 
+**tbx on macOS can run its VMs on two hypervisors** (tbx ≥ v0.1.6). The default is
+Apple's Virtualization.framework (`vz`) — zero install, leave it alone if it works. If
+Virtualization.framework itself misbehaves on your machine, QEMU/HVF is the escape hatch:
+
+```bash
+brew install qemu     # macOS 15+ — on macOS 14 Homebrew builds QEMU without HVF
+CLOUDBOX_TBX_HYPERVISOR=qemu ./scripts/create-cluster.sh
+```
+
+The choice is baked into the cluster at creation and is **immutable**: to move an
+existing cluster to the other hypervisor, `./scripts/destroy-cluster.sh` first, then
+create with the override. Same labs, same URLs, same mirror on either backend. One
+honest caveat: the macOS kernel-panic hazard in `docs/HAZARDS.md` is a content-filter
+bug in macOS itself and is *not* avoided by switching to QEMU — for that, deactivate
+the content-filter extension or use the Docker substrate.
+
 The memory lasts as long as the cluster does: `destroy-cluster.sh` removes that file
 along with the cluster it described, and the next `create-cluster.sh` decides again from
 scratch. It prints the substrate it just forgot and the command that keeps it
