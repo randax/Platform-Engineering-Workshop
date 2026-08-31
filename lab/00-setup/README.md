@@ -42,7 +42,10 @@ From the repository root:
    on Talos-in-Docker instead. Everyone else — Windows/WSL2, Codespaces, or any machine
    `tbx doctor` is unhappy with — runs the identical workshop on Talos-in-Docker. The
    scripts decide for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you
-   want to. **On tbx you do not need Docker at all**: the VMs pull every image through
+   want to. On macOS, tbx runs its VMs on Virtualization.framework by default; if that
+   framework acts up on your machine, `brew install qemu` (macOS 15+) and create with
+   `CLOUDBOX_TBX_HYPERVISOR=qemu` instead — the README's substrate section has the
+   details, including why an existing cluster must be destroyed to switch. **On tbx you do not need Docker at all**: the VMs pull every image through
    talos-box's own mirror, which `cloudbox-init.sh` fills with `tbx cache warm`. On
    Talos-in-Docker the mirror is a container, so Docker is required there.
    **On tbx, also let Ollama listen on more than loopback** if you plan to

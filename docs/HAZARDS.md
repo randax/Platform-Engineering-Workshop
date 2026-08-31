@@ -240,9 +240,40 @@ teardown returned. A cluster that is merely *running* has been fine for minutes.
 still reset a minute later. On the day that is worse than failing loudly: an
 attendee would have a green cluster, then no machine.
 
-**Retired by:** an upstream fix released and surviving a full rehearsal on the
-panicking host — not on a host that never reproduced it, which proves nothing.
-Three versions have now been tried on this one, so "bump it and see" is spent.
+**Diagnosis confirmed upstream, 2026-08-31 (tbx v0.1.6, upstream docs/macos-panics.md).**
+Symbolizing all the backtraces places every fault at the same instruction:
+`cfil_acquire_sockbuf` reading freed **socket content-filter** state — a
+use-after-free in XNU itself, triggered when three ingredients coincide: a
+content-filter Network Extension active (GlobalProtect, Zscaler, Netskope, Cisco
+Secure Client, …), silicon that enforces kernel MTE (M5-generation — earlier
+Apple Silicon executes the same use-after-free *silently*), and a process busily
+closing TCP sockets, which tbxd is around every cluster lifecycle transition.
+That fits everything this entry recorded: why it fires at create/teardown and
+never in steady state, why the balloon exoneration held, why the Rehearsal 7
+host (pre-M5) never saw it, and why no tbx version fixes it. The vmnet
+suspicion above is retired too — that path is an AF_UNIX socket the content
+filter never touches. `tbx doctor` on v0.1.6 prints a `WARN security-inventory`
+line when the filter + MTE ingredients are both present, so an at-risk machine
+is now *identifiable before it panics* — check for that WARN during lab 00.
+
+**What actually helps on an at-risk machine, in order:** exempt tbxd's traffic
+from the filter (fleet policy), or deactivate the content-filter extension while
+running the workshop — disconnecting the VPN is usually NOT enough; verify with
+`systemextensionsctl list` that the filter is not `[activated enabled]`. If the
+filter cannot be touched (corporate device), fall back to docker as described
+above — noting honestly that the underlying bug is any-socket-busy-process, so
+docker on the same host is *less* exposed (fewer lifecycle bursts), not proven
+immune. **The v0.1.6 QEMU hypervisor (`CLOUDBOX_TBX_HYPERVISOR=qemu`) does NOT
+avoid this panic**: the faulting sockets are tbxd's own, opened and closed the
+same way under either hypervisor. QEMU is the escape hatch for
+Virtualization.framework misbehavior, which this is not — do not recommend it
+as a panic remedy in the room.
+
+**Retired by:** Apple fixing the XNU use-after-free (or every affected attendee
+exempting/deactivating their content filter, which retires it per-machine and is
+verifiable via the doctor WARN). An upstream tbx fix is no longer the retire
+condition — upstream's confirmed diagnosis places the bug outside tbx's reach,
+and three version bumps were spent proving that empirically.
 
 
 ## LIVE — L2 failover on macOS takes 40-50 s

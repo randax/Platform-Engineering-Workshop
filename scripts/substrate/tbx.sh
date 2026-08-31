@@ -213,7 +213,26 @@ render_tbx_cluster_file() {
   # makes `tbx up` refuse outright. See tbx_worker_memory() above.
   workers_memory="$(tbx_worker_memory)"
   info "Worker VM: ${workers_memory} / ${workers_cpus} vCPU · control plane: ${TBX_CP_MEMORY} / ${TBX_CP_CPUS} vCPU"
+  # The optional hypervisor override (versions.env documents it). Baked into
+  # the cluster yaml because that is the one place tbx reads it reliably —
+  # `clusters[].hypervisor` beats the TBX_HYPERVISOR env var, which only works
+  # in the DAEMON's environment (upstream docs/macos.md). Unset deletes the
+  # line and tbx keeps its compiled default (vz on Apple Silicon). tbx itself
+  # re-validates the value (hypervisor.ParseName) and enforces immutability:
+  # an existing cluster created on the other hypervisor makes `tbx up` refuse
+  # with "destroy and recreate", which is the right answer verbatim. An OMITTED
+  # field is "no opinion" (checkHypervisorUnchanged returns nil on ""), so a
+  # later re-render without the env var — catch-up, lab recovery — never
+  # conflicts with a cluster that was created as qemu.
+  local hv="${CLOUDBOX_TBX_HYPERVISOR:-}" hv_sed
+  case "${hv}" in
+    "")      hv_sed="/^__TBX_HYPERVISOR_LINE__$/d" ;;
+    vz|qemu) hv_sed="s|^__TBX_HYPERVISOR_LINE__$|    hypervisor: ${hv}|"
+             info "Hypervisor pinned by CLOUDBOX_TBX_HYPERVISOR: ${hv}" ;;
+    *) die "CLOUDBOX_TBX_HYPERVISOR must be vz or qemu (got '${hv}'). qemu additionally needs an HVF-enabled QEMU on the host: brew install qemu (macOS 15+; Homebrew builds QEMU without HVF on macOS 14)." ;;
+  esac
   sed \
+    -e "${hv_sed}" \
     -e "s|__TALOS_VERSION__|${TALOS_VERSION}|g" \
     -e "s|__CLUSTER_NAME__|${CLUSTER_NAME}|g" \
     -e "s|__CLOUDBOX_DOMAIN__|${CLOUDBOX_DOMAIN}|g" \

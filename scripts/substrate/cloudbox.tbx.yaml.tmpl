@@ -8,11 +8,16 @@
 # 1.20.0 install path across both substrates. Adding `cni: cilium` here would
 # hand the cluster talos-box's curated 1.19.6 and its own machine config.
 # No `csi:` either (it requires `cni:`); local-path-provisioner is wave 0.
+#
+# __TBX_HYPERVISOR_LINE__ becomes `hypervisor: vz|qemu` when the attendee sets
+# CLOUDBOX_TBX_HYPERVISOR (versions.env documents it), and is deleted otherwise
+# so tbx keeps its compiled default. The choice is immutable per cluster.
 version: 1
 talos:
   version: __TALOS_VERSION__
 clusters:
   - name: __CLUSTER_NAME__
+__TBX_HYPERVISOR_LINE__
     controlPlanes: 1
     workers: 1
     domain: __CLOUDBOX_DOMAIN__
