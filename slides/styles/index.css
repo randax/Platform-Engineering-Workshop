@@ -283,11 +283,6 @@
 .arch .services{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem 0.9rem;align-items:start;}
 .arch .svc{display:flex;flex-direction:column;gap:0.35rem;}
 .arch .svc .cap{font-size:0.58rem;text-transform:uppercase;letter-spacing:0.07em;font-weight:800;color:#94a3b8;}
-/* Closing callback: the same diagram, now every box green. */
-.arch.done .laptop{border-color:rgba(5,150,105,0.5);}
-.arch.done .k8s{border-color:var(--jz-run);background:rgba(5,150,105,0.09);}
-.arch.done .band-title{color:var(--jz-run);opacity:0.95;}
-.arch.done .delivers{color:var(--jz-run);font-style:normal;font-weight:700;}
 
 /* Cover: a subtle band of the tools you'll run today. */
 

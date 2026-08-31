@@ -1,78 +1,11 @@
 ---
 layout: section
 transition: view-transition
----
 
-# What you built today
 
-<!--
-Closing section, HARD-SCHEDULED: the last 10 minutes belong to this, protected even from the adventure hour. Peak-end rule: the room's memory of four hours is disproportionately set by its final minutes. An ending where people drift out mid-hack is remembered as a fizzle; this before/after replay is remembered as an achievement. Call the one signal 10 minutes before the end, wait for keyboards to actually stop, then run: the replay (next slide), the take-home path, and a 60-second close: ask the room for one word each on what they're taking home, or simply "look at what you built this morning vs now". End on accomplishment, not fatigue.
--->
 
----
 
-# The box, now full
 
-<div class="arch done">
-  <div class="laptop">
-    <div class="band-title"><Logo name="docker" size="1.3rem"/> Your laptop, still yours when the lid closes</div>
-    <div class="k8s">
-      <div class="band-title"><Logo name="talos" size="1.3rem"/> <Logo name="cilium" size="1.3rem"/> ✅ Talos + Cilium · Kubernetes, running (01)</div>
-      <div class="engine">
-        <Logo name="gitea" label size="1.7rem"/> <span class="arrow">→</span> <Logo name="argocd" label="Argo CD" size="1.7rem"/>
-        <span class="delivers">✅ every box below, delivered by git (02)</span>
-      </div>
-      <div class="services">
-        <div class="svc"><span class="cap">Data</span>
-          <Logo name="cloudnativepg" label="CloudNativePG · 03" size="1.5rem"/>
-          <Logo name="rustfs" label="RustFS · 03" size="1.5rem"/></div>
-        <div class="svc"><span class="cap">Self-service</span>
-          <Logo name="crossplane" label="Crossplane · 04" size="1.5rem"/>
-          <Logo name="cloudbox" label="Console · 08" size="1.5rem"/></div>
-        <div class="svc"><span class="cap">Compute &amp; build</span>
-          <Logo name="knative" label="Knative · 06+09" size="1.5rem"/>
-          <Logo name="argo-workflows" label="CI · 07" size="1.5rem"/></div>
-        <div class="svc"><span class="cap">Connect &amp; observe</span>
-          <Logo name="nats" label="NATS · 09" size="1.5rem"/>
-          <Logo name="grafana" label="Victoria + OTel" size="1.5rem"/></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!--
-The same diagram from the first ten minutes, but now every box on it is running on the laptops in this room. Walk it once more, fast, in the past tense: "you built an immutable OS layer with no kube-proxy; you gave your cluster its own git server and made git the only way anything changes; you became the RDS team and the S3 team; you shipped a self-service API on Crossplane v2; you debugged it like an SRE and fact-checked an AI agent doing the same; and some of you added serverless, in-cluster CI, a portal you can read, and an event-driven pipeline traced end to end."
-
-Then the sovereignty callback: no account was created today. No bill will arrive. Nothing phones home. When the laptop lid closes, the cloud goes to sleep, and it wakes up still yours.
-
-The mental model is the real takeaway: cloud products are software plus an API, and every one of them has an open-source shape you can own.
--->
-
----
-
-# Remember the table? All yours now.
-
-<div class="allgreen">
-<table>
-<thead><tr><th>Cloud primitive</th><th>You're running</th></tr></thead>
-<tbody>
-<tr><td>Kubernetes / compute</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="talos" label size="1.5rem"/> <Logo name="cilium" label size="1.5rem"/></td></tr>
-<tr><td>Managed Postgres</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudnativepg" label size="1.5rem"/></td></tr>
-<tr><td>Object storage (S3)</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="rustfs" label size="1.5rem"/></td></tr>
-<tr><td>Self-service infra</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="crossplane" label size="1.5rem"/></td></tr>
-<tr><td>Serverless · CI · registry</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="knative" label size="1.5rem"/> <Logo name="argo-workflows" label="Argo Workflows" size="1.5rem"/> <Logo name="zot" label size="1.5rem"/></td></tr>
-<tr><td>Cloud console</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudbox" label size="1.5rem"/></td></tr>
-</tbody>
-</table>
-</div>
-
-<div class="mt-6 text-xl opacity-80">No account. No bill. No permission.</div>
-
-<!--
-The bookend: the opening's two rent-vs-run tables, folded into one. The left column was what you'd rent from a hyperscaler. Now the right column is running on the laptop in front of you, every row green.
-
-Say it plainly: "Four hours ago this was a shopping list of things you pay for. Now it's a list of things you own." Then bring it home to Bruktby on the next slide.
--->
 
 ---
 
@@ -105,6 +38,23 @@ This is the payoff slide the whole story has been building to. Say what the outc
 Walk the two columns as a before/after: v1 wasn't wrong, it got them to market, but the three forces from the opening (price, jurisdiction, roadmap) each took a decision out of their hands. Today the identical product runs on infrastructure they control: the listings Postgres is CloudNativePG, the photos live in RustFS buckets on disks they own, the thumbnailer is a Knative service that costs nothing between uploads, and the whole thing was delivered by git and is traceable end to end. Data residency is now a fact they can prove to that B2B partner, not a region setting they hope is good enough.
 
 The sentence to land: "The complete outcome of today isn't 'you learned Kubernetes.' It's that a real product can run, same features, same UX, on a cloud its team owns, and you just did the migration end to end." Then the sovereignty line one more time, and hand to take-home.
+
+
+WHAT YOU BUILT TODAY (slide cut; kept because it is the only place this is written down):
+Closing section, HARD-SCHEDULED: the last 10 minutes belong to this, protected even from the adventure hour. Peak-end rule: the room's memory of four hours is disproportionately set by its final minutes. An ending where people drift out mid-hack is remembered as a fizzle; this before/after replay is remembered as an achievement. Call the one signal 10 minutes before the end, wait for keyboards to actually stop, then run: the replay (next slide), the take-home path, and a 60-second close: ask the room for one word each on what they're taking home, or simply "look at what you built this morning vs now". End on accomplishment, not fatigue.
+
+THE BOX, NOW FULL (slide cut; kept because it is the only place this is written down):
+The same diagram from the first ten minutes, but now every box on it is running on the laptops in this room. Walk it once more, fast, in the past tense: "you built an immutable OS layer with no kube-proxy; you gave your cluster its own git server and made git the only way anything changes; you became the RDS team and the S3 team; you shipped a self-service API on Crossplane v2; you debugged it like an SRE and fact-checked an AI agent doing the same; and some of you added serverless, in-cluster CI, a portal you can read, and an event-driven pipeline traced end to end."
+
+Then the sovereignty callback: no account was created today. No bill will arrive. Nothing phones home. When the laptop lid closes, the cloud goes to sleep, and it wakes up still yours.
+
+The mental model is the real takeaway: cloud products are software plus an API, and every one of them has an open-source shape you can own.
+
+REMEMBER THE TABLE? ALL YOURS NOW. (slide cut; kept because it is the only place this is written down):
+The bookend: the opening's two rent-vs-run tables, folded into one. The left column was what you'd rent from a hyperscaler. Now the right column is running on the laptop in front of you, every row green.
+
+Say it plainly: "Four hours ago this was a shopping list of things you pay for. Now it's a list of things you own." Then bring it home to Bruktby on the next slide.
+
 -->
 
 ---
