@@ -15,7 +15,18 @@ Ground rule to state once, up front: nothing here is "best in class" in the abst
 
 ---
 
+transition: view-transition
+---
+
 # Layer 1 — the metal & the network
+
+<div class="layerstack">
+  <div class="layer off" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer off" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer off" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
+  <div class="layer off" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
+  <div class="layer on cur" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+</div>
 
 <div class="stack">
 
@@ -48,7 +59,18 @@ Cilium tradeoff to name honestly: eBPF wants a modern kernel — a talos-box VM 
 
 ---
 
+transition: view-transition
+---
+
 # Layer 2 — how everything ships
+
+<div class="layerstack">
+  <div class="layer off" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer off" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer off" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
+  <div class="layer on cur" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
+  <div class="layer on" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+</div>
 
 <div class="stack">
 
@@ -78,7 +100,18 @@ ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; 
 
 ---
 
+transition: view-transition
+---
+
 # Layer 3 — the data services
+
+<div class="layerstack">
+  <div class="layer off" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer off" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer on cur" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
+  <div class="layer on" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
+  <div class="layer on" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+</div>
 
 <div class="stack">
 
@@ -110,7 +143,18 @@ RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed clust
 
 ---
 
+transition: view-transition
+---
+
 # Layer 4 — self-service & compute
+
+<div class="layerstack">
+  <div class="layer off" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer on cur" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer on" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
+  <div class="layer on" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
+  <div class="layer on" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+</div>
 
 <div class="stack">
 
@@ -143,7 +187,18 @@ Knative: Kourier ingress (not Gateway API — not in Cilium's conformance matrix
 
 ---
 
+transition: view-transition
+---
+
 # Layer 5 — messaging & observability
+
+<div class="layerstack">
+  <div class="layer on cur" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer on" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer on" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
+  <div class="layer on" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
+  <div class="layer on" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+</div>
 
 <div class="stack">
 

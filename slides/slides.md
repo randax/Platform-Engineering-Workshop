@@ -121,6 +121,8 @@ src: ./pages/why.md
 ---
 
 ---
+transition: view-transition
+---
 
 # What you'll walk out able to do
 

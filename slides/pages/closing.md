@@ -23,14 +23,18 @@ Closing section — HARD-SCHEDULED: the last 10 minutes belong to this, protecte
         <span class="delivers">✅ every box below, delivered by git (02)</span>
       </div>
       <div class="services">
-        <Logo name="cloudnativepg" label="CloudNativePG · 03" size="1.6rem"/>
-        <Logo name="rustfs" size="1.6rem"/>
-        <Logo name="crossplane" label="Crossplane · 04" size="1.6rem"/>
-        <Logo name="knative" label="Knative · 06+09" size="1.6rem"/>
-        <Logo name="nats" label="NATS · 09" size="1.6rem"/>
-        <Logo name="argo-workflows" label="CI · 07" size="1.6rem"/>
-        <Logo name="cloudbox" label size="1.6rem"/>
-        <Logo name="grafana" label="Victoria + OTel" size="1.6rem"/>
+        <div class="svc"><span class="cap">Data</span>
+          <Logo name="cloudnativepg" label="CloudNativePG · 03" size="1.5rem"/>
+          <Logo name="rustfs" label="RustFS · 03" size="1.5rem"/></div>
+        <div class="svc"><span class="cap">Self-service</span>
+          <Logo name="crossplane" label="Crossplane · 04" size="1.5rem"/>
+          <Logo name="cloudbox" label="Console · 08" size="1.5rem"/></div>
+        <div class="svc"><span class="cap">Compute &amp; build</span>
+          <Logo name="knative" label="Knative · 06+09" size="1.5rem"/>
+          <Logo name="argo-workflows" label="CI · 07" size="1.5rem"/></div>
+        <div class="svc"><span class="cap">Connect &amp; observe</span>
+          <Logo name="nats" label="NATS · 09" size="1.5rem"/>
+          <Logo name="grafana" label="Victoria + OTel" size="1.5rem"/></div>
       </div>
     </div>
   </div>

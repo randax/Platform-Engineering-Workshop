@@ -18,6 +18,8 @@ Anyone whose laptop fundamentally can't run it goes straight to a lifeboat (pair
 -->
 
 ---
+transition: view-transition
+---
 
 # WiFi carries keystrokes, not gigabytes
 

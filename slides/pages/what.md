@@ -12,6 +12,7 @@ If cloudbox-init is still downloading for some people, say so now: "This next bi
 -->
 
 ---
+transition: view-transition
 layout: fact
 ---
 
@@ -36,6 +37,8 @@ The joke is true, and that's the good news. "The cloud" is not exotic hardware; 
 So the meme is our thesis, inverted: if a cloud is just someone else's computer, then your computer, plus the right open-source control plane, is a cloud. That's the whole workshop in one line.
 -->
 
+---
+transition: view-transition
 ---
 
 # What makes a computer a *cloud*
@@ -62,8 +65,6 @@ Now the punchline that sets up the table: Kubernetes is a control plane. Operato
 
 ---
 
-# The core primitives are all open source
-
 <div class="compare">
 <table>
 <thead><tr><th>Cloud primitive</th><th>What you'd rent</th><th>What you'll run today</th></tr></thead>
@@ -78,11 +79,10 @@ Now the punchline that sets up the table: Kubernetes is a control plane. Operato
 </table>
 </div>
 
-<div class="story mt-3"><span class="tag">BRUKTBY</span> &nbsp;The left column is everything Bruktby rented. The right column is what you'll run for them today — same primitive, minus the bill and the account.</div>
-
-<div class="mt-3 text-sm opacity-70">Modules 01–05 — the core. Top to bottom, in order.</div>
-
 <!--
+Say the heading, because the slide no longer carries it: the core primitives are all open source. Then the Bruktby line: the left column is everything Bruktby rented, the right column is what you run for them today, same primitive minus the bill and the account. These are modules 01 to 05, top to bottom, in order.
+
+
 Don't read the table aloud row by row — let them scan it, then make three points:
 
 - The left column is what a hyperscaler charges for. The right column is what runs on your laptop by lunch. Same primitive, both times — the operator on the right IS the managed service on the left, minus the bill and the account.
@@ -93,8 +93,6 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 -->
 
 ---
-
-# ...and so is everything above it
 
 <div class="compare">
 <table>
@@ -110,9 +108,10 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 </table>
 </div>
 
-<div class="mt-4 text-sm opacity-70">Serverless and the pipeline you build today · CI, the console and day-2 ops behind door 0.</div>
-
 <!--
+Say the heading, because the slide no longer carries it: and so is everything above it. Serverless and the pipeline are built today; CI, the console and day-2 ops sit behind door 0.
+
+
 The rest of the cloud, framed as "it doesn't stop at databases" — serverless and the pipeline are today's finale, the other three are door 0:
 
 - Serverless: scale-to-zero request-driven containers. Knative is the open engine underneath a lot of what you'd recognize — it's literally what Google Cloud Run is built on.
@@ -131,22 +130,22 @@ Say the tiering honestly: "The top two rows we do together — a platform that c
 <div class="grid grid-cols-2 gap-4 mt-2">
   <div v-click class="practice">
     <strong>GitOps</strong><br>
-    Git is the only way anything changes — every change a reviewable commit.
+    Every change is a reviewable commit.
     <div class="mod">module 02 · the loop you'll use all day</div>
   </div>
   <div v-click class="practice">
     <strong>Immutable infrastructure</strong><br>
-    No SSH, no drift. The whole machine is one declarative document.
+    No SSH. The machine is one document.
     <div class="mod">module 01 · Talos + Cilium</div>
   </div>
   <div v-click class="practice">
     <strong>Self-service</strong><br>
-    Declare what you want; the platform makes it real. Nobody files a ticket.
+    Declare it. No ticket, no queue.
     <div class="mod">module 04 · Crossplane</div>
   </div>
   <div v-click class="practice">
     <strong>Operators as control loops</strong><br>
-    The "managed service" is just software that reconciles toward your intent.
+    A managed service is a control loop.
     <div class="mod">module 03 · CloudNativePG</div>
   </div>
 </div>
@@ -176,14 +175,18 @@ These four are the transferable skills — the thing they take to work on Monday
         <span class="delivers">delivers everything below as a git commit</span>
       </div>
       <div class="services">
-        <Logo name="cloudnativepg" label size="1.6rem"/>
-        <Logo name="rustfs" size="1.6rem"/>
-        <Logo name="crossplane" label size="1.6rem"/>
-        <Logo name="knative" label size="1.6rem"/>
-        <Logo name="nats" label="NATS" size="1.6rem"/>
-        <Logo name="argo-workflows" label="CI · Workflows" size="1.6rem"/>
-        <Logo name="cloudbox" label size="1.6rem"/>
-        <Logo name="grafana" label="Victoria + OTel" size="1.6rem"/>
+        <div class="svc"><span class="cap">Data</span>
+          <Logo name="cloudnativepg" label size="1.5rem"/>
+          <Logo name="rustfs" label size="1.5rem"/></div>
+        <div class="svc"><span class="cap">Self-service</span>
+          <Logo name="crossplane" label size="1.5rem"/>
+          <Logo name="cloudbox" label size="1.5rem"/></div>
+        <div class="svc"><span class="cap">Compute &amp; build</span>
+          <Logo name="knative" label size="1.5rem"/>
+          <Logo name="argo-workflows" label="Workflows" size="1.5rem"/></div>
+        <div class="svc"><span class="cap">Connect &amp; observe</span>
+          <Logo name="nats" label="NATS" size="1.5rem"/>
+          <Logo name="grafana" label="Victoria + OTel" size="1.5rem"/></div>
       </div>
     </div>
   </div>

@@ -273,11 +273,16 @@
 .arch{margin-top:0.5rem;}
 .arch .laptop{border:2px dashed rgba(100,116,139,0.45);border-radius:16px;padding:0.7rem 1rem 1rem;}
 .arch .k8s{border:2px solid var(--jz-accent);border-radius:13px;padding:0.7rem 1rem 0.9rem;background:rgba(56,189,248,0.06);}
-.arch .band-title{font-size:0.74rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:800;color:var(--jz-ink);opacity:0.72;margin-bottom:0.55rem;display:flex;align-items:center;gap:0.5rem;}
+/* Was var(--jz-ink) (#0f172a), which is black on a dark slide. */
+.arch .band-title{font-size:0.74rem;text-transform:uppercase;letter-spacing:0.05em;font-weight:800;color:#cbd5e1;opacity:0.85;margin-bottom:0.55rem;display:flex;align-items:center;gap:0.5rem;}
 .arch .engine{display:flex;align-items:center;justify-content:center;gap:0.7rem;margin:0.2rem 0 0.9rem;flex-wrap:wrap;}
 .arch .arrow{color:var(--jz-accent);font-weight:900;font-size:1.3rem;}
-.arch .delivers{font-size:0.82rem;font-style:italic;color:var(--jz-rent);}
-.arch .services{display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem 0.9rem;}
+.arch .delivers{font-size:0.82rem;font-style:italic;color:#94a3b8;}
+/* Four labelled pairs instead of eight loose chips: the grouping is the point,
+   so the room reads relationships rather than an inventory. */
+.arch .services{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem 0.9rem;align-items:start;}
+.arch .svc{display:flex;flex-direction:column;gap:0.35rem;}
+.arch .svc .cap{font-size:0.58rem;text-transform:uppercase;letter-spacing:0.07em;font-weight:800;color:#94a3b8;}
 /* Closing callback: the same diagram, now every box green. */
 .arch.done .laptop{border-color:rgba(5,150,105,0.5);}
 .arch.done .k8s{border-color:var(--jz-run);background:rgba(5,150,105,0.09);}
@@ -438,3 +443,25 @@
 .bruktby-slide .bruktby-art{position:absolute;right:2.2rem;top:50%;transform:translateY(-50%);
   width:40%;border-radius:0.5rem;background:#f8fafc;}
 .bruktby-slide h1,.bruktby-slide h2,.bruktby-slide p,.bruktby-slide div:not(.bruktby-art){max-width:55%;}
+
+/* The layer slides as an actual stack. Each slide shows all five bars, filled up
+   to the one it is about, so the platform visibly builds from the metal upward.
+
+   Each bar carries its own view-transition-name, so when Slidev routes the
+   navigation through the View Transitions API the browser morphs bar N from the
+   old slide into bar N on the new one: the filled bars stay put and the next one
+   lights up, rather than the whole block cross-fading. That is the difference
+   between a diagram that animates and a diagram that flickers. */
+.layerstack{display:flex;flex-direction:column;gap:0.3rem;margin:0.6rem 0 0.9rem;}
+.layerstack .layer{display:flex;align-items:center;gap:0.6rem;padding:0.28rem 0.7rem;
+  border-radius:0.4rem;font-size:0.72rem;letter-spacing:0.02em;
+  border:1px solid rgba(148,163,184,0.28);color:#94a3b8;}
+.layerstack .layer .ln{font-weight:800;font-size:0.66rem;opacity:0.75;min-width:0.9rem;}
+/* Not reached yet: outlined, so the room can see what is still coming. */
+.layerstack .layer.off{border-style:dashed;opacity:0.4;}
+/* Already built: filled, and it stays filled on every later slide. */
+.layerstack .layer.on{background:rgba(56,189,248,0.10);border-color:rgba(56,189,248,0.35);color:#cbd5e1;}
+/* The one this slide is about. */
+.layerstack .layer.cur{background:rgba(56,189,248,0.22);border-color:var(--jz-accent);
+  color:#e2e8f0;font-weight:700;}
+@media (prefers-reduced-motion:reduce){.layerstack .layer{view-transition-name:none!important;}}

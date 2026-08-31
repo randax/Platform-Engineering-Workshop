@@ -14,6 +14,7 @@ Every hand that goes up is a person who already knows why they're here. Then: "L
 -->
 
 ---
+transition: view-transition
 layout: default
 class: bruktby-slide
 ---
@@ -72,6 +73,7 @@ Transition: "The usual answer is 'that's the price of the cloud.' Bruktby tried 
 -->
 
 ---
+transition: view-transition
 layout: fact
 ---
 
