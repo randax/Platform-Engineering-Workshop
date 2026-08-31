@@ -6,7 +6,7 @@ transition: view-transition
 # What you built today
 
 <!--
-Closing section — HARD-SCHEDULED: the last 10 minutes belong to this, protected even from the adventure hour. Peak-end rule: the room's memory of four hours is disproportionately set by its final minutes — an ending where people drift out mid-hack is remembered as a fizzle, this before/after replay is remembered as an achievement. Call the one signal 10 minutes before the end, wait for keyboards to actually stop, then run: the replay (next slide), the take-home path, and a 60-second close — ask the room for one word each on what they're taking home, or simply "look at what you built this morning vs now". End on accomplishment, not fatigue.
+Closing section, HARD-SCHEDULED: the last 10 minutes belong to this, protected even from the adventure hour. Peak-end rule: the room's memory of four hours is disproportionately set by its final minutes. An ending where people drift out mid-hack is remembered as a fizzle; this before/after replay is remembered as an achievement. Call the one signal 10 minutes before the end, wait for keyboards to actually stop, then run: the replay (next slide), the take-home path, and a 60-second close: ask the room for one word each on what they're taking home, or simply "look at what you built this morning vs now". End on accomplishment, not fatigue.
 -->
 
 ---
@@ -15,9 +15,9 @@ Closing section — HARD-SCHEDULED: the last 10 minutes belong to this, protecte
 
 <div class="arch done">
   <div class="laptop">
-    <div class="band-title"><Logo name="docker" size="1.3rem"/> Your laptop — still yours when the lid closes</div>
+    <div class="band-title"><Logo name="docker" size="1.3rem"/> Your laptop, still yours when the lid closes</div>
     <div class="k8s">
-      <div class="band-title"><Logo name="talos" size="1.3rem"/> <Logo name="cilium" size="1.3rem"/> ✅ Talos + Cilium · Kubernetes — running (01)</div>
+      <div class="band-title"><Logo name="talos" size="1.3rem"/> <Logo name="cilium" size="1.3rem"/> ✅ Talos + Cilium · Kubernetes, running (01)</div>
       <div class="engine">
         <Logo name="gitea" label size="1.7rem"/> <span class="arrow">→</span> <Logo name="argocd" label="Argo CD" size="1.7rem"/>
         <span class="delivers">✅ every box below, delivered by git (02)</span>
@@ -41,9 +41,9 @@ Closing section — HARD-SCHEDULED: the last 10 minutes belong to this, protecte
 </div>
 
 <!--
-The same diagram from the first ten minutes — but now every box on it is running on the laptops in this room. Walk it once more, fast, in the past tense: "you built an immutable OS layer with no kube-proxy; you gave your cluster its own git server and made git the only way anything changes; you became the RDS team and the S3 team; you shipped a self-service API on Crossplane v2; you debugged it like an SRE and fact-checked an AI agent doing the same; and some of you added serverless, in-cluster CI, a portal you can read, and an event-driven pipeline traced end to end."
+The same diagram from the first ten minutes, but now every box on it is running on the laptops in this room. Walk it once more, fast, in the past tense: "you built an immutable OS layer with no kube-proxy; you gave your cluster its own git server and made git the only way anything changes; you became the RDS team and the S3 team; you shipped a self-service API on Crossplane v2; you debugged it like an SRE and fact-checked an AI agent doing the same; and some of you added serverless, in-cluster CI, a portal you can read, and an event-driven pipeline traced end to end."
 
-Then the sovereignty callback: no account was created today. No bill will arrive. Nothing phones home. When the laptop lid closes, the cloud goes to sleep — and it wakes up still yours.
+Then the sovereignty callback: no account was created today. No bill will arrive. Nothing phones home. When the laptop lid closes, the cloud goes to sleep, and it wakes up still yours.
 
 The mental model is the real takeaway: cloud products are software plus an API, and every one of them has an open-source shape you can own.
 -->
@@ -69,7 +69,7 @@ The mental model is the real takeaway: cloud products are software plus an API, 
 <div class="mt-6 text-xl opacity-80">No account. No bill. No permission.</div>
 
 <!--
-The bookend: the opening's two rent-vs-run tables, folded into one — the left column was what you'd rent from a hyperscaler. Now the right column is running on the laptop in front of you, every row green.
+The bookend: the opening's two rent-vs-run tables, folded into one. The left column was what you'd rent from a hyperscaler. Now the right column is running on the laptop in front of you, every row green.
 
 Say it plainly: "Four hours ago this was a shopping list of things you pay for. Now it's a list of things you own." Then bring it home to Bruktby on the next slide.
 -->
@@ -80,15 +80,15 @@ Say it plainly: "Four hours ago this was a shopping list of things you pay for. 
 
 <div class="ba">
   <div class="before">
-    <h3>v1 — rented</h3>
+    <h3>v1: rented</h3>
     The same product, on a US hyperscaler. Three bills they didn't control:
     <br>• storage + egress on every listing photo
     <br>• user data under someone else's law
     <br>• a core service relicensed out from under them
   </div>
   <div class="after">
-    <h3>today — owned</h3>
-    Photos in, listings out — on a platform <em>they run</em>:
+    <h3>today: owned</h3>
+    Photos in, listings out, on a platform <em>they run</em>:
     <br>• data stays in Norway, provably
     <br>• no per-photo egress bill; scales to zero when quiet
     <br>• every component open-source and pinned: nobody can take back what already runs
@@ -96,15 +96,15 @@ Say it plainly: "Four hours ago this was a shopping list of things you pay for. 
 </div>
 
 <div class="mt-5 text-lg opacity-85">
-Same product. Same photo pipeline. A cloud they own — and the migration was ~9 open-source components and a laptop.
+Same product. Same photo pipeline. A cloud they own, and the migration was ~9 open-source components and a laptop.
 </div>
 
 <!--
-This is the payoff slide the whole story has been building to — say what the outcome actually IS, in Bruktby's terms, because "you built a cloud" is abstract until it's someone's real product.
+This is the payoff slide the whole story has been building to. Say what the outcome actually IS, in Bruktby's terms, because "you built a cloud" is abstract until it's someone's real product.
 
-Walk the two columns as a before/after: v1 wasn't wrong — it got them to market — but the three forces from the opening (price, jurisdiction, roadmap) each took a decision out of their hands. Today the identical product runs on infrastructure they control: the listings Postgres is CloudNativePG, the photos live in RustFS buckets on disks they own, the thumbnailer is a Knative service that costs nothing between uploads, and the whole thing was delivered by git and is traceable end to end. Data residency is now a fact they can prove to that B2B partner, not a region setting they hope is good enough.
+Walk the two columns as a before/after: v1 wasn't wrong, it got them to market, but the three forces from the opening (price, jurisdiction, roadmap) each took a decision out of their hands. Today the identical product runs on infrastructure they control: the listings Postgres is CloudNativePG, the photos live in RustFS buckets on disks they own, the thumbnailer is a Knative service that costs nothing between uploads, and the whole thing was delivered by git and is traceable end to end. Data residency is now a fact they can prove to that B2B partner, not a region setting they hope is good enough.
 
-The sentence to land: "The complete outcome of today isn't 'you learned Kubernetes.' It's that a real product can run — same features, same UX — on a cloud its team owns, and you just did the migration end to end." Then the sovereignty line one more time, and hand to take-home.
+The sentence to land: "The complete outcome of today isn't 'you learned Kubernetes.' It's that a real product can run, same features, same UX, on a cloud its team owns, and you just did the migration end to end." Then the sovereignty line one more time, and hand to take-home.
 -->
 
 ---
@@ -112,39 +112,39 @@ The sentence to land: "The complete outcome of today isn't 'you learned Kubernet
 # Take it home
 
 - Everything is public, pinned, Apache-2.0
-- `mise run catch-up <module>` — resume from anywhere
+- `mise run catch-up <module>` · resume from anywhere
 - Didn't finish your door? It's all still there
-- Your adventure briefing keeps going — `adventures/` was written for the couch
+- Your adventure briefing keeps going: `adventures/` was written for the couch
 - `git tag javazone-2026` = today, forever
 - Broken prereqs at home? Open an issue
 
 <!--
-The platform survives the room — that was the design goal, so make the path home concrete:
+The platform survives the room; that was the design goal, so make the path home concrete:
 
 - The repo (github.com/randax/Platform-Engineering-Workshop) contains labs, hints, solutions, scripts, and these slides. Apache 2.0: take it, fork it, run your cloud on your terms.
-- catch-up.sh <module> works on a fresh cluster at home exactly like it did here — you can rebuild to any module's end-state in minutes and continue from there. The solutions/ directory holds every canonical end-state.
+- catch-up.sh <module> works on a fresh cluster at home exactly like it did here. You can rebuild to any module's end-state in minutes and continue from there. The solutions/ directory holds every canonical end-state.
 - Door 0 was designed for the couch as much as for the room: in-cluster CI, the Console's source, day-2 ops. Nothing needs conference infrastructure.
-- The javazone-2026 tag freezes today's exact versions — in a year, when everything has drifted, the tag still builds.
-- And genuinely: broken prereqs or labs are OUR bug — issues welcome.
+- The javazone-2026 tag freezes today's exact versions. In a year, when everything has drifted, the tag still builds.
+- And genuinely: broken prereqs or labs are OUR bug; issues welcome.
 -->
 
 ---
 
 # Going deeper
 
-- Talos · Cilium — the metal layer
-- ArgoCD · Gitea — the delivery layer
-- CloudNativePG · RustFS — the data layer
-- Crossplane v2 · Knative · Zot — the platform layer
+- Talos · Cilium: the metal layer
+- ArgoCD · Gitea: the delivery layer
+- CloudNativePG · RustFS: the data layer
+- Crossplane v2 · Knative · Zot: the platform layer
 - All linked from the repo README
 
 <!--
-Further-reading pointers, one line each — the repo README links all of them so nobody needs to photograph this slide:
+Further-reading pointers, one line each; the repo README links all of them so nobody needs to photograph this slide:
 
-- talos.dev and cilium.io — go deeper on the OS and eBPF layers; Talos on real hardware (or a stack of NUCs) is the natural next step, and talos-box is the same machineconfig one rung down from it.
-- argo-cd.readthedocs.io and gitea — the app-of-apps and sync-wave patterns used today are documented ArgoCD idioms, not workshop inventions.
-- cloudnative-pg.io — backups, PITR, and replicas are where the operator really starts earning its keep; rustfs.com for where RustFS goes post-1.0 (and SeaweedFS as the alternative we'd reach for).
-- crossplane.io (make sure it says v2!), knative.dev, zotregistry.dev, backstage.io for the honest big-portal path, and the VictoriaMetrics stack (victoriametrics.com — VictoriaMetrics/VictoriaLogs/VictoriaTraces) fronted by Grafana and fed by the OpenTelemetry Collector for the on-demand observability layer.
+- talos.dev and cilium.io: go deeper on the OS and eBPF layers; Talos on real hardware (or a stack of NUCs) is the natural next step, and talos-box is the same machineconfig one rung down from it.
+- argo-cd.readthedocs.io and gitea: the app-of-apps and sync-wave patterns used today are documented ArgoCD idioms, not workshop inventions.
+- cloudnative-pg.io: backups, PITR, and replicas are where the operator really starts earning its keep; rustfs.com for where RustFS goes post-1.0 (and SeaweedFS as the alternative we'd reach for).
+- crossplane.io (make sure it says v2!), knative.dev, zotregistry.dev, backstage.io for the honest big-portal path, and the VictoriaMetrics stack (victoriametrics.com: VictoriaMetrics/VictoriaLogs/VictoriaTraces) fronted by Grafana and fed by the OpenTelemetry Collector for the on-demand observability layer.
 
 Also plug the ecosystem around this audience: CNCF meetups, GDG Bergen, and Plattformpodden (Norwegian-language platform-engineering podcast Hans co-hosts) for continuing the conversation.
 -->
@@ -158,23 +158,23 @@ layout: cover
 **Your laptop. Your cloud. Your terms.**
 
 <div class="pt-8 text-sm leading-relaxed opacity-85">
-  <strong>Øyvind Randa</strong> — Software Architect, NextGenTel · GDG Bergen<br>
-  <strong>Hans Kristian Flaatten</strong> — Platform Engineer, Norwegian Government · CNCF Ambassador · Plattformpodden
+  <strong>Øyvind Randa</strong> · Software Architect, NextGenTel · GDG Bergen<br>
+  <strong>Hans Kristian Flaatten</strong> · Platform Engineer, Norwegian Government · CNCF Ambassador · Plattformpodden
 </div>
 
 <div class="callout mt-8 mx-auto max-w-120">
   <code>github.com/randax/Platform-Engineering-Workshop</code><br>
-  <span class="svgi i-star"></span> it — then go run your cloud on your terms.
+  <span class="svgi i-star"></span> it, then go run your cloud on your terms.
 </div>
 
 <!--
-Final slide — leave it up during the protected tinkering time and the goodbyes.
+Final slide; leave it up during the protected tinkering time and the goodbyes.
 
-Thank JavaZone, and thank the room — with two of us up front, the neighbors who helped neighbors carried the day.
+Thank JavaZone, and thank the room: with two of us up front, the neighbors who helped neighbors carried the day.
 
 Invitations to end on:
-- "The cluster on your laptop is not a demo — it's yours. Keep it. Break it. Rebuild it with catch-up."
-- Find us afterwards — here, in the hallway, at the CNCF/GDG meetups, or via the repo. Both of us genuinely want to hear what you build (or what broke) when you run this at home.
+- "The cluster on your laptop is not a demo. It's yours. Keep it. Break it. Rebuild it with catch-up."
+- Find us afterwards: here, in the hallway, at the CNCF/GDG meetups, or via the repo. Both of us genuinely want to hear what you build (or what broke) when you run this at home.
 - Feedback: issues and PRs on the repo are the best thank-you there is.
 
 (If JavaZone provides a feedback QR/link for the session, put it on the projector next to this slide.)

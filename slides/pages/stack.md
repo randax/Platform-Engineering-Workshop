@@ -3,21 +3,21 @@ layout: section
 transition: view-transition
 ---
 
-# The stack — and *why*
+# The stack, and *why*
 
 Every box was a choice. Here's what we rejected, and the tradeoff we took.
 
 <!--
-This is the "experienced-engineer tax": the audience will not accept a shopping list without the reasoning behind it. Six fast slides, one per layer, each naming what we run, what we turned down, and the one-line tradeoff. Keep it moving — it's a menu with opinions, not a spec review. ~6–8 minutes total; skip to the layers people ask about if you're tight on time.
+This is the "experienced-engineer tax": the audience will not accept a shopping list without the reasoning behind it. Six fast slides, one per layer, each naming what we run, what we turned down, and the one-line tradeoff. Keep it moving. It's a menu with opinions, not a spec review. ~6–8 minutes total; skip to the layers people ask about if you're tight on time.
 
-Ground rule to state once, up front: nothing here is "best in class" in the abstract. Every pick is optimised for the same three constraints — fits a 16 GB laptop, runs fully offline, and is legible enough to read in a 4-hour workshop. A different set of constraints would give a different stack, and that's the real lesson.
+Ground rule to state once, up front: nothing here is "best in class" in the abstract. Every pick is optimised for the same three constraints: fits a 16 GB laptop, runs fully offline, and is legible enough to read in a 4-hour workshop. A different set of constraints would give a different stack, and that's the real lesson.
 -->
 
 ---
 transition: view-transition
 ---
 
-# Layer 1 — the metal & the network
+# Layer 1: the metal & the network
 
 <div class="layerstack">
   <div class="layer off"><span class="ln">5</span> messaging &amp; observability</div>
@@ -32,35 +32,35 @@ transition: view-transition
 <table>
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
-<tr><td>K8s OS</td><td><span class="we"><Logo name="talos" size="1.3rem"/> <b>Talos v1.13.8</b></span></td><td>kubeadm · minikube · kind</td><td>No shell, no SSH, no drift — you lose the escape hatch on purpose</td></tr>
-<tr><td>CNI + proxy</td><td><span class="we"><Logo name="cilium" size="1.3rem"/> <b>Cilium 1.20.0</b></span></td><td>flannel + kube-proxy</td><td>eBPF datapath, kube-proxy-free — needs kernel ≥5.10</td></tr>
+<tr><td>K8s OS</td><td><span class="we"><Logo name="talos" size="1.3rem"/> <b>Talos v1.13.8</b></span></td><td>kubeadm · minikube · kind</td><td>No shell, no SSH, no drift. You lose the escape hatch on purpose</td></tr>
+<tr><td>CNI + proxy</td><td><span class="we"><Logo name="cilium" size="1.3rem"/> <b>Cilium 1.20.0</b></span></td><td>flannel + kube-proxy</td><td>eBPF datapath, kube-proxy-free; needs kernel ≥5.10</td></tr>
 </tbody>
 </table>
 
 </div>
 
-<div class="mt-4 text-base opacity-85 text-center">The node is a <strong>document</strong> — and service traffic is answered <strong>in-kernel</strong>.</div>
+<div class="mt-4 text-base opacity-85 text-center">The node is a <strong>document</strong>, and service traffic is answered <strong>in-kernel</strong>.</div>
 
 <!--
-The two lines the table earns: the node is a declarative resource — one machineconfig, no shell to drift into. And there is no kube-proxy pod to find — eBPF answers service traffic in-kernel.
+The two lines the table earns: the node is a declarative resource, one machineconfig, no shell to drift into. And there is no kube-proxy pod to find; eBPF answers service traffic in-kernel.
 
 Talos: one machineconfig document over a gRPC API. kind stays in the repo as the
-strictly-more-robust fallback — a mutable node you can shell into, which is exactly
+strictly-more-robust fallback: a mutable node you can shell into, which is exactly
 what Talos refuses to be.
 
-Cilium: replaces kube-proxy entirely — no growing pile of iptables rules, identity-based
+Cilium: replaces kube-proxy entirely. No growing pile of iptables rules, identity-based
 policy, kubeProxyReplacement via KubePrism on :7445.
 
-Talos is the biggest identity shift of the day (module 01 goes deep). The pin matters: v1.13.8, never 1.12.x — cni:none docker clusters hung on readiness until the v1.13.0 fix (talos#12885). Default node memory limit is 2048 MB and the stack won't fit, so the scripts raise it (4096 CP / 6144 worker).
+Talos is the biggest identity shift of the day (module 01 goes deep). The pin matters: v1.13.8, never 1.12.x. cni:none docker clusters hung on readiness until the v1.13.0 fix (talos#12885). Default node memory limit is 2048 MB and the stack won't fit, so the scripts raise it (4096 CP / 6144 worker).
 
-Cilium tradeoff to name honestly: eBPF wants a modern kernel — a talos-box VM brings its own, and on the Docker substrate Docker Desktop macOS ships 6.10 and WSL2 6.6, both fine; the risk platform is exotic Linux firewalld/nftables setups. We keep kube-proxy-free for the wow factor but the fallback keeps kube-proxy to remove a nested-cgroup variable — robustness vs. wow is a real dial here.
+Cilium tradeoff to name honestly: eBPF wants a modern kernel. A talos-box VM brings its own, and on Docker, Docker Desktop macOS ships 6.10 and WSL2 6.6, both fine; the risk platform is exotic Linux firewalld/nftables setups. We keep kube-proxy-free for the wow factor but the fallback keeps kube-proxy to remove a nested-cgroup variable. Robustness vs. wow is a real dial here.
 -->
 
 ---
 transition: view-transition
 ---
 
-# Layer 2 — how everything ships
+# Layer 2: how everything ships
 
 <div class="layerstack">
   <div class="layer off"><span class="ln">5</span> messaging &amp; observability</div>
@@ -82,16 +82,16 @@ transition: view-transition
 
 </div>
 
-<div class="mt-4 text-base opacity-85 text-center">Your cloud has its <strong>own git server</strong> — the write path never leaves the laptop.</div>
+<div class="mt-4 text-base opacity-85 text-center">Your cloud has its <strong>own git server</strong>: the write path never leaves the laptop.</div>
 
 <!--
-Off-slide but said aloud: Gitea in the cluster, not GitHub — the write path is yours, and offline. App-of-apps + sync waves — restore the Application health check in argocd-cm, or the waves don't gate.
+Off-slide but said aloud: Gitea in the cluster, not GitHub. The write path is yours, and offline. App-of-apps + sync waves: restore the Application health check in argocd-cm, or the waves don't gate.
 
-Gitea: attendees can't push to our GitHub, and ~50 clusters polling anonymously through one venue NAT hit GitHub's per-IP limits. Single-pod SQLite, push-to-create, seeded by a Job. ArgoCD points only here — edit → push → converge, never touching the internet.
+Gitea: attendees can't push to our GitHub, and ~50 clusters polling anonymously through one venue NAT hit GitHub's per-IP limits. Single-pod SQLite, push-to-create, seeded by a Job. ArgoCD points only here: edit → push → converge, never touching the internet.
 
 ArgoCD over Flux (more controllers, less legible to teach) or raw kubectl (no reconciliation). Plain install.yaml with server-side apply beats Helm for teaching.
 
-The Git topology is the single most important architectural decision in the workshop — it's what makes the whole thing work at a venue with hostile WiFi. This replicates the CNOE idpbuilder pattern; idpbuilder itself is kind-only (issue #74) so we copy the pattern and its manifests, not the binary.
+The Git topology is the single most important architectural decision in the workshop. It's what makes the whole thing work at a venue with hostile WiFi. This replicates the CNOE idpbuilder pattern; idpbuilder itself is kind-only (issue #74) so we copy the pattern and its manifests, not the binary.
 
 ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; we have one cluster with disparate components, which is exactly the app-of-apps shape. Crossplane's CRDs blow the 262KB client-side annotation limit, so CRD-heavy apps get ServerSideApply=true; CR-shipping apps get SkipDryRunOnMissingResource=true.
 -->
@@ -100,7 +100,7 @@ ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; 
 transition: view-transition
 ---
 
-# Layer 3 — the data services
+# Layer 3: the data services
 
 <div class="layerstack">
   <div class="layer off"><span class="ln">5</span> messaging &amp; observability</div>
@@ -115,34 +115,34 @@ transition: view-transition
 <table>
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
-<tr><td>Managed Postgres</td><td><span class="we"><Logo name="cloudnativepg" size="1.3rem"/> <b>CloudNativePG 1.28.4</b></span></td><td>bitnami/stock PG · RDS</td><td>A real control loop (failover, backup) vs. a bare pod — costs CRDs</td></tr>
-<tr><td>Object storage (S3)</td><td><span class="we"><Logo name="rustfs" size="1.3rem"/> <b>RustFS 1.0.0-rc.2</b></span></td><td>MinIO</td><td>Apache-2.0, ~90 MB — but young; SeaweedFS is the rehearsed Plan B</td></tr>
-<tr><td>OCI registry</td><td><span class="we"><Logo name="zot" size="1.3rem"/> <b>v2.1.20</b></span></td><td>Harbor · registry:2</td><td>One CNCF binary + UI vs. a Postgres/Redis/Trivy fleet — fewer features</td></tr>
-<tr><td>Storage class</td><td><span class="we"><Logo name="localpath" text="local-path" size="1.3rem"/> <b>v0.0.37</b></span></td><td>Longhorn · Ceph CSI</td><td>Node-local, no snapshots/replication — right for one node</td></tr>
+<tr><td>Managed Postgres</td><td><span class="we"><Logo name="cloudnativepg" size="1.3rem"/> <b>CloudNativePG 1.28.4</b></span></td><td>bitnami/stock PG · RDS</td><td>A real control loop (failover, backup) vs. a bare pod; costs CRDs</td></tr>
+<tr><td>Object storage (S3)</td><td><span class="we"><Logo name="rustfs" size="1.3rem"/> <b>RustFS 1.0.0-rc.2</b></span></td><td>MinIO</td><td>Apache-2.0, ~90 MB, but young; SeaweedFS is the rehearsed Plan B</td></tr>
+<tr><td>OCI registry</td><td><span class="we"><Logo name="zot" size="1.3rem"/> <b>v2.1.20</b></span></td><td>Harbor · registry:2</td><td>One CNCF binary + UI vs. a Postgres/Redis/Trivy fleet; fewer features</td></tr>
+<tr><td>Storage class</td><td><span class="we"><Logo name="localpath" text="local-path" size="1.3rem"/> <b>v0.0.37</b></span></td><td>Longhorn · Ceph CSI</td><td>Node-local, no snapshots/replication; right for one node</td></tr>
 </tbody>
 </table>
 
 </div>
 
-<div class="mt-4 text-base opacity-85 text-center">CNPG <strong>is</strong> the RDS control loop — and the RustFS row is the roadmap-risk story, lived.</div>
+<div class="mt-4 text-base opacity-85 text-center">CNPG <strong>is</strong> the RDS control loop, and the RustFS row is the roadmap-risk story, lived.</div>
 
 <!--
-Say it, don't show it: CNPG is the RDS control loop — a Cluster CR, not a Postgres pod. And RustFS-not-MinIO: MinIO's community edition was gutted for proprietary AIStor.
+Say it, don't show it: CNPG is the RDS control loop, a Cluster CR, not a Postgres pod. And RustFS-not-MinIO: MinIO's community edition was gutted for proprietary AIStor.
 
 CNPG: a Cluster CR reconciles into primary + replica with backups and failover. Bitnami's chart is just a Postgres pod.
 
-RustFS: MinIO's community edition was gutted through 2025–26 in favour of proprietary AIStor — the exact roadmap risk this workshop is about. Say it precisely: RustFS is NOT a MinIO successor, it's an independent Apache-2.0 rewrite.
+RustFS: MinIO's community edition was gutted through 2025–26 in favour of proprietary AIStor. That is the exact roadmap risk this workshop is about. Say it precisely: RustFS is NOT a MinIO successor, it's an independent Apache-2.0 rewrite.
 
 CloudNativePG uses Postgres 18.4; the CRDs are far past the 262KB annotation limit so the ArgoCD app is ServerSideApply=true.
 
-RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed cluster!), ~90 MB idle, presigned GET/PUT work, presigned POST doesn't, IAM is console-first, security history is rough (that's teachable material). Switch triggers to SeaweedFS are written down for mid-August. Zot: anonymous read/write on purpose (workshop-grade), search + UI extensions on for a visible win at http://zot.cloudbox.k8s.test. Harbor would be the right enterprise pick and the wrong workshop pick — Postgres, Redis, Trivy, ChartMuseum, many pods.
+RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed cluster!), ~90 MB idle, presigned GET/PUT work, presigned POST doesn't, IAM is console-first, security history is rough (that's teachable material). Switch triggers to SeaweedFS are written down for mid-August. Zot: anonymous read/write on purpose (workshop-grade), search + UI extensions on for a visible win at http://zot.cloudbox.k8s.test. Harbor would be the right enterprise pick and the wrong workshop pick: Postgres, Redis, Trivy, ChartMuseum, many pods.
 -->
 
 ---
 transition: view-transition
 ---
 
-# Layer 4 — self-service & compute
+# Layer 4: self-service & compute
 
 <div class="layerstack">
   <div class="layer off"><span class="ln">5</span> messaging &amp; observability</div>
@@ -157,9 +157,9 @@ transition: view-transition
 <table>
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
-<tr><td>Self-service API</td><td><span class="we"><Logo name="crossplane" size="1.3rem"/> <b>Crossplane v2.3.4</b></span></td><td>Helm/operators · Crossplane v1</td><td>Namespaced XRs compose real K8s resources — needs per-group RBAC</td></tr>
-<tr><td>Serverless</td><td><span class="we"><Logo name="knative" size="1.3rem"/> <b>Knative v1.23</b></span></td><td>plain Deployments · KEDA</td><td>Scale-to-zero + request buffering — an activator in the path</td></tr>
-<tr><td>In-cluster CI</td><td><span class="we"><Logo name="argo-workflows" size="1.3rem"/> <b>Argo Workflows v4.1.1 + BuildKit</b></span></td><td>Tekton · external CI</td><td>Rootless image builds, no cloud — needs a PSA-privileged namespace</td></tr>
+<tr><td>Self-service API</td><td><span class="we"><Logo name="crossplane" size="1.3rem"/> <b>Crossplane v2.3.4</b></span></td><td>Helm/operators · Crossplane v1</td><td>Namespaced XRs compose real K8s resources; needs per-group RBAC</td></tr>
+<tr><td>Serverless</td><td><span class="we"><Logo name="knative" size="1.3rem"/> <b>Knative v1.23</b></span></td><td>plain Deployments · KEDA</td><td>Scale-to-zero + request buffering; an activator in the path</td></tr>
+<tr><td>In-cluster CI</td><td><span class="we"><Logo name="argo-workflows" size="1.3rem"/> <b>Argo Workflows v4.1.1 + BuildKit</b></span></td><td>Tekton · external CI</td><td>Rootless image builds, no cloud; needs a PSA-privileged namespace</td></tr>
 </tbody>
 </table>
 
@@ -168,24 +168,24 @@ transition: view-transition
 <div class="mt-4 text-base opacity-85 text-center">One YAML becomes a stack · zero becomes a pod · your cluster <strong>builds its own images</strong>.</div>
 
 <!--
-Spoken, not projected: Crossplane v2 — Claims are gone, a namespaced XR IS the API. Knative — scale-to-zero, which is what Cloud Run is built on. BuildKit — rootless, in-cluster, pushes to your own Zot.
+Spoken, not projected: Crossplane v2: Claims are gone, a namespaced XR IS the API. Knative: scale-to-zero, which is what Cloud Run is built on. BuildKit: rootless, in-cluster, pushes to your own Zot.
 
-Crossplane v2: pipeline compositions emit arbitrary K8s resources — ours literally composes a CNPG Cluster.
+Crossplane v2: pipeline compositions emit arbitrary K8s resources. Ours literally composes a CNPG Cluster.
 
 Knative: plain Deployments are always-on, and KEDA won't buffer the first request.
 
 BuildKit: Kaniko was archived June 2025.
 
-Crossplane v2: the v1 tutorials (Claims, provider-kubernetes Object-wrapping) are actively misleading now — one slide in module 04 warns about this. v2 needs an aggregated ClusterRole per composed third-party API group because it composes resources directly; budget ~0.7–1 GiB. The Function package is fetched straight from the registry (not the node image cache), so enable Crossplane while internet is available or mirror the xpkg into Zot.
+Crossplane v2: the v1 tutorials (Claims, provider-kubernetes Object-wrapping) are actively misleading now; one slide in module 04 warns about this. v2 needs an aggregated ClusterRole per composed third-party API group because it composes resources directly; budget ~0.7–1 GiB. The Function package is fetched straight from the registry (not the node image cache), so enable Crossplane while internet is available or mirror the xpkg into Zot.
 
-Knative: Kourier ingress (not Gateway API — not in Cilium's conformance matrix), requests halved via the k0s-blog pattern → ~0.6 GiB. BuildKit rootless needs seccomp/AppArmor Unconfined, which Talos's default PSA baseline forbids — so the build namespace is labelled pod-security.kubernetes.io/enforce=privileged. Unrehearsed combo; spiked early.
+Knative: Kourier ingress (not Gateway API; not in Cilium's conformance matrix), requests halved via the k0s-blog pattern → ~0.6 GiB. BuildKit rootless needs seccomp/AppArmor Unconfined, which Talos's default PSA baseline forbids, so the build namespace is labelled pod-security.kubernetes.io/enforce=privileged. Unrehearsed combo; spiked early.
 -->
 
 ---
 transition: view-transition
 ---
 
-# Layer 5 — messaging & observability
+# Layer 5: messaging & observability
 
 <div class="layerstack">
   <div class="layer on cur"><span class="ln">5</span> messaging &amp; observability</div>
@@ -201,8 +201,8 @@ transition: view-transition
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
 <tr><td>Durable messaging</td><td><span class="we"><Logo name="nats" size="1.3rem"/> <b>NATS 2.14 + JetStream</b></span></td><td>Kafka · RabbitMQ</td><td>The durable primitive in ~15 MB of Go vs. GBs of JVM/Erlang</td></tr>
-<tr><td>Observability</td><td><span class="we"><Logo name="victoriametrics" size="1.3rem"/> <Logo name="grafana" size="1.3rem"/> <Logo name="opentelemetry" size="1.3rem"/> <b>Victoria stack + OTel</b></span></td><td>kube-prometheus-stack · otel-lgtm · LGTM</td><td>Assembled from parts — but ~1 GiB, not several, and it fits</td></tr>
-<tr><td>Day-2 AI agent</td><td><span class="we"><Logo name="kagent" size="1.3rem"/> <b>kagent 0.9.12 + qwen3:1.7b</b></span></td><td>hosted AIOps · k8sgpt</td><td>An Agent is a CRD — but the model runs host-side, and it only ever gets read-only eyes</td></tr>
+<tr><td>Observability</td><td><span class="we"><Logo name="victoriametrics" size="1.3rem"/> <Logo name="grafana" size="1.3rem"/> <Logo name="opentelemetry" size="1.3rem"/> <b>Victoria stack + OTel</b></span></td><td>kube-prometheus-stack · otel-lgtm · LGTM</td><td>Assembled from parts, but ~1 GiB, not several, and it fits</td></tr>
+<tr><td>Day-2 AI agent</td><td><span class="we"><Logo name="kagent" size="1.3rem"/> <b>kagent 0.9.12 + qwen3:1.7b</b></span></td><td>hosted AIOps · k8sgpt</td><td>An Agent is a CRD, but the model runs host-side and only ever gets read-only eyes</td></tr>
 </tbody>
 </table>
 
@@ -211,13 +211,13 @@ transition: view-transition
 <div class="mt-4 text-base opacity-85 text-center">Durable messaging in <strong>~15 MB</strong> · full observability in <strong>~1 GiB</strong>.</div>
 
 <!--
-Spoken: NATS JetStream — durable streams on a PVC for a rounding error of Kafka's RAM. The whole Victoria stack fits in ~1 GiB where LGTM wants several. Datasource plugins are baked into the Grafana image — nothing fetched at boot.
+Spoken: NATS JetStream is durable streams on a PVC for a rounding error of Kafka's RAM. The whole Victoria stack fits in ~1 GiB where LGTM wants several. Datasource plugins are baked into the Grafana image; nothing fetched at boot.
 
 Observability is the sharpest tradeoff on this slide. OTel Collector (agent DaemonSet + gateway) feeds VictoriaMetrics (PromQL), VictoriaLogs (LogsQL) and VictoriaTraces (Jaeger API), fronted by Grafana.
 
-VM's columnar TSDB + vmrange histograms hold it to ~1 GiB where kube-prometheus-stack or full LGTM want several. And unlike single-pod otel-lgtm, there's a REAL collector — so more than three apps actually emit telemetry.
+VM's columnar TSDB + vmrange histograms hold it to ~1 GiB where kube-prometheus-stack or full LGTM want several. And unlike single-pod otel-lgtm, there's a REAL collector, so more than three apps actually emit telemetry.
 
-Pins: NATS 2.14.5; VictoriaMetrics 1.150.0, VictoriaLogs 1.52.0, VictoriaTraces 0.10.0, Grafana 13.1.3, OTel Collector contrib 0.158.0; kagent 0.9.12 with qwen3:1.7b on host-side Ollama — never in-cluster, so it can't compete with the cluster for memory (module 10). Observability is on-demand — enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
+Pins: NATS 2.14.5; VictoriaMetrics 1.150.0, VictoriaLogs 1.52.0, VictoriaTraces 0.10.0, Grafana 13.1.3, OTel Collector contrib 0.158.0; kagent 0.9.12 with qwen3:1.7b on host-side Ollama, never in-cluster, so it can't compete with the cluster for memory (module 10). Observability is on-demand: enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
 
-The four things we rejected, precisely: kube-prometheus-stack (heavy, and no traces at all); single-pod otel-lgtm (no real Collector — only the three instrumented apps push anything, which is the gap #57 closed); full Grafana LGTM = Loki+Tempo+Mimir (GBs); and the OTel Demo (~6 GB). "Assembled, not a blob" is the honest description: OTel Collector contrib for filelog/kubeletstats/k8s_cluster receivers, three Victoria single-node stores, Grafana wiring them as native MetricsQL/LogsQL plugins plus the built-in Jaeger type — every piece readable, and the whole thing an on-demand ~1 GiB.
+The four things we rejected, precisely: kube-prometheus-stack (heavy, and no traces at all); single-pod otel-lgtm (no real Collector; only the three instrumented apps push anything, which is the gap #57 closed); full Grafana LGTM = Loki+Tempo+Mimir (GBs); and the OTel Demo (~6 GB). "Assembled, not a blob" is the honest description: OTel Collector contrib for filelog/kubeletstats/k8s_cluster receivers, three Victoria single-node stores, Grafana wiring them as native MetricsQL/LogsQL plugins plus the built-in Jaeger type. Every piece readable, and the whole thing an on-demand ~1 GiB.
 -->

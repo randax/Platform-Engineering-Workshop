@@ -58,7 +58,7 @@ layout: cover
 <div class="callout mt-5 mx-auto max-w-130">
   <strong>Did you run the prework?</strong><br>
   <code>mise run preflight</code> must be all green.<br>
-  Not green? Start <strong>now</strong> — or grab one of us.
+  Not green? Start <strong>now</strong>, or grab one of us.
 </div>
 
 <div class="abs-br m-6 text-sm opacity-60">
@@ -69,9 +69,9 @@ layout: cover
 Welcome! While people trickle in, this slide does the most important job of the day: getting everyone to run the pre-flight check immediately.
 
 - Introduce yourselves briefly: Øyvind (NextGenTel, GDG Bergen) and Hans (platform engineer in the Norwegian Government, CNCF Ambassador, co-host of Plattformpodden).
-- Point at the callout: "If you haven't run the three prework scripts, start `mise run init` RIGHT NOW — it pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
-- Repo URL is at the bottom — it's public, everything (labs, solutions, slides) lives there, and it will keep working after today.
-- Staffing: it's the two of you and nobody else — say so, and explain the sticky notes briefly (more in a few slides).
+- Point at the callout: "If you haven't run the three prework scripts, start `mise run init` RIGHT NOW. It pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
+- Repo URL is at the bottom. It's public, everything (labs, solutions, slides) lives there, and it keeps working after today.
+- Staffing: it's the two of you and nobody else. Say so, and explain the sticky notes briefly (more in a few slides).
 
 Timing: ~10 minutes for the cover + "why", then module 00's GO slide puts hands on keyboards at minute 10. The pre-flight runs in the background while the concept sections play; we triage it just before module 01.
 -->
@@ -136,11 +136,11 @@ transition: view-transition
 </div>
 
 <!--
-Say this as the contract for the day, and keep it short — it is a promise slide, not a lecture. These are capabilities, deliberately not a tool list: nobody remembers "Crossplane v2" a month later, but "I replaced a ticket queue with an API" sticks.
+Say this as the contract for the day, and keep it short. It is a promise slide, not a lecture. These are capabilities, not a tool list: nobody remembers "Crossplane v2" a month later, but "I replaced a ticket queue with an API" sticks.
 
 The one to land hardest is the last. Everything here keeps working after you close the lid: no trial, no account, no bill. That is the whole argument of the workshop compressed into one line.
 
-If the room is running late, this slide can be read in twenty seconds — it is scaffolding for what follows, and every item gets built for real later.
+If the room is running late, read this slide in twenty seconds. Every item gets built for real later.
 -->
 
 ---
@@ -160,7 +160,7 @@ If the room is running late, this slide can be read in twenty seconds — it is 
 <!--
 Five tips, thirty seconds, then move. Do not turn this into a lecture on how to learn.
 
-"Try before you open a hint" is the one that changes behaviour: the hints are free and uncounted, and the last one is always the full answer, so nobody is being tested. The ask is only that they spend a minute thinking first — that minute is where the learning actually happens.
+"Try before you open a hint" is the one that changes behaviour: the hints are free and uncounted, and the last one is always the full answer, so nobody is being tested. The ask is only a minute of thinking first. That minute is where the learning happens.
 
 Say the catch-up line without shame in your voice, because the room takes its cue from you: "catch-up is not failure, it is how this workshop absorbs variance." An attendee who believes that will experiment; one who does not will sit frozen at a broken cluster rather than skip ahead.
 
@@ -168,7 +168,7 @@ The explain-back is the cheapest quality gate in the day. Two minutes at each mo
 
 "Why this, not that?" is an invitation, and you should mean it: the stack slides carry a Rejected column for exactly this reason. Being asked to defend Talos over kubeadm in front of the room is a good outcome, not an interruption.
 
-The AI tip is the one to say in your own words, because the room will assume you mean the opposite. We are not banning agents — a later slide says they are explicitly welcome and the repo itself tells them to coach rather than solve. The point is narrower and worth being blunt about: if you paste the lab into an agent and paste its answer back, you will finish the module and leave with nothing. The cluster goes home with you; the understanding only does if you built it.
+The AI tip is the one to say in your own words, because the room will assume you mean the opposite. We are not banning agents. A later slide welcomes them, and the repo itself tells them to coach rather than solve. The narrower point is worth being blunt about: paste the lab into an agent and paste its answer back, and you finish the module with nothing. The cluster goes home with you; the understanding only does if you built it.
 
 Frame it as self-interest rather than a rule. Nobody is checking, there is no penalty, and the last hint is the full answer anyway. The person who lets an agent drive is not cheating the workshop, they are cheating themselves out of the one thing a video or a chatbot could not have given them.
 

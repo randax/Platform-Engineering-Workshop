@@ -9,12 +9,12 @@ transition: view-transition
 
 <div class="modlogos"><Logo name="argo-workflows" label="Argo Workflows" size="2.6rem"/> <Logo name="buildkit" label size="2.6rem"/> <Logo name="zot" label size="2.6rem"/></div>
 
-<div class="story"><span class="tag">BRUKTBY</span> &nbsp;They build and ship their own images in-cluster — no Docker Hub, no cloud-build minutes. The pipeline never leaves their cloud.</div>
+<div class="story"><span class="tag">BRUKTBY</span> &nbsp;They build and ship their own images in-cluster. No Docker Hub, no cloud-build minutes. The pipeline never leaves their cloud.</div>
 
 <!--
-Door-0 reference — never presented as a section; the room reaches this through the pivot, and these slides serve door-0 walkers and the published deck.
+Door-0 reference, never presented as a section; the room reaches this through the pivot, and these slides serve door-0 walkers and the published deck.
 
-Demo-backed module: rootless BuildKit on Talos is pioneer territory (nobody has published this combo), so the projector shows the golden path — as an opt-in demo inside the door block, ~3:20 — and the lab stays available for the brave and for home.
+Demo-backed module: rootless BuildKit on Talos is pioneer territory (nobody has published this combo), so the projector shows the golden path as an opt-in demo inside the door block, ~3:20, and the lab stays available for the brave and for home.
 -->
 
 ---
@@ -33,20 +33,20 @@ flowchart LR
 - Git → build → push → deploy: all in-cluster
 
 <div class="mt-6 text-sm opacity-75">
-<span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> CodeBuild + ECR · Cloud Build + Artifact Registry — the whole build-and-ship pipeline, running inside your own cluster with zero external services.
+<span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> CodeBuild + ECR · Cloud Build + Artifact Registry. The whole build-and-ship pipeline, inside your own cluster, zero external services.
 </div>
 
 <!--
 The concept: CI is the last thing teams believe they can't self-host ("but we need GitHub Actions!"). Strip the branding and a build is just a pod doing elevated filesystem tricks, and a registry is a single binary.
 
-The 2026 stack, accurately: Kaniko — the old in-cluster build answer — is archived/dead. Rootless BuildKit is its replacement. Zot is the CNCF registry, one small binary. Argo Workflows orchestrates: clone from the in-cluster Gitea, build with BuildKit, push to Zot, deploy. Every hop of git → build → push → deploy happens inside the laptop's cluster — zero external services.
+The 2026 stack, accurately: Kaniko, the old in-cluster build answer, is archived/dead. Rootless BuildKit is its replacement. Zot is the CNCF registry, one small binary. Argo Workflows orchestrates: clone from the in-cluster Gitea, build with BuildKit, push to Zot, deploy. Every hop of git → build → push → deploy happens inside the laptop's cluster. Zero external services.
 
-One honest detail worth teaching: the builds namespace is labeled PSA-privileged, because rootless BuildKit needs an unconfined seccomp profile. Finding that label and understanding why it exists is part of the lab — security boundaries for builds are a real platform-team concern, not workshop trivia.
+One honest detail worth teaching: the builds namespace is labeled PSA-privileged, because rootless BuildKit needs an unconfined seccomp profile. Finding that label and understanding why it exists is part of the lab; security boundaries for builds are a real platform-team concern, not workshop trivia.
 
-Honesty note from the lab README, worth repeating from the front: this is the least-rehearsed path in the workshop — rootless BuildKit on Talos has no published prior art. It's a presenter demo first, self-paced lab second. If it fights you, watch the demo, file the scars, move on.
+Honesty note from the lab README, worth repeating from the front: this is the least-rehearsed path in the workshop; rootless BuildKit on Talos has no published prior art. It's a presenter demo first, self-paced lab second. If it fights you, watch the demo, file the scars, move on.
 -->
 
-----
+---
 
 # See it
 
@@ -59,9 +59,9 @@ Honesty note from the lab README, worth repeating from the front: this is the le
 Hold this up while the room works, or come back to it at the walk-through. It is the Console from module 08 showing what they just built, so say plainly that they have not built the Console yet: this is what module 08 gives them a view of.
 -->
 
---
+---
 
-# GO — Module 07
+# GO: Module 07
 
 **Outcome:** an image built in-cluster, in your registry, running.
 
@@ -75,13 +75,13 @@ cd lab/07-ci && ./verify.sh
 <div class="urls"><span class="ulabel">open when green</span><code>zot.cloudbox.k8s.test/v2/_catalog</code></div>
 
 <!--
-The demo (~5 min, announced at the pivot for ~3:20, opt-in — never call the room back for it): enable both catalog apps on the projector cluster, submit the build workflow, follow it to Succeeded, then prove the artifact is real by querying Zot's OCI API (/v2/ endpoints on NodePort 30500) — and run the freshly built image via GitOps.
+The demo (~5 min, announced at the pivot for ~3:20, opt-in; never call the room back for it): enable both catalog apps on the projector cluster, submit the build workflow, follow it to Succeeded, then prove the artifact is real by querying Zot's OCI API (/v2/ endpoints on NodePort 30500), then run the freshly built image via GitOps.
 
 Then self-paced for those who want it: the same flow with the tiny app in lab/07-ci/app/ (a Dockerfile + one HTML page, already in everyone's Gitea because the whole repo was seeded).
 
 The two beats to narrate during the demo:
-1. The workflow's build step is just a pod — show it in kubectl get pods -n builds while it runs.
+1. The workflow's build step is just a pod; show it in kubectl get pods -n builds while it runs.
 2. The registry answer: curl Zot's /v2/_catalog and there's the image. "Your registry. Your build. No Docker Hub, no GitHub Actions, no external anything."
 
-Floor note for self-paced attempts: workflow stuck in Pending is usually the PSA label question from the README; build failures inside BuildKit are the deep end — that's what restore/`catch-up.sh 7` and the demo recording are for.
+Floor note for self-paced attempts: workflow stuck in Pending is usually the PSA label question from the README; build failures inside BuildKit are the deep end; that's what restore/`catch-up.sh 7` and the demo recording are for.
 -->
