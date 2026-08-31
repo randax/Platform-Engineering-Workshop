@@ -80,6 +80,8 @@ cd lab/02-gitops && ./verify.sh
 
 <span class="badge">20 min</span> · behind? `mise run catch-up 2`
 
+<div class="urls"><span class="ulabel">open when green</span><code>gitea.cloudbox.k8s.test</code> <code>argocd.cloudbox.k8s.test</code></div>
+
 <!--
 Two scripts install the machinery: bootstrap-gitops.sh puts Gitea and ArgoCD into the cluster; seed-gitea.sh pushes this repository into the in-cluster Gitea (the cloudbox/platform repo).
 

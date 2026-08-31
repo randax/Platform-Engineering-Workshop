@@ -227,6 +227,8 @@ cd lab/08-portal && ./verify.sh
 
 <span class="badge">~20 min</span> · then read the source: `apps/portal/`
 
+<div class="urls"><span class="ulabel">open when green</span><code>portal.cloudbox.k8s.test</code></div>
+
 <!--
 The Console has been running since the capstone's setup enabled portal.yaml — this module is about what's inside it. The task: explore the Console at http://portal.cloudbox.k8s.test and for each page answer "which Kubernetes API is this?" — they installed every one of them today.
 

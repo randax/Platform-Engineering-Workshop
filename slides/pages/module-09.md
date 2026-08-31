@@ -102,6 +102,8 @@ cd lab/09-capstone && ./verify.sh
 
 <span class="badge">25 min</span> · trophy: the trace in Grafana
 
+<div class="urls"><span class="ulabel">open when green</span><code>portal.cloudbox.k8s.test/gallery</code> <code>grafana.cloudbox.k8s.test</code></div>
+
 <!--
 The task: enable three catalog files in one push — portal.yaml (the Console, which is where you upload; module 08 on door 0 is about reading its source, not about turning it on), knative-eventing.yaml (the Broker/Trigger machinery in ns knative-eventing) and picture-pipeline.yaml (ns pipeline: Broker, uploader + resizer as cluster-local ksvcs, the Trigger, and a Job creating the images bucket); Eventing's webhook takes a minute and the pipeline app retries until it's up, same dance as module 06.
 

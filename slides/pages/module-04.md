@@ -29,11 +29,6 @@ flowchart LR
 - You own **both** sides of the API
 - `aws rds create-db-instance` — but yours
 
-<figure class="shot">
-  <img src="/console/new-application-dark.png" alt="the same XR, as a form (module 08)" />
-  <figcaption>the same XR, as a form (module 08)</figcaption>
-</figure>
-
 <!--
 The concept: developers shouldn't need to know CNPG, storage classes, or RustFS endpoints. Platform engineering is building the abstraction — you define WHAT can be asked for (an XRD: the WorkshopDatabase schema), and HOW it's fulfilled (a Composition), and developers just write a 10-line resource.
 
@@ -66,7 +61,20 @@ Field guide for the room: if you (or your AI assistant) see `kind: Claim`, `clai
 This lands twice: it's a real operational skill (knowing which major version your sources describe), and it foreshadows module 05's theme — plausible, confident, out-of-date answers are exactly what agents produce when their training data lags the ecosystem.
 -->
 
----
+----
+
+# See it
+
+<figure class="bigshot">
+  <img src="/console/new-application-dark.png" alt="The same XR you just authored, rendered as a form. One submit composes a workload, a database and a bucket." />
+  <figcaption>The same XR you just authored, rendered as a form. One submit composes a workload, a database and a bucket.</figcaption>
+</figure>
+
+<!--
+Hold this up while the room works, or come back to it at the walk-through. It is the Console from module 08 showing what they just built, so say plainly that they have not built the Console yet: this is what module 08 gives them a view of.
+-->
+
+--
 
 # GO — Module 04
 
@@ -78,6 +86,8 @@ cd lab/04-self-service && ./verify.sh
 ```
 
 <span class="badge">20 min</span> · behind? `mise run catch-up 4`
+
+<div class="urls"><span class="ulabel">open when green</span><code>argocd.cloudbox.k8s.test</code></div>
 
 <!--
 The task: enable crossplane.yaml from the catalog (installs Crossplane v2, the patch-and-transform function, and the RBAC letting it manage CNPG Clusters and Jobs). Ship the platform API — the XRD and the Composition from the lab's platform/ dir — as a new component via git. Then be the developer: push the 10-line example WorkshopDatabase and watch the XR, the composed CNPG Cluster, and the bucket Job appear.

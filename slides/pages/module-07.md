@@ -36,11 +36,6 @@ flowchart LR
 <span class="svgi i-cloud"></span> <strong>Cloud parallel:</strong> CodeBuild + ECR · Cloud Build + Artifact Registry — the whole build-and-ship pipeline, running inside your own cluster with zero external services.
 </div>
 
-<figure class="shot">
-  <img src="/console/deploy-from-source-dark.png" alt="build and deploy from source (module 08)" />
-  <figcaption>build and deploy from source (module 08)</figcaption>
-</figure>
-
 <!--
 The concept: CI is the last thing teams believe they can't self-host ("but we need GitHub Actions!"). Strip the branding and a build is just a pod doing elevated filesystem tricks, and a registry is a single binary.
 
@@ -51,7 +46,20 @@ One honest detail worth teaching: the builds namespace is labeled PSA-privileged
 Honesty note from the lab README, worth repeating from the front: this is the least-rehearsed path in the workshop — rootless BuildKit on Talos has no published prior art. It's a presenter demo first, self-paced lab second. If it fights you, watch the demo, file the scars, move on.
 -->
 
----
+----
+
+# See it
+
+<figure class="bigshot">
+  <img src="/console/deploy-from-source-dark.png" alt="Build from source, in your own cluster: BuildKit builds it, Zot stores it, Knative runs it. No cloud CI." />
+  <figcaption>Build from source, in your own cluster: BuildKit builds it, Zot stores it, Knative runs it. No cloud CI.</figcaption>
+</figure>
+
+<!--
+Hold this up while the room works, or come back to it at the walk-through. It is the Console from module 08 showing what they just built, so say plainly that they have not built the Console yet: this is what module 08 gives them a view of.
+-->
+
+--
 
 # GO — Module 07
 
@@ -63,6 +71,8 @@ cd lab/07-ci && ./verify.sh
 ```
 
 <span class="badge">demo first</span> · then self-paced, ~25 min
+
+<div class="urls"><span class="ulabel">open when green</span><code>zot.cloudbox.k8s.test/v2/_catalog</code></div>
 
 <!--
 The demo (~5 min, announced at the pivot for ~3:20, opt-in — never call the room back for it): enable both catalog apps on the projector cluster, submit the build workflow, follow it to Succeeded, then prove the artifact is real by querying Zot's OCI API (/v2/ endpoints on NodePort 30500) — and run the freshly built image via GitOps.

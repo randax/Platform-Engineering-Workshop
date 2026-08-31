@@ -25,11 +25,6 @@ transition: view-transition
 - Same story for S3: RustFS speaks the API
 - Less magic than the price tag suggests
 
-<figure class="shot">
-  <img src="/console/database-monitoring-dark.png" alt="your database, in the Console (module 08)" />
-  <figcaption>your database, in the Console (module 08)</figcaption>
-</figure>
-
 <!--
 The concept: what you're buying from a hyperscaler's managed database is software that provisions, monitors, fails over, and backs up. A Kubernetes operator like CloudNativePG IS that software — the same control loop that would run behind AWS's console runs in your cluster instead. Declare a Cluster resource, get a supervised Postgres with failover and backup hooks.
 
@@ -63,7 +58,20 @@ Why we chose RustFS anyway, with eyes open: Apache-2.0 license, ~90 MB idle foot
 The meta-lesson connects back to the "why" section: the roadmap risk from slide 3 isn't cloud-only — it applies to the open-source supply chain too. Owning your platform includes owning the choice of what replaces a discontinued dependency.
 -->
 
----
+----
+
+# See it
+
+<figure class="bigshot">
+  <img src="/console/database-monitoring-dark.png" alt="Your database, in the Console you build in module 08: live CPU, memory and connections for the CNPG cluster you just created." />
+  <figcaption>Your database, in the Console you build in module 08: live CPU, memory and connections for the CNPG cluster you just created.</figcaption>
+</figure>
+
+<!--
+Hold this up while the room works, or come back to it at the walk-through. It is the Console from module 08 showing what they just built, so say plainly that they have not built the Console yet: this is what module 08 gives them a view of.
+-->
+
+--
 
 # GO — Module 03
 
@@ -75,6 +83,8 @@ cd lab/03-data && ./verify.sh
 ```
 
 <span class="badge">20 min</span> · behind? `mise run catch-up 3`
+
+<div class="urls"><span class="ulabel">open when green</span><code>s3.cloudbox.k8s.test</code></div>
 
 <!--
 The task in three beats, all through the git loop from module 02:

@@ -521,17 +521,6 @@
 .twoup .col p{font-size:0.8rem;line-height:1.5;color:#cbd5e1;margin:0 0 0.6rem;}
 .twoup .col b{color:#e2e8f0;}
 
-/* Console screenshots dropped into module slides as a corner inset. Absolutely
-   positioned on purpose: these slides are already full, and a block image would
-   push their content off the bottom. The caption names the module the Console
-   itself arrives in, so an early screenshot reads as a promise rather than
-   something the room should already have. */
-.shot{position:absolute;right:1.6rem;bottom:1.4rem;width:30%;margin:0;
-  z-index:5;pointer-events:none;}
-.shot img{width:100%;display:block;border-radius:0.45rem;
-  border:1px solid rgba(148,163,184,0.35);box-shadow:0 10px 26px rgba(2,6,23,0.55);}
-.shot figcaption{margin-top:0.35rem;font-size:0.55rem;letter-spacing:0.02em;
-  color:#94a3b8;text-align:right;}
 
 
 
@@ -549,3 +538,20 @@
 /* The AI tip is the one most likely to be misheard, so it gets the weight. */
 .tips .tip.last .tno{color:#f0abfc;}
 .tips .tip.last .tt{color:#e2e8f0;}
+
+/* Console screenshots get a slide to themselves. They were insets crammed beside
+   text, which made a 1400px screenshot unreadable from the back of the room.
+   80% of the slide height, caption underneath. */
+.bigshot{margin:0.6rem auto 0;display:flex;flex-direction:column;align-items:center;gap:0.6rem;}
+.bigshot img{height:78vh;max-height:78vh;width:auto;max-width:100%;object-fit:contain;
+  border-radius:0.5rem;border:1px solid rgba(148,163,184,0.35);
+  box-shadow:0 16px 40px rgba(2,6,23,0.6);}
+.bigshot figcaption{font-size:0.72rem;color:#94a3b8;text-align:center;max-width:52rem;}
+
+/* Where to point a browser once the lab is green. */
+.urls{margin-top:0.9rem;display:flex;flex-wrap:wrap;gap:0.5rem 1.1rem;align-items:center;
+  font-size:0.8rem;}
+.urls .ulabel{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.06em;
+  font-weight:800;color:#94a3b8;}
+.urls code{background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);
+  border-radius:0.3rem;padding:0.1rem 0.4rem;color:#e2e8f0;}

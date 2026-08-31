@@ -24,11 +24,6 @@ Serverless is core, not a bonus: a platform without scale-to-zero is missing a p
 - The engine behind Cloud Run's API
 - Demystified: it's a URL and a watch
 
-<figure class="shot">
-  <img src="/console/function-detail-dark.png" alt="a scaled-to-zero function (module 08)" />
-  <figcaption>a scaled-to-zero function (module 08)</figcaption>
-</figure>
-
 <!--
 The concept: "serverless" was never literally about someone else's servers — it's about not paying for idle capacity and not managing replica counts. Knative Serving is the open-source engine behind most Kubernetes serverless offerings (Cloud Run implements its API): request-driven autoscaling, revisioned deploys, and the headline trick — scale to zero.
 
@@ -39,7 +34,20 @@ Running this yourself demystifies the single most magic-looking cloud product th
 Kourier is the ingress (lighter than Istio), on NodePort 31080; traffic routes by Host header — figuring out the ksvc's host is part of the lab (hint 2 if needed).
 -->
 
----
+----
+
+# See it
+
+<figure class="bigshot">
+  <img src="/console/function-detail-dark.png" alt="A function that was scaled to zero a moment ago. The Console shows the revision, the URL and the cold start." />
+  <figcaption>A function that was scaled to zero a moment ago. The Console shows the revision, the URL and the cold start.</figcaption>
+</figure>
+
+<!--
+Hold this up while the room works, or come back to it at the walk-through. It is the Console from module 08 showing what they just built, so say plainly that they have not built the Console yet: this is what module 08 gives them a view of.
+-->
+
+--
 
 # GO — Module 06
 
@@ -51,6 +59,8 @@ cd lab/06-serverless && ./verify.sh
 ```
 
 <span class="badge">15 min</span> · time the cold start!
+
+<div class="urls"><span class="ulabel">open when green</span><code>hello-demo.kn.cloudbox.k8s.test</code></div>
 
 <!--
 The task: enable knative-serving.yaml from the catalog (Serving + Kourier, NodePort 31080), deliver hello-ksvc.yaml the GitOps way — by now nobody should need telling where it goes — wait for READY True, then stage the moment:

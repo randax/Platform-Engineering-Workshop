@@ -141,6 +141,8 @@ cd lab/10-day2-ops && ./verify.sh
 
 <span class="badge">~20 min</span> · beat 1: `qwen3:1.7b` flails · beat 2: one `ModelConfig` push fixes it
 
+<div class="urls"><span class="ulabel">open when green</span><code>portal.cloudbox.k8s.test</code> <code>grafana.cloudbox.k8s.test</code></div>
+
 <!--
 The task: enable kagent.yaml from the catalog (same push-to-Gitea dance as every capability today), pick one of three scenarios and inject it (inject.sh 1|2|3 — a bad rollback, a "rightsizing" commit that sets the memory limit below what the runtime needs to create the container, or a Docker Hub image reference — on docker your own mirror answers for it anyway, on tbx it is a mirror miss that falls through to Docker Hub, so offline it IS a crashing pod there; either way the guardrail is the repo policy), then open the affected Application's detail page in the Console and click "Open investigation."
 
