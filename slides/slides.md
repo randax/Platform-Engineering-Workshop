@@ -83,29 +83,23 @@ class: term-slide
 
 <div class="term">
   <div class="term-bar"><span class="d r"></span><span class="d y"></span><span class="d g"></span>
-    <span class="term-title">~ — the only three commands you need today</span></div>
+    <span class="term-title">~/Platform-Engineering-Workshop</span></div>
   <div class="term-body">
 
 <div style="--d:0.2s"><span class="p">$</span> <span class="c">git clone https://github.com/randax/Platform-Engineering-Workshop.git</span></div>
-<div class="o" style="--d:1.3s">Cloning into 'Platform-Engineering-Workshop'... done.</div>
-<div style="--d:1.7s"><span class="p">$</span> <span class="c">cd Platform-Engineering-Workshop</span></div>
+<div style="--d:1.2s"><span class="p">$</span> <span class="c">cd Platform-Engineering-Workshop</span></div>
 
-<div class="gap" style="--d:2.3s"><span class="p">$</span> <span class="c">./scripts/dev-setup.sh</span></div>
-<div class="o" style="--d:2.6s">installing the pinned tool chain with mise…</div>
-<div class="o ok" style="--d:4.2s">✅ talosctl, kubectl, helm, crane — pinned &nbsp;✅ mise.toml trusted</div>
+<div class="gap" style="--d:1.9s"><span class="p">$</span> <span class="c">./scripts/dev-setup.sh</span></div>
+<div class="o ok" style="--d:3.2s">✅ pinned tool chain installed</div>
 
-<div class="gap" style="--d:4.9s"><span class="p">$</span> <span class="c">mise run init</span> <span class="cm"># pre-pull ~7.5 GB · the only step that needs bandwidth</span></div>
-<div class="o ok" style="--d:6.6s">✅ 76 images warmed into the mirror, 0 failed</div>
+<div class="gap" style="--d:3.9s"><span class="p">$</span> <span class="c">mise run init</span></div>
+<div class="o ok" style="--d:5.4s">✅ 76 images warmed, 0 failed</div>
 
-<div class="gap" style="--d:7.2s"><span class="p">$</span> <span class="c">mise run preflight</span> <span class="cm"># Docker, resources, tools, images</span></div>
-<div class="o ok" style="--d:8.1s">✅ Host memory: 32 GB &nbsp;✅ Host CPUs: 10 &nbsp;✅ Free disk: 96 GB</div>
-<div class="o ok" style="--d:8.4s">✅ Docker daemon reachable &nbsp;✅ images complete &nbsp;✅ kubeconfig writable</div>
-<div class="o done" style="--d:9.0s">✅ All checks passed — you are ready for the workshop! 🎉</div>
+<div class="gap" style="--d:6.1s"><span class="p">$</span> <span class="c">mise run preflight</span></div>
+<div class="o ok" style="--d:7.2s">✅ all checks passed</div>
 
-<div class="gap" style="--d:9.8s"><span class="p">$</span> <span class="c">cd lab/00-setup &amp;&amp; ./verify.sh</span> <span class="cm"># module 00, and you are done</span></div>
-<div class="o done" style="--d:10.6s">✅ Module 00 complete<span class="cur"></span></div>
-
-<div class="term-foot" style="--d:11.4s">Red anywhere? The output names the fix. Still stuck: <strong>grab one of us</strong>, or take the Codespaces lifeboat.</div>
+<div class="gap" style="--d:7.9s"><span class="p">$</span> <span class="c">cd lab/00-setup &amp;&amp; ./verify.sh</span></div>
+<div class="o ok" style="--d:8.9s">✅ module 00 complete<span class="cur"></span></div>
 
   </div>
 </div>

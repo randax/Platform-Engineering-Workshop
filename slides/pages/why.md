@@ -14,9 +14,12 @@ Every hand that goes up is a person who already knows why they're here. Then: "L
 -->
 
 ---
-layout: image-right
-image: /images/bruktby.jpg
+layout: default
+class: bruktby-slide
 ---
+
+<img src="/images/bruktby.jpg" class="bruktby-art"
+     alt="Hand-drawn sketch: photographing a chair in a loft becomes a listing, a buyer across the fjord, a managed cloud, then the bills" />
 
 # Meet Bruktby
 

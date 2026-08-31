@@ -321,9 +321,6 @@
 .term-body .o.ok{color:#86efac;}
 .term-body .o.done{color:#4ade80;font-weight:700;padding-left:0;margin-top:0.45rem;}
 .term-body .gap{margin-top:0.85rem;}
-.term-foot{margin-top:1.35rem;font-size:0.78rem;color:#94a3b8;
-  font-family:var(--slidev-font-family,inherit);}
-.term-foot strong{color:#e2e8f0;}
 .term-body>div{opacity:0;animation:term-print 0.12s linear forwards;animation-delay:var(--d,0s);}
 @keyframes term-print{to{opacity:1}}
 .term-body .cur{display:inline-block;width:0.5rem;height:0.95em;margin-left:0.42rem;
@@ -434,9 +431,9 @@
   animation-duration: 320ms;
 }
 
-/* The Bruktby doodle: a hand-drawn square on a light ground. Contain rather than
-   cover so the whole story stays visible (loft photo, listing, buyer, cloud,
-   bills) — cover would crop the bills off the bottom, which is the punchline. */
-.slidev-layout.image-right .slidev-layout-image,
-.slidev-layout.image-right > div:last-child{background-color:#f8fafc;}
-.slidev-layout.image-right img{object-fit:contain!important;background:#f8fafc;}
+/* The Bruktby doodle sits right at 40% of the slide, with the text keeping the left
+   55%. layout: image-right cannot do this: it is a hardcoded 50/50 grid and paints the
+   image as a background, so the drawing would be cropped rather than sized. */
+.bruktby-slide .bruktby-art{position:absolute;right:2.2rem;top:50%;transform:translateY(-50%);
+  width:40%;border-radius:0.5rem;background:#f8fafc;}
+.bruktby-slide h1,.bruktby-slide h2,.bruktby-slide p,.bruktby-slide div:not(.bruktby-art){max-width:55%;}
