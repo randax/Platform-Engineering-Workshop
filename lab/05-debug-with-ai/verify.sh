@@ -80,6 +80,9 @@ fi
 
 if [ "$INJECTED" -eq 0 ]; then
   ok "no fault namespaces present (nothing injected, or './restore.sh clean' was run)"
+  echo "⚠️  nothing was graded: with zero fault namespaces this pass is vacuous."
+  echo "   Order matters — run ./verify.sh while your fixed faults still exist,"
+  echo "   and './restore.sh clean' only after it is green."
 fi
 
 # --- the platform must have survived your debugging ---------------------------

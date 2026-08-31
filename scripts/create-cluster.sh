@@ -71,6 +71,11 @@ esac
 # and there is no point spending seconds deciding which substrate to build on a
 # machine this script is about to refuse to touch.
 assert_identity_readable
+# A readable record can still be a STALE one — left by a failed run, naming a
+# substrate with no cluster artifacts anywhere. Forget it (with a warning) so
+# neither the decision below nor require_identity_match steers by a ghost;
+# keep it whenever absence cannot be proven (lib.sh, finding 08 of rehearsal 9).
+substrate_record_forget_if_stale
 # The _into form: `$(substrate_resolve)` is a subshell, so the `tbx doctor` memo
 # detection fills in (TBX_DOCTOR_RC, lib.sh) died with it and substrate_preflight
 # below re-ran the slowest read-only probe in the repo a second time.

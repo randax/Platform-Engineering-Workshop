@@ -678,6 +678,52 @@ require_identity_match() { # <desired>
   die "Destroy the '${recorded}' cluster first, then re-run with CLOUDBOX_SUBSTRATE=${desired}."
 }
 
+# substrate_record_forget_if_stale — a record whose substrate has NO artifacts
+# left steers every later decision toward a cluster that does not exist:
+# rehearsal 8's failed run left 'docker' recorded with nothing anywhere, a bare
+# create silently followed it, and an explicit CLOUDBOX_SUBSTRATE=tbx was then
+# refused by require_identity_match over a cluster there was nothing to tear
+# down (rehearsal 9, finding 08). The record is a fact about state; when the
+# state is provably gone, so is the fact.
+#
+# Conservative on purpose: the record is forgotten ONLY when absence is proven,
+# meaning the daemon/CLI that owns the identity answers, and answers "nothing".
+# A docker daemon that is not running, a missing tbx binary, or an errored probe
+# all KEEP the record: wrongly forgetting one would let a mutating script walk
+# past the require_identity_match guard while the cluster still exists.
+# create-cluster.sh calls this; destroy keeps its own refusal messages.
+substrate_record_forget_if_stale() {
+  local recorded
+  recorded="$(substrate_current 2>/dev/null || true)"
+  [[ -n "${recorded}" ]] || return 0
+  local gone="false"
+  case "${recorded}" in
+    docker)
+      # The talos containers carry this label whatever state they are in.
+      if docker info >/dev/null 2>&1 \
+         && [[ -z "$(docker ps -aq --filter "label=talos.cluster.name=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
+        gone="true"
+      fi ;;
+    kind)
+      if docker info >/dev/null 2>&1 \
+         && [[ -z "$(docker ps -aq --filter "label=io.x-k8s.kind.cluster=${CLUSTER_NAME}" 2>/dev/null)" ]]; then
+        gone="true"
+      fi ;;
+    tbx)
+      # Proven gone only when `tbx cluster list` itself succeeds and the
+      # cluster is not in it; a daemon that cannot answer keeps the record.
+      if have tbx && tbx cluster list >/dev/null 2>&1 \
+         && ! tbx cluster list 2>/dev/null | grep -qw "${CLUSTER_NAME}"; then
+        gone="true"
+      fi ;;
+  esac
+  [[ "${gone}" == "true" ]] || return 0
+  warn "The substrate record (${CLOUDBOX_SUBSTRATE_FILE}) names '${recorded}', but no"
+  warn "'${recorded}' cluster artifacts exist on this machine — a failed or interrupted"
+  warn "run left it behind. Forgetting the stale record; substrate detection decides fresh."
+  rm -f "${CLOUDBOX_SUBSTRATE_FILE}"
+}
+
 # tbx_version_check <reporter> — assert the tbx on PATH is the PINNED one,
 # reporting a mismatch through <reporter> (`die` on the create path,
 # check_fail in install.sh --check). Lives in lib.sh, not in substrate/tbx.sh,

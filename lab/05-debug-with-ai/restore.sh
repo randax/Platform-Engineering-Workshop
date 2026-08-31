@@ -41,7 +41,21 @@ case "${1:-}" in
     echo "🧹 all fault namespaces deleted (deletion runs in background)"
     ;;
   all)
-    for n in 01 02 03 04; do restore_one "$n"; done
+    # One slow fault must not strand the rest: fault 02's CNPG wait can time out
+    # on a cluster under pressure, which is exactly when the others most need
+    # restoring (rehearsal 9, finding 05). Collect failures, keep going, report.
+    failed=()
+    for n in 01 02 03 04; do
+      restore_one "$n" || failed+=("$n")
+    done
+    if [ "${#failed[@]}" -gt 0 ]; then
+      echo ""
+      echo "❌ FAIL: ${#failed[@]} fault(s) did not restore: ${failed[*]}"
+      echo "   retry one at a time: ./restore.sh <n> — a timeout here usually means"
+      echo "   the cluster itself is unhealthy (disk pressure, evictions); fix that first,"
+      echo "   or './restore.sh clean' to delete the fault namespaces outright."
+      exit 1
+    fi
     ;;
   ''|-h|--help)
     echo "usage: ./restore.sh <1-4> | all | clean"; exit 1
