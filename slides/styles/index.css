@@ -465,3 +465,43 @@
 .layerstack .layer.cur{background:rgba(56,189,248,0.22);border-color:var(--jz-accent);
   color:#e2e8f0;font-weight:700;}
 @media (prefers-reduced-motion:reduce){.layerstack .layer{view-transition-name:none!important;}}
+
+/* ==========================================================================
+   Nav slides. Nais is the reference platform in Norway, so these two carry
+   more visual weight than a bullet list would give them.
+
+   The chevrons are a chain: each pill is notched on the left and pointed on
+   the right, so segment N visibly feeds segment N+1. Clip-path does the shape
+   and a negative margin interlocks the notch with the point before it, which
+   is why the padding-left is larger than the padding-right.
+   ========================================================================== */
+.chevrons{display:flex;align-items:stretch;}
+.chevrons .chev{
+  flex:1;min-width:0;position:relative;
+  margin-left:-14px;padding:0.75rem 0.8rem 0.75rem 1.7rem;
+  display:flex;flex-direction:column;justify-content:center;gap:0.2rem;
+  clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%);
+  background:rgba(56,189,248,0.10);
+  border-top:1px solid rgba(56,189,248,0.22);
+  border-bottom:1px solid rgba(56,189,248,0.22);
+}
+.chevrons .chev:first-child{margin-left:0;
+  clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%);}
+/* Each step reads slightly stronger than the last, so the eye travels left to right. */
+.chevrons .chev:nth-child(2){background:rgba(56,189,248,0.14);}
+.chevrons .chev:nth-child(3){background:rgba(56,189,248,0.18);}
+.chevrons .chev:nth-child(4){background:rgba(56,189,248,0.22);}
+.chevrons .chev:nth-child(5){background:rgba(56,189,248,0.26);}
+.chevrons .cn{font-weight:800;font-size:0.78rem;color:#e2e8f0;line-height:1.2;}
+.chevrons .cd{font-size:0.64rem;color:#94a3b8;line-height:1.3;}
+.chevrons .cm{font-size:0.6rem;font-weight:700;color:var(--jz-accent);letter-spacing:0.02em;}
+/* The three-step flow on the scale slide: same motif, fewer and wider. */
+.chevrons.narrow .chev{padding-top:0.6rem;padding-bottom:0.6rem;}
+.chevrons.narrow .cn{font-size:0.86rem;}
+
+/* The numbers are the argument on the scale slide, so they get the room. */
+.navstats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;text-align:center;}
+.navstats div{padding:0.9rem 0.5rem;border-radius:0.6rem;
+  background:rgba(5,150,105,0.10);border:1px solid rgba(5,150,105,0.30);}
+.navstats b{display:block;font-size:2.6rem;line-height:1;font-weight:800;color:var(--jz-run);}
+.navstats span{display:block;margin-top:0.35rem;font-size:0.78rem;color:#cbd5e1;}

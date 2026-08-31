@@ -46,23 +46,19 @@ Foreshadow: "You'll build both layers today. Modules 01–03 are the cloud. Modu
 
 <div class="text-lg opacity-90 mt-2">Norway's Labour and Welfare Administration — the services a third of the country depends on — runs on a platform its own engineers built: <strong>Nais</strong> (open source, nais.io).</div>
 
-<div class="grid grid-cols-3 gap-4 mt-6 text-center">
-  <div class="story"><div class="text-3xl font-bold">~100+</div>product teams served</div>
-  <div class="story"><div class="text-3xl font-bold">1000s</div>of deploys per week</div>
-  <div class="story"><div class="text-3xl font-bold">1</div>manifest to production</div>
+<div class="navstats mt-6">
+  <div><b>~100+</b><span>product teams served</span></div>
+  <div><b>1000s</b><span>deploys per week</span></div>
+  <div><b>1</b><span>manifest to production</span></div>
 </div>
 
-<div class="flex justify-center mt-4">
-
-```mermaid {scale: 0.8}
-flowchart LR
-  yaml["nais.yaml<br><i>one manifest</i>"] --> plat["the platform<br><i>reconciliation loops</i>"]
-  plat --> out["app + URL&nbsp;&nbsp;·&nbsp;&nbsp;database&nbsp;&nbsp;·&nbsp;&nbsp;bucket&nbsp;&nbsp;·&nbsp;&nbsp;queue&nbsp;&nbsp;·&nbsp;&nbsp;access policy"]
-```
-
+<div class="chevrons narrow mt-7">
+  <div class="chev"><span class="cn">nais.yaml</span><span class="cd">one manifest</span></div>
+  <div class="chev"><span class="cn">the platform</span><span class="cd">reconciliation loops</span></div>
+  <div class="chev"><span class="cn">app + URL, database, bucket, queue, access policy</span><span class="cd">what the team actually gets</span></div>
 </div>
 
-<div v-click class="mt-2 text-lg opacity-85 text-center">Sound familiar? It's the shape you build in <strong>module 04</strong>.</div>
+<div class="mt-6 text-lg opacity-85 text-center">Sound familiar? It is the shape you build in <strong>module 04</strong>.</div>
 
 <!--
 [TODO Hans: replace the three headline numbers with your current firsthand figures before the workshop — these are order-of-magnitude from public Nais talks.]
@@ -80,13 +76,15 @@ Key beats:
 
 # Five things Nav's platform got right
 
-<div class="grid grid-cols-1 gap-2 mt-2">
-  <div v-click class="story"><span class="tag">GOLDEN PATH</span> &nbsp;One manifest declares the app <em>and</em> its dependencies → <strong>module 04's <code>Application</code> XR</strong> is you building exactly this</div>
-  <div v-click class="story"><span class="tag">SELF-SERVICE</span> &nbsp;No tickets, no humans in the loop — ask in git, reconciliation makes it true → <strong>modules 02–04</strong></div>
-  <div v-click class="story"><span class="tag">SECURE DEFAULTS</span> &nbsp;Zero-trust network policy is the <em>default</em>, teams declare exceptions → <strong>the security door, later today</strong></div>
-  <div v-click class="story"><span class="tag">BATTERIES INCLUDED</span> &nbsp;Observability comes with the platform, not per-team → <strong>the Victoria + OTel catalog apps</strong></div>
-  <div v-click class="story"><span class="tag">PLATFORM AS PRODUCT</span> &nbsp;Teams are customers who could go elsewhere — the platform earns adoption → <strong>the whole design of today</strong></div>
+<div class="chevrons mt-8">
+  <div class="chev"><span class="cn">Golden path</span><span class="cd">one manifest, app <em>and</em> dependencies</span><span class="cm">module 04</span></div>
+  <div class="chev"><span class="cn">Self-service</span><span class="cd">ask in git, no ticket, no human</span><span class="cm">modules 02–04</span></div>
+  <div class="chev"><span class="cn">Secure defaults</span><span class="cd">zero-trust unless you declare otherwise</span><span class="cm">security door</span></div>
+  <div class="chev"><span class="cn">Batteries included</span><span class="cd">observability ships with the platform</span><span class="cm">Victoria + OTel</span></div>
+  <div class="chev"><span class="cn">Platform as product</span><span class="cd">teams could leave, so it earns them</span><span class="cm">all of today</span></div>
 </div>
+
+<div class="mt-8 text-lg opacity-85 text-center">Each one is a decision you make yourself today.</div>
 
 <!--
 This is the map between the real world and the next four hours — each learning points at the module where the room builds its miniature version.
