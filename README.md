@@ -100,6 +100,78 @@ because it is what installs mise in the first place.
 cannot be fixed, the [devcontainer lifeboat](#plan-b-devcontainer--codespaces) has you
 covered. Bring your laptop and its power supply.
 
+**You do not create the cluster at home.** These three steps install tools and download
+images. The cluster itself gets built in the room, with the three commands in the next
+section.
+
+## At the venue
+
+You'll run these together with us; no need at home (you can, though: the whole workshop
+works offline once the images are pre-pulled and the Helm charts are vendored, and they
+are, in `scripts/manifests/`).
+
+```bash
+mise run cluster:create     # Talos cluster (tbx VMs or Docker) + Cilium
+mise run gitops:bootstrap   # in-cluster Gitea + ArgoCD
+mise run gitops:seed        # seed your cloud's git with the platform tree
+```
+
+**On the Docker substrate, `mise run cluster:create` asks for your password once, at the
+very end.** It is the only sudo in the workshop: Docker has no resolver, so the workshop
+hostnames come from a marked `# cloudbox-begin` block in `/etc/hosts`, written via
+`sudo tee`; `./scripts/install.sh --print-hosts` shows exactly what goes in (WSL2: the
+same lines also belong in `C:\Windows\System32\drivers\etc\hosts`, edited as
+Administrator). Decline the password and every `*.cloudbox.k8s.test` URL fails on a
+perfectly healthy cluster; the cluster stays up, and
+`./scripts/install.sh --write-hosts` writes the block whenever you are ready. That is
+also the fix when the names stop resolving: **WSL2 regenerates `/etc/hosts` on every
+restart** unless you tell it not to (see `lab/00-setup`). *Every*
+`mise run cluster:destroy` on the Docker substrate *asks* to remove the block, not
+only `--purge-mirror`, which additionally forgets the extra names you added with
+`--add-hosts`; decline that prompt and the teardown still finishes, saying which lines
+remain. On tbx nothing touches `/etc/hosts`; talos-box's own resolver answers the names.
+
+Fell behind or broke something interesting? `mise run catch-up <module>` force-pushes
+the canonical state for that module to your Gitea and lets ArgoCD converge. Scripted
+state, not hope.
+
+If neither substrate will cooperate, `mise run cluster:fallback` gives you a
+kind+Cilium cluster meeting the same contract: the same vendored Cilium with the **same
+ingress values**, host port 80 mapped to the ingress, and the same marked `/etc/hosts`
+block, so every `*.cloudbox.k8s.test` hostname works and **modules 02 onward are
+identical**. You lose only the Talos content of module 01: `lab/01-cluster/verify.sh`
+checks a Talos cluster, so on the lifeboat it prints "not gradeable here" and exits 0
+rather than failing a cluster that is working as documented.
+
+kind is not one of the two substrates, but it *is* a recorded identity: the script
+writes `kind` into `~/.cloudbox/substrate`, which tells `install.sh --check` to grade
+this machine with Docker semantics, fills the image mirror for the right architecture,
+and makes `create-cluster.sh` and `destroy-cluster.sh` **refuse** rather than build a
+second cluster over the lifeboat or delete its hostnames.
+
+Tear the lifeboat down with `./scripts/kind-fallback.sh --delete`: it deletes the kind
+cluster, removes the `/etc/hosts` block it wrote (one sudo prompt; decline and it names
+the lines to delete by hand) and clears the identity. It removes the block only when the
+identity says `kind`, so on a Docker-substrate machine it cannot take out a live
+cluster's names; and it clears the identity only once the cluster is gone *and* the
+block is removed or proven absent, so a declined sudo leaves you able to retry. If the
+file is missing (a lifeboat taken before this existed), say so for the session:
+`CLOUDBOX_SUBSTRATE=kind mise run preflight`. The same override works for the
+teardown, `CLOUDBOX_SUBSTRATE=kind ./scripts/kind-fallback.sh --delete`, but there it is
+honoured only against **kind-specific** proof: `kind get clusters` must list `cloudbox`,
+or Docker must still hold containers labelled `io.x-k8s.kind.cluster=cloudbox`. The
+`/etc/hosts` block is *not* proof: the docker substrate writes an identical one, and
+accepting it would let an environment variable delete a live Talos cluster's hostnames.
+Once proved, `kind` is written back into `~/.cloudbox/substrate` immediately, so a retry
+after a declined sudo needs no override at all. The teardown exits non-zero whenever
+anything is left; it needs Docker running (it asks the daemon for the containers) but
+neither `kind` nor `kubectl` on `PATH`.
+
+## Background: what the setup just decided
+
+None of this is required reading before the workshop. It explains the choices the
+scripts made for you, and it is where to look when something surprises you.
+
 ### Which substrate will I get?
 
 The cluster runs on one of two substrates; the scripts detect which and record the
@@ -115,6 +187,17 @@ is identical on both: same labs, same `verify.sh` scripts, same URLs.
 
 `mise run preflight` prints which one you will get, and on a fallback to Docker it
 prints the `tbx doctor` line that decided.
+
+Rather than typing the override in front of every command, pin it for this machine:
+
+```bash
+mise set --file mise.local.toml CLOUDBOX_SUBSTRATE=docker
+```
+
+`mise.local.toml` is gitignored and outranks both a shell prefix and an exported
+variable, so the choice sticks until you delete the line. Keep it out of the shared
+`mise.toml`: a value there would silently beat every `CLOUDBOX_SUBSTRATE=…` anyone types,
+including yours.
 
 ### Optional: real Talos VMs with tbx
 
@@ -252,69 +335,6 @@ VMs are down.
 **One catalog extra is amd64-only:** Backstage's CNOE image has no arm64 build, and a
 tbx VM emulates nothing, so on Apple Silicon that stretch item needs the Docker
 substrate. `install.sh --check` warns. Nothing on the core path is affected.
-
-## At the venue
-
-You'll run these together with us; no need at home (you can, though: the whole workshop
-works offline once the images are pre-pulled and the Helm charts are vendored, and they
-are, in `scripts/manifests/`).
-
-```bash
-mise run cluster:create     # Talos cluster (tbx VMs or Docker) + Cilium
-mise run gitops:bootstrap   # in-cluster Gitea + ArgoCD
-mise run gitops:seed        # seed your cloud's git with the platform tree
-```
-
-**On the Docker substrate, `mise run cluster:create` asks for your password once, at the
-very end.** It is the only sudo in the workshop: Docker has no resolver, so the workshop
-hostnames come from a marked `# cloudbox-begin` block in `/etc/hosts`, written via
-`sudo tee`; `./scripts/install.sh --print-hosts` shows exactly what goes in (WSL2: the
-same lines also belong in `C:\Windows\System32\drivers\etc\hosts`, edited as
-Administrator). Decline the password and every `*.cloudbox.k8s.test` URL fails on a
-perfectly healthy cluster; the cluster stays up, and
-`./scripts/install.sh --write-hosts` writes the block whenever you are ready. That is
-also the fix when the names stop resolving: **WSL2 regenerates `/etc/hosts` on every
-restart** unless you tell it not to (see `lab/00-setup`). *Every*
-`mise run cluster:destroy` on the Docker substrate *asks* to remove the block, not
-only `--purge-mirror`, which additionally forgets the extra names you added with
-`--add-hosts`; decline that prompt and the teardown still finishes, saying which lines
-remain. On tbx nothing touches `/etc/hosts`; talos-box's own resolver answers the names.
-
-Fell behind or broke something interesting? `mise run catch-up <module>` force-pushes
-the canonical state for that module to your Gitea and lets ArgoCD converge. Scripted
-state, not hope.
-
-If neither substrate will cooperate, `mise run cluster:fallback` gives you a
-kind+Cilium cluster meeting the same contract: the same vendored Cilium with the **same
-ingress values**, host port 80 mapped to the ingress, and the same marked `/etc/hosts`
-block, so every `*.cloudbox.k8s.test` hostname works and **modules 02 onward are
-identical**. You lose only the Talos content of module 01: `lab/01-cluster/verify.sh`
-checks a Talos cluster, so on the lifeboat it prints "not gradeable here" and exits 0
-rather than failing a cluster that is working as documented.
-
-kind is not one of the two substrates, but it *is* a recorded identity: the script
-writes `kind` into `~/.cloudbox/substrate`, which tells `install.sh --check` to grade
-this machine with Docker semantics, fills the image mirror for the right architecture,
-and makes `create-cluster.sh` and `destroy-cluster.sh` **refuse** rather than build a
-second cluster over the lifeboat or delete its hostnames.
-
-Tear the lifeboat down with `./scripts/kind-fallback.sh --delete`: it deletes the kind
-cluster, removes the `/etc/hosts` block it wrote (one sudo prompt; decline and it names
-the lines to delete by hand) and clears the identity. It removes the block only when the
-identity says `kind`, so on a Docker-substrate machine it cannot take out a live
-cluster's names; and it clears the identity only once the cluster is gone *and* the
-block is removed or proven absent, so a declined sudo leaves you able to retry. If the
-file is missing (a lifeboat taken before this existed), say so for the session:
-`CLOUDBOX_SUBSTRATE=kind mise run preflight`. The same override works for the
-teardown, `CLOUDBOX_SUBSTRATE=kind ./scripts/kind-fallback.sh --delete`, but there it is
-honoured only against **kind-specific** proof: `kind get clusters` must list `cloudbox`,
-or Docker must still hold containers labelled `io.x-k8s.kind.cluster=cloudbox`. The
-`/etc/hosts` block is *not* proof: the docker substrate writes an identical one, and
-accepting it would let an environment variable delete a live Talos cluster's hostnames.
-Once proved, `kind` is written back into `~/.cloudbox/substrate` immediately, so a retry
-after a declined sudo needs no override at all. The teardown exits non-zero whenever
-anything is left; it needs Docker running (it asks the daemon for the containers) but
-neither `kind` nor `kubectl` on `PATH`.
 
 ## Lab overview
 

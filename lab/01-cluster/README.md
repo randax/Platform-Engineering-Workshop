@@ -23,7 +23,7 @@ for you (`talos-box` VMs, or Talos-in-Docker); everything below is the same on b
 1. Create the cluster, **without a network**:
 
    ```bash
-   ./scripts/create-cluster.sh --skip-cilium
+   mise run cluster:create -- --skip-cilium
    ```
 
    While it runs (~2–3 min), read the script. It is short on purpose: everything it does,
@@ -42,7 +42,7 @@ for you (`talos-box` VMs, or Talos-in-Docker); everything below is the same on b
    terminal and watch NotReady become Ready the moment the CNI lands. That transition is
    the whole lesson.
 
-   (Behind, or rebuilding? Plain `./scripts/create-cluster.sh` without the flag does this
+   (Behind, or rebuilding? Plain `mise run cluster:create` without the flag does this
    step for you. That's what catch-up uses.)
 
 4. Now **prove to yourself what you just built**. Find answers to these, using `talosctl`
@@ -152,13 +152,13 @@ the one part the script does for you rather than making you type subnet
 arithmetic: once your Cilium is up, run
 
 ```bash
-./scripts/create-cluster.sh --post-cni
+mise run cluster:create -- --post-cni
 ```
 
 It does exactly three things: applies the pool and the policy, waits for your
 Cilium rollout and the nodes, and proves `cilium-ingress` got `.200`. Nothing
 else: no preflight, no `tbx doctor`, no VM is touched. (Do **not** re-run
-the bare `./scripts/create-cluster.sh`: on tbx it refuses because the cluster
+the bare `mise run cluster:create`: on tbx it refuses because the cluster
 already exists.)
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
@@ -211,7 +211,7 @@ that is a configured node, not a problem.)
 <summary>Full solution</summary>
 
 ```bash
-./scripts/create-cluster.sh --skip-cilium
+mise run cluster:create -- --skip-cilium
 kubectl get nodes                # NotReady — no CNI, by your own choice
 
 # Give it a network yourself (hint 3 has the full command with values):
@@ -236,7 +236,7 @@ kubectl get nodes -w             # NotReady -> Ready, live
 # the tbx ending, then run the post step — the pool and policy the VIP needs:
 #   --set ingressController.service.type=LoadBalancer \
 #   --set bpf.hostLegacyRouting=true
-# ./scripts/create-cluster.sh --post-cni
+# mise run cluster:create -- --post-cni
 
 # The management plane is an API, not SSH:
 talosctl config info                     # which node/endpoint this context talks to
@@ -327,15 +327,15 @@ The cluster is cattle: destroying and recreating it takes ~5 minutes (images are
 local). Name the substrate on both halves:
 
 ```bash
-CLOUDBOX_SUBSTRATE=docker ./scripts/destroy-cluster.sh && \
-CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh     # or =tbx, whichever you are on
+CLOUDBOX_SUBSTRATE=docker mise run cluster:destroy && \
+CLOUDBOX_SUBSTRATE=docker mise run cluster:create     # or =tbx, whichever you are on
 ```
 
 The destroy removes `~/.cloudbox/substrate` with the cluster, so a bare
 `create-cluster.sh` would decide again from scratch rather than rebuild what you had.
-`./scripts/install.sh --check` prints which one you are on. On the kind lifeboat neither
+`mise run preflight` prints which one you are on. On the kind lifeboat neither
 script applies: rebuild with `./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh`.
-If Talos-in-Docker fights your machine specifically, `./scripts/kind-fallback.sh` gives
+If Talos-in-Docker fights your machine specifically, `mise run cluster:fallback` gives
 you a kind+Cilium cluster with the same ingress, the same hostnames and the same
 `/etc/hosts` block. You lose the Talos exploration but every later module works the
 same. Remove it afterwards with `./scripts/kind-fallback.sh --delete` (cluster, hosts

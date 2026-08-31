@@ -58,7 +58,7 @@ Core path everyone should finish: **modules 00–05**. Stretch (fast folks / tak
 
 | # | Module | The "done" signal |
 |---|--------|-------------------|
-| 00 | Setup / preflight | `./scripts/install.sh --check` all green |
+| 00 | Setup / preflight | `mise run preflight` all green |
 | 01 | Talos + Cilium | 2 nodes Ready, no kube-proxy pods |
 | 02 | GitOps (Gitea + ArgoCD) | edit → push → ArgoCD converges |
 | 03 | CNPG Postgres + RustFS | psql works; a presigned S3 URL opens |
@@ -66,10 +66,10 @@ Core path everyone should finish: **modules 00–05**. Stretch (fast folks / tak
 | 05 | Debug with AI | the four seeded faults found and fixed |
 | 06–09 | Knative · CI · portal · capstone | stretch — see the lab READMEs |
 
-**The universal escape hatch:** `./scripts/catch-up.sh <module>` force-pushes the
+**The universal escape hatch:** `mise run catch-up <module>` force-pushes the
 canonical end-state of module N to the attendee's in-cluster Gitea and lets
 ArgoCD converge. If someone is hopelessly behind or their platform is a mess,
-this is faster than debugging. `./scripts/catch-up.sh <module> --rebuild` nukes
+this is faster than debugging. `mise run catch-up <module> -- --rebuild` nukes
 and recreates the cluster from scratch (~10 min with pre-pulled images) — the
 last resort.
 
@@ -83,7 +83,7 @@ These are real — most were found by running the whole thing on clean machines.
 
 **Setup / prework (module 00)**
 - *`install.sh --check` fails on the image mirror* → they didn't run
-  `./scripts/cloudbox-init.sh` at home, or it didn't finish. If they have
+  `mise run init` at home, or it didn't finish. If they have
   internet, the cluster still comes up (nodes pull upstream); it's just slower.
   At a hostile-wifi venue, pair them with a neighbor whose mirror is populated.
 - *A tool "not found" right after `dev-setup.sh`* → mise isn't on PATH yet.
@@ -116,7 +116,7 @@ First question when someone's cluster "disappeared", or `kubectl get nodes` show
 cluster that is obviously not theirs:
 
 ```bash
-./scripts/install.sh --check      # names the file in effect, and fails on the third state
+mise run preflight                # names the file in effect, and fails on the third state
 echo "$KUBECONFIG"                # empty = the pin is not in this shell
 kubectl config get-contexts       # admin@cloudbox present?
 ```
@@ -184,12 +184,12 @@ agent-and-human verify against the live cluster.
 ## Quick reference
 
 ```
-./scripts/install.sh --check          # is this laptop ready?
-./scripts/create-cluster.sh           # module 01
-./scripts/bootstrap-gitops.sh         # module 02
-./scripts/seed-gitea.sh               # module 02
-./scripts/catch-up.sh <N>             # jump to end of module N
-./scripts/catch-up.sh <N> --rebuild   # nuke + rebuild to module N
+mise run preflight                    # is this laptop ready?
+mise run cluster:create               # module 01
+mise run gitops:bootstrap             # module 02
+mise run gitops:seed                  # module 02
+mise run catch-up <N>                 # jump to end of module N
+mise run catch-up <N> -- --rebuild    # nuke + rebuild to module N
 ./lab/NN-*/verify.sh                  # did this module's outcome happen?
 kubectl get pods -A                   # the first thing to look at, always
 

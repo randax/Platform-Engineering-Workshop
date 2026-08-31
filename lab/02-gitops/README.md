@@ -21,8 +21,8 @@ platform teams bootstrap clusters.
 1. Install the machinery and seed the repo:
 
    ```bash
-   ./scripts/bootstrap-gitops.sh   # Gitea + ArgoCD into the cluster
-   ./scripts/seed-gitea.sh         # pushes this repository into your in-cluster Gitea
+   mise run gitops:bootstrap   # Gitea + ArgoCD into the cluster
+   mise run gitops:seed        # pushes this repository into your in-cluster Gitea
    ```
 
 2. Look around your cloud's control room:
@@ -106,8 +106,8 @@ experiment: which file would you edit to change the name *legitimately*?
 <summary>Full solution</summary>
 
 ```bash
-./scripts/bootstrap-gitops.sh
-./scripts/seed-gitea.sh
+mise run gitops:bootstrap
+mise run gitops:seed
 
 WORKSHOP="$(git rev-parse --show-toplevel)"
 git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git /tmp/platform

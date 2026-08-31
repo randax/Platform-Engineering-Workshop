@@ -16,7 +16,7 @@ in S3, and, for the flourish, the whole chain as a single trace in Grafana.
 
 **Prerequisites:** this capstone builds on modules 03 (RustFS), 06 (Knative Serving)
 and 08 (the portal). Have them green, or jump straight here with
-`./scripts/catch-up.sh 8`.
+`mise run catch-up 8`.
 
 ## Why this matters
 

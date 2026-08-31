@@ -13,7 +13,7 @@ reached.)
 
 | # | Module | Time | Type | Outcome (the visible win) |
 |---|--------|------|------|---------------------------|
-| 00 | [Setup & pre-flight](00-setup/) | before / first 15 min | gate | `./scripts/install.sh --check` is all green, images pre-pulled |
+| 00 | [Setup & pre-flight](00-setup/) | before / first 15 min | gate | `mise run preflight` is all green, images pre-pulled |
 | 01 | [Your own cloud: Talos + Cilium](01-cluster/) | 35 min | core | 2 Kubernetes nodes Ready on eBPF networking — with no SSH and no kube-proxy anywhere |
 | 02 | [GitOps: Gitea + ArgoCD](02-gitops/) | 35 min | core | You push a commit to *your cluster's own git server* and watch it materialize |
 | 03 | [Data services: Postgres + S3](03-data/) | 35 min | core | `psql` into a database you provisioned via git; a presigned S3 URL that works |
@@ -27,7 +27,7 @@ reached.)
 
 Core = 00–05. Stretch modules are for the fast 20% and for home; the core path never
 depends on them — but they build on each other: 09 (capstone) needs 06 and 08, and 08's
-star task needs 04's platform API, while 10 only needs 02. `./scripts/catch-up.sh <module>` bridges any gap.
+star task needs 04's platform API, while 10 only needs 02. `mise run catch-up <module>` bridges any gap.
 
 ## How every module works
 
@@ -51,7 +51,7 @@ Each module directory contains:
   CI regression against `verify.sh` (job tracked in issue #10), and for you if you want
   to fast-forward.
 
-Fallen behind? `./scripts/catch-up.sh <module>` force-pushes the canonical end-state of
+Fallen behind? `mise run catch-up <module>` force-pushes the canonical end-state of
 that module to your in-cluster Gitea and lets ArgoCD converge (see [`solutions/`](../solutions/)).
 
 ## AI assistants are welcome

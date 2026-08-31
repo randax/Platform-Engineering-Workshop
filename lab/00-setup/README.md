@@ -8,7 +8,7 @@
 
 By the end of this module your laptop is provably ready for the whole workshop: all tools
 installed, Docker with enough resources, and every container image already on your machine.
-Proof: `./scripts/install.sh --check` all green and this module's `./verify.sh` exiting 0.
+Proof: `mise run preflight` all green and this module's `./verify.sh` exiting 0.
 
 ## Why this matters
 
@@ -61,10 +61,10 @@ From the repository root:
    **Say yes**: that puts the tools on your PATH *and* points `KUBECONFIG` at a
    workshop-only file, `~/.kube/cloudbox.conf`, while you are in this repo. Open a new
    terminal afterwards.
-2. Pre-pull the workshop images with `./scripts/cloudbox-init.sh`: on tbx into talos-box's
+2. Pre-pull the workshop images with `mise run init` (`scripts/cloudbox-init.sh`): on tbx into talos-box's
    own mirror store (`tbx cache warm`), on Talos-in-Docker into a local registry
    container, `cloudbox-mirror`, on port 5001. This is the slow step, do it on good WiFi.
-3. Run the pre-flight gate: `./scripts/install.sh --check`. It checks *everything*,
+3. Run the pre-flight gate: `mise run preflight`. It checks *everything*,
    including the images from step 2, which is why it goes last. Fix what it flags (most
    common on Docker: Docker not running, or its memory limit below 10 GB). On tbx,
    `--check --deep` also rehashes every cached blob. Run that once before you travel,
@@ -123,7 +123,7 @@ done on macOS / the systemd helper not set up on Linux, or the service is down).
 this machine has never made a tbx cluster — there is nothing it could collide with. If you
 *have* used tbx here before, it stops instead, because two clusters called `cloudbox` is a
 mess you would meet an hour later. Either fix tbx (`tbx doctor`), or, if you know its VMs
-are not running, re-run with `CLOUDBOX_IGNORE_TBX=1 ./scripts/create-cluster.sh`.
+are not running, re-run with `CLOUDBOX_IGNORE_TBX=1 mise run cluster:create`.
 
 ## Optional: sign up for OpenCode Zen (module 10 prep)
 
@@ -183,7 +183,7 @@ goes to `~/.kube/config` instead, which also works.
 
 What does **not** work is half of each: `mise run` / `mise exec` for the scripts, bare
 `kubectl` in a shell without the pin. Then the cluster is in one file and your terminal
-reads another. `./scripts/install.sh --check` prints the file in effect and fails if it
+reads another. `mise run preflight` prints the file in effect and fails if it
 catches you in that state. Note it is per-directory too: a terminal outside this repo
 does not get the pin.
 </details>
@@ -202,8 +202,8 @@ run it again and it skips images already in the mirror. Check progress with
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 ./scripts/dev-setup.sh
-./scripts/cloudbox-init.sh
-./scripts/install.sh --check     # fix anything red, re-run until green
+mise run init
+mise run preflight     # fix anything red, re-run until green
 cd lab/00-setup && ./verify.sh
 ```
 </details>

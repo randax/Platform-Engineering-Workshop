@@ -330,7 +330,7 @@ and name the fix. Confirm by hand with `route -n get 172.30.0.200` (macOS) namin
 `utun*` interface instead of a bridge. Do not go looking in Cilium.
 
 **Fix:** disconnect the VPN, or split-exclude `172.30.0.0/16`, then restart the cluster —
-or run the fallback, `CLOUDBOX_SUBSTRATE=docker ./scripts/create-cluster.sh`, which needs
+or run the fallback, `CLOUDBOX_SUBSTRATE=docker mise run cluster:create`, which needs
 no host route at all.
 
 **Retired by:** upstream teaching detection-time doctor to check the *configured* subnet
@@ -488,7 +488,7 @@ URL…` (`e9585df`) touches `apps/portal/*.go`, as do `ee8837e` and `a6f03fd`. T
 **Retired by, in order:** merge to `main` → `release-please` opens the release PR
 (pins rewritten in it) → merge that → `build-images` publishes the images →
 verify every ref resolves (the `crane manifest` loop in the publish-window entry
-below) → `./scripts/cloudbox-init.sh` re-mirrors. **Step 0 of rehearsal 5**
+below) → `mise run init` re-mirrors. **Step 0 of rehearsal 5**
 (`docs/REHEARSALS.md`) — nothing else in that rehearsal proves the Console's
 function URLs until it is done.
 
@@ -1695,7 +1695,7 @@ after `tbx cluster start` the control plane can come up somewhere else in the
 pointing at it too, and the guard refusing an address it has no record of. One
 command repairs the **client-side** files:
 
-    ./scripts/create-cluster.sh --refresh-endpoint
+    mise run cluster:create -- --refresh-endpoint
 
 It re-reads `tbx status` and rewrites three things: the kubeconfig's `server`,
 the `cloudbox` talosconfig context's `endpoints`/`nodes` (baked at create time by
