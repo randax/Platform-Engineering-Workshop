@@ -1,32 +1,39 @@
-# Module 06 (stretch) — Serverless: scale from zero, on your hardware
+# Module 06 (stretch): serverless, scale from zero on your hardware
 
 ## The goal
 
-At the end of this module a Knative Service runs on your platform with **zero pods**
-until you `curl` it, at which point a pod cold-starts, answers, and a minute later is
-gone again. You prove it by watching the pod count go 0 → 1 → 0 around a 200 response.
+A Knative Service runs on your platform with **zero pods** until you `curl` it, at
+which point a pod cold-starts, answers, and a minute later is gone again. You prove it
+by watching the pod count go 0 → 1 → 0 around a 200 response.
 
 ## Why this matters
 
-"Serverless" was never about someone else's servers. It's about *not paying for idle*
-and *not managing replicas*. Knative Serving is the open-source engine behind most
-Kubernetes serverless offerings (including Cloud Run's API): request-driven autoscaling,
-revisioned deploys, scale-to-zero. Running it yourself demystifies the single most
-magic-looking cloud product there is.
+"Serverless" was never about someone else's servers; it's about not paying for idle.
+Knative Serving is the open-source engine behind most Kubernetes serverless offerings,
+Cloud Run's API included. Running it yourself demystifies the most magic-looking cloud
+product there is.
 
 ## The task
 
-1. Enable `knative-serving.yaml` from the catalog (installs Knative Serving + the Kourier
+1. Enable `knative-serving.yaml` from the catalog (Knative Serving + the Kourier
    gateway behind the Cilium ingress).
-2. Deploy [`hello-ksvc.yaml`](hello-ksvc.yaml) from this lab dir the GitOps way (you know
-   where it goes by now). Wait until the ksvc reports `READY True` and note its URL.
-3. **The moment.** Arrange two terminals:
+2. Deploy [`hello-ksvc.yaml`](hello-ksvc.yaml) from this lab dir the GitOps way (you
+   know where it goes by now). Wait for `READY True` and note its URL.
+3. **The moment.** Two terminals:
    - one watching pods: `kubectl -n demo get pods -w`
-   - one to curl the ksvc URL: `curl "$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')/"`
+   - one to curl: `curl "$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')/"`
 
-   Watch the first request *create* a pod (cold start: how long did it take?), repeat
+   Watch the first request *create* a pod (how long did the cold start take?), repeat
    requests hit it warm, and ~60–90s of silence make it disappear.
 4. Run `./verify.sh`.
+
+## Check your work
+
+```bash
+./verify.sh
+```
+
+The scale-to-zero check waits up to ~2 minutes; be patient.
 
 ## Hints
 
@@ -52,34 +59,26 @@ Knative's webhooks take a minute to come up; the demo app retries. Watch:
 kubectl -n demo get ksvc hello -o jsonpath='{.status.url}'
 ```
 
-The URL is in the `kn.cloudbox.k8s.test` domain and routes through the Cilium ingress:
+The host is `<ksvc>-<namespace>.kn.cloudbox.k8s.test`, here
+`hello-demo.kn.cloudbox.k8s.test`: the dash keeps every ksvc one DNS label, which is
+what lets a single `*.kn.cloudbox.k8s.test` rule serve every namespace anyone invents.
+`.status.url` is the published truth; ask the cluster rather than assuming.
 
-```bash
-curl "$(kubectl -n demo get ksvc hello -o jsonpath='{.status.url}')/"
-```
-
-The host is `<ksvc>-<namespace>.kn.cloudbox.k8s.test`, here `hello-demo.kn.cloudbox.k8s.test`.
-That dash is not cosmetic: it keeps every ksvc one DNS label under the domain, and a
-Kubernetes Ingress wildcard host matches exactly one label. That is what lets a single
-`*.kn.cloudbox.k8s.test` rule serve every namespace anyone invents. Ask the cluster rather
-than assuming, though: `.status.url` is the published truth.
-
-On the **docker** substrate `/etc/hosts` cannot hold a wildcard, so only the ksvc names
-`install.sh --print-hosts` lists resolve. For a ksvc you invent yourself, teach it the
-name: `./scripts/install.sh --add-hosts <first label>`, e.g. `--add-hosts hello-demo`.
-It remembers it, so a later rewrite of the block keeps it. Or skip the name entirely:
-`curl -H "Host: <the ksvc host>" http://localhost/`. On **tbx** the resolver answers the
-wildcard, so anything you create just works.
+On the **Docker** backend `/etc/hosts` cannot hold a wildcard, so only the ksvc names
+`install.sh --print-hosts` lists resolve. For a ksvc you invent, teach it the name:
+`./scripts/install.sh --add-hosts <first label>`, e.g. `--add-hosts hello-demo` (it's
+remembered across rewrites of the block). Or skip the name:
+`curl -H "Host: <the ksvc host>" http://localhost/`. On **tbx** the resolver answers
+the wildcard, so anything you create just works.
 </details>
 
 <details>
 <summary>Hint 3: Scale-to-zero is taking forever / never happens</summary>
 
-The ksvc sets `autoscaling.knative.dev/window: "30s"` so idle detection is quick, but
-scale-to-zero also waits the global grace period (~30s): total ≈ 1–1.5 min of *no
-requests*. Watch the decision-maker directly:
-`kubectl -n knative-serving logs deploy/autoscaler --tail=20`. And make sure no terminal
-is still curling in a loop.
+The ksvc sets `autoscaling.knative.dev/window: "30s"`, but scale-to-zero also waits
+the global grace period (~30s): total ≈ 1–1.5 min of *no requests*. Watch the
+decision-maker: `kubectl -n knative-serving logs deploy/autoscaler --tail=20`. And
+make sure no terminal is still curling in a loop.
 </details>
 
 <details>
@@ -105,28 +104,16 @@ cd "$WORKSHOP/lab/06-serverless" && ./verify.sh
 ```
 </details>
 
-## Check your work
-
-```bash
-./verify.sh
-```
-
-It checks: the knative-serving app is Healthy (Synced is the happy path; sync is advisory) and its deployments are up; ksvc
-`hello` is Ready; a curl through the Cilium ingress returns 200 with
-the expected body; and, after a quiet period, that the revision has scaled to zero pods
-(this check waits up to ~2 minutes, be patient).
-
 ## Explain-back
 
-Tell your neighbor: between your `curl` hitting the ksvc URL and a `Hello ...!` coming back
-from a pod that didn't exist, what had to happen, in order? (Ingress → ? → pod; who
-buffered your request while the pod started?)
+Between your `curl` and a `Hello ...!` from a pod that didn't exist: what had to
+happen, in order, and who buffered your request while the pod started?
 
 ## Going deeper
 
-- Deploy a change (edit `TARGET` via git). Knative keeps both revisions. Find them
-  (`kubectl -n demo get revisions`) and split traffic 50/50 between them in the ksvc spec.
-- Load it: `for i in $(seq 1 200); do curl -s "${URL}/" & done; wait`
-  and watch the autoscaler add pods. What controls the max?
+- Deploy a change (edit `TARGET` via git). Find both revisions
+  (`kubectl -n demo get revisions`) and split traffic 50/50 in the ksvc spec.
+- Load it: `for i in $(seq 1 200); do curl -s "${URL}/" & done; wait` and watch the
+  autoscaler add pods. What controls the max?
 - Set `autoscaling.knative.dev/min-scale: "1"` and explain when you'd pay that cost on
-  purpose (hint: what did your first curl's latency look like?).
+  purpose.

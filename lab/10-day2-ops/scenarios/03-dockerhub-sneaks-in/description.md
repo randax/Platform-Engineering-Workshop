@@ -25,7 +25,7 @@ architecture contract requires every workload image to be pinned, hosted on GHCR
 pre-pulled by `scripts/cloudbox-init.sh` precisely because Docker Hub is rate-limited at
 the venue. See the [root repository guide](../../../../CLAUDE.md).
 
-**Why nothing broke — the part worth understanding.** It depends on your substrate
+**Why nothing broke, and the part worth understanding.** It depends on your cluster backend
 (`cat ~/.cloudbox/substrate`). On **docker/kind**, two mechanisms hide this commit,
 both of them things you built in module 00 and 01:
 
