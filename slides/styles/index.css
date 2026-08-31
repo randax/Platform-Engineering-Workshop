@@ -285,14 +285,76 @@
 .arch.done .delivers{color:var(--jz-run);font-style:normal;font-weight:700;}
 
 /* Cover: a subtle band of the tools you'll run today. */
-/* Cover logo marquee. The track holds the set TWICE and slides left by exactly one
-   set width, so copy 2 lands where copy 1 started and the loop has no seam. The
-   trailing padding on each set is what makes -50% exact: without it the gap
-   between the two copies is counted once instead of twice and the row drifts. */
-.coverlogos{overflow:hidden;margin:1.3rem auto 0;max-width:50rem;
+
+/* Terminal slide: the prework, as a terminal rather than a bullet list. Every
+   command and output string is real — the scripts and mise tasks exist, and the
+   success line is the one scripts/install.sh actually prints. A fake terminal on
+   a workshop slide is the kind of thing an attendee notices and then stops
+   trusting the rest of the deck.
+
+   It plays ITSELF: staggered CSS animations, not v-clicks. Slidev cannot
+   auto-advance clicks, and clicks would mean pressing right ten times before the
+   slide would move on. On a timer the run happens by itself, the slide never
+   advances on its own, and one right-arrow leaves whenever the speaker is ready.
+   Re-entering the slide replays it.
+
+   Lines PRINT, they do not slide in. A terminal that eases text upward reads as a
+   web page pretending to be a terminal; real output just appears. The only
+   softness is a 0.12s fade so the projector does not flicker, and the delays are
+   spaced by how long each command actually takes, not evenly. */
+.term-slide{display:flex;align-items:center;justify-content:center;padding:1.5rem!important;}
+.term{width:min(62rem,94%);max-height:88%;display:flex;flex-direction:column;
+  border-radius:0.7rem;overflow:hidden;background:#0b1220;
+  box-shadow:0 18px 50px rgba(2,6,23,0.55),inset 0 0 0 1px rgba(148,163,184,0.18);}
+.term-bar{display:flex;align-items:center;gap:0.42rem;padding:0.55rem 0.85rem;flex:none;
+  background:rgba(148,163,184,0.10);border-bottom:1px solid rgba(148,163,184,0.16);}
+.term-bar .d{width:0.68rem;height:0.68rem;border-radius:50%;display:inline-block;}
+.term-bar .d.r{background:#ff5f57}.term-bar .d.y{background:#febc2e}.term-bar .d.g{background:#28c840}
+.term-title{margin-left:0.5rem;font-size:0.72rem;opacity:0.5;}
+.term-body{flex:1;padding:1.3rem 1.7rem 1.5rem;overflow:hidden;
+  font-family:var(--slidev-code-font-family,ui-monospace,SFMono-Regular,Menlo,monospace);
+  font-size:0.88rem;line-height:1.7;color:#cbd5e1;}
+.term-body .p{color:#38bdf8;font-weight:700;}
+.term-body .c{color:#e2e8f0;}
+.term-body .cm{color:#64748b;}
+.term-body .o{color:#94a3b8;padding-left:1.15rem;}
+.term-body .o.ok{color:#86efac;}
+.term-body .o.done{color:#4ade80;font-weight:700;padding-left:0;margin-top:0.45rem;}
+.term-body .gap{margin-top:0.85rem;}
+.term-foot{margin-top:1.35rem;font-size:0.78rem;color:#94a3b8;
+  font-family:var(--slidev-font-family,inherit);}
+.term-foot strong{color:#e2e8f0;}
+.term-body>div{opacity:0;animation:term-print 0.12s linear forwards;animation-delay:var(--d,0s);}
+@keyframes term-print{to{opacity:1}}
+.term-body .cur{display:inline-block;width:0.5rem;height:0.95em;margin-left:0.42rem;
+  background:#4ade80;vertical-align:text-bottom;animation:term-blink 1.05s step-end infinite;}
+@keyframes term-blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .term-body>div{opacity:1;animation:none;}
+  .term-body .cur{animation:none;}
+}
+
+/* Cover speakers: avatar + name/role, side by side. Photos are vendored under
+   public/speakers/ like every other asset — the deck never fetches at runtime. */
+.speakers{display:flex;justify-content:center;gap:1.5rem;flex-wrap:nowrap;margin-top:0.9rem;
+  font-size:0.68rem;line-height:1.3;text-align:left;opacity:0.9;}
+.speaker{display:flex;align-items:center;gap:0.55rem;min-width:0;}
+.speaker img{width:2.3rem;height:2.3rem;border-radius:50%;object-fit:cover;flex:none;
+  box-shadow:0 0 0 2px rgba(56,189,248,0.55),0 2px 8px rgba(15,23,42,0.35);}
+.speaker strong{font-size:0.8rem;font-weight:700;}
+
+/* Cover logo marquee. The track holds SIX copies of the set and slides left by
+   half the track (three copies), so copy 4 lands exactly where copy 1 started and
+   the loop has no seam. Six, not two: the animated half must be WIDER than the
+   visible box, or the row runs out of logos before it wraps and a gap crosses the
+   slide. One set of ten chips is roughly 350px against an 800px box, so three
+   copies per half clears it with room to spare. The trailing padding on each set
+   is what keeps -50% exact: without it the gap between halves is counted once
+   instead of twice and the row drifts a little further left every loop. */
+.coverlogos{overflow:hidden;margin:0.9rem auto 0;max-width:50rem;
   -webkit-mask:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);
   mask:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);}
-.coverlogos-track{display:flex;width:max-content;animation:coverlogos-scroll 34s linear infinite;}
+.coverlogos-track{display:flex;width:max-content;animation:coverlogos-scroll 68s linear infinite;}
 .coverlogos-set{display:flex;flex:none;align-items:center;gap:0.6rem;padding-right:0.6rem;}
 @keyframes coverlogos-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 /* A logo row that never stops is motion nobody asked for; honour the OS setting. */
@@ -301,10 +363,13 @@
   .coverlogos-set:nth-child(2){display:none;}}
 
 /* "The stack — and why" layer tables (consolidated; was duplicated per slide). */
-.stack table{font-size:0.82rem;width:100%;border-collapse:collapse;}
-.stack th{text-align:left;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.05em;opacity:0.65;padding:0.3rem 0.7rem;}
-.stack td{padding:0.45rem 0.7rem;border-top:1px solid rgba(148,163,184,0.25);vertical-align:middle;}
-.stack td:nth-child(2){color:var(--jz-run);font-weight:700;min-width:13rem;}
+/* Layer tables run to four rows with a wrapping "tradeoff" column, which on a
+   16:9 slide clipped top and bottom. Tighter type and padding, and a narrower
+   "we run" column so the tradeoff prose wraps to fewer lines. */
+.stack table{font-size:0.74rem;width:100%;border-collapse:collapse;}
+.stack th{text-align:left;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.05em;opacity:0.65;padding:0.22rem 0.6rem;}
+.stack td{padding:0.3rem 0.6rem;border-top:1px solid rgba(148,163,184,0.25);vertical-align:middle;line-height:1.4;}
+.stack td:nth-child(2){color:var(--jz-run);font-weight:700;min-width:11rem;}
 .stack td:nth-child(3){color:var(--jz-rent);}
 .stack .we{display:flex;align-items:center;gap:0.5em;}
 .i-book-open{-webkit-mask:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%207v14%22%20%2F%3E%3Cpath%20d%3D%22M3%2018a1%201%200%200%201-1-1V4a1%201%200%200%201%201-1h5a4%204%200%200%201%204%204%204%204%200%200%201%204-4h5a1%201%200%200%201%201%201v13a1%201%200%200%201-1%201h-6a3%203%200%200%200-3%203%203%203%200%200%200-3-3z%22%20%2F%3E%3C%2Fsvg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%207v14%22%20%2F%3E%3Cpath%20d%3D%22M3%2018a1%201%200%200%201-1-1V4a1%201%200%200%201%201-1h5a4%204%200%200%201%204%204%204%204%200%200%201%204-4h5a1%201%200%200%201%201%201v13a1%201%200%200%201-1%201h-6a3%203%200%200%200-3%203%203%203%200%200%200-3-3z%22%20%2F%3E%3C%2Fsvg%3E") center/contain no-repeat;}
@@ -368,3 +433,10 @@
 ::view-transition-new(root) {
   animation-duration: 320ms;
 }
+
+/* The Bruktby doodle: a hand-drawn square on a light ground. Contain rather than
+   cover so the whole story stays visible (loft photo, listing, buyer, cloud,
+   bills) — cover would crop the bills off the bottom, which is the punchline. */
+.slidev-layout.image-right .slidev-layout-image,
+.slidev-layout.image-right > div:last-child{background-color:#f8fafc;}
+.slidev-layout.image-right img{object-fit:contain!important;background:#f8fafc;}

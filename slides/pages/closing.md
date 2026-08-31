@@ -24,7 +24,7 @@ Closing section — HARD-SCHEDULED: the last 10 minutes belong to this, protecte
       </div>
       <div class="services">
         <Logo name="cloudnativepg" label="CloudNativePG · 03" size="1.6rem"/>
-        <Logo name="rustfs" text="RustFS" size="1.6rem"/>
+        <Logo name="rustfs" size="1.6rem"/>
         <Logo name="crossplane" label="Crossplane · 04" size="1.6rem"/>
         <Logo name="knative" label="Knative · 06+09" size="1.6rem"/>
         <Logo name="nats" label="NATS · 09" size="1.6rem"/>
@@ -54,7 +54,7 @@ The mental model is the real takeaway: cloud products are software plus an API, 
 <tbody>
 <tr><td>Kubernetes / compute</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="talos" label size="1.5rem"/> <Logo name="cilium" label size="1.5rem"/></td></tr>
 <tr><td>Managed Postgres</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudnativepg" label size="1.5rem"/></td></tr>
-<tr><td>Object storage (S3)</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="rustfs" text="RustFS" size="1.5rem"/></td></tr>
+<tr><td>Object storage (S3)</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="rustfs" label size="1.5rem"/></td></tr>
 <tr><td>Self-service infra</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="crossplane" label size="1.5rem"/></td></tr>
 <tr><td>Serverless · CI · registry</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="knative" label size="1.5rem"/> <Logo name="argo-workflows" label="Argo Workflows" size="1.5rem"/> <Logo name="zot" label size="1.5rem"/></td></tr>
 <tr><td>Cloud console</td><td><span class="svgi i-check" style="color:var(--jz-run)"></span> <Logo name="cloudbox" label size="1.5rem"/></td></tr>

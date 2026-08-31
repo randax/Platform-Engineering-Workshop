@@ -29,7 +29,7 @@ Ground rule to state once, up front: nothing here is "best in class" in the abst
 
 </div>
 
-<div v-click class="mt-6 text-lg opacity-85 text-center">The node is a <strong>document</strong> — and service traffic is answered <strong>in-kernel</strong>.</div>
+<div v-click class="mt-4 text-base opacity-85 text-center">The node is a <strong>document</strong> — and service traffic is answered <strong>in-kernel</strong>.</div>
 
 <!--
 The two lines the table earns: the node is a declarative resource — one machineconfig, no shell to drift into. And there is no kube-proxy pod to find — eBPF answers service traffic in-kernel.
@@ -62,7 +62,7 @@ Cilium tradeoff to name honestly: eBPF wants a modern kernel — a talos-box VM 
 
 </div>
 
-<div v-click class="mt-6 text-lg opacity-85 text-center">Your cloud has its <strong>own git server</strong> — the write path never leaves the laptop.</div>
+<div v-click class="mt-4 text-base opacity-85 text-center">Your cloud has its <strong>own git server</strong> — the write path never leaves the laptop.</div>
 
 <!--
 Off-slide but said aloud: Gitea in the cluster, not GitHub — the write path is yours, and offline. App-of-apps + sync waves — restore the Application health check in argocd-cm, or the waves don't gate.
@@ -86,7 +86,7 @@ ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; 
 <thead><tr><th>Role</th><th>We run</th><th>Rejected</th><th>The tradeoff</th></tr></thead>
 <tbody>
 <tr><td>Managed Postgres</td><td><span class="we"><Logo name="cloudnativepg" size="1.3rem"/> <b>CloudNativePG 1.28.4</b></span></td><td>bitnami/stock PG · RDS</td><td>A real control loop (failover, backup) vs. a bare pod — costs CRDs</td></tr>
-<tr><td>Object storage (S3)</td><td><span class="we"><Logo name="rustfs" text="RustFS" size="1.3rem"/> <b>1.0.0-rc.2</b></span></td><td>MinIO</td><td>Apache-2.0, ~90 MB — but young; SeaweedFS is the rehearsed Plan B</td></tr>
+<tr><td>Object storage (S3)</td><td><span class="we"><Logo name="rustfs" size="1.3rem"/> <b>RustFS 1.0.0-rc.2</b></span></td><td>MinIO</td><td>Apache-2.0, ~90 MB — but young; SeaweedFS is the rehearsed Plan B</td></tr>
 <tr><td>OCI registry</td><td><span class="we"><Logo name="zot" size="1.3rem"/> <b>v2.1.20</b></span></td><td>Harbor · registry:2</td><td>One CNCF binary + UI vs. a Postgres/Redis/Trivy fleet — fewer features</td></tr>
 <tr><td>Storage class</td><td><span class="we"><Logo name="localpath" text="local-path" size="1.3rem"/> <b>v0.0.37</b></span></td><td>Longhorn · Ceph CSI</td><td>Node-local, no snapshots/replication — right for one node</td></tr>
 </tbody>
@@ -94,7 +94,7 @@ ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; 
 
 </div>
 
-<div v-click class="mt-6 text-lg opacity-85 text-center">CNPG <strong>is</strong> the RDS control loop — and the RustFS row is the roadmap-risk story, lived.</div>
+<div v-click class="mt-4 text-base opacity-85 text-center">CNPG <strong>is</strong> the RDS control loop — and the RustFS row is the roadmap-risk story, lived.</div>
 
 <!--
 Say it, don't show it: CNPG is the RDS control loop — a Cluster CR, not a Postgres pod. And RustFS-not-MinIO: MinIO's community edition was gutted for proprietary AIStor.
@@ -125,7 +125,7 @@ RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed clust
 
 </div>
 
-<div v-click class="mt-6 text-lg opacity-85 text-center">One YAML becomes a stack · zero becomes a pod · your cluster <strong>builds its own images</strong>.</div>
+<div v-click class="mt-4 text-base opacity-85 text-center">One YAML becomes a stack · zero becomes a pod · your cluster <strong>builds its own images</strong>.</div>
 
 <!--
 Spoken, not projected: Crossplane v2 — Claims are gone, a namespaced XR IS the API. Knative — scale-to-zero, which is what Cloud Run is built on. BuildKit — rootless, in-cluster, pushes to your own Zot.
@@ -152,13 +152,13 @@ Knative: Kourier ingress (not Gateway API — not in Cilium's conformance matrix
 <tbody>
 <tr><td>Durable messaging</td><td><span class="we"><Logo name="nats" size="1.3rem"/> <b>NATS 2.14 + JetStream</b></span></td><td>Kafka · RabbitMQ</td><td>The durable primitive in ~15 MB of Go vs. GBs of JVM/Erlang</td></tr>
 <tr><td>Observability</td><td><span class="we"><Logo name="victoriametrics" size="1.3rem"/> <Logo name="grafana" size="1.3rem"/> <Logo name="opentelemetry" size="1.3rem"/> <b>Victoria stack + OTel</b></span></td><td>kube-prometheus-stack · otel-lgtm · LGTM</td><td>Assembled from parts — but ~1 GiB, not several, and it fits</td></tr>
-<tr><td>Day-2 AI agent</td><td><span class="we"><Logo name="kagent" text="kagent" size="1.3rem"/> <b>0.9.12 + qwen3:1.7b</b></span></td><td>hosted AIOps · k8sgpt</td><td>An Agent is a CRD — but the model runs host-side, and it only ever gets read-only eyes</td></tr>
+<tr><td>Day-2 AI agent</td><td><span class="we"><Logo name="kagent" size="1.3rem"/> <b>kagent 0.9.12 + qwen3:1.7b</b></span></td><td>hosted AIOps · k8sgpt</td><td>An Agent is a CRD — but the model runs host-side, and it only ever gets read-only eyes</td></tr>
 </tbody>
 </table>
 
 </div>
 
-<div v-click class="mt-6 text-lg opacity-85 text-center">Durable messaging in <strong>~15 MB</strong> · full observability in <strong>~1 GiB</strong>.</div>
+<div v-click class="mt-4 text-base opacity-85 text-center">Durable messaging in <strong>~15 MB</strong> · full observability in <strong>~1 GiB</strong>.</div>
 
 <!--
 Spoken: NATS JetStream — durable streams on a PVC for a rounding error of Kafka's RAM. The whole Victoria stack fits in ~1 GiB where LGTM wants several. Datasource plugins are baked into the Grafana image — nothing fetched at boot.

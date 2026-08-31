@@ -38,6 +38,9 @@ each project's own brand assets or a permissive icon set.
 | `googlecloud.svg` | Google Cloud (rent column, dimmed) | Simple Icons |
 | `zot.svg` | Zot | CNCF artwork (color icon) |
 | `backstage.svg` | Backstage | CNCF artwork (color icon) |
+| `kagent.svg` | kagent | CNCF artwork (color icon) |
+| `rustfs.svg` | RustFS | rustfs/console `app/icon.svg` (the square mark; the project's
+  `rustfs.logo.svg` is a 6:1 wordmark and does not fit a chip) |
 | `cert-manager.svg` | cert-manager (adventure door 2) | CNCF artwork (color icon) |
 | `strimzi.svg` | Strimzi / Kafka operator (adventure door 2) | CNCF artwork (color icon) |
 | `kafka.svg` | Apache Kafka (adventure door 2) | Simple Icons |
@@ -51,3 +54,9 @@ one appears. Zot was in this list until 2026-08-24; CNCF artwork now has it.
 Logos are fetched once and committed. If a source URL rots, refetch from the
 project's current brand page and update the row above. Keep them as SVG (crisp +
 tiny + offline).
+
+## Deliberately not vendored
+
+`local-path-provisioner` renders as a text chip (`<Logo name="localpath" text="local-path">`).
+Rancher ships no standalone mark for it, and using the Rancher logo would put the
+vendor's brand on a project that is not the vendor. A text chip is the honest option.

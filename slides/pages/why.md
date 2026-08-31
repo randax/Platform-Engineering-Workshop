@@ -14,16 +14,19 @@ Every hand that goes up is a person who already knows why they're here. Then: "L
 -->
 
 ---
+layout: image-right
+image: /images/bruktby.jpg
+---
 
 # Meet Bruktby
 
-<div class="text-xl opacity-90 mt-2">A Norwegian second-hand marketplace — <em>kjøp og selg brukt.</em></div>
+<div class="text-lg opacity-90 mt-2">A Norwegian second-hand marketplace — <em>kjøp og selg brukt.</em></div>
 
-<div class="story mt-6">
+<div class="story mt-5">
 <span class="svgi i-package"></span> Snap a photo of the thing in your loft → it's a listing in seconds. Someone across the fjord buys it. <strong>Photos in, thumbnails out, listings browsable.</strong> A million small uploads a day.
 </div>
 
-<div class="mt-6 text-lg opacity-80">
+<div class="mt-5 text-base opacity-80">
 Version 1 shipped fast on a big US hyperscaler — managed Kubernetes, managed Postgres, managed object storage, a serverless thumbnailer. It worked. Then three bills came due.
 </div>
 

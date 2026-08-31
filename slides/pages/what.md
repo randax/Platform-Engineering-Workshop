@@ -71,7 +71,7 @@ Now the punchline that sets up the table: Kubernetes is a control plane. Operato
 <tr><td>Kubernetes / compute</td><td><Logo name="aws" dim/> <Logo name="azure" dim/> <Logo name="gcp" dim/></td><td><Logo name="talos" label/> <Logo name="cilium" label/></td></tr>
 <tr><td>GitOps delivery</td><td><em>the mechanic itself</em></td><td><Logo name="gitea" label/> <Logo name="argocd" label/></td></tr>
 <tr><td>Managed Postgres</td><td>RDS · Cloud SQL · Azure DB</td><td><Logo name="cloudnativepg" label/></td></tr>
-<tr><td>Object storage (S3)</td><td>S3 · GCS · Blob</td><td><Logo name="rustfs" text="RustFS"/></td></tr>
+<tr><td>Object storage (S3)</td><td>S3 · GCS · Blob</td><td><Logo name="rustfs" label/></td></tr>
 <tr><td>Self-service infra</td><td>Service Catalog · CloudFormation</td><td><Logo name="crossplane" label/></td></tr>
 <tr><td>Observability</td><td>CloudWatch · Cloud Ops</td><td><Logo name="grafana" label/> <Logo name="opentelemetry" label/></td></tr>
 </tbody>
@@ -105,7 +105,7 @@ Point at the module map on the wall/handout: "Modules 01 through 05 are literall
 <tr><td>CI / image builds</td><td>CodeBuild · Cloud Build</td><td><Logo name="argo-workflows" label="Argo Workflows"/> <Logo name="buildkit" label/></td></tr>
 <tr><td>Container registry</td><td>ECR · Artifact Registry · ACR</td><td><Logo name="zot" label/></td></tr>
 <tr><td>Cloud console</td><td><Logo name="aws" dim/> <Logo name="azure" dim/> <Logo name="gcp" dim/></td><td><Logo name="cloudbox" label/></td></tr>
-<tr><td>Day-2 AI ops</td><td>DevOps Guru · Copilot for Azure</td><td><Logo name="kagent" text="kagent"/></td></tr>
+<tr><td>Day-2 AI ops</td><td>DevOps Guru · Copilot for Azure</td><td><Logo name="kagent" label/></td></tr>
 </tbody>
 </table>
 </div>
@@ -177,7 +177,7 @@ These four are the transferable skills — the thing they take to work on Monday
       </div>
       <div class="services">
         <Logo name="cloudnativepg" label size="1.6rem"/>
-        <Logo name="rustfs" text="RustFS" size="1.6rem"/>
+        <Logo name="rustfs" size="1.6rem"/>
         <Logo name="crossplane" label size="1.6rem"/>
         <Logo name="knative" label size="1.6rem"/>
         <Logo name="nats" label="NATS" size="1.6rem"/>

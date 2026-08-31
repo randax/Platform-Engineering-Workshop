@@ -22,7 +22,7 @@ Say where help lives, honestly: the briefings are self-service by design — two
 # Five doors
 
 <div class="grid grid-cols-1 gap-2 mt-2">
-  <div v-click class="story"><span class="tag">0 · START HERE</span> &nbsp;<Logo name="argo-workflows" size="1.2rem"/> <Logo name="cloudbox" size="1.2rem"/> <Logo name="kagent" size="1.2rem" text="kagent"/> &nbsp;Modules 07 · 08 · 10 — build images in-cluster, read your Console end to end, hand an agent the day-2 pager.</div>
+  <div v-click class="story"><span class="tag">0 · START HERE</span> &nbsp;<Logo name="argo-workflows" size="1.2rem"/> <Logo name="cloudbox" size="1.2rem"/> <Logo name="kagent" size="1.2rem"/> &nbsp;Modules 07 · 08 · 10 — build images in-cluster, read your Console end to end, hand an agent the day-2 pager.</div>
   <div v-click class="story"><span class="tag">1 · APP DEV</span> &nbsp;<Logo name="crossplane" size="1.2rem"/> <Logo name="nats" size="1.2rem"/> <Logo name="buildkit" size="1.2rem"/> &nbsp;Be the product team: one-YAML deploys, event consumers, your own CI.</div>
   <div v-click class="story"><span class="tag">2 · PLATFORM</span> &nbsp;<Logo name="cert-manager" size="1.2rem"/> <Logo name="strimzi" size="1.2rem"/> <Logo name="kafka" size="1.2rem"/> &nbsp;Be the platform team: author a capability — cert-manager (16 GB) or Kafka (32 GB) — then make it self-service.</div>
   <div v-click class="story"><span class="tag">3 · SECURITY</span> &nbsp;<Logo name="cilium" size="1.2rem"/> <Logo name="zot" size="1.2rem"/> &nbsp;Zero trust for real: default-deny a live pipeline, earn it back, sign your images.</div>
