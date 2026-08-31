@@ -21,43 +21,35 @@ the end of the day. The full component list and why each one beat its alternativ
 
 ## Before the conference
 
-Conference WiFi carries keystrokes, not gigabytes; setup downloads roughly 7.5 GB of
-container images (7.7 GB on x86-64). **Run these three steps at home, on a network you
-trust:**
-
-Install Docker first (Docker Desktop, OrbStack or docker-ce): step 2 needs it to run the
-image mirror, and step 3 checks it has at least 10 GB and 4 CPUs. The exception is a
-machine using tbx, which needs no Docker at all.
+Conference WiFi carries keystrokes, not gigabytes: setup pulls roughly 7.5 GB of images
+(7.7 GB on x86-64), so run it at home. You need Docker (Desktop, OrbStack or docker-ce)
+with at least 10 GB and 4 CPUs, unless you use tbx, which needs none. On Apple Silicon,
+decide about tbx *before* step 2: it warms images for the substrate you have at that
+moment, and installing the helper afterwards downloads them twice
+([docs/SUBSTRATES.md](docs/SUBSTRATES.md)).
 
 ```bash
 git clone https://github.com/randax/Platform-Engineering-Workshop.git
 # (will be renamed to jz-2026-platform-engineering — the old URL will redirect)
 cd Platform-Engineering-Workshop
 
-./scripts/dev-setup.sh        # 1. install the pinned CLI tools, via mise
-mise run init                 # 2. pre-pull all pinned images (~7.5 GB, be patient)
-mise run preflight            # 3. preflight: prints ✅/❌ for everything
+./scripts/dev-setup.sh   # 1. pinned CLI tools, via mise. Say yes to the shell hook: it
+                         #    points KUBECONFIG at ~/.kube/cloudbox.conf, this workshop's
+                         #    cluster and nothing else
+mise run init            # 2. pre-pull all pinned images (~7.5 GB, be patient)
+mise run preflight       # 3. prints ✅/❌ for everything
 ```
 
-On Apple Silicon macOS, decide about tbx **before** step 2. Step 2 warms images for the
-substrate you have at that moment, so installing the tbx helper afterwards means
-downloading them again. See [docs/SUBSTRATES.md](docs/SUBSTRATES.md).
+**All green means you are done.** Otherwise the output names the fix, and the
+[devcontainer lifeboat](#plan-b-devcontainer--codespaces) covers what cannot be fixed.
+Broken prereqs are our bug, not yours: open an issue and we will fix it before the day.
+Bring your power supply. You do not build the cluster here; that happens in the room
+([Get started](#get-started)).
 
-Broken prereqs are our bug, not yours: open an issue on this repo and we will fix it
-before the day.
-
-**If step 3 is all green, you are done.** If not, the output names what to fix; if it cannot
-be fixed, the [devcontainer lifeboat](#plan-b-devcontainer--codespaces) has you covered.
-Bring your laptop and its power supply.
-
-You do not create the cluster at home: these steps install tools and download images; the
-cluster is built in the room ([Get started](#get-started)). Step 1 offers to hook mise into
-your shell; say yes. It pins the tools and points `KUBECONFIG` at
-`~/.kube/cloudbox.conf`, this workshop's cluster and nothing else
-([detail](docs/SUBSTRATES.md#your-kubeconfig)).
-Steps 2–3, like every command below, are mise tasks (`mise tasks` lists them all; the
-underlying scripts live in `scripts/`); step 1 stays a script because it is what installs
-mise in the first place.
+Steps 2 and 3 are mise tasks, like every command below (`mise tasks` lists them all, and
+the scripts they run live in `scripts/`). Step 1 stays a script because it is what
+installs mise. Details on the kubeconfig pin are in
+[docs/SUBSTRATES.md](docs/SUBSTRATES.md#your-kubeconfig).
 
 ## Get started
 
