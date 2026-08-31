@@ -10,8 +10,8 @@ By the end of this module your laptop is provably ready for the whole workshop: 
 installed, Docker with enough resources, and every container image already on your machine.
 Proof: `mise run preflight` all green and this module's `./verify.sh` exiting 0.
 
-The conference WiFi will carry keystrokes, not gigabytes; nothing in this workshop
-downloads images at runtime. That is also platform-engineering lesson #1: a platform you
+Nothing in this workshop downloads images at runtime, so everything has to be on your
+machine before the session starts. That is also platform-engineering lesson #1: a platform you
 can't stand up without the internet is someone else's platform. Do this module **at home
 before the workshop** if you can. The room's first 15 minutes are the safety net, not the plan.
 
