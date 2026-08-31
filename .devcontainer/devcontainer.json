@@ -51,7 +51,7 @@
   // which routes by hostname — has no rule for it. Forwarded port 80 therefore 404s.
   // Open services from the Ports tab instead (one forwarded NodePort each, below);
   // README "Plan B: devcontainer / Codespaces" carries the table.
-  "postCreateCommand": "curl -fsSL https://mise.run | MISE_VERSION=v2026.8.6 sh && export PATH=\"$HOME/.local/bin:$PATH\" && printf '\\n# mise (CloudBox workshop tools + KUBECONFIG)\\neval \"$($HOME/.local/bin/mise activate bash)\"\\n' >> \"$HOME/.bashrc\" && ./scripts/dev-setup.sh",
+  "postCreateCommand": "curl -fsSL https://mise.run | MISE_VERSION=v2026.8.15 sh && export PATH=\"$HOME/.local/bin:$PATH\" && printf '\\n# mise (CloudBox workshop tools + KUBECONFIG)\\neval \"$($HOME/.local/bin/mise activate bash)\"\\n' >> \"$HOME/.bashrc\" && ./scripts/dev-setup.sh",
 
   // NodePorts exposed by the in-cluster platform.
   "forwardPorts": [80, 30300, 30080, 30500, 30600, 30700, 30900, 30030, 31080, 30422],
