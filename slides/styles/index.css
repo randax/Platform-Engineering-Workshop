@@ -541,12 +541,14 @@
 
 /* Console screenshots get a slide to themselves. They were insets crammed beside
    text, which made a 1400px screenshot unreadable from the back of the room.
-   80% of the slide height, caption underneath. */
-.bigshot{margin:0.6rem auto 0;display:flex;flex-direction:column;align-items:center;gap:0.6rem;}
-.bigshot img{height:78vh;max-height:78vh;width:auto;max-width:100%;object-fit:contain;
+
+   64vh, not 80: the slide also carries an h1 and a caption, and at 78vh the three
+   together overflowed and the bottom of the screenshot was cut off. */
+.bigshot{margin:0.4rem auto 0;display:flex;flex-direction:column;align-items:center;gap:0.45rem;}
+.bigshot img{height:64vh;max-height:64vh;width:auto;max-width:96%;object-fit:contain;
   border-radius:0.5rem;border:1px solid rgba(148,163,184,0.35);
   box-shadow:0 16px 40px rgba(2,6,23,0.6);}
-.bigshot figcaption{font-size:0.72rem;color:#94a3b8;text-align:center;max-width:52rem;}
+.bigshot figcaption{font-size:0.68rem;color:#94a3b8;text-align:center;max-width:52rem;}
 
 /* Where to point a browser once the lab is green. */
 .urls{margin-top:0.9rem;display:flex;flex-wrap:wrap;gap:0.5rem 1.1rem;align-items:center;
