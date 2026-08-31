@@ -189,3 +189,20 @@ users raise it in `.wslconfig`. On tbx the VM sizes are pins (`TBX_CP_MEMORY` /
 talos-box balloons memory back out of a running node when the host comes under pressure,
 which keeps the laptop alive and means a hungry browser can shrink your cluster mid-module.
 Close the zoo anyway.
+
+## Platform support matrix
+
+16 GB RAM, 4 cores and 40 GB free is the floor on both substrates (on Docker, with at
+least 10 GB and 4 CPUs given to Docker itself); 32 GB is comfortable, and the full
+platform idles at roughly 8 GB inside the cluster. Details, and what each substrate buys
+you, are in [Hardware](#hardware) below.
+
+| Platform | Substrate | Support |
+|---|---|---|
+| macOS, Apple Silicon | tbx (Docker if `tbx doctor` fails) | fully supported |
+| Linux, amd64/arm64 with KVM | tbx (Docker if `tbx doctor` fails) | fully supported |
+| macOS, Intel | Docker | fully supported |
+| Windows via WSL2 | Docker | best-effort; pair up if it fights you |
+| GitHub Codespaces / devcontainer | Docker | the lifeboat, tested weekly in CI |
+
+On Linux, watch out for firewalld/nftables interference on either substrate.

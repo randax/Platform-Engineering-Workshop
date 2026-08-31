@@ -41,7 +41,7 @@ mise run preflight       # 3. prints ✅/❌ for everything
 ```
 
 **All green means you are done.** Otherwise the output names the fix, and the
-[devcontainer lifeboat](#plan-b-devcontainer--codespaces) covers what cannot be fixed.
+[devcontainer lifeboat](.devcontainer/README.md) covers what cannot be fixed.
 Broken prereqs are our bug, not yours: open an issue and we will fix it before the day.
 Bring your power supply. You do not build the cluster here; that happens in the room
 ([Get started](#get-started)).
@@ -108,109 +108,38 @@ afterwards. Canonical end-states live in `solutions/`.
 
 ## The Cloudbox Console
 
-The platform's front door: a bespoke **Go + htmx** portal, server-rendered and fully
-**offline** (no CDN, one vendored `.js` file, no build step). A read-only ServiceAccount
-token lets it read the Kubernetes API and surface everything you built (ArgoCD apps, CNPG
-databases, Knative services), plus **per-component metrics, logs, and traces** from the
-on-cluster OTel stack (VictoriaMetrics / VictoriaLogs / VictoriaTraces via the OTel
-Collector). Light and dark themes, responsive down to a phone. Small enough to read over
-coffee: [`apps/portal/`](apps/portal/). You build it in [module 08](lab/08-portal); it comes
-fully alive in the [capstone](lab/09-capstone).
+The platform's front door: a bespoke Go + htmx portal, server-rendered, fully offline, and
+small enough to read over coffee (no CDN, one vendored `.js` file, no build step). It
+reads the Kubernetes API with a read-only
+ServiceAccount and surfaces what you built, with per-component metrics, logs and traces
+from the on-cluster OTel stack. You build it in [module 08](lab/08-portal) and it comes
+fully alive in the [capstone](lab/09-capstone); the source and what each app demonstrates
+are in [`apps/portal/`](apps/portal/) and [apps/README.md](apps/README.md); every
+screenshot is in
+[docs/screenshots/](docs/screenshots/README.md).
 
 <p align="center">
   <img src="docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console, a component's Monitoring page: CPU/memory sparklines and a live log tail" width="49%" />
   <img src="docs/screenshots/console-components-dark.png" alt="Cloudbox Console, the Components health page, per-namespace status" width="49%" />
 </p>
 
-<p align="center"><em>Left: a component's Monitoring detail (CPU/memory sparklines, live log tail from the OTel stack). Right: the Components health page. Both dark mode; the console ships light + dark.</em></p>
+## Running it elsewhere
 
-All screenshots (desktop, mobile nav, the "enable observability" gated state, database
-metrics): [docs/screenshots/](docs/screenshots/README.md).
+The cluster runs on Talos-in-Docker by default, or on real Talos VMs with
+[talos-box](https://github.com/randax/talos-box) where the machine supports it. You do not
+choose: the scripts detect it and `mise run preflight` prints which you will get. Which
+substrate you land on, how to pin it, the platform support matrix and the tbx helper are
+all in **[docs/SUBSTRATES.md](docs/SUBSTRATES.md)**.
 
-## Substrates, in one paragraph
+If `mise run preflight` will not go green on your machine, do not burn workshop time on
+it: this repo ships a [devcontainer](.devcontainer/devcontainer.json) with the same
+content, usable in GitHub Codespaces or locally. Setup, the machine size to pick, and the
+one thing that differs there (services open from the Ports tab, not by hostname) are in
+[.devcontainer/README.md](.devcontainer/README.md).
 
-The cluster runs on **Talos-in-Docker** (everyone, by default) or on **tbx**
-([talos-box](https://github.com/randax/talos-box)) real Talos VMs (Apple Silicon macOS, or Linux with KVM, and only if you install its privileged
-helper). You do not choose: the scripts detect it, `mise run preflight` prints which you
-will get, and every module after 01 is identical on both. Force it with
-`CLOUDBOX_SUBSTRATE=docker` or `=tbx`, or pin it for the machine as shown in
-[Get started](#get-started).
-
-**[docs/SUBSTRATES.md](docs/SUBSTRATES.md)** has the rest: the comparison table, the tbx
-helper install and its macOS kernel-panic warning, hypervisor selection, what writes to
-`/etc/hosts` and what happens if you decline the password, and the kind lifeboat.
-
-## Platform support matrix
-
-16 GB RAM, 4 cores and 40 GB free is the floor on both substrates (on Docker, with at
-least 10 GB and 4 CPUs given to Docker itself); 32 GB is comfortable, and the full
-platform idles at roughly 8 GB inside the cluster. Details, and what each substrate buys
-you, are in [docs/SUBSTRATES.md](docs/SUBSTRATES.md#hardware).
-
-| Platform | Substrate | Support |
-|---|---|---|
-| macOS, Apple Silicon | tbx (Docker if `tbx doctor` fails) | fully supported |
-| Linux, amd64/arm64 with KVM | tbx (Docker if `tbx doctor` fails) | fully supported |
-| macOS, Intel | Docker | fully supported |
-| Windows via WSL2 | Docker | best-effort; pair up if it fights you |
-| GitHub Codespaces / devcontainer | Docker | the lifeboat, tested weekly in CI |
-
-On Linux, watch out for firewalld/nftables interference on either substrate.
-
-## Using AI assistants
-
-**Yes. Please.** Claude Code, Copilot, kubectl-ai, whatever you run: point it at your
-cluster. The labs are outcomes, not command lists, because copying 12 commands (yourself or
-via an LLM) teaches nothing; the goal is a running platform and the mental model, not the
-typing. One warning shot: module 05 includes a fault where the obvious AI diagnosis is
-plausible and wrong. Verifying what an agent tells you against the live system is the 2026
-skill, and we'll practice it.
-
-**The house style: your assistant is a tutor, not a chauffeur.** This repo's instructions
-(`CLAUDE.md` / `AGENTS.md`) ask coding agents to *coach* during the workshop (explain, point
-at the next hint layer, debug your environment with you) and to decline to simply do the
-labs for you. It's advisory: you can delete the file or talk your agent past it, except that
-the only thing you'd take home from a workshop your agent did is a warm laptop. One
-deliberate carve-out: **environment and tooling failures are not the lesson.** Docker won't
-start, a mise shim misbehaves, a download died halfway? Sic your agent on those with
-everything it has.
-
-## Plan B: devcontainer / Codespaces
-
-If `mise run preflight` won't go green on your machine, don't burn workshop time on it. This
-repo ships a [devcontainer](.devcontainer/devcontainer.json) with Docker-in-Docker and all
-tools preinstalled, the exact same workshop content:
-
-- **GitHub Codespaces**: Code → Create codespace on this repo. Pick a machine with
-  **4 cores / 16 GB RAM** or larger, then run the same three prework steps inside it.
-- **Locally**: any editor that speaks the [Dev Containers spec](https://containers.dev)
-  (VS Code, JetBrains, `devcontainer` CLI), though if Docker works locally you likely don't
-  need the lifeboat.
-
-**One thing differs in Codespaces: how you open a service.** Everywhere else the workshop's
-URLs are hostnames (`http://gitea.cloudbox.k8s.test`). A codespace's browser is not on the
-machine the cluster runs on; it reaches the container through
-`https://<codespace>-<port>.app.github.dev`, which sends whatever `Host` header GitHub
-chooses, and the platform's ingress routes **by hostname**, so the forwarded port-80 URL
-404s on a healthy cluster. Use the **Ports tab** instead: the devcontainer forwards a
-NodePort per service, each row opening the right one directly, no `Host` header involved.
-
-| Ports tab entry | Service |
-|---|---|
-| NodePort 30300 | Gitea (in-cluster git) |
-| NodePort 30080 | ArgoCD |
-| NodePort 30600 | Cloudbox Console |
-| NodePort 30030 | Grafana |
-| NodePort 30900 | RustFS S3 |
-| NodePort 30500 | Zot registry |
-| NodePort 31080 | your apps (Kourier); needs a `Host` header, so `curl` it from the terminal |
-
-Inside the codespace's own terminal the hostnames work normally (`curl` and the labs'
-`verify.sh` scripts resolve them from the container's `/etc/hosts`); only the browser needs
-the Ports tab.
-
-Codespaces runs in Microsoft's cloud. A pragmatic irony for a sovereignty workshop, and
-exactly why it's the lifeboat and not the boat.
+Assistants are welcome in every module, and this repo asks them to coach rather than
+solve (`CLAUDE.md` / `AGENTS.md`). The house rules, and why pasting cannot win, are in
+[lab/README.md](lab/README.md#ai-assistants-are-welcome).
 
 ## Workshop leaders
 
