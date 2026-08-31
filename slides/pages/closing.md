@@ -115,11 +115,14 @@ layout: cover
   </div>
 </div>
 
-<div class="navstats mt-6">
-  <div><b>2</b><span>days</span></div>
-  <div><b>3</b><span>tracks</span></div>
-  <div><b>9</b><span>workshops</span></div>
+<div class="cndspeakers mt-6">
+  <div><img src="/speakers/cnd/abdel.jpg" alt="Abdel SGHIOUAR" /><b>Abdel SGHIOUAR</b><span>Google</span></div>
+  <div><img src="/speakers/cnd/diana.jpg" alt="Diana Todea" /><b>Diana Todea</b><span>VictoriaMetrics</span></div>
+  <div><img src="/speakers/cnd/imma.jpg" alt="Imma Valls" /><b>Imma Valls</b><span>Grafana Labs</span></div>
+  <div><img src="/speakers/cnd/adriana.jpg" alt="Adriana Villela" /><b>Adriana Villela</b><span>Developer Advocate</span></div>
 </div>
+
+<div class="mt-4 text-center text-sm opacity-70">2 days · 3 tracks · 9 workshops</div>
 
 <!--
 The nerdiest tech conference in Norway, and the natural next step for anyone who
@@ -130,7 +133,12 @@ enjoyed today: two days in Bergen, three tracks, nine workshops, tickets from ab
 pitch is that everything on today's stack came from that community, and the conference is
 where you meet the people who run it in production.
 
-Details and tickets: 2026.cloudnativedays.no.
+Two of the four faces are people whose software the room ran today: Diana works on
+VictoriaMetrics and Imma on Grafana, both in the observability stack from module 09. Say
+that, because it is the argument for going.
+
+Details and tickets: 2026.cloudnativedays.no. Photos and affiliations come from the
+conference's own speaker pages.
 -->
 
 ---

@@ -586,3 +586,13 @@
 .cndwhen{margin-top:0.6rem;font-size:0.95rem;color:#cbd5e1;}
 .cndurl{margin-top:0.5rem;font-size:0.95rem;font-weight:700;color:#e2e8f0;
   font-family:var(--slidev-code-font-family,ui-monospace,monospace);}
+
+/* Speaker highlights on the conference slide. Photos and affiliations are taken from
+   the conference's own speaker cards, so each face is paired with the name that sits
+   in the same card, not the nearest one in the markup. */
+.cndspeakers{display:grid;grid-template-columns:repeat(4,1fr);gap:1.2rem;max-width:46rem;margin-inline:auto;}
+.cndspeakers > div{display:flex;flex-direction:column;align-items:center;text-align:center;gap:0.3rem;}
+.cndspeakers img{width:5.2rem;height:5.2rem;border-radius:50%;object-fit:cover;
+  box-shadow:0 0 0 2px rgba(56,189,248,0.5),0 4px 12px rgba(2,6,23,0.5);}
+.cndspeakers b{font-size:0.72rem;color:#e2e8f0;line-height:1.2;}
+.cndspeakers span{font-size:0.62rem;color:#94a3b8;}
