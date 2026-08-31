@@ -26,6 +26,7 @@ the run scratchpads referenced from each hazard entry.
 | [12](rehearsals/12-docker-merged-main.md) | 2026-08-30 | docker | merged main at the resource floor, all eleven `verify.sh` exit 0; lab 08's verify graded on the lying `status.phase` |
 | [13](rehearsals/13-adventures-and-recovery.md) | 2026-08-30 | docker | adventures + recovery tooling, no happy path; ArgoCD's silent give-up after 5 retries, `catch-up.sh` proven idempotent |
 | [14](rehearsals/14-tbx-v015-balloon-disabled.md) | 2026-08-30 | tbx v0.1.5 | **third panic**: full cycle clean, host died 71 s after teardown — the balloon ruled out |
+| [15](rehearsals/15-agy-on-the-rewritten-labs.md) | 2026-08-31 | docker | an outside agent on the delivered labs: 00–09 all green, and the three rewritten going-deeper texts confirmed against a live cluster |
 
 ## The 240-minute budget is not the constraint
 
