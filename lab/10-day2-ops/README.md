@@ -34,14 +34,15 @@ says.
 Scenario 3 is awkward on purpose: nothing is visibly broken, and it still has to be
 reverted.
 
-Injecting is always two runs: the first seeds the `demo-web` baseline and stops so
-ArgoCD can converge it; the second pushes the bad release.
+On a fresh lab the first injection is two runs: it seeds the `demo-web` baseline and
+stops so ArgoCD can converge it, then a re-run pushes the bad release. Once the
+baseline exists and is healthy, later scenarios inject on their first run.
 
 ```bash
-./inject.sh 1        # first run: seeds the demo-web baseline, then stops
-./inject.sh 1        # second run (after ArgoCD converges): pushes the bad release
+./inject.sh 1        # fresh lab: seeds the demo-web baseline, then stops
+./inject.sh 1        # re-run (after ArgoCD converges): pushes the bad release
 ./restore.sh 1       # the canonical Git revert / give up gracefully
-./inject.sh 2        # same two-run pattern
+./inject.sh 2        # injects at once; the baseline is already there
 ./restore.sh 2
 ./inject.sh 3
 ./restore.sh 3

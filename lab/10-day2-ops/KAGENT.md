@@ -8,6 +8,13 @@ Part 1 runs a real model on your host beside the whole cluster and needs the 32 
 "comfortable" spec from module 00. On 16 GB, skip straight to part 2; it costs no
 extra RAM.
 
+Nothing on this page is graded; the module's `verify.sh` stops at the scenarios.
+That is a deliberate exception to principle 6, "Verify against the running system,
+never against text": part 1's deliverable is a sentence you wrote about how the
+model failed, and part 2's is a kill-test you ran against the cluster yourself.
+Both are principle-8 checkpoints (understanding, not completion) that a script
+asserting cluster state cannot grade.
+
 ## Enable Kagent and point it at your platform
 
 ```bash
@@ -61,8 +68,13 @@ kubectl -n gitea exec deploy/gitea -c gitea -- wget -qO- \
   "http://$(kubectl -n kagent get cm cloudbox-host -o jsonpath='{.data.gateway}'):11434/api/version"
 ```
 
-Ollama also needs the model: `ollama list | grep qwen3` (~1.4 GB;
-`ollama pull qwen3:1.7b` if missing).
+Ollama also needs the model, which `cloudbox-init.sh` pulled in module 00 and
+`scripts/versions.env` pins as `KAGENT_OLLAMA_MODEL`:
+
+```bash
+source scripts/versions.env            # the single place the model is pinned
+ollama pull "${KAGENT_OLLAMA_MODEL}"   # ~1.4 GB; a no-op when already present
+```
 </details>
 
 ## Part 1: watch the local model flail, and write down how
@@ -96,8 +108,9 @@ instructive outcome this part can hand you.
 
 ## Part 2: one `ModelConfig` push to a hosted model
 
-Part 2 is the workshop's one documented exception to the offline rule: it needs the
-network, because small local models can't do multi-step triage. If the network is
+Part 2 is the workshop's one documented exception to principle 2, "Nothing requires
+the internet at runtime": a hosted model needs the network, and it earns the
+exception because small local models can't do multi-step triage. If the network is
 down, part 1 still works on 32 GB machines and the scenario path needs none.
 
 Sign up for a free [OpenCode Zen](https://opencode.ai/auth) key (module 00 prep). If
