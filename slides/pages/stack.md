@@ -14,7 +14,6 @@ Ground rule to state once, up front: nothing here is "best in class" in the abst
 -->
 
 ---
-
 transition: view-transition
 ---
 
@@ -58,7 +57,6 @@ Cilium tradeoff to name honestly: eBPF wants a modern kernel — a talos-box VM 
 -->
 
 ---
-
 transition: view-transition
 ---
 
@@ -99,7 +97,6 @@ ApplicationSets vs app-of-apps: ApplicationSets are for stamping many clusters; 
 -->
 
 ---
-
 transition: view-transition
 ---
 
@@ -142,7 +139,6 @@ RustFS honesty: standalone mode (the chart defaults to a 4-pod distributed clust
 -->
 
 ---
-
 transition: view-transition
 ---
 
@@ -186,7 +182,6 @@ Knative: Kourier ingress (not Gateway API — not in Cilium's conformance matrix
 -->
 
 ---
-
 transition: view-transition
 ---
 
