@@ -447,11 +447,12 @@
 /* The layer slides as an actual stack. Each slide shows all five bars, filled up
    to the one it is about, so the platform visibly builds from the metal upward.
 
-   Each bar carries its own view-transition-name, so when Slidev routes the
-   navigation through the View Transitions API the browser morphs bar N from the
-   old slide into bar N on the new one: the filled bars stay put and the next one
-   lights up, rather than the whole block cross-fading. That is the difference
-   between a diagram that animates and a diagram that flickers. */
+   The bars deliberately carry NO view-transition-name. Naming each one morphs
+   beautifully in theory, but Slidev keeps the outgoing and incoming slides in the
+   DOM together, so the same name appears twice and the browser aborts the whole
+   transition with InvalidStateError. The bars sit at identical coordinates on
+   every layer slide, so the ordinary cross-fade already reads as "the stack stays
+   put and the next layer lights up". */
 .layerstack{display:flex;flex-direction:column;gap:0.3rem;margin:0.6rem 0 0.9rem;}
 .layerstack .layer{display:flex;align-items:center;gap:0.6rem;padding:0.28rem 0.7rem;
   border-radius:0.4rem;font-size:0.72rem;letter-spacing:0.02em;
@@ -464,7 +465,6 @@
 /* The one this slide is about. */
 .layerstack .layer.cur{background:rgba(56,189,248,0.22);border-color:var(--jz-accent);
   color:#e2e8f0;font-weight:700;}
-@media (prefers-reduced-motion:reduce){.layerstack .layer{view-transition-name:none!important;}}
 
 /* ==========================================================================
    Nav slides. Nais is the reference platform in Norway, so these two carry
@@ -510,3 +510,13 @@
 .navlede{display:flex;align-items:center;gap:1rem;font-size:1.05rem;opacity:0.92;}
 .navfoot{display:flex;align-items:center;justify-content:center;gap:0.7rem;
   font-size:1.05rem;opacity:0.85;}
+
+/* "Stuck?" is deliberately NOT another card grid. Two columns of short prose
+   under a labelled head, so the run of how-it-works slides does not read as one
+   long identical template. */
+.twoup{display:grid;grid-template-columns:1fr 1fr;gap:2.2rem;}
+.twoup .colhead{display:flex;align-items:center;gap:0.55rem;font-size:1rem;font-weight:800;
+  color:#e2e8f0;padding-bottom:0.45rem;margin-bottom:0.7rem;
+  border-bottom:2px solid rgba(148,163,184,0.3);}
+.twoup .col p{font-size:0.8rem;line-height:1.5;color:#cbd5e1;margin:0 0 0.6rem;}
+.twoup .col b{color:#e2e8f0;}

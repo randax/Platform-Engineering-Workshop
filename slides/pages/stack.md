@@ -20,11 +20,11 @@ transition: view-transition
 # Layer 1 — the metal & the network
 
 <div class="layerstack">
-  <div class="layer off" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
-  <div class="layer off" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
-  <div class="layer off" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
-  <div class="layer off" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
-  <div class="layer on cur" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+  <div class="layer off"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer off"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer off"><span class="ln">3</span> data</div>
+  <div class="layer off"><span class="ln">2</span> delivery</div>
+  <div class="layer on cur"><span class="ln">1</span> metal &amp; network</div>
 </div>
 
 <div class="stack">
@@ -63,11 +63,11 @@ transition: view-transition
 # Layer 2 — how everything ships
 
 <div class="layerstack">
-  <div class="layer off" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
-  <div class="layer off" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
-  <div class="layer off" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
-  <div class="layer on cur" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
-  <div class="layer on" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+  <div class="layer off"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer off"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer off"><span class="ln">3</span> data</div>
+  <div class="layer on cur"><span class="ln">2</span> delivery</div>
+  <div class="layer on"><span class="ln">1</span> metal &amp; network</div>
 </div>
 
 <div class="stack">
@@ -103,11 +103,11 @@ transition: view-transition
 # Layer 3 — the data services
 
 <div class="layerstack">
-  <div class="layer off" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
-  <div class="layer off" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
-  <div class="layer on cur" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
-  <div class="layer on" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
-  <div class="layer on" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+  <div class="layer off"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer off"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer on cur"><span class="ln">3</span> data</div>
+  <div class="layer on"><span class="ln">2</span> delivery</div>
+  <div class="layer on"><span class="ln">1</span> metal &amp; network</div>
 </div>
 
 <div class="stack">
@@ -145,11 +145,11 @@ transition: view-transition
 # Layer 4 — self-service & compute
 
 <div class="layerstack">
-  <div class="layer off" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
-  <div class="layer on cur" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
-  <div class="layer on" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
-  <div class="layer on" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
-  <div class="layer on" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+  <div class="layer off"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer on cur"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer on"><span class="ln">3</span> data</div>
+  <div class="layer on"><span class="ln">2</span> delivery</div>
+  <div class="layer on"><span class="ln">1</span> metal &amp; network</div>
 </div>
 
 <div class="stack">
@@ -188,11 +188,11 @@ transition: view-transition
 # Layer 5 — messaging & observability
 
 <div class="layerstack">
-  <div class="layer on cur" style="view-transition-name:stack-layer-5"><span class="ln">5</span> messaging &amp; observability</div>
-  <div class="layer on" style="view-transition-name:stack-layer-4"><span class="ln">4</span> self-service &amp; compute</div>
-  <div class="layer on" style="view-transition-name:stack-layer-3"><span class="ln">3</span> data</div>
-  <div class="layer on" style="view-transition-name:stack-layer-2"><span class="ln">2</span> delivery</div>
-  <div class="layer on" style="view-transition-name:stack-layer-1"><span class="ln">1</span> metal &amp; network</div>
+  <div class="layer on cur"><span class="ln">5</span> messaging &amp; observability</div>
+  <div class="layer on"><span class="ln">4</span> self-service &amp; compute</div>
+  <div class="layer on"><span class="ln">3</span> data</div>
+  <div class="layer on"><span class="ln">2</span> delivery</div>
+  <div class="layer on"><span class="ln">1</span> metal &amp; network</div>
 </div>
 
 <div class="stack">
@@ -220,41 +220,4 @@ VM's columnar TSDB + vmrange histograms hold it to ~1 GiB where kube-prometheus-
 Pins: NATS 2.14.5; VictoriaMetrics 1.150.0, VictoriaLogs 1.52.0, VictoriaTraces 0.10.0, Grafana 13.1.3, OTel Collector contrib 0.158.0; kagent 0.9.12 with qwen3:1.7b on host-side Ollama — never in-cluster, so it can't compete with the cluster for memory (module 10). Observability is on-demand — enabled from the catalog as the module-09 capstone "now observe what you built", not part of the wave-0 baseline.
 
 The four things we rejected, precisely: kube-prometheus-stack (heavy, and no traces at all); single-pod otel-lgtm (no real Collector — only the three instrumented apps push anything, which is the gap #57 closed); full Grafana LGTM = Loki+Tempo+Mimir (GBs); and the OTel Demo (~6 GB). "Assembled, not a blob" is the honest description: OTel Collector contrib for filelog/kubeletstats/k8s_cluster receivers, three Victoria single-node stores, Grafana wiring them as native MetricsQL/LogsQL plugins plus the built-in Jaeger type — every piece readable, and the whole thing an on-demand ~1 GiB.
--->
-
----
-
-# The rule underneath every pick
-
-<div class="grid grid-cols-2 gap-4 mt-2">
-  <div v-click class="practice">
-    <strong>Pinned by digest</strong><br>
-    Every image is a <code>sha256:</code>, never <code>:latest</code> — a floating tag silently defeats a pre-pulled cache.
-    <div class="mod">scripts/images.txt · check-consistency.sh enforces it</div>
-  </div>
-  <div v-click class="practice">
-    <strong>Pre-pulled &amp; offline</strong><br>
-    Nothing is fetched at the venue — no CDN, no Grafana plugin download, no Docker Hub live pull.
-    <div class="mod">cloudbox-init.sh → local mirror</div>
-  </div>
-  <div v-click class="practice">
-    <strong>Assembled, not a blob</strong><br>
-    Hand-written minimal manifests where a Helm chart would drag in StatefulSets, sidecars, PDBs.
-    <div class="mod">rustfs · nats · grafana · victoria-*</div>
-  </div>
-  <div v-click class="practice">
-    <strong>Fits a 16 GB laptop</strong><br>
-    In-cluster total ≈ 7.5–8 GB; 16 GB laptop, ≥10 GB to Docker on that substrate. Every pick optimises for this ceiling.
-    <div class="mod">the constraint that shaped the whole stack</div>
-  </div>
-</div>
-
-<div class="mt-6 text-sm opacity-80">
-Change the constraints — a real datacenter, a compliance regime, a 10-person platform team — and some of these picks flip. <strong>That</strong> is the transferable skill: not the tools, but reading the tradeoff.
-</div>
-
-<!--
-The payoff slide: the stack isn't a "best tools" list, it's the answer to one specific constraint set, and naming the constraints is what makes the reasoning portable. This is also the honest bridge to production — say it out loud: "at work you'd swap local-path for a real CSI, RustFS for MinIO-or-S3, in-cluster Gitea for your actual GitHub/GitLab, and add cert-manager and the OTel Operator. The *shape* stays identical; the parts change with the constraints."
-
-The digest-pinning point is not pedantry: a single :latest anywhere means a laptop pulls at the venue and the offline story collapses. The consistency check fails CI if a manifest image and scripts/images.txt drift. Land the sovereignty callback: pinned + offline + Apache-2.0 is also what makes the repo still build this exact platform in a year.
 -->
