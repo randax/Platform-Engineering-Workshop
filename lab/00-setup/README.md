@@ -36,7 +36,7 @@ From the repository root:
    Skip the helper and nothing breaks: `tbx doctor` fails and the scripts put you on
    the Docker backend. On tbx you do not need Docker at all; on the Docker backend
    Docker must run. Setup-specific tbx details (Linux helper install, QEMU fallback,
-   Ollama, Backstage) live under [Backend fine print](#backend-fine-print-tbx) below.
+   Backstage) live under [Backend fine print](#backend-fine-print-tbx) below.
 
 2. **Install the tool chain**: `./scripts/dev-setup.sh` (pinned versions via
    [mise](https://mise.jdx.dev/)). When it offers to hook mise into your shell,
@@ -78,15 +78,6 @@ sudo's PATH can pick a different tbx than yours.
 `brew install qemu` (macOS 15+) and create with `CLOUDBOX_TBX_HYPERVISOR=qemu`. The
 root README has the details, including why an existing cluster must be destroyed to
 switch.
-</details>
-
-<details>
-<summary>Planning module 10? Let Ollama listen on more than loopback</summary>
-
-On tbx the cluster reaches your laptop at `172.30.<n>.1`, which Ollama's default
-`127.0.0.1:11434` bind refuses. `launchctl setenv OLLAMA_HOST 0.0.0.0` (then quit and
-reopen Ollama.app), or `OLLAMA_HOST=0.0.0.0 ollama serve`. `cloudbox-init.sh` warns if
-it is still loopback-only.
 </details>
 
 <details>
@@ -160,6 +151,21 @@ Module 10 (stretch) swaps a flailing local AI model for a free hosted one. Sign 
 (the signup asks for billing details; the models module 10 uses are free). The key
 goes into a Kubernetes Secret, never into git. Module 10 also documents a fallback
 for a personal Claude or OpenAI key.
+
+Module 10's part 1 runs Ollama on your laptop, and the cluster must be able to
+reach it:
+
+<details>
+<summary>Let Ollama listen on more than loopback (tbx and native-Linux Docker)</summary>
+
+On tbx the cluster reaches your laptop at `172.30.<n>.1`, on native-Linux Docker at
+`10.5.0.1`; Ollama's default `127.0.0.1:11434` bind refuses both. Run
+`OLLAMA_HOST=0.0.0.0 ollama serve` (macOS Ollama.app: `launchctl setenv OLLAMA_HOST
+0.0.0.0`, then quit and reopen the app; Linux: set it in the systemd unit). macOS and
+WSL2 on the Docker backend need nothing, `host.docker.internal` reaches your loopback
+as is. On tbx, `cloudbox-init.sh` warns if Ollama is still loopback-only; on
+native-Linux Docker nothing warns you, so set it now.
+</details>
 
 ## If your laptop says no: the lifeboats
 
