@@ -72,7 +72,7 @@ This lands twice: it's a real operational skill (knowing which major version you
 cd lab/04-self-service && ./verify.sh
 ```
 
-<span class="badge">20 min</span> · behind? `./scripts/catch-up.sh 4`
+<span class="badge">20 min</span> · behind? `mise run catch-up 4`
 
 <!--
 The task: enable crossplane.yaml from the catalog (installs Crossplane v2, the patch-and-transform function, and the RBAC letting it manage CNPG Clusters and Jobs). Ship the platform API — the XRD and the Composition from the lab's platform/ dir — as a new component via git. Then be the developer: push the 10-line example WorkshopDatabase and watch the XR, the composed CNPG Cluster, and the bucket Job appear.

@@ -74,11 +74,11 @@ No kubectl apply for platform components, all day. If someone is tempted to shor
 **Outcome:** push a commit, watch it materialize. No `kubectl apply`.
 
 ```bash
-./scripts/bootstrap-gitops.sh && ./scripts/seed-gitea.sh
+mise run gitops:bootstrap && mise run gitops:seed
 cd lab/02-gitops && ./verify.sh
 ```
 
-<span class="badge">20 min</span> · behind? `./scripts/catch-up.sh 2`
+<span class="badge">20 min</span> · behind? `mise run catch-up 2`
 
 <!--
 Two scripts install the machinery: bootstrap-gitops.sh puts Gitea and ArgoCD into the cluster; seed-gitea.sh pushes this repository into the in-cluster Gitea (the cloudbox/platform repo).

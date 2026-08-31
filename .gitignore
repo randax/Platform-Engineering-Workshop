@@ -2,3 +2,7 @@
 # Claude Code worktrees and SDD scratch
 .claude/worktrees/
 .superpowers/
+
+# Per-machine mise overrides (e.g. a pinned CLOUDBOX_SUBSTRATE). Never committed:
+# it must not decide the substrate for anyone else.
+mise.local.toml

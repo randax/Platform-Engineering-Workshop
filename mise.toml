@@ -33,7 +33,7 @@
 # `mise activate`, a mise shim, or `mise run`/`mise exec`. Without activation
 # nothing here is set and everything lands in ~/.kube/config exactly as before;
 # `./scripts/install.sh --check` tells you which of the two you are, and why it
-# matters. See docs/HELPERS.md ("Which kubeconfig am I even looking at?").
+# matters. See docs/RUNBOOK.md ("Which kubeconfig am I even looking at?").
 [env]
 KUBECONFIG = "{{env.HOME}}/.kube/cloudbox.conf"
 
@@ -98,6 +98,13 @@ run = "./scripts/destroy-cluster.sh"
 [tasks."cluster:fallback"]
 description = "🛟 Fallback: kind cluster + Cilium (if Talos-in-Docker fails)"
 run = "./scripts/kind-fallback.sh"
+
+[tasks."catch-up"]
+# Takes the module number: `mise run catch-up 3`. mise appends extra CLI args to
+# the run command, so no templating is needed, and running it bare still gets
+# catch-up.sh's own usage message rather than a mise argument error.
+description = "⏭️  Jump to a module's end-state (force-pushes it to your Gitea)"
+run = "./scripts/catch-up.sh"
 
 [tasks."gitops:bootstrap"]
 description = "🔁 Install Gitea + ArgoCD into the cluster (module 2)"

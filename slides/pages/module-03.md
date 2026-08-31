@@ -69,7 +69,7 @@ The meta-lesson connects back to the "why" section: the roadmap risk from slide 
 cd lab/03-data && ./verify.sh
 ```
 
-<span class="badge">20 min</span> · behind? `./scripts/catch-up.sh 3`
+<span class="badge">20 min</span> · behind? `mise run catch-up 3`
 
 <!--
 The task in three beats, all through the git loop from module 02:

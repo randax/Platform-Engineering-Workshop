@@ -50,13 +50,13 @@ The lab is deliberately investigative: create the cluster networkless, diagnose 
 **Outcome:** 2-node cluster `cloudbox`, no SSH, no kube-proxy — and **you** installed its network.
 
 ```bash
-./scripts/create-cluster.sh --skip-cilium   # a few min; read it while it runs
+mise run cluster:create -- --skip-cilium   # a few min; read it while it runs
 kubectl get nodes                           # NotReady. Your move.
 # → install Cilium yourself (lab task 3), watch NotReady become Ready
 cd lab/01-cluster && ./verify.sh
 ```
 
-<span class="badge">20 min</span> · fallback: `./scripts/kind-fallback.sh`
+<span class="badge">20 min</span> · fallback: `mise run cluster:fallback`
 
 <!--
 The script deliberately stops HALF-DONE: --skip-cilium leaves the cluster with no CNI, nodes NotReady, coredns Pending. That's not a bug to rescue people from — it's the lab. Say it from the front: "your cluster is exactly as alive as a cloud region with no network fabric; go find out why, then fix it." The helm install they run (hint 3 has the exact command; the script itself is the reference solution) is the same one every managed cloud hides from them. The NotReady→Ready flip in a -w watch is the moment of the module.

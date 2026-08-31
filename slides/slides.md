@@ -57,7 +57,7 @@ layout: cover
 
 <div class="callout mt-5 mx-auto max-w-130">
   <strong>Did you run the prework?</strong><br>
-  <code>./scripts/install.sh --check</code> must be all green.<br>
+  <code>mise run preflight</code> must be all green.<br>
   Not green? Start <strong>now</strong> — or grab one of us.
 </div>
 
@@ -69,7 +69,7 @@ layout: cover
 Welcome! While people trickle in, this slide does the most important job of the day: getting everyone to run the pre-flight check immediately.
 
 - Introduce yourselves briefly: Øyvind (NextGenTel, GDG Bergen) and Hans (platform engineer in the Norwegian Government, CNCF Ambassador, co-host of Plattformpodden).
-- Point at the callout: "If you haven't run the three prework scripts, start `./scripts/cloudbox-init.sh` RIGHT NOW — it pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
+- Point at the callout: "If you haven't run the three prework scripts, start `mise run init` RIGHT NOW — it pre-pulls several gigabytes of images and it's the only step that needs real bandwidth. Everything else today works offline."
 - Repo URL is at the bottom — it's public, everything (labs, solutions, slides) lives there, and it will keep working after today.
 - Staffing: it's the two of you and nobody else — say so, and explain the sticky notes briefly (more in a few slides).
 
