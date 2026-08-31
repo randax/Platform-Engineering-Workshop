@@ -704,7 +704,7 @@ fi
 before_fail=${FAILURES}
 docker_only_nodes="$(grep -rnE '10\.5\.0\.|cloudbox-(controlplane|worker)-1' \
   lab/*/README.md lab/*/verify.sh lab/*/solve.sh slides/pages 2>/dev/null \
-  | grep -Eiv 'docker substrate|docker-only|talos-box|tbx ' || true)"
+  | grep -Eiv 'docker substrate|docker backend|docker-only|talos-box|tbx ' || true)"
 if [[ -n "${docker_only_nodes}" ]]; then
   bad "docker-substrate node facts (10.5.0.x, cloudbox-*-1 container names) in attendee-facing material without naming the substrate — on tbx the nodes are VMs with DHCP addresses and these commands cannot work:"
   printf '   %s\n' "${docker_only_nodes}" | head -30

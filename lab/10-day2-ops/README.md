@@ -327,7 +327,7 @@ git push
 Wait for `kubectl -n argocd get application kagent` to report `Synced`/`Healthy`, then
 check what shipped: `kubectl -n kagent get modelconfig default-model-config -o yaml`. It
 defaults to host-side Ollama running `qwen3:1.7b`, reached at whatever "the host" means
-on your substrate. See the check below.
+on your backend. See the check below.
 
 **Expect `kagent-controller` to CrashLoopBackOff ~3 times on the way there, and leave it
 alone.** It runs its database migration at startup, and it starts before the
@@ -337,8 +337,8 @@ restart count is not a diagnosis, and *ordering* failures self-heal in a way
 *configuration* failures never do. Still restarting after ~3 minutes? Read the logs.
 
 **"The host" is not one address, and you do not hand-edit it.** It is
-`host.docker.internal` on the macOS/WSL2 docker substrate, `10.5.0.1`
-(`TALOS_SUBNET_GATEWAY`) on the native-Linux docker substrate, and the cluster gateway
+`host.docker.internal` on the macOS/WSL2 Docker backend, `10.5.0.1`
+(`TALOS_SUBNET_GATEWAY`) on the native-Linux Docker backend, and the cluster gateway
 `172.30.<n>.1` inside a talos-box VM. Same host-vs-cluster addressing problem the image
 mirror solved in module 00 (see `mirror_host_endpoint()` and `cloudbox_host_gateway()`
 in `scripts/lib.sh`). It is already handled, in two halves: `bootstrap-gitops.sh`

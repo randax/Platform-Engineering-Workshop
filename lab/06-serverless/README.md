@@ -75,7 +75,7 @@ Kubernetes Ingress wildcard host matches exactly one label. That is what lets a 
 `*.kn.cloudbox.k8s.test` rule serve every namespace anyone invents. Ask the cluster rather
 than assuming, though: `.status.url` is the published truth.
 
-On the **docker** substrate `/etc/hosts` cannot hold a wildcard, so only the ksvc names
+On the **Docker** backend `/etc/hosts` cannot hold a wildcard, so only the ksvc names
 `install.sh --print-hosts` lists resolve. For a ksvc you invent yourself, teach it the
 name: `./scripts/install.sh --add-hosts <first label>`, e.g. `--add-hosts hello-demo`.
 It remembers it, so a later rewrite of the block keeps it. Or skip the name entirely:

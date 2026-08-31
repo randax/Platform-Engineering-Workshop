@@ -42,7 +42,7 @@ archived Kaniko as the 2026 in-cluster answer, and a registry is a single binary
      MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1")'):5055"
    fi
 
-   # --platform: ONE architecture — the NODES' (node_arch asks the substrate: the
+   # --platform: ONE architecture — the NODES' (node_arch asks the backend: the
    # host CPU on tbx, the Docker daemon on docker; a Rosetta shell's uname lies).
    # On tbx the warmed store only holds that arch's blobs, so a full-index copy
    # would reach for the internet.
@@ -53,7 +53,7 @@ archived Kaniko as the 2026 in-cluster answer, and a registry is a single binary
 
    This works the same on tbx: the mirror speaks plain HTTP, and `crane --insecure`
    tries HTTPS first, gets an immediate non-TLS answer (~10 ms) and falls back. Nothing
-   in module 07 needs the internet on either substrate. (If the mirror isn't reachable
+   in module 07 needs the internet on either backend. (If the mirror isn't reachable
    at all, `docker.io/library/busybox:1.37.0` is always a valid source, but then you're
    online.)
 

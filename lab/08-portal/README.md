@@ -294,7 +294,7 @@ git instead?
   ```
   Deploy `my-app`, watch it turn Ready, and open its `*.kn.cloudbox.k8s.test` URL. The apex
   of the self-service arc, from a form.
-  On the **docker substrate** that URL is a name nobody could have listed in advance, and
+  On the **Docker backend** that URL is a name nobody could have listed in advance, and
   `/etc/hosts` has no wildcards, so teach it once:
   `./scripts/install.sh --add-hosts my-app-demo` (the first label of the URL the Console
   shows you). On tbx it already resolves.

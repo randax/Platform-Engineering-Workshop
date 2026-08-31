@@ -15,7 +15,7 @@ that layer. Talos Linux is an immutable, API-only operating system built solely 
 Kubernetes: no shell, no SSH, no package manager. The whole machine is one declarative
 config document managed over a gRPC API (`talosctl`). Cilium replaces both the CNI and
 kube-proxy with eBPF programs in the kernel. This is what production-grade looks like in
-2026, and it fits on your laptop. `create-cluster.sh` picks the substrate for you
+2026, and it fits on your laptop. `create-cluster.sh` picks the cluster backend for you
 (talos-box VMs, or Talos-in-Docker); everything below is the same on both.
 
 ## The task
@@ -64,16 +64,16 @@ kube-proxy with eBPF programs in the kernel. This is what production-grade looks
 ./verify.sh
 ```
 
-It checks: your two Talos nodes exist on whichever substrate you are on (talos-box VMs
+It checks: your two Talos nodes exist on whichever backend you are on (talos-box VMs
 via `tbx status`, Talos node containers via `docker ps`); both nodes are `Ready`; the
 Cilium DaemonSet is fully available; the Cilium operator is Available; Cilium reports
 kube-proxy replacement active; no kube-proxy is running anywhere; CoreDNS is Available;
 and the shared ingress holds the endpoint every `*.cloudbox.k8s.test` name lands on.
 
 <details>
-<summary>Docker substrate: the /etc/hosts block, and the one sudo prompt</summary>
+<summary>Docker backend: the /etc/hosts block, and the one sudo prompt</summary>
 
-On the docker substrate the `*.cloudbox.k8s.test` names need a line each in
+On the Docker backend the `*.cloudbox.k8s.test` names need a line each in
 `/etc/hosts`, and that is the one step in this whole workshop that asks for your
 password. `create-cluster.sh` writes them for you, including on the `--skip-cilium`
 path you just took. If you declined the prompt, or the block never got written, every
@@ -96,7 +96,7 @@ On tbx nothing is written: talos-box's own resolver answers those names.
 `talosctl` talks to the Talos API on the nodes. The create script set up your talosconfig
 and pointed the `cloudbox` context at your control plane, so you need no `-n` flag:
 `talosctl get members` already knows which node to ask. `talosctl config info` prints the
-endpoint and node it will use. The address differs per substrate: a DHCP lease in a
+endpoint and node it will use. The address differs per backend: a DHCP lease in a
 talos-box VM, an address in the Talos docker network. That is exactly why you read it
 rather than type it. `kubectl get nodes -o wide` shows the same addresses.
 </details>
@@ -153,7 +153,7 @@ helm upgrade --install cilium \
   --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"
 ```
 
-(`l2announcements` and the raised client rate limit are set on both substrates on
+(`l2announcements` and the raised client rate limit are set on both backends on
 purpose, so `cilium config view` reads the same on every laptop in the room; only tbx
 actually announces anything.)
 
@@ -163,7 +163,7 @@ rest of the day, and `verify.sh` checks for it. The script builds them from
 `cilium_ingress_values()` in `scripts/lib.sh`, the single source it shares with
 the kind lifeboat.
 
-Those two `service.*` lines are the **docker** shape. Check which substrate you
+Those two `service.*` lines are the **docker** shape. Check which backend you
 are on with `cat ~/.cloudbox/substrate`, because tbx needs a different ending:
 a real LoadBalancer instead of a NodePort (the L2 announcer already enabled above
 is what claims its VIP on the network), plus host routing so the VIP is reachable
@@ -312,11 +312,11 @@ changed what").
   </details>
 
   <details>
-  <summary>docker substrate (containers)</summary>
+  <summary>Docker backend (containers)</summary>
 
   ```bash
-  docker pause   cloudbox-worker-1   # docker substrate only
-  docker unpause cloudbox-worker-1   # docker substrate only
+  docker pause   cloudbox-worker-1   # Docker backend only
+  docker unpause cloudbox-worker-1   # Docker backend only
   ```
   </details>
 - `talosctl read /proc/version`: you can read files via the API, but try to
@@ -327,7 +327,7 @@ changed what").
 ## If it goes wrong
 
 The cluster is cattle: destroying and recreating it takes ~5 minutes (images are already
-local). Name the substrate on both halves:
+local). Name the backend on both halves:
 
 ```bash
 CLOUDBOX_SUBSTRATE=docker mise run cluster:destroy && \
@@ -343,11 +343,11 @@ you a kind+Cilium cluster with the same ingress, the same hostnames and the same
 `/etc/hosts` block. You lose the Talos exploration but every later module works the
 same. Remove it afterwards with `./scripts/kind-fallback.sh --delete` (cluster, hosts
 block and the recorded identity). `destroy-cluster.sh` refuses there: it tears down
-substrates, and kind is not one. Rebuild the lifeboat with
+cluster backends, and kind is not one. Rebuild the lifeboat with
 `./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh`.
 
 **On the lifeboat this module is not gradeable.** `./verify.sh` checks a *Talos*
-cluster: Talos node containers or tbx VMs, and the ingress shape the substrate
+cluster: Talos node containers or tbx VMs, and the ingress shape the backend
 gives it. So it prints "kind lifeboat: module 01 is not gradeable here" and exits
 0 rather than failing a cluster that is working exactly as documented. That is the
 whole price of the lifeboat: module 02 onward is identical, and `verify.sh` in every

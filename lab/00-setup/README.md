@@ -19,30 +19,31 @@ before the workshop** if you can. The room's first 15 minutes are the safety net
 
 From the repository root:
 
-1. **Pick your substrate.** On an Apple Silicon Mac (or Linux with KVM) you get real
-   Talos VMs with real LoadBalancer addresses, via
-   [talos-box](https://github.com/randax/talos-box). Everyone else (Windows/WSL2,
-   Codespaces, or any machine `tbx doctor` is unhappy with) runs the identical workshop
-   on Talos-in-Docker. The scripts decide for you; force it with
-   `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`) if you want to.
+1. **Pick your cluster backend**: what your Talos nodes run on. Two choices. Real VMs
+   with real LoadBalancer addresses via [talos-box](https://github.com/randax/talos-box),
+   on Apple Silicon Macs and Linux with KVM. Or Docker containers, for everyone else
+   (Windows/WSL2, Codespaces, or any machine `tbx doctor` is unhappy with). Same
+   workshop either way. The scripts pick for you; force it with
+   `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`). Substrate is the scripts' name for the
+   cluster backend; you'll see it in script output too.
 
    The `tbx` binary comes with the tool chain in step 2, pinned in `mise.toml` like
-   everything else. The one thing you add by hand is the one-time privileged step that
-   installs the helper doing the VM and network wiring:
+   everything else. The one thing you add by hand is the one-time privileged helper
+   that does the VM and network wiring:
 
    ```bash
    ./scripts/dev-setup.sh          # step 2, installs tbx among the rest
    tbx system install              # macOS, one-time; asks for your password
-   tbx doctor                      # no FAIL? you are on the VM substrate
+   tbx doctor                      # no FAIL? you are on the VM backend
                                    # (SKIPs before a cluster exists, and WARNs, are fine)
    ```
 
-   Skip the helper step and nothing breaks: `tbx doctor` fails, and the scripts put you
-   on Talos-in-Docker instead. **On tbx you do not need Docker at all**: the VMs pull
-   every image through talos-box's own mirror, which `cloudbox-init.sh` fills with
-   `tbx cache warm`. On Talos-in-Docker the mirror is a container, so Docker is required
-   there. tbx details that only hit some setups (Linux helper install, QEMU fallback,
-   Ollama, Backstage) live under [Substrate fine print](#substrate-fine-print-tbx) below.
+   Skip the helper and nothing breaks: `tbx doctor` fails and the scripts put you on
+   the Docker backend. **On tbx you do not need Docker at all**: the VMs pull every
+   image through talos-box's own mirror, which `cloudbox-init.sh` fills with
+   `tbx cache warm`. On the Docker backend the mirror is a container, so Docker must
+   run. tbx details that only hit some setups (Linux helper install, QEMU fallback,
+   Ollama, Backstage) live under [Backend fine print](#backend-fine-print-tbx) below.
 
 2. **Install the tool chain**: `./scripts/dev-setup.sh` (uses
    [mise](https://mise.jdx.dev/) with pinned versions, nothing floats). It ends by
@@ -66,13 +67,13 @@ From the repository root:
 
 5. Run `./verify.sh` in this directory.
 
-**Hardware reality check:** 16 GB RAM is the absolute minimum on both substrates, 32 GB is
+**Hardware reality check:** 16 GB RAM is the absolute minimum on both backends, 32 GB is
 comfortable, and you need 40 GB free disk (the image caches are most of it). On Docker you
 also need ≥10 GB and ≥4 CPUs *allocatable to Docker*. macOS and Linux are fully supported;
-Windows works via WSL2 (Docker substrate only) but is our least-tested platform. If it
+Windows works via WSL2 (Docker backend only) but is our least-tested platform. If it
 fights you, use a lifeboat below rather than burning workshop time.
 
-## Substrate fine print (tbx)
+## Backend fine print (tbx)
 
 <details>
 <summary>Linux: the helper installs from source, not via mise</summary>
@@ -90,8 +91,8 @@ yours.
 
 tbx runs its VMs on Virtualization.framework by default. If that framework misbehaves,
 `brew install qemu` (macOS 15+) and create with `CLOUDBOX_TBX_HYPERVISOR=qemu` instead.
-The README's substrate section has the details, including why an existing cluster must
-be destroyed to switch.
+The root README has the details, including why an existing cluster must be destroyed
+to switch.
 </details>
 
 <details>
@@ -170,7 +171,7 @@ silent-allow mode.
 
 That is a half-installed talos-box: the binary is on your PATH but its helper daemon has
 never run (`tbx system install` not done on macOS / the systemd helper not set up on
-Linux, or the service is down). On the docker substrate the create continues by itself
+Linux, or the service is down). On the Docker backend the create continues by itself
 when this machine has never made a tbx cluster; there is nothing it could collide with.
 If you *have* used tbx here before, it stops instead, because two clusters called
 `cloudbox` is a mess you would meet an hour later. Either fix tbx (`tbx doctor`), or, if
