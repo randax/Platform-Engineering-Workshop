@@ -8,9 +8,9 @@
 
 Your laptop provably ready for the whole workshop: tools installed, every container
 image already on your machine, `mise run preflight` all green. Nothing downloads images
-at runtime, and that is platform-engineering lesson #1: a platform you can't stand up
-without the internet is someone else's platform. Do this module **at home before the
-workshop**; the room's first 15 minutes are the safety net, not the plan.
+at runtime: a platform you can't stand up without the internet is someone else's
+platform. Do this module **at home before the workshop**; the room's first 15 minutes
+are for stragglers, not the plan.
 
 ## The task
 
@@ -39,20 +39,20 @@ From the repository root:
    Ollama, Backstage) live under [Backend fine print](#backend-fine-print-tbx) below.
 
 2. **Install the tool chain**: `./scripts/dev-setup.sh` (pinned versions via
-   [mise](https://mise.jdx.dev/), nothing floats). When it offers to hook mise into
-   your shell, **say yes**: that puts the tools on your PATH and points `KUBECONFIG`
-   at a workshop-only file, `~/.kube/cloudbox.conf`, while you are in this repo. Open
-   a new terminal afterwards.
+   [mise](https://mise.jdx.dev/)). When it offers to hook mise into your shell,
+   **say yes**: that puts the tools on your PATH and points `KUBECONFIG` at a
+   workshop-only file, `~/.kube/cloudbox.conf`, while you are in this repo. Open a
+   new terminal afterwards.
 
 3. **Pre-pull the workshop images**: `mise run init`. On tbx they land in talos-box's
    own mirror store; on Docker in a local registry container, `cloudbox-mirror`, on
-   port 5001. This is the slow step. Do it on good WiFi.
+   port 5001. This is the slow step; do it at home, before you travel.
 
 4. **Run the pre-flight gate**: `mise run preflight`. Fix what it flags (most common
    on Docker: Docker not running, or its memory limit below 10 GB). On tbx, run
    `--check --deep` once before you travel, and at the venue flip
    `tbx mirror offline on` so a missing image fails loudly instead of being quietly
-   pulled over conference WiFi.
+   pulled from the internet.
 
 5. Run `./verify.sh` in this directory.
 
@@ -157,22 +157,20 @@ Either fix tbx (`tbx doctor`) or, if you know its VMs are not running, re-run wi
 ## Optional: sign up for OpenCode Zen (module 10 prep)
 
 Module 10 (stretch) swaps a flailing local AI model for a free hosted one. Sign in at
-[opencode.ai/auth](https://opencode.ai/auth) now while you have good WiFi and save
-your API key; the signup form asks for billing details, but the models module 10 uses
-are free. The key goes into a Kubernetes Secret in module 10, never into git. Skip
-this if you won't reach module 10; it documents a fallback for any personal Claude or
-OpenAI key.
+[opencode.ai/auth](https://opencode.ai/auth) before the workshop and save your API key
+(the signup asks for billing details; the models module 10 uses are free). The key
+goes into a Kubernetes Secret, never into git. Module 10 also documents a fallback
+for a personal Claude or OpenAI key.
 
 ## If your laptop says no: the lifeboats
 
-- **Pair up.** Fully doable as a pair on one machine, and you'll talk through more.
-  Red sticky note up and we'll match you.
+- **Pair up.** The whole workshop works as a pair on one machine. Red sticky note up
+  and we'll match you.
 - **Devcontainer / GitHub Codespaces.** The repo's `.devcontainer/` runs the same
-  labs and scripts on someone else's hardware; start from step 2. One difference:
-  your browser is not on the machine running the cluster, and the ingress routes by
-  hostname, so open services from the **Ports tab** (a forwarded NodePort each)
-  instead of a port-80 preview. In the codespace's own terminal every `verify.sh`
-  behaves exactly as on a laptop. The root README's Plan B section has the full table.
+  labs and scripts on someone else's hardware; start from step 2. The ingress routes
+  by hostname and your browser is elsewhere, so open services from the **Ports tab**
+  (a forwarded NodePort each), not a port-80 preview. In the codespace's terminal
+  every `verify.sh` works normally. The root README's Plan B section has the table.
 
 ## Check your work
 
@@ -204,16 +202,14 @@ Quick test: `mise exec -- talosctl version --client`.
 `mise.toml` sets `KUBECONFIG=~/.kube/cloudbox.conf` for this repo, keeping the
 workshop cluster out of your real ones. `echo $KUBECONFIG` shows the file in effect;
 empty means mise is not active in this shell and `~/.kube/config` is used, which also
-works. What breaks is half of each: scripts via `mise run`, bare `kubectl` in an
-unpinned shell, cluster in one file, terminal reading another. `mise run preflight`
-catches that state. The pin is per-directory; terminals outside this repo don't get it.
+works. What breaks is mixing them: scripts via `mise run`, bare `kubectl` in an
+unpinned shell. `mise run preflight` catches that state. The pin is per-directory.
 </details>
 
 <details>
 <summary>Hint 4: cloudbox-init.sh is slow or flaky on this network</summary>
 
-It is the only big download of the whole workshop, and it's resumable: run it again
-and it skips what's already mirrored. Check progress with
+It's resumable: run it again and it skips what's already mirrored. Check progress with
 `curl -s http://localhost:5001/v2/_catalog` (docker) or `tbx cache list` (tbx).
 </details>
 
@@ -237,4 +233,4 @@ reasons: one about the venue NAT, one about the message.)
 ## Going deeper
 
 - Peek at what got pre-pulled: `curl -s http://localhost:5001/v2/_catalog | jq .` (docker) or `tbx cache list` (tbx)
-- Read `scripts/install.sh`. A pre-flight gate is itself a platform artifact. What would *your* team's check?
+- Read `scripts/install.sh`. A pre-flight gate is itself a platform artifact. What would your team's check include?

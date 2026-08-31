@@ -26,11 +26,10 @@ programs in the kernel.
 
    While it runs (~2-3 min), read the script. It is short on purpose.
 
-2. Look at what you own: `kubectl get nodes`. Both nodes are **NotReady** and will stay
-   that way, because this cluster has no CNI. Convince yourself of why before fixing it:
-   `kubectl describe node` one of them, explain the `Pending` pods in
-   `kubectl -n kube-system get pods`, find the `cluster.network.cni: none` decision in
-   the machine config (hint 2).
+2. `kubectl get nodes`: both nodes are **NotReady** and stay that way, because this
+   cluster has no CNI. Convince yourself why before fixing it: `kubectl describe node`
+   one of them, explain the `Pending` pods in `kubectl -n kube-system get pods`, find
+   the `cluster.network.cni: none` decision in the machine config (hint 2).
 
 3. **Give your cluster a network.** Install Cilium with Helm from the vendored chart at
    `scripts/manifests/`, no internet needed. The values are Talos-specific and matter;
@@ -60,10 +59,10 @@ programs in the kernel.
 <details>
 <summary>Docker backend: the /etc/hosts block, and the one sudo prompt</summary>
 
-On the Docker backend the `*.cloudbox.k8s.test` names need a line each in `/etc/hosts`,
-the one step in this workshop that asks for your password. `create-cluster.sh` writes
-them, including on the `--skip-cilium` path. If you declined the prompt, every workshop
-URL fails from module 02 onward on a perfectly healthy cluster. Fix it any time:
+On the Docker backend the `*.cloudbox.k8s.test` names need a line each in `/etc/hosts`;
+`create-cluster.sh` writes them (the one sudo prompt in this workshop). If you declined
+the prompt, every workshop URL fails from module 02 onward on a healthy cluster. Fix it
+any time:
 
 ```bash
 ./scripts/install.sh --print-hosts    # exactly what would be added
@@ -79,11 +78,9 @@ On tbx nothing is written: talos-box's own resolver answers those names.
 <summary>Hint 1: Where do I even start with talosctl?</summary>
 
 `talosctl` talks to the Talos API on the nodes. The create script pointed the `cloudbox`
-context at your control plane, so you need no `-n` flag: `talosctl get members` already
-knows which node to ask. `talosctl config info` prints the endpoint and node in use. The
-address differs per backend (a DHCP lease in a talos-box VM, a Docker network address),
-which is why you read it rather than type it. `kubectl get nodes -o wide` shows the same
-addresses.
+context at your control plane, so `talosctl get members` needs no `-n` flag.
+`talosctl config info` prints the endpoint and node in use; read the address rather than
+type it, it differs per backend. `kubectl get nodes -o wide` shows the same addresses.
 </details>
 
 <details>
@@ -111,8 +108,7 @@ addresses.
   `hostRoot=/sys/fs/cgroup`) and its default PodSecurity needs the agent's capability
   list spelled out. This is the documented Talos+Cilium recipe:
   https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium
-- **The command**, exactly as the script would run it. `create-cluster.sh` step 3 *is*
-  the reference solution, and it's meant to be read:
+- **The command**, as `create-cluster.sh` step 3 runs it:
 
 ```bash
 source scripts/versions.env
@@ -138,14 +134,12 @@ helm upgrade --install cilium \
   --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"
 ```
 
-(`l2announcements` and the raised rate limit are set on both backends on purpose, so
-`cilium config view` reads the same on every laptop in the room; only tbx actually
-announces anything.)
+(`l2announcements` and the raised rate limit are set on both backends so
+`cilium config view` reads the same everywhere; only tbx actually announces.)
 
-The last five flags are the shared **ingress**, and they are not optional: one Cilium
-ingress serves every `*.cloudbox.k8s.test` hostname for the rest of the day, and
-`verify.sh` checks for it. The script builds them from `cilium_ingress_values()` in
-`scripts/lib.sh`.
+The last five flags are the shared **ingress** that serves every `*.cloudbox.k8s.test`
+hostname for the rest of the day; `verify.sh` checks for it. The script builds them
+from `cilium_ingress_values()` in `scripts/lib.sh`.
 
 Those two `service.*` lines are the **docker** shape. Check which backend you are on
 with `cat ~/.cloudbox/substrate`; tbx needs a different ending, a real LoadBalancer
@@ -156,17 +150,15 @@ plus host routing so its VIP is reachable from your laptop:
   --set bpf.hostLegacyRouting=true
 ```
 
-**On tbx, one more step.** A LoadBalancer needs an address to hand out: a
-`CiliumLoadBalancerIPPool` and a `CiliumL2AnnouncementPolicy`. Without them
-`cilium-ingress` sits in `<pending>` forever. The script applies them for you:
+**On tbx, one more step.** Without a `CiliumLoadBalancerIPPool` and a
+`CiliumL2AnnouncementPolicy`, `cilium-ingress` sits in `<pending>` forever:
 
 ```bash
 mise run cluster:create -- --post-cni
 ```
 
-It applies the pool and policy, waits for the rollout, and proves `cilium-ingress` got
-`.200`. (Don't re-run the bare `mise run cluster:create`: on tbx it refuses because the
-cluster already exists.)
+It applies both, waits for the rollout, and proves `cilium-ingress` got `.200`. (Don't
+re-run the bare `mise run cluster:create`; on tbx it refuses over an existing cluster.)
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
   `kubectl get nodes -w` terminal.
@@ -290,7 +282,7 @@ operational problems that design deletes.
 
 ## If it goes wrong
 
-The cluster is cattle: destroy and recreate takes ~5 minutes (images are local). Name
+The cluster is disposable: destroy and recreate takes ~5 minutes (images are local). Name
 the backend on both halves, since the destroy removes `~/.cloudbox/substrate`:
 
 ```bash

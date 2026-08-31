@@ -11,7 +11,7 @@ you touching `kubectl apply`.
 
 Everything from here on arrives as a git commit that ArgoCD converges: databases,
 platform APIs, serverless. The git server is *inside* the cluster, so your platform
-doesn't depend on GitHub, the venue WiFi, or anyone's SaaS. The pattern (app-of-apps:
+doesn't depend on GitHub or anyone's SaaS. The pattern (app-of-apps:
 one root Application that deploys other Applications) is how real platform teams
 bootstrap clusters.
 

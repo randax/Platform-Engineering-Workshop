@@ -2,12 +2,10 @@
 
 ## The goal
 
-Your platform gets a front door: the Cloudbox Console at
-http://portal.cloudbox.k8s.test, showing live the ArgoCD apps, Postgres clusters, and
-Knative services you built today. The trophy: create a database through its "New
-database" form, prove with `kubectl` that a real `WorkshopDatabase` XR and a real CNPG
-cluster appeared, then read the portal's entire source, because it's small enough that
-you can.
+The Cloudbox Console at http://portal.cloudbox.k8s.test shows live the ArgoCD apps,
+Postgres clusters, and Knative services you built today. The finish line: create a
+database through its "New database" form, prove with `kubectl` that a real
+`WorkshopDatabase` XR and CNPG cluster appeared, then read the portal's source.
 
 <p align="center">
   <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console: a component's Monitoring page: CPU/memory sparklines and a live log tail" width="80%" />
@@ -24,41 +22,37 @@ your OTel stack:
   <img src="../../docs/screenshots/console-buckets-monitoring-dark.png" alt="Cloudbox Console: the Buckets page: RustFS pod CPU/memory" width="32%" />
 </p>
 
-<p align="center"><em>Builds (BuildKit above the live Argo Workflows runs), Streams (JetStream via a
-prometheus-nats-exporter sidecar), Buckets (RustFS has no Prometheus endpoint, so the
-generic per-namespace pod signal). Each queries VictoriaMetrics on page load and
-degrades to "no data yet" when observability is off.</em></p>
+<p align="center"><em>Builds, Streams, and Buckets. Each queries VictoriaMetrics on page load
+and shows "no data yet" when observability is off.</em></p>
 
 ## Why this matters
 
 Everything you built so far is APIs and YAML, invisible to anyone who isn't a platform
 engineer. A portal is how a platform gets adopted. This one is a few thousand lines of
-Go and htmx in [`apps/portal/`](../../apps/portal/), no framework, no React build, no
-CDN; after today you can read every line of your platform's front door. Try saying that
-about most portals.
+Go and htmx in [`apps/portal/`](../../apps/portal/), no framework, no build step, and
+you can read every line of it.
 
 ## The task
 
-1. Enable `portal.yaml` from the catalog and push (the module-02 move). It lands in ns
-   `portal` and takes seconds: one small Go binary.
-2. Open http://portal.cloudbox.k8s.test and explore. None of it is a mock: every row is
-   a live read from your cluster, and the Workshop page tracks your module progress.
-   For each page, answer: *which Kubernetes API is this?* You installed all of them
-   today.
+1. Enable `portal.yaml` from the catalog and push (the module-02 move). One small Go
+   binary in ns `portal`.
+2. Open http://portal.cloudbox.k8s.test and explore. Every row is a live read from
+   your cluster; the Workshop page tracks your module progress. For each page, answer:
+   *which Kubernetes API is this?*
 3. **Hand your portal the keys.** Creating databases needs a write grant the portal
-   deliberately doesn't ship with. Copy [`portal-access.yaml`](portal-access.yaml)
+   doesn't ship with. Copy [`portal-access.yaml`](portal-access.yaml)
    (in this lab directory) to `gitops/components/demo/` in your Gitea clone and push.
    Read it first: one Role, one RoleBinding to the portal's ServiceAccount. The
    platform owner grants access; the portal can't grant itself anything.
-4. **The star task.** On the Databases page, create `console-db`, size `small`. Then
+4. **The main task.** On the Databases page, create `console-db`, size `small`. Then
    prove it's real, the module-04 way:
    - `kubectl -n demo get workshopdatabase console-db`: the XR the form created
    - `kubectl -n demo get cluster console-db-pg -w`: the composed CNPG cluster booting
 
-   Same XRD, same Composition, same controllers as module 04, with a form in front.
+   Same XRD, Composition, and controllers as module 04, with a form in front.
 5. Spot the difference: your module-04 database went through git; this one didn't.
    `kubectl -n demo get workshopdatabase console-db -o yaml`: who created it? Is it in
-   your Gitea repo? Keep that thought for the explain-back.
+   your Gitea repo?
 6. Run `./verify.sh`.
 
 ## How it works (read the source!)
@@ -95,8 +89,8 @@ git add . && git commit -m "enable the cloudbox console" && git push
 kubectl -n portal get pods -w    # one small pod
 ```
 
-Up when `curl -s http://portal.cloudbox.k8s.test/healthz` answers `ok`. The portal
-needs the `demo` namespace and the module-04 platform API; it *is* the UI for them.
+Up when `curl -s http://portal.cloudbox.k8s.test/healthz` answers `ok`. Needs the
+`demo` namespace and the module-04 platform API; it *is* the UI for them.
 </details>
 
 <details>
@@ -111,7 +105,7 @@ kubectl -n demo describe workshopdatabase console-db  # composition events
 kubectl -n demo get cluster,job,pods                  # the composed stack
 ```
 
-`SYNCED True / READY False` while Postgres boots is normal; give it 2–3 minutes.
+`SYNCED True / READY False` while Postgres boots is normal; give it 2-3 minutes.
 </details>
 
 <details>
@@ -148,49 +142,44 @@ kubectl -n demo get cluster console-db-pg             # the real database behind
 cd "$WORKSHOP/lab/08-portal" && ./verify.sh
 ```
 
-(No UI handy? The form is sugar over the API: `kubectl apply` the same 10-line
-`WorkshopDatabase` YAML from module 04 with name `console-db`, which is exactly what
-`solve.sh` does.)
+(No UI? `kubectl apply` the module-04 `WorkshopDatabase` YAML with name `console-db`;
+that is what `solve.sh` does.)
 </details>
 
 ## Build vs. buy: when you'd reach for Backstage instead
 
-Bespoke won here because the platform is small and the audience is you. Backstage earns
-its costs (~2 GB of Node.js + Postgres, YAML-heavy config, usually a team that owns it)
+Bespoke won here because the platform is small and the audience is you. Backstage
+earns its costs (~2 GB of Node.js + Postgres, YAML-heavy config, a team that owns it)
 when you need its plugin ecosystem, a catalog across dozens of teams, or TechDocs and
-scaffolder templates with an ecosystem behind them. A portal is a product decision, not
-a default.
+scaffolder templates. A portal is a product decision, not a default.
 
 > **Presenter demo (~5 min):** the presenter enables `backstage.yaml` on the projector
-> cluster and runs the classic loop: catalog → software template → new Gitea repo →
-> ArgoCD app → pods. That integration glue is the real work of running Backstage.
+> cluster and runs a software template: it creates a Gitea repo, ArgoCD picks it up,
+> pods appear. That integration glue is the real work of running Backstage.
 >
-> *Presenter notes:* the CNOE image is amd64-only, so on Apple Silicon the demo cluster
-> must be the Docker backend (`CLOUDBOX_SUBSTRATE=docker`); tbx VMs emulate nothing.
-> Pre-enable `backstage.yaml` before the module (first boot is slow: ~2 GB image + CNPG
-> database, which is why this is a demo, not the lab). Show guest sign-in at
-> `http://backstage.cloudbox.k8s.test`, catalog entities fed from Gitea, run the
-> template, then chase it through Gitea and ArgoCD. `backstage.yaml` stays in the
-> catalog for attendees with RAM to spare at home.
+> *Presenter notes:* the CNOE image is amd64-only, so on Apple Silicon the demo
+> cluster must be the Docker backend (`CLOUDBOX_SUBSTRATE=docker`); tbx VMs emulate
+> nothing. Pre-enable `backstage.yaml` before the module; first boot is slow (~2 GB
+> image + CNPG database). Show guest sign-in at `http://backstage.cloudbox.k8s.test`,
+> run the template, chase it through Gitea and ArgoCD. `backstage.yaml` stays in the
+> catalog for home.
 
 ## Explain-back
 
-Module 04's database went `git push → ArgoCD → Crossplane`; the console's went
-`form → API → Crossplane`, skipping git. What did you lose, and when is that the right
-trade?
+Module 04's database arrived by git push and ArgoCD; the console's went straight to
+the API, skipping git. What did you lose, and when is that the right trade?
 
 ## Going deeper
 
 <details>
 <summary>Resize a database, then catch the platform lying about it</summary>
 
-On the database detail page, resize `console-db` from `small` to `medium`. The `patch`
-verb you granted in task 3 is what allows it; every verb in that Role is a capability
-you handed over on purpose.
+On the database detail page, resize `console-db` from `small` to `medium`; the `patch`
+verb you granted in task 3 allows it.
 
-Now check whether it worked, because three layers say it did: the form reports success,
-`spec` says `medium`, and `kubectl -n demo get cluster console-db-pg` prints
-`Cluster in healthy state`. All three are wrong:
+Three layers say it worked: the form reports success, `spec` says `medium`, and
+`kubectl -n demo get cluster console-db-pg` prints `Cluster in healthy state`. All
+three are wrong:
 
 ```bash
 kubectl -n demo get cluster console-db-pg \
@@ -198,35 +187,33 @@ kubectl -n demo get cluster console-db-pg \
 kubectl -n demo describe cluster console-db-pg | tail -20
 ```
 
-`medium` means 5Gi and two instances; `small` was 1Gi and one. The cluster is stuck at
-1Gi and one instance, forever. The events say why: the `local-path` StorageClass has no
+`medium` means 5Gi and two instances; `small` was 1Gi and one. The cluster stays at
+1Gi and one instance forever. The events say why: the `local-path` StorageClass has no
 `allowVolumeExpansion: true`, so Kubernetes forbids growing the PVC, and that one
-failure blocks the whole Cluster reconcile (which is why the second instance never
-appears). CNPG retries about every 24 seconds while `status.phase` keeps saying
-healthy. The truth was in the events and the operator's log
-(`kubectl -n cnpg-system logs deploy/cnpg-controller-manager | tail`), one layer below
-anything the form shows. `status.phase` is a summary, not a health check.
+failure blocks the whole Cluster reconcile. CNPG retries about every 24 seconds while
+`status.phase` keeps saying healthy. The truth was in the events and the operator's
+log (`kubectl -n cnpg-system logs deploy/cnpg-controller-manager | tail`).
+`status.phase` is a summary, not a health check.
 
 Resize back to `small` and CNPG refuses: `can't shrink existing storage`. It compares
-against the 5Gi you asked for, not the 1Gi you have, so a resize that never happened
-still cost you the way back. Delete `console-db` and recreate it `small`; modules 09
-and 10 want that memory back.
+against the 5Gi you asked for, not the 1Gi you have. Delete `console-db` and recreate
+it `small`; modules 09 and 10 want that memory back.
 
-Worth arguing about: should the platform have refused the resize up front? Should the
-console show `readyInstances` next to the size it claims? You now have the evidence.
+Should the platform have refused the resize up front? You have the evidence to argue
+it either way.
 </details>
 
 <details>
-<summary>Deploy a function from the console (the Lambda moment)</summary>
+<summary>Deploy a function from the console</summary>
 
 <p align="center">
   <img src="../../docs/screenshots/console-new-function-dark.png" alt="Cloudbox Console: the New function modal: name, source, optional env vars and a keep-warm toggle; builds the image in-cluster and deploys it as a Knative Service" width="80%" />
 </p>
 
 In the *New function* form, pick a source and name it; the console submits an Argo
-`Workflow` that builds the image (BuildKit → Zot) and a Knative `Service` that runs it.
-The page unlocks with `knative-serving`; building also needs `argo-workflows`, and the
-two creates need one more scoped grant (same pattern as step 3):
+`Workflow` that builds the image with BuildKit, pushes it to Zot, and creates a
+Knative `Service`. The page unlocks with `knative-serving`; building also needs
+`argo-workflows` and one more scoped grant (same pattern as step 3):
 
 ```bash
 cp "$WORKSHOP/lab/08-portal/portal-functions-access.yaml" gitops/components/demo/
@@ -234,8 +221,8 @@ git add . && git commit -m "grant portal: create Workflows + Knative Services" &
 ```
 
 Build `hello-site`, watch it on Builds, and the `fn-hello-site` row turns Ready
-(~1 min). **Invoke** wakes it from zero; **Delete** removes it. Until the grant syncs,
-the create shows a friendly *forbidden* flash.
+(~1 min). Invoke wakes it from zero; Delete removes it. Until the grant syncs, the
+create shows a *forbidden* flash.
 </details>
 
 <details>
@@ -255,8 +242,8 @@ URL wasn't in `/etc/hosts` (no wildcards there), so teach it once:
 `./scripts/install.sh --add-hosts my-app-demo`. On tbx it already resolves.
 
 **Ship your own code (PRD-0012).** In *New Application*, switch Source to *Build from
-a repo* and give an in-cluster Gitea repo. One is seeded: `cloudbox/demo-app`, a real
-Go service that uses its composed Postgres and bucket. Its Dockerfile builds `FROM` a
+a repo* and give an in-cluster Gitea repo. One is seeded: `cloudbox/demo-app`, a Go
+service that uses its composed Postgres and bucket. Its Dockerfile builds `FROM` a
 golang base in Zot, so seed that base once, from your own mirror:
 
 ```bash
@@ -271,14 +258,13 @@ MIRROR="$(tbx status cloudbox -o json | jq -r '.[0].subnet | sub("\\.0/24$"; ".1
 crane copy --insecure "$MIRROR/public.ecr.aws/docker/library/golang:1.25-alpine" zot.cloudbox.k8s.test/library/golang:1.25-alpine
 ```
 
-(If your `cloudbox-init.sh` run predates the golang base joining the pre-pull list,
-re-run it or fall back to `public.ecr.aws/docker/library/golang:1.25-alpine` online.)
+(Base missing from your mirror? Re-run `cloudbox-init.sh`, or pull
+`public.ecr.aws/docker/library/golang:1.25-alpine` online.)
 
-Needs both grants above; repos are restricted to the in-cluster Gitea. Then close the
-loop: change the code, push, hit **Redeploy** on the detail page, and it rebuilds at a
-fresh tag and rolls forward. *Start from a template* is the zero-setup version: the
-console creates a fresh `cloudbox/<name>` repo from the `demo-app` template, builds,
-deploys.
+Needs both grants above; repos are restricted to the in-cluster Gitea. Change the
+code, push, hit Redeploy on the detail page: it rebuilds at a fresh tag and rolls
+forward. *Start from a template* creates a fresh `cloudbox/<name>` repo from the
+`demo-app` template, builds, deploys.
 
 **Projects.** The top-bar Project selector maps 1:1 to namespaces; "New project"
 provisions a namespace and binds the portal's tenant grant into it. Grant via git,
@@ -290,15 +276,13 @@ git add . && git commit -m "grant portal: create projects (scoped)" && git push
 ```
 
 Create `teama`, switch to it, provision a database, and note it lands in ns `teama`.
-Project names have no hyphens and the console refuses one: a Knative URL is
-`<app>-<project>.kn.cloudbox.k8s.test`, name and namespace in one DNS label, so
-`web-api`/`team` and `web`/`api-team` would claim the same hostname
-([docs/HAZARDS.md](../../docs/HAZARDS.md)).
+The console refuses hyphens in project names: a Knative URL is
+`<app>-<project>.kn.cloudbox.k8s.test`, name and namespace in one DNS label, so two
+name/project pairs could claim one hostname ([docs/HAZARDS.md](../../docs/HAZARDS.md)).
 
 **Diagnostics (DR-0005).** When something isn't Ready, its detail page shows the
 failing conditions, container states, and a next-step hint, the way `kubectl describe`
-would. Break it on purpose: deploy a tag that doesn't exist in Zot and watch the page
-name the problem. Lists are for triage; detail pages are for diagnosis.
+would. Deploy a tag that doesn't exist in Zot and watch the page name the problem.
 </details>
 
 - Add a column: each CNPG cluster's `instances` on the Databases page (`resources.go` + `databases.html`).

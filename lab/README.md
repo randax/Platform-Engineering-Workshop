@@ -25,7 +25,7 @@ reached.
 | 10 | [Day-2 operations: roll back a bad release](10-day2-ops/) | stretch | self-paced | You used `git revert`, the only durable fix, to recover the release; kagent can assist the diagnosis |
 
 Core = 00–05. Stretch modules are for the fast 20% and for home. The core path never
-depends on them, but they build on each other: 09 needs 06 and 08, 08's star task needs
+depends on them, but they build on each other: 09 needs 06 and 08, 08's main task needs
 04's platform API, and 10 only needs 02.
 
 ## How every module works
