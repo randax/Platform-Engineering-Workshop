@@ -59,8 +59,8 @@ Kourier is the ingress (lighter than Istio), on NodePort 31080; traffic routes b
 # See it
 
 <figure class="bigshot">
-  <img src="/console/function-detail-dark.png" alt="A function that was scaled to zero a moment ago. The Console shows the revision, the URL and the cold start." />
-  <figcaption>A function that was scaled to zero a moment ago. The Console shows the revision, the URL and the cold start.</figcaption>
+  <img src="/console/services-dark.png" alt="Ready, and zero pods. That is scale-to-zero working, not a broken service." />
+  <figcaption>Ready, and zero pods. That is scale-to-zero working, not a broken service.</figcaption>
 </figure>
 
 <!--

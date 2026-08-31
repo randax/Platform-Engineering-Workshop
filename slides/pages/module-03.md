@@ -83,8 +83,8 @@ The meta-lesson connects back to the "why" section: the roadmap risk from slide 
 # See it
 
 <figure class="bigshot">
-  <img src="/console/database-monitoring-dark.png" alt="Your database, in the Console you build in module 08: live CPU, memory and connections for the CNPG cluster you just created." />
-  <figcaption>Your database, in the Console you build in module 08: live CPU, memory and connections for the CNPG cluster you just created.</figcaption>
+  <img src="/console/buckets-dark.png" alt="The other half of this module: your own S3, with the RustFS pod behind it. Seen from the Console you build in module 08." />
+  <figcaption>The other half of this module: your own S3, with the RustFS pod behind it. Seen from the Console you build in module 08.</figcaption>
 </figure>
 
 <!--
@@ -110,7 +110,7 @@ cd lab/03-data && ./verify.sh
 The task in three beats, all through the git loop from module 02:
 1. Enable cnpg-operator.yaml and rustfs.yaml from the catalog (copy → commit → push).
 2. Deliver the provided CNPG Cluster manifest (app-db) into the demo namespace via the repo; wait for "Cluster in healthy state"; get a psql prompt inside it and run SELECT 1.
-3. RustFS speaks S3 on NodePort 30900 (access key cloudbox / secret cloudbox123): create a bucket, upload a file, generate a presigned URL, open it in the browser.
+3. RustFS speaks S3 at http://s3.cloudbox.k8s.test (access key cloudbox / secret cloudbox123): create a bucket, upload a file, generate a presigned URL, open it in the browser.
 
 Wins to celebrate: the psql prompt (module win #1) and a presigned URL opening in a browser (win #2: "you just handed out a download link with zero AWS").
 

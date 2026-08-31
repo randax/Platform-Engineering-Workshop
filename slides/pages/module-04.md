@@ -80,8 +80,8 @@ This lands twice: it's a real operational skill (knowing which major version you
 # See it
 
 <figure class="bigshot">
-  <img src="/console/new-application-dark.png" alt="The same XR you just authored, rendered as a form. One submit composes a workload, a database and a bucket." />
-  <figcaption>The same XR you just authored, rendered as a form. One submit composes a workload, a database and a bucket.</figcaption>
+  <img src="/console/database-dark.png" alt="The XR you just authored, as the Console sees it: one WorkshopDatabase, and the CNPG cluster it composed." />
+  <figcaption>The XR you just authored, as the Console sees it: one WorkshopDatabase, and the CNPG cluster it composed.</figcaption>
 </figure>
 
 <!--

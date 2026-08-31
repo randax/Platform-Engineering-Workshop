@@ -132,4 +132,6 @@ Readiness check before the moment: kubectl -n pipeline get broker,trigger,ksvc a
 Then stage the two terminals, upload at portal.cloudbox.k8s.test/gallery, and work through the three proofs from the previous slide. verify.sh seals it.
 
 Anyone who finishes has run the full arc: platform built by git commits, storage and databases self-hosted, a self-service API, a portal, and an event-driven serverless pipeline traced end to end. Send them off victorious, and remind them the hard stop brings everyone back for the close.
+
+ENABLE-LIST MISMATCH, say one sentence so the room does not split: this slide lists three files (portal.yaml + knative-eventing.yaml + picture-pipeline.yaml), which is the room order PLAN.md assumes. lab/09-capstone/README.md lists two and tells anyone who skipped module 08 to run catch-up 8 first. Both reach the same end state. Say which one you want them on before you release them.
 -->
