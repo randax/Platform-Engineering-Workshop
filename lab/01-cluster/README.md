@@ -178,8 +178,8 @@ talosctl -n <node-ip> -e <node-ip> reboot --wait=false
 # or, from the outside (tbx):
 tbx node stop  cloudbox cloudbox-worker-1             # or cloudbox-cp-1
 tbx node start cloudbox cloudbox-worker-1
-# or, from the outside (docker backend):
-docker restart cloudbox-worker-1
+# or, from the outside:
+docker restart cloudbox-worker-1                      # docker backend only
 ```
 
 (`tbx status cloudbox` and `tbx doctor` name a stalled service too,

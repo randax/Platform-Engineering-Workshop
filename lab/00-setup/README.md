@@ -158,8 +158,8 @@ reach it:
 <details>
 <summary>Let Ollama listen on more than loopback (tbx and native-Linux Docker)</summary>
 
-On tbx the cluster reaches your laptop at `172.30.<n>.1`, on native-Linux Docker at
-`10.5.0.1`; Ollama's default `127.0.0.1:11434` bind refuses both. Run
+On tbx the cluster reaches your laptop at `172.30.<n>.1`, and on the native-Linux
+docker backend at `10.5.0.1`; Ollama's default `127.0.0.1:11434` bind refuses both. Run
 `OLLAMA_HOST=0.0.0.0 ollama serve` (macOS Ollama.app: `launchctl setenv OLLAMA_HOST
 0.0.0.0`, then quit and reopen the app; Linux: set it in the systemd unit). macOS and
 WSL2 on the Docker backend need nothing, `host.docker.internal` reaches your loopback
