@@ -74,8 +74,12 @@ Roughly one small Go file per page plus HTML templates, all in
 ./verify.sh
 ```
 
-Green once the portal answers. `console-db` is graded as the star task: verify tells
-you if it is missing, and fails only if it exists without becoming Ready.
+Green once the portal app is Healthy in ArgoCD, its Deployment and ServiceAccount
+exist, and the console answers over HTTP. `console-db` is the star task: verify names
+it when missing and fails only if it exists without becoming Ready. That lenience is
+deliberate, per principle 8 in [docs/PRINCIPLES.md](../../docs/PRINCIPLES.md)
+(checkpoint understanding, not completion): creating it through the form is a human
+moment, and `solve.sh` still creates it so CI regression-tests the check.
 
 ## Hints
 

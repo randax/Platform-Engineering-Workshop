@@ -2,10 +2,10 @@
 
 ## The goal
 
-Your platform exposes its own API: a developer writes a dozen-line `WorkshopDatabase`
-resource and gets a Postgres cluster *and* an S3 bucket, provisioned, wired, and
-lifecycle-managed. You prove it by pushing exactly such a resource and running
-`./verify.sh`.
+Your platform exposes its own API: a developer writes a `WorkshopDatabase` resource
+that asks for little more than a name and a size, and gets a Postgres cluster *and*
+an S3 bucket, provisioned, wired, and lifecycle-managed. You prove it by pushing
+exactly such a resource and running `./verify.sh`.
 
 ## Why this matters
 

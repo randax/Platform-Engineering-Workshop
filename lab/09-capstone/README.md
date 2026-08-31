@@ -130,9 +130,10 @@ tell them apart.
 The uploader never waits for the resizer: it logs the Broker's `202 Accepted` and is
 done, and the resizer's cold start happens after that (both visible in your `-w`
 watch). Now the uncomfortable question: this Broker is backed by an **in-memory**
-channel, and delivery is at-most-once. Restart the middleman
-(`kubectl -n knative-eventing rollout restart deploy/imc-dispatcher`) and upload
-during the roll: an accepted event can vanish for good, with no error anywhere, and
+channel. A delivery the resizer answers with a non-2xx is retried, up to ~10
+attempts, but the events themselves live in the dispatcher's memory. Restart the
+middleman (`kubectl -n knative-eventing rollout restart deploy/imc-dispatcher`) and
+upload during the roll: an accepted event can vanish for good, with no error anywhere, and
 the fix is what you'd do in the gallery anyway, upload again. That's why production
 brokers ride on Kafka, and why this one deliberately doesn't; it's a lab.
 </details>
