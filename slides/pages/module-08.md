@@ -77,53 +77,30 @@ The tenant plane is console-direct: create a database, deploy a function, spin u
 kubectl is the third, orthogonal thing: it inspects (and rescues) either plane, the muscle from modules 01-05.
 
 The one deliberately clever move we did NOT make: having the console write to Gitea behind your back (console → commit → ArgoCD → cluster). It sounds elegant, an audit trail for everything. But it pays git's latency and moving parts on the one thing a console is uniquely good at (immediate self-service) to buy an audit trail a single-user lab doesn't need. Right pattern, wrong context. When you build projects later, "New project" is console-direct too, behind a scoped ClusterRole you granted it once, via git. Grant via git; act via console.
+
+PROJECTS = NAMESPACES (was its own slide, cut as a third identical card grid): Projects make the namespace-as-tenant idea visible. The selector in the top bar is exactly the scope switcher every cloud console has: pick a project, and Databases/Functions/Applications all list and create inside that namespace. The interesting part is "New project." It's a console-direct action (per the previous slide's rule, tenant self-service goes straight to the API), but it needs to do something privileged: create a namespace AND grant the portal access to it. So the escalation is bounded by RBAC: you hand the portal, once via git, a tightly scoped grant. It may create namespaces and rolebindings, and it may `bind` exactly one ClusterRole (portal-tenant), nothing else. That `bind` verb is the Kubernetes escalation guard: without it, an account can't create a binding to a role it doesn't already fully hold. So the portal can stand up a tenant, but it can't grant itself cluster-admin. The security lesson stays intact. That's the whole platform in one feature: the capability is granted declaratively in git (scoped, auditable, reviewable), and the action is immediate self-service in the console. Grant via git; act via console.
+
 -->
 
----
 
-# Projects = namespaces
-
-<div class="grid grid-cols-2 gap-4 mt-4">
-  <div class="principle">
-    <div class="ico"><span class="svgi i-package"></span></div>
-    <div class="name">A project <em>is</em> a namespace</div>
-    <div class="tie" style="opacity:.85">The top-bar selector maps 1:1 to namespaces. Switch project → every self-service page scopes to it. The tenancy unit every cloud console has (GCP projects, Nais teams).</div>
-  </div>
-  <div class="principle">
-    <div class="ico"><span class="svgi i-concierge-bell"></span></div>
-    <div class="name">"New project", console-direct</div>
-    <div class="tie" style="opacity:.85">Provisions a namespace <b>+</b> binds the portal's tenant grant into it, so your databases and apps land there. Behind a <b>scoped</b>, git-delivered grant: namespaces + <code>bind</code> on exactly <code>portal-tenant</code>.</div>
-  </div>
-</div>
-
-<div class="mt-5 text-lg opacity-85">The platform pattern in miniature: <b>grant via git</b> (scoped, once) · <b>act via console</b> (self-service).</div>
-
-<!--
-Projects make the namespace-as-tenant idea visible. The selector in the top bar is exactly the scope switcher every cloud console has: pick a project, and Databases/Functions/Applications all list and create inside that namespace.
-
-The interesting part is "New project." It's a console-direct action (per the previous slide's rule, tenant self-service goes straight to the API), but it needs to do something privileged: create a namespace AND grant the portal access to it. So the escalation is bounded by RBAC: you hand the portal, once via git, a tightly scoped grant. It may create namespaces and rolebindings, and it may `bind` exactly one ClusterRole (portal-tenant), nothing else. That `bind` verb is the Kubernetes escalation guard: without it, an account can't create a binding to a role it doesn't already fully hold. So the portal can stand up a tenant, but it can't grant itself cluster-admin. The security lesson stays intact.
-
-That's the whole platform in one feature: the capability is granted declaratively in git (scoped, auditable, reviewable), and the action is immediate self-service in the console. Grant via git; act via console.
--->
 
 ---
 
 # Two golden paths
 
-<div class="grid grid-cols-2 gap-4 mt-4">
-  <div class="principle">
-    <div class="ico"><span class="svgi i-package"></span></div>
-    <div class="name">Platform team</div>
-    <div class="tie" style="opacity:.85"><code>git push</code> (config repo) → <b>ArgoCD</b> → converge.<br>Changing the platform. <b>GitOps.</b></div>
-  </div>
-  <div class="principle">
-    <div class="ico"><span class="svgi i-workflow"></span></div>
-    <div class="name">App team</div>
-    <div class="tie" style="opacity:.85"><code>git push</code> (app repo) → <b>build</b> → deploy.<br>Shipping an app onto the platform. <b>CI/CD.</b></div>
-  </div>
+<div class="chevrons mt-6">
+  <div class="chev"><span class="cn">Platform team</span><span class="cd">git push, config repo</span></div>
+  <div class="chev"><span class="cn">ArgoCD</span><span class="cd">reconciles</span></div>
+  <div class="chev"><span class="cn">the platform changes</span><span class="cm">GitOps</span></div>
 </div>
 
-<div class="mt-5 text-lg opacity-85">Same Gitea, two reconcilers, two audiences. <b>GitOps is not the app team's deploy path.</b></div>
+<div class="chevrons alt mt-4">
+  <div class="chev"><span class="cn">App team</span><span class="cd">git push, app repo</span></div>
+  <div class="chev"><span class="cn">build</span><span class="cd">BuildKit into Zot</span></div>
+  <div class="chev"><span class="cn">an app ships</span><span class="cm">CI/CD</span></div>
+</div>
+
+<div class="mt-6 text-lg opacity-85">Same Gitea, two reconcilers, two audiences. <b>GitOps is not the app team's deploy path.</b></div>
 
 <!--
 The missing half of the "how does everyone use this platform" story, and the answer to a question sharp attendees carry all day: if everything is GitOps, how does an app developer ship THEIR code?

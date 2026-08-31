@@ -564,3 +564,11 @@
 .snip .slidev-code{font-size:0.62rem!important;line-height:1.45!important;}
 .snipsrc{display:block;margin-top:0.3rem;font-size:0.56rem;color:#64748b;
   font-family:var(--slidev-code-font-family,ui-monospace,monospace);}
+
+/* A second chevron chain on the same slide, in the "you run this" green, so the
+   two golden paths read as different audiences rather than one repeated shape. */
+.chevrons.alt .chev{background:rgba(5,150,105,0.12);
+  border-top-color:rgba(5,150,105,0.3);border-bottom-color:rgba(5,150,105,0.3);}
+.chevrons.alt .chev:nth-child(2){background:rgba(5,150,105,0.18);}
+.chevrons.alt .chev:nth-child(3){background:rgba(5,150,105,0.24);}
+.chevrons.alt .cm{color:var(--jz-run);}
