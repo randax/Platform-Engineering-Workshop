@@ -39,7 +39,7 @@ transition: view-transition
 
 </div>
 
-<div v-click class="mt-4 text-base opacity-85 text-center">The node is a <strong>document</strong> — and service traffic is answered <strong>in-kernel</strong>.</div>
+<div class="mt-4 text-base opacity-85 text-center">The node is a <strong>document</strong> — and service traffic is answered <strong>in-kernel</strong>.</div>
 
 <!--
 The two lines the table earns: the node is a declarative resource — one machineconfig, no shell to drift into. And there is no kube-proxy pod to find — eBPF answers service traffic in-kernel.
@@ -82,7 +82,7 @@ transition: view-transition
 
 </div>
 
-<div v-click class="mt-4 text-base opacity-85 text-center">Your cloud has its <strong>own git server</strong> — the write path never leaves the laptop.</div>
+<div class="mt-4 text-base opacity-85 text-center">Your cloud has its <strong>own git server</strong> — the write path never leaves the laptop.</div>
 
 <!--
 Off-slide but said aloud: Gitea in the cluster, not GitHub — the write path is yours, and offline. App-of-apps + sync waves — restore the Application health check in argocd-cm, or the waves don't gate.
@@ -124,7 +124,7 @@ transition: view-transition
 
 </div>
 
-<div v-click class="mt-4 text-base opacity-85 text-center">CNPG <strong>is</strong> the RDS control loop — and the RustFS row is the roadmap-risk story, lived.</div>
+<div class="mt-4 text-base opacity-85 text-center">CNPG <strong>is</strong> the RDS control loop — and the RustFS row is the roadmap-risk story, lived.</div>
 
 <!--
 Say it, don't show it: CNPG is the RDS control loop — a Cluster CR, not a Postgres pod. And RustFS-not-MinIO: MinIO's community edition was gutted for proprietary AIStor.
@@ -165,7 +165,7 @@ transition: view-transition
 
 </div>
 
-<div v-click class="mt-4 text-base opacity-85 text-center">One YAML becomes a stack · zero becomes a pod · your cluster <strong>builds its own images</strong>.</div>
+<div class="mt-4 text-base opacity-85 text-center">One YAML becomes a stack · zero becomes a pod · your cluster <strong>builds its own images</strong>.</div>
 
 <!--
 Spoken, not projected: Crossplane v2 — Claims are gone, a namespaced XR IS the API. Knative — scale-to-zero, which is what Cloud Run is built on. BuildKit — rootless, in-cluster, pushes to your own Zot.
@@ -208,7 +208,7 @@ transition: view-transition
 
 </div>
 
-<div v-click class="mt-4 text-base opacity-85 text-center">Durable messaging in <strong>~15 MB</strong> · full observability in <strong>~1 GiB</strong>.</div>
+<div class="mt-4 text-base opacity-85 text-center">Durable messaging in <strong>~15 MB</strong> · full observability in <strong>~1 GiB</strong>.</div>
 
 <!--
 Spoken: NATS JetStream — durable streams on a PVC for a rounding error of Kafka's RAM. The whole Victoria stack fits in ~1 GiB where LGTM wants several. Datasource plugins are baked into the Grafana image — nothing fetched at boot.
