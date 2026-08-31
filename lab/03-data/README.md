@@ -1,11 +1,11 @@
-# Module 03 — Data services: Postgres and S3, on your terms
+# Module 03: data services, Postgres and S3 on your terms
 
 ## The goal
 
-At the end of this module your platform offers two managed data services, both delivered
-via git: a PostgreSQL database (CloudNativePG operator) you can `psql` into, and an
-S3-compatible object store (RustFS) where you can create a bucket and share a working
-presigned URL. `./verify.sh` proves all of it.
+Your platform offers two managed data services, both delivered via git: a PostgreSQL
+database (CloudNativePG operator) you can `psql` into, and an S3-compatible object store
+(RustFS) where you can create a bucket and share a working presigned URL. `./verify.sh`
+proves all of it.
 
 ## Why this matters
 
@@ -36,6 +36,18 @@ Everything goes through the git workflow from module 02 (your Gitea clone).
    download link to someone with zero AWS involved.
 
 4. Run `./verify.sh`.
+
+## Check your work
+
+```bash
+./verify.sh
+```
+
+It checks: the cnpg-operator and rustfs ArgoCD apps are Healthy (Synced is the happy
+path; sync is advisory); the CNPG operator deployment is up; `app-db` reports healthy
+with 1/1 ready instances; `SELECT 1` actually returns 1 from inside the database; RustFS
+answers S3 at `http://s3.cloudbox.k8s.test`; and bucket `app-assets` exists with at
+least one object.
 
 ## Hints
 
@@ -156,18 +168,6 @@ s5cmd --endpoint-url http://s3.cloudbox.k8s.test presign --expire 1h s3://app-as
 cd "$WORKSHOP/lab/03-data" && ./verify.sh
 ```
 </details>
-
-## Check your work
-
-```bash
-./verify.sh
-```
-
-It checks: the cnpg-operator and rustfs ArgoCD apps are Healthy (Synced is the happy path; sync is advisory); the CNPG operator
-deployment is up; `app-db` reports healthy with 1/1 ready instances; `SELECT 1` actually
-returns 1 from inside the database; RustFS answers S3 at
-`http://s3.cloudbox.k8s.test`; and bucket `app-assets`
-exists with at least one object.
 
 ## Explain-back
 

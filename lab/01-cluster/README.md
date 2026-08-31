@@ -1,22 +1,22 @@
-# Module 01 — Your own cloud: Talos Linux + Cilium
+# Module 01: your own cloud with Talos Linux and Cilium
 
 ## The goal
 
-By the end of this module a two-node Kubernetes cluster called **cloudbox** runs on your
-laptop: Talos Linux nodes, real VMs where `tbx` works and Docker containers everywhere
-else, networked by Cilium's eBPF datapath, with **no kube-proxy and no SSH anywhere**.
-Proof: `kubectl get nodes` showing two Ready nodes and `./verify.sh` green. More
-importantly, you can explain what's *missing* from these nodes and why.
+A two-node Kubernetes cluster called **cloudbox** runs on your laptop: Talos Linux nodes
+(real VMs where `tbx` works, Docker containers everywhere else), networked by Cilium's
+eBPF datapath, with no kube-proxy and no SSH anywhere. Proof: `kubectl get nodes` shows
+two Ready nodes and `./verify.sh` is green. And you can explain what's *missing* from
+these nodes, and why.
 
 ## Why this matters
 
 Every cloud provider runs an OS under your Kubernetes that you never see. Today you own
 that layer. Talos Linux is an immutable, API-only operating system built solely to run
-Kubernetes: no shell, no SSH, no package manager. The entire machine is one declarative
-config document managed over a gRPC API (`talosctl`). Cilium replaces both the CNI *and*
-kube-proxy with eBPF programs in the kernel. This combination is what "production-grade"
-looks like in 2026, and it fits on your laptop. `create-cluster.sh` picks the substrate
-for you (`talos-box` VMs, or Talos-in-Docker); everything below is the same on both.
+Kubernetes: no shell, no SSH, no package manager. The whole machine is one declarative
+config document managed over a gRPC API (`talosctl`). Cilium replaces both the CNI and
+kube-proxy with eBPF programs in the kernel. This is what production-grade looks like in
+2026, and it fits on your laptop. `create-cluster.sh` picks the substrate for you
+(talos-box VMs, or Talos-in-Docker); everything below is the same on both.
 
 ## The task
 
@@ -26,13 +26,13 @@ for you (`talos-box` VMs, or Talos-in-Docker); everything below is the same on b
    mise run cluster:create -- --skip-cilium
    ```
 
-   While it runs (~2–3 min), read the script. It is short on purpose: everything it does,
-   you could type.
+   While it runs (~2-3 min), read the script. It is short on purpose: everything it
+   does, you could type.
 
 2. Look at what you own: `kubectl get nodes`. Both nodes are **NotReady**, and will stay
-   that way forever, because this cluster has **no CNI**. Convince yourself of why
-   before fixing it: `kubectl describe node` one of them and find the complaint;
-   `kubectl -n kube-system get pods` and explain the `Pending` ones; find the
+   that way forever, because this cluster has no CNI. Convince yourself of why before
+   fixing it: `kubectl describe node` one of them and find the complaint; explain the
+   `Pending` pods in `kubectl -n kube-system get pods`; find the
    `cluster.network.cni: none` decision in the Talos machine config (hint 2). A cloud
    provider made this choice for you on every cluster you've ever used. Today it's yours.
 
@@ -45,18 +45,48 @@ for you (`talos-box` VMs, or Talos-in-Docker); everything below is the same on b
    (Behind, or rebuilding? Plain `mise run cluster:create` without the flag does this
    step for you. That's what catch-up uses.)
 
-4. Now **prove to yourself what you just built**. Find answers to these, using `talosctl`
-   and `kubectl` (hints below if you want them):
+4. **Prove to yourself what you just built.** Answer these with `talosctl` and `kubectl`
+   (hints below if you want them):
 
    - There is no SSH. What *is* the management plane? Show the machine's config document
      without logging into anything.
    - Open the Talos dashboard for a node. What is the machine doing right now?
    - Which cluster members does Talos itself know about (not Kubernetes, Talos)?
    - Kubernetes says both nodes are `Ready`. What is doing the networking? Show that
-     Cilium is healthy, and that **kube-proxy does not exist** in this cluster.
-     Who answers Service traffic then?
+     Cilium is healthy, and that kube-proxy does not exist in this cluster. Who answers
+     Service traffic then?
 
 5. Run `./verify.sh`.
+
+## Check your work
+
+```bash
+./verify.sh
+```
+
+It checks: your two Talos nodes exist on whichever substrate you are on (talos-box VMs
+via `tbx status`, Talos node containers via `docker ps`); both nodes are `Ready`; the
+Cilium DaemonSet is fully available; the Cilium operator is Available; Cilium reports
+kube-proxy replacement active; no kube-proxy is running anywhere; CoreDNS is Available;
+and the shared ingress holds the endpoint every `*.cloudbox.k8s.test` name lands on.
+
+<details>
+<summary>Docker substrate: the /etc/hosts block, and the one sudo prompt</summary>
+
+On the docker substrate the `*.cloudbox.k8s.test` names need a line each in
+`/etc/hosts`, and that is the one step in this whole workshop that asks for your
+password. `create-cluster.sh` writes them for you, including on the `--skip-cilium`
+path you just took. If you declined the prompt, or the block never got written, every
+`*.cloudbox.k8s.test` URL fails from module 02 onward on a perfectly healthy cluster.
+Fix it any time, the cluster keeps running:
+
+```bash
+./scripts/install.sh --print-hosts    # exactly what would be added
+./scripts/install.sh --write-hosts    # add it (sudo, once)
+```
+
+On tbx nothing is written: talos-box's own resolver answers those names.
+</details>
 
 ## Hints
 
@@ -64,7 +94,7 @@ for you (`talos-box` VMs, or Talos-in-Docker); everything below is the same on b
 <summary>Hint 1: Where do I even start with talosctl?</summary>
 
 `talosctl` talks to the Talos API on the nodes. The create script set up your talosconfig
-and pointed the `cloudbox` context at your control plane, so you need **no `-n` flag**:
+and pointed the `cloudbox` context at your control plane, so you need no `-n` flag:
 `talosctl get members` already knows which node to ask. `talosctl config info` prints the
 endpoint and node it will use. The address differs per substrate: a DHCP lease in a
 talos-box VM, an address in the Talos docker network. That is exactly why you read it
@@ -123,7 +153,7 @@ helm upgrade --install cilium \
   --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"
 ```
 
-(`l2announcements` and the raised client rate limit are set on **both** substrates on
+(`l2announcements` and the raised client rate limit are set on both substrates on
 purpose, so `cilium config view` reads the same on every laptop in the room; only tbx
 actually announces anything.)
 
@@ -134,7 +164,7 @@ rest of the day, and `verify.sh` checks for it. The script builds them from
 the kind lifeboat.
 
 Those two `service.*` lines are the **docker** shape. Check which substrate you
-are on with `cat ~/.cloudbox/substrate`, because **tbx needs a different ending**:
+are on with `cat ~/.cloudbox/substrate`, because tbx needs a different ending:
 a real LoadBalancer instead of a NodePort (the L2 announcer already enabled above
 is what claims its VIP on the network), plus host routing so the VIP is reachable
 from your laptop:
@@ -149,17 +179,16 @@ address to hand out, which means two more objects: a `CiliumLoadBalancerIPPool`
 and a `CiliumL2AnnouncementPolicy`. Without them `cilium-ingress` sits in
 `<pending>` forever and `verify.sh` fails with nothing to tell you why. They are
 the one part the script does for you rather than making you type subnet
-arithmetic: once your Cilium is up, run
+arithmetic. Once your Cilium is up, run
 
 ```bash
 mise run cluster:create -- --post-cni
 ```
 
 It does exactly three things: applies the pool and the policy, waits for your
-Cilium rollout and the nodes, and proves `cilium-ingress` got `.200`. Nothing
-else: no preflight, no `tbx doctor`, no VM is touched. (Do **not** re-run
-the bare `mise run cluster:create`: on tbx it refuses because the cluster
-already exists.)
+Cilium rollout and the nodes, and proves `cilium-ingress` got `.200`. No
+preflight, no `tbx doctor`, no VM is touched. (Do not re-run the bare
+`mise run cluster:create`: on tbx it refuses because the cluster already exists.)
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
   `kubectl get nodes -w` terminal.
@@ -184,7 +213,7 @@ tbx node start cloudbox cloudbox-worker-1
 ```
 
 then keep watching `kubectl get nodes -w`. (`tbx status cloudbox` also names a
-stalled service directly, and `tbx doctor` FAILs on one — randax/talos-box#482 —
+stalled service directly, and `tbx doctor` FAILs on one, randax/talos-box#482,
 so either is a shortcut to the same verdict; the `service` command above is the
 one that shows the byte count. The recovery is the same either way. After an
 in-guest reboot the node shows as `rebooted` in `tbx status` for 15 minutes;
@@ -255,32 +284,6 @@ cd lab/01-cluster && ./verify.sh
 ```
 </details>
 
-## Check your work
-
-```bash
-./verify.sh
-```
-
-It checks: your two Talos nodes exist on whichever substrate you are on (talos-box VMs
-via `tbx status`, Talos node containers via `docker ps`); both nodes are `Ready`; the
-Cilium DaemonSet is fully available; the Cilium operator is Available; Cilium reports
-kube-proxy replacement active; no kube-proxy is running anywhere; CoreDNS is Available;
-and the shared ingress holds the endpoint every `*.cloudbox.k8s.test` name lands on.
-
-On the **docker** substrate those names also need a line each in `/etc/hosts`, and that
-is the one step in this whole workshop that asks for your password. `create-cluster.sh`
-writes them for you, including on the `--skip-cilium` path you just took. If you
-declined the prompt, or the block never got written, every `*.cloudbox.k8s.test` URL
-fails from module 02 onward on a perfectly healthy cluster. Fix it any time, the cluster
-keeps running:
-
-```bash
-./scripts/install.sh --print-hosts    # exactly what would be added
-./scripts/install.sh --write-hosts    # add it (sudo, once)
-```
-
-(On **tbx** nothing is written: talos-box's own resolver answers those names.)
-
 ## Explain-back
 
 Tell your neighbor: this node has no SSH and no package manager. Name two concrete
@@ -333,14 +336,15 @@ CLOUDBOX_SUBSTRATE=docker mise run cluster:create     # or =tbx, whichever you a
 
 The destroy removes `~/.cloudbox/substrate` with the cluster, so a bare
 `create-cluster.sh` would decide again from scratch rather than rebuild what you had.
-`mise run preflight` prints which one you are on. On the kind lifeboat neither
-script applies: rebuild with `./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh`.
+`mise run preflight` prints which one you are on.
+
 If Talos-in-Docker fights your machine specifically, `mise run cluster:fallback` gives
 you a kind+Cilium cluster with the same ingress, the same hostnames and the same
 `/etc/hosts` block. You lose the Talos exploration but every later module works the
 same. Remove it afterwards with `./scripts/kind-fallback.sh --delete` (cluster, hosts
-block **and** the recorded identity); `destroy-cluster.sh` refuses there: it tears down
-substrates, and kind is not one.
+block and the recorded identity). `destroy-cluster.sh` refuses there: it tears down
+substrates, and kind is not one. Rebuild the lifeboat with
+`./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh`.
 
 **On the lifeboat this module is not gradeable.** `./verify.sh` checks a *Talos*
 cluster: Talos node containers or tbx VMs, and the ingress shape the substrate

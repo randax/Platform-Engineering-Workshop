@@ -1,26 +1,27 @@
-# Module 04 — Self-service: your platform gets an API
+# Module 04: self-service, your platform gets an API
 
 ## The goal
 
-At the end of this module your platform exposes its own API: developers write a 10-line
-`WorkshopDatabase` resource and get a whole stack provisioned, wired, and
-lifecycle-managed: a Postgres cluster *and* an S3 bucket. You prove it by pushing exactly
-such a 10-liner and running `./verify.sh`.
+At the end of this module your platform exposes its own API: a developer writes a 10-line
+`WorkshopDatabase` resource and gets a Postgres cluster *and* an S3 bucket, provisioned,
+wired, and lifecycle-managed. You prove it by pushing exactly such a 10-liner and running
+`./verify.sh`.
 
 ## Why this matters
 
-Module 03 made *you* capable of provisioning databases. Your developers shouldn't
-need to know CNPG, storage classes, or RustFS endpoints. Platform engineering is building
-the **abstraction**: you define an API (`WorkshopDatabase`) and an implementation
-(Crossplane Composition), developers consume the API. This is precisely what `aws rds
-create-db-instance` is, except you own both sides of it now.
+Module 03 made *you* capable of provisioning databases. Your developers shouldn't need to
+know CNPG, storage classes, or RustFS endpoints. Platform engineering is building the
+abstraction: you define an API (`WorkshopDatabase`) and an implementation (a Crossplane
+Composition), developers consume the API. That is what `aws rds create-db-instance` is,
+except you own both sides now.
 
 ⚠️ **A word about training data (yours and your AI's):** this is Crossplane **v2**.
 Claims are gone: you create namespaced XRs directly. Compositions are pipeline-mode only
 and emit *plain Kubernetes resources* (a CNPG `Cluster`, a `Job`) directly, no
-provider-kubernetes wrapping. Most tutorials online, and most LLM answers, still
-describe v1. If you see `kind: Claim`, `claimNames`, or `resources:` at the top level of
-a Composition, you're reading the past.
+provider-kubernetes wrapping. Most tutorials online, and most LLM answers, still describe
+v1. If you see `kind: Claim`, `claimNames`, or `resources:` at the top level of a
+Composition, you're reading the past. If your assistant proposes any of those, paste it
+the XRD and Composition from this repo as context and ask it to stay within v2 semantics.
 
 ## The task
 
@@ -42,6 +43,18 @@ a Composition, you're reading the past.
    whole tree?
 
 4. Run `./verify.sh`.
+
+## Check your work
+
+```bash
+./verify.sh
+```
+
+It checks: the crossplane and platform-api apps are Healthy (Synced is the happy path;
+sync is advisory); the `function-patch-and-transform` Function is installed and healthy;
+the XRD is Established; the Composition exists; `my-db` is Synced *and* Ready; the
+composed CNPG cluster `my-db-pg` is healthy; and the `my-db-assets` bucket really exists
+in RustFS.
 
 ## Hints
 
@@ -117,48 +130,36 @@ cd "$WORKSHOP/lab/04-self-service" && ./verify.sh
 ```
 </details>
 
-## Check your work
-
-```bash
-./verify.sh
-```
-
-It checks: the crossplane and platform-api apps are Healthy (Synced is the happy path; sync is advisory); the
-`function-patch-and-transform` Function is installed and healthy; the XRD is Established;
-the Composition exists; `my-db` is Synced *and* Ready; the composed CNPG cluster
-`my-db-pg` is healthy; and the `my-db-assets` bucket really exists in RustFS.
-
-## One rule the schema cannot enforce for you
-
-Module 08's `Application` XR composes a Knative Service whose URL is
-`<name>-<namespace>.kn.cloudbox.k8s.test`: **name and namespace share one DNS label**, so
-they have to fit in 63 characters together, and a hyphen in the *namespace* makes the split
-ambiguous (`web-api` in `team` and `web` in `api-team` compose the same hostname).
-
-The XRD caps `metadata.name` at 40, and that is as far as a schema can go. A CRD validation
-rule cannot check the pair: Kubernetes exposes only `metadata.name` and
-`metadata.generateName` to CEL, "no other metadata properties are accessible", so
-`self.metadata.namespace` is not a thing a rule can read. (Crossplane also copies
-`x-kubernetes-validations` only from the XRD's `spec` and `status` sub-schemas; a root-level
-rule never reaches the generated CRD at all.) The Console enforces the pair in code and
-refuses hyphens in project names; `kubectl apply` of a hand-written XR does not.
-Keep namespaces short and hyphen-free. See [docs/HAZARDS.md](../../docs/HAZARDS.md).
-
-## Going further: the golden path
-
-This lab ships one more example you have not used: `examples/my-application.yaml`, an
-`Application` XR that composes a workload, a database and a bucket from a single manifest.
-That is the shape [Nav's nais.yaml](https://nais.io) has at national scale, and it is the
-warm-up for **adventure door 1** (`adventures/1-app-dev.md`), which starts exactly there.
-Deploy it now if you are ahead, or leave it for the doors. Either way, it is the answer to
-"what would this look like if my whole app were one file?".
-
 ## Explain-back
 
 Tell your neighbor: your teammate asks "why not just give developers the CNPG YAML from
 module 03? It was only 30 lines." Give the two strongest answers you have. (Think:
 what can you change later without touching developers? what can developers *not* do
 through this API?)
+
+## One rule the schema cannot enforce for you
+
+Module 08's `Application` XR composes a Knative Service whose URL is
+`<name>-<namespace>.kn.cloudbox.k8s.test`: **name and namespace share one DNS label**, so
+together they must fit in 63 characters, and a hyphen in the *namespace* makes the split
+ambiguous (`web-api` in `team` and `web` in `api-team` compose the same hostname).
+
+The XRD caps `metadata.name` at 40, and that is as far as a schema can go. A CRD
+validation rule cannot check the pair: CEL rules see only `metadata.name` and
+`metadata.generateName`, so `self.metadata.namespace` is not readable. (Crossplane also
+copies `x-kubernetes-validations` only from the XRD's `spec` and `status` sub-schemas; a
+root-level rule never reaches the generated CRD.) The Console enforces the pair in code
+and refuses hyphens in project names; `kubectl apply` of a hand-written XR does not.
+Keep namespaces short and hyphen-free. See [docs/HAZARDS.md](../../docs/HAZARDS.md).
+
+## Going further: the golden path
+
+This lab ships one more example you have not used: `examples/my-application.yaml`, an
+`Application` XR that composes a workload, a database and a bucket from a single
+manifest. That is the shape [Nav's nais.yaml](https://nais.io) has at national scale, and
+it is the warm-up for **adventure door 1** (`adventures/1-app-dev.md`), which starts
+exactly there. Deploy it now if you are ahead, or leave it for the doors. Either way, it
+answers "what would this look like if my whole app were one file?".
 
 ## Going deeper
 
@@ -184,10 +185,3 @@ through this API?)
 - Add a `status` field: patch the composed cluster's readiness or connection Service name
   back onto the XR (`ToCompositeFieldPath` patches) so developers can `kubectl get wdb`
   and see where to connect.
-
-## AI assistants welcome — with the v2 warning
-
-Assistants are genuinely useful for reading Compositions. But this is where training-data
-skew bites hardest: if your assistant proposes Claims or provider-kubernetes `Object`
-wrappers, it's writing Crossplane v1. Paste it the XRD + composition from this repo as
-context and ask it to stay within v2 semantics.

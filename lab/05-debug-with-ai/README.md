@@ -1,4 +1,4 @@
-# Module 05 — Break it, diagnose it, verify the diagnosis
+# Module 05: break it, diagnose it, verify the diagnosis
 
 ## The goal
 
@@ -10,11 +10,11 @@ cluster before acting**. `./verify.sh` confirms every injected fault is actually
 ## Why this matters
 
 Installing things teaches less per minute than debugging things, and in 2026 "debugging"
-usually starts with asking an assistant. Assistants are excellent at Kubernetes triage and
-*confidently wrong* just often enough to hurt. The skill of the decade is not prompting;
-it is **verification**: treating every diagnosis, human or machine, as a hypothesis and
-designing the one observation that would kill it. Fair warning: one fault below was
-designed so that the obvious AI answer is plausible and wrong.
+usually starts with asking an assistant. Assistants are excellent at Kubernetes triage
+and *confidently wrong* just often enough to hurt. The skill of the decade is not
+prompting; it is **verification**: treat every diagnosis, human or machine, as a
+hypothesis and design the one observation that would kill it. Fair warning: one fault
+below was designed so the obvious AI answer is plausible and wrong.
 
 ## The setup
 
@@ -70,6 +70,17 @@ sentence **"the agent claimed X; I checked Y; the claim was right/wrong because 
 No agent handy? Pair up: one of you plays "confident AI", states a diagnosis from the
 manifests alone; the other falsifies it against the cluster.
 
+## Check your work
+
+```bash
+./verify.sh
+```
+
+For every fault namespace that exists it checks the *outcome* (the workload actually
+works: availability, DB readiness, and for fault 4 repeated connection attempts, so a
+half-fixed trap still fails), and that your platform (demo apps, ArgoCD health) survived
+the session.
+
 ## Hints
 
 <details>
@@ -120,17 +131,6 @@ The written-out root causes and canonical repairs live in each fault's spoiler:
 Mechanically: `./restore.sh all` applies every canonical fix; `./restore.sh clean`
 removes the namespaces. (CI runs `solve.sh` = inject everything, restore everything.)
 </details>
-
-## Check your work
-
-```bash
-./verify.sh
-```
-
-For every fault namespace that exists it checks the *outcome* (the workload actually
-works: availability, DB readiness, and for fault 4 repeated connection attempts, so a
-half-fixed trap still fails), and that your platform (demo apps, ArgoCD health) survived
-the session.
 
 ## Explain-back
 

@@ -1,4 +1,4 @@
-# Module 06 (stretch) — Serverless: scale from zero, on your hardware
+# Module 06 (stretch): serverless, scale from zero on your hardware
 
 ## The goal
 
@@ -11,7 +11,7 @@ gone again. You prove it by watching the pod count go 0 → 1 → 0 around a 200
 "Serverless" was never about someone else's servers. It's about *not paying for idle*
 and *not managing replicas*. Knative Serving is the open-source engine behind most
 Kubernetes serverless offerings (including Cloud Run's API): request-driven autoscaling,
-revisioned deploys, scale-to-zero. Running it yourself demystifies the single most
+revisioned deploys, scale-to-zero. Running it yourself demystifies the most
 magic-looking cloud product there is.
 
 ## The task
@@ -27,6 +27,17 @@ magic-looking cloud product there is.
    Watch the first request *create* a pod (cold start: how long did it take?), repeat
    requests hit it warm, and ~60–90s of silence make it disappear.
 4. Run `./verify.sh`.
+
+## Check your work
+
+```bash
+./verify.sh
+```
+
+It checks: the knative-serving app is Healthy (Synced is the happy path; sync is
+advisory) and its deployments are up; ksvc `hello` is Ready; a curl through the Cilium
+ingress returns 200 with the expected body; and, after a quiet period, that the revision
+has scaled to zero pods (this check waits up to ~2 minutes, be patient).
 
 ## Hints
 
@@ -104,17 +115,6 @@ kill %1
 cd "$WORKSHOP/lab/06-serverless" && ./verify.sh
 ```
 </details>
-
-## Check your work
-
-```bash
-./verify.sh
-```
-
-It checks: the knative-serving app is Healthy (Synced is the happy path; sync is advisory) and its deployments are up; ksvc
-`hello` is Ready; a curl through the Cilium ingress returns 200 with
-the expected body; and, after a quiet period, that the revision has scaled to zero pods
-(this check waits up to ~2 minutes, be patient).
 
 ## Explain-back
 

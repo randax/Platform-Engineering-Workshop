@@ -1,4 +1,4 @@
-# Module 07 (stretch) — CI on your terms: build inside the cluster
+# Module 07 (stretch): CI on your terms, build inside the cluster
 
 ## The goal
 
@@ -15,9 +15,9 @@ laptop's cloud.
 ## Why this matters
 
 CI is the last thing teams believe they can self-host ("we need GitHub Actions!").
-But a build is just a pod with elevated filesystem tricks: BuildKit replaced the archived
-Kaniko as the 2026 in-cluster answer, and a registry is a single binary (Zot, CNCF).
-Once *build → push → deploy* closes inside your platform, the loop is fully yours.
+But a build is just a pod with elevated filesystem tricks: BuildKit replaced the
+archived Kaniko as the 2026 in-cluster answer, and a registry is a single binary
+(Zot, CNCF). Once build → push → deploy closes inside your platform, the loop is yours.
 
 ## The task
 
@@ -29,11 +29,10 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
    contains it (it was seeded with the whole workshop repo). Notice the `FROM` line:
    it pulls the base image from *your* Zot, not from Docker Hub. Your platform builds
    FROM your own registry, fully offline.
-3. **Seed the base image**: copy busybox into YOUR registry (host-side, through Zot's
-   ingress hostname). `crane copy` doesn't read your local docker. It's a registry-to-registry
-   copy. Source it from your own image mirror, which already has it from the
-   pre-pull, so this step needs no internet either (Docker Hub is rate-limited at the
-   venue, the whole reason the mirror exists). Which mirror depends on your
+3. **Seed the base image**: copy busybox into YOUR registry, host-side, through Zot's
+   ingress hostname. `crane copy` is a registry-to-registry copy; it never reads your
+   local docker. Source it from your own mirror, which already holds it from the
+   pre-pull, so this step needs no internet either. Which mirror depends on your
    substrate (`cat ~/.cloudbox/substrate`):
 
    ```bash
@@ -52,22 +51,24 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
      "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
    ```
 
-   This works the same on tbx: the mirror speaks plain HTTP, `crane --insecure` tries
-   HTTPS first, gets an immediate non-TLS answer (~10 ms) and falls back to HTTP. Nothing
-   in module 07 needs the internet on either substrate. If `crane` instead sits repeating
-   `net/http: TLS handshake timeout`, the mirror's listener accepted the connection but
-   nothing answered. That is a stalled `tbxd`, not the mirror design: check
+   This works the same on tbx: the mirror speaks plain HTTP, and `crane --insecure`
+   tries HTTPS first, gets an immediate non-TLS answer (~10 ms) and falls back. Nothing
+   in module 07 needs the internet on either substrate. (If the mirror isn't reachable
+   at all, `docker.io/library/busybox:1.37.0` is always a valid source, but then you're
+   online.)
+
+   That's the platform-team move: you decide what base images exist in your cloud.
+
+   <details>
+   <summary>If the copy hangs: no output, no error, just nothing</summary>
+
+   Do not wait it out. `crane` probes HTTPS before HTTP, and a registry that accepts
+   the connection without answering leaves it silently retrying
+   `net/http: TLS handshake timeout`. On tbx that means the mirror's listener accepted
+   but nothing answered: a stalled `tbxd`, not the mirror design. Check
    `curl -m5 http://<gateway>:5055/v2/` and `tbx system status`, and
    `tbx system restart` if the daemon is wedged (randax/talos-box#498 tracks the
-   observability gap).
-
-   If the mirror isn't reachable on any substrate, `docker.io/library/busybox:1.37.0`
-   is always a valid source, but then you're online.
-
-   **If that copy hangs**, no output, no error, just nothing, do not wait it out.
-   `crane` probes HTTPS before HTTP, and a registry that accepts the connection
-   without answering leaves it retrying `net/http: TLS handshake timeout` with
-   nothing on screen. Ctrl-C and give it a deadline, so a bad source fails in
+   observability gap). Ctrl-C and give the copy a deadline, so a bad source fails in
    seconds instead of eating the module:
 
    ```bash
@@ -77,14 +78,24 @@ Once *build → push → deploy* closes inside your platform, the loop is fully 
      pid=$!; ( sleep 45; kill "$pid" 2>/dev/null ) & wait "$pid" ) \
      || echo "the mirror did not answer — use docker.io/library/busybox:1.37.0 as the source instead"
    ```
-
-   That's the platform-team move: you decide what base images exist in your cloud.
+   </details>
 4. Submit a build with [`workflow-run.yaml`](workflow-run.yaml) and follow it to
    `Succeeded`. Then prove the artifact is real: ask Zot's API what's in the registry
    (at `http://zot.cloudbox.k8s.test`, using standard OCI `/v2/` endpoints).
 5. Run the image: deliver [`hello-site.yaml`](hello-site.yaml) via GitOps, then curl the
    page it serves.
 6. Run `./verify.sh`.
+
+## Check your work
+
+```bash
+./verify.sh
+```
+
+It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is
+advisory); Zot's API answering at `http://zot.cloudbox.k8s.test`; at least one
+`build-hello-site-*` workflow **Succeeded**; the `hello-site` image present in Zot's
+catalog; and the hello-site Deployment Available and serving the page.
 
 ## Hints
 
@@ -166,16 +177,6 @@ kill %1
 cd "$WORKSHOP/lab/07-ci" && ./verify.sh
 ```
 </details>
-
-## Check your work
-
-```bash
-./verify.sh
-```
-
-It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is advisory); Zot's API answering at `http://zot.cloudbox.k8s.test`;
-at least one `build-hello-site-*` workflow **Succeeded**; the `hello-site` image present
-in Zot's catalog; and the hello-site Deployment Available and serving the page.
 
 ## Explain-back
 

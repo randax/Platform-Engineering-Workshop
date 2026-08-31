@@ -1,17 +1,17 @@
-# Module 02 — GitOps: your cluster gets a git server and an opinion
+# Module 02: your cluster gets a git server and an opinion
 
 ## The goal
 
-At the end of this module your cluster hosts its own git server (Gitea) and its own
-delivery system (ArgoCD), and **git is the only way anything changes**. You prove it by
-pushing a commit to the in-cluster repo and watching a namespace and a ConfigMap with
-your name in it materialize without you touching `kubectl apply`.
+Your cluster hosts its own git server (Gitea) and its own delivery system (ArgoCD), and
+git is the only way anything changes. You prove it by pushing a commit to the in-cluster
+repo and watching a namespace and a ConfigMap with your name in it materialize without
+you touching `kubectl apply`.
 
 ## Why this matters
 
 This is the architectural heart of the workshop. Everything from here on arrives as a git
 commit that ArgoCD converges: databases, platform APIs, serverless. The git server is
-*inside* the cluster: your platform doesn't depend on GitHub, on the venue WiFi, or on
+*inside* the cluster, so your platform doesn't depend on GitHub, on the venue WiFi, or on
 anyone's SaaS. That's "cloud on your terms" in one design decision. The pattern
 (app-of-apps: one root Application that deploys other Applications) is exactly how real
 platform teams bootstrap clusters.
@@ -45,6 +45,18 @@ platform teams bootstrap clusters.
    else. Wait up to ~5 minutes (or press Refresh→Sync in the UI). What happens, and why?
 
 5. Run `./verify.sh`.
+
+## Check your work
+
+```bash
+./verify.sh
+```
+
+It checks: Gitea answers at `http://gitea.cloudbox.k8s.test` and hosts
+`cloudbox/platform`; ArgoCD answers at `http://argocd.cloudbox.k8s.test`; the root
+`platform` app points at your in-cluster Gitea (not GitHub) and is Healthy (Synced is
+the happy path; sync is advisory); the wave-0 app (storage) is healthy; and your `demo`
+app delivered the `welcome` ConfigMap with a real name in it.
 
 ## Hints
 
@@ -124,19 +136,6 @@ kubectl -n demo get configmap welcome -o yaml
 ```
 </details>
 
-## Check your work
-
-```bash
-./verify.sh
-```
-
-It checks: Gitea answers at `http://gitea.cloudbox.k8s.test` and hosts
-`cloudbox/platform`; ArgoCD answers at `http://argocd.cloudbox.k8s.test`; the root
-`platform` app points at your in-cluster Gitea (not GitHub) and is
-Healthy (Synced is the happy path; sync is advisory); the wave-0 app (storage) is
-healthy; and your `demo`
-app delivered the `welcome` ConfigMap with a real name in it.
-
 ## Explain-back
 
 Tell your neighbor: in step 4 your manual edit was reverted. Walk through *who* reverted
@@ -149,7 +148,7 @@ being in-cluster a sovereignty feature and not just a demo trick?
   catalog (`gitops/catalog/grafana.yaml` plus the `victoria-*` and `otel-collector` items),
   not part of wave 0. You'll switch it on and find Grafana in the capstone (module 09).
 - Delete `gitops/apps/demo.yaml` from the repo and push. The root app-of-apps runs with
-  `prune: false` (it only ever *adds* the child Applications each module enables, and
+  `prune: false` (it only ever *adds* the child Applications each module enables;
   auto-pruning the newest child on a transient/stale sync once tore whole namespaces out
   from under a running lab), so it won't delete the `demo` *Application object* for you.
   Remove it yourself with `kubectl -n argocd delete application demo`. Now look again: the

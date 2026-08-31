@@ -1,34 +1,32 @@
-# Module 09 (capstone) — The picture pipeline: everything, wired together
+# Module 09 (capstone): the picture pipeline, everything wired together
 
 ## The goal
 
-At the end of this module your platform runs an event-driven picture pipeline: you drop a
-photo into the Cloudbox Console's Gallery, and a resizer service *that is not running*
-wakes from zero, makes a thumbnail and a metadata file, and goes back to sleep. You prove
-it three ways: pods appearing in a `-w` watch, the thumbnail landing in the gallery and
-in S3, and, for the flourish, the whole chain as a single trace in Grafana.
+Your platform runs an event-driven picture pipeline: you drop a photo into the Cloudbox
+Console's Gallery, and a resizer service *that is not running* wakes from zero, makes a
+thumbnail and a metadata file, and goes back to sleep. You prove it three ways: pods
+appearing in a `-w` watch, the thumbnail landing in the gallery and in S3, and, for the
+flourish, the whole chain as a single trace in Grafana.
 
 <p align="center">
-  <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console — a component's Monitoring page: CPU/memory sparklines and a live log tail from the OTel stack" width="80%" />
+  <img src="../../docs/screenshots/console-component-monitoring-dark.png" alt="Cloudbox Console: a component's Monitoring page: CPU/memory sparklines and a live log tail from the OTel stack" width="80%" />
 </p>
 
-<p align="center"><em>Look at what you built: the Cloudbox Console surfaces per-component metrics and a live log tail straight from the OTel stack (VictoriaMetrics / VictoriaLogs / VictoriaTraces), the same telemetry that renders your upload as one end-to-end trace in Grafana.</em></p>
+<p align="center"><em>The Cloudbox Console surfaces per-component metrics and a live log tail straight from the OTel stack (VictoriaMetrics / VictoriaLogs / VictoriaTraces), the same telemetry that renders your upload as one end-to-end trace in Grafana.</em></p>
 
-**Prerequisites:** this capstone builds on modules 03 (RustFS), 06 (Knative Serving)
-and 08 (the portal). Have them green, or jump straight here with
-`mise run catch-up 8`.
+**Prerequisites:** modules 03 (RustFS), 06 (Knative Serving) and 08 (the portal). Have
+them green, or jump straight here with `mise run catch-up 8`.
 
 ## Why this matters
 
-This is the capstone because it uses *everything you built today*, at once: GitOps
+This is the capstone because it uses everything you built today, at once: GitOps
 delivers it (02), RustFS stores it (03), Knative scales it from zero (06), the portal
-fronts it (08), and the Victoria stack + OTel Collector, enabled
-on-demand right here, watches it end to end. The one new piece is
-**Knative Eventing**: a Broker and Triggers, the open-source shape of S3 events → SQS →
-Lambda. The uploader doesn't know the resizer exists; it emits a fact
-(`dev.cloudbox.image.uploaded`, as a CloudEvent) and the Broker routes it to whoever
-subscribed. That decoupling is the whole point of event-driven architecture, and today it
-runs on your laptop, readable end to end.
+fronts it (08), and the Victoria stack + OTel Collector, enabled on-demand right here,
+watches it end to end. The one new piece is **Knative Eventing**: a Broker and Triggers,
+the open-source shape of S3 events → SQS → Lambda. The uploader doesn't know the resizer
+exists; it emits a fact (`dev.cloudbox.image.uploaded`, as a CloudEvent) and the Broker
+routes it to whoever subscribed. That decoupling is the whole point of event-driven
+architecture, and today it runs on your laptop, readable end to end.
 
 ## The task
 
@@ -44,8 +42,8 @@ runs on your laptop, readable end to end.
 
    Watch the uploader pod cold-start to receive the file, then the *resizer* appear from
    nowhere to handle the event. Nothing called it. The first upload is the slow one: both
-   services start from zero (image pull + boot), so the thumbnail can take up to ~a minute
-   to land. The gallery shows "original uploaded, waiting for the resizer…" until it does.
+   services start from zero (image pull + boot), so the thumbnail can take up to ~a minute.
+   The gallery shows "original uploaded, waiting for the resizer…" until it lands.
    Count the actors between your browser and that second pod.
 3. **Find the results.** Both views of the same bucket:
    - the Gallery (refresh) shows the thumbnail + its metadata (dimensions, dominant color);
@@ -61,6 +59,18 @@ runs on your laptop, readable end to end.
    portal → uploader → broker → resizer as one waterfall. Hint 5 if the Jaeger trace view is
    new to you.
 6. Run `./verify.sh`.
+
+## Check your work
+
+```bash
+./verify.sh
+```
+
+It checks: both apps Healthy (Synced is the happy path; sync is advisory); the eventing control plane and Broker data plane
+are up; Broker `default` and Trigger `resize-on-upload` are Ready; both ksvcs are Ready;
+bucket `images` exists; and, if anything has been uploaded, that every batch of
+originals has produced at least one matching thumbnail. The upload itself needs a human
+(or `solve.sh`): the machinery is verifiable, the *moment* is yours.
 
 ## Hints
 
@@ -112,7 +122,7 @@ s5cmd --endpoint-url http://s3.cloudbox.k8s.test ls s3://images/thumbs/
 s5cmd --endpoint-url http://s3.cloudbox.k8s.test cat s3://images/meta/<key>.json
 ```
 
-The metadata JSON (dimensions, dominant color) is the resizer's proof of work. The
+The metadata JSON (dimensions, dominant color) is the resizer's proof of work; the
 gallery page renders exactly this file. No S3 client installed? The in-cluster pattern
 from module 03's hint 4 works verbatim (endpoint
 `http://rustfs-svc.rustfs.svc.cluster.local:9000`).
@@ -186,18 +196,6 @@ cd "$WORKSHOP/lab/09-capstone" && ./verify.sh
 (No browser? `solve.sh` uploads a test PNG with plain `curl` through the portal. The
 gallery form is just a multipart POST.)
 </details>
-
-## Check your work
-
-```bash
-./verify.sh
-```
-
-It checks: both apps Healthy (Synced is the happy path; sync is advisory); the eventing control plane and Broker data plane
-are up; Broker `default` and Trigger `resize-on-upload` are Ready; both ksvcs are Ready;
-bucket `images` exists; and, if anything has been uploaded, that every batch of
-originals has produced at least one matching thumbnail. The upload itself needs a human
-(or `solve.sh`): the machinery is verifiable, the *moment* is yours.
 
 ## Explain-back
 
