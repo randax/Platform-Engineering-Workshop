@@ -455,7 +455,15 @@ asserts the same thing on the tbx branch. Fix it by deleting whichever other Loa
 Service took `.200` first (`kubectl get svc -A --field-selector spec.type=LoadBalancer`)
 and re-creating; do not repoint the resolver.
 
-## TRAP — the pinned portal image predates `KNATIVE_DOMAIN`
+## RESOLVED — the pinned portal image predated `KNATIVE_DOMAIN`
+
+**Closed 2026-09-01.** The portal is pinned to `ghcr.io/randax/cloudbox-portal:v0.4.0`
+in both places (`scripts/images.txt`, `gitops/components/portal/portal.yaml`), and the
+running Console now returns the domain Knative actually programs. Checked against a live
+cluster: `http://portal.cloudbox.k8s.test/services` lists
+`hello-demo.kn.cloudbox.k8s.test`, and `kubectl get ksvc` agrees. No `sslip.io` anywhere
+in the response. The account below is kept because the reasoning about not hand-editing
+pins is still the rule.
 
 The Console builds the URL of every function it lists from a domain it now reads
 out of the environment: `KNATIVE_DOMAIN`, defaulted in `apps/portal/config.go:54`
