@@ -10,12 +10,10 @@ repository and the live rollout.
 ## Prerequisites
 
 A stretch module. Needs only the cluster and module 02 (Gitea + ArgoCD and the `demo`
-Application). This lab owns the workload it breaks: the first run of any
-`./inject.sh <n>` seeds `gitops/components/demo/demo-web.yaml` (a plain
-Deployment + Service on the pre-pulled `helloworld-go` image) into your
-`cloudbox/platform` repo and stops; wait for ArgoCD, then run it again to inject the
-fault. Every deploy is a push to `cloudbox/platform:main`; there is no rebuild step.
-`cloudbox/demo-app` is not used here; investigating it is a dead end.
+Application). This lab owns the workload it breaks, `demo-web`, a plain
+Deployment + Service the first `inject.sh` run seeds into your `cloudbox/platform`
+repo. Every deploy is a push to `cloudbox/platform:main`; there is no rebuild step,
+and `cloudbox/demo-app` plays no part here; investigating it is a dead end.
 
 ## Why this matters
 
@@ -36,11 +34,15 @@ says.
 Scenario 3 is awkward on purpose: nothing is visibly broken, and it still has to be
 reverted.
 
+On a fresh lab the first injection is two runs: it seeds the `demo-web` baseline and
+stops so ArgoCD can converge it, then a re-run pushes the bad release. Once the
+baseline exists and is healthy, later scenarios inject on their first run.
+
 ```bash
-./inject.sh 1        # first run: seeds the demo-web baseline, then stops
-./inject.sh 1        # second run (after ArgoCD converges): pushes the bad release
+./inject.sh 1        # fresh lab: seeds the demo-web baseline, then stops
+./inject.sh 1        # re-run (after ArgoCD converges): pushes the bad release
 ./restore.sh 1       # the canonical Git revert / give up gracefully
-./inject.sh 2        # same two-run pattern
+./inject.sh 2        # injects at once; the baseline is already there
 ./restore.sh 2
 ./inject.sh 3
 ./restore.sh 3
@@ -239,192 +241,13 @@ proves why the pull succeeds, from the mirror's own access log. `./restore.sh 3`
 reverts and pushes.
 </details>
 
-## Escalate to the agent: flail first, then diagnose
+## Escalate to the agent
 
-Kagent, the platform's read-only agent, streams its investigation into a "Case file"
-on the demo component's Console page. You run the same fault twice, changing one field
-in between. Work at least one scenario by hand first.
-
-Part 1 runs a real model on your host beside the whole cluster and needs the 32 GB
-"comfortable" spec from module 00. On 16 GB, skip straight to part 2; it costs no
-extra RAM.
-
-<details>
-<summary>Where the RAM numbers come from (measured 2026-08-18)</summary>
-
-On a 32 GB M1 Max (16 GB inside Colima, all 21 apps and 76 pods running),
-`qwen3:1.7b` at this repo's `num_ctx: 16384` costs 3.4 GB (1.4 GiB weights, 1.8 GiB
-KV cache); ten investigations took 31-106 s each. The chart's default `qwen3:4b` at
-`num_ctx: 64000` costs 12 GB (9.0 GiB of it KV cache) and the machine swaps. 16384 is
-a floor: one `k8s_get_events` result on this cluster is ~8.2 k tokens, so 8192
-overflows the moment the agent reads one.
-</details>
-
-### Enable Kagent and point it at your platform
-
-```bash
-git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
-cp gitops/catalog/kagent.yaml gitops/apps/
-git add gitops/apps/kagent.yaml
-git commit -m "enable kagent"
-git push
-```
-
-Wait for `kubectl -n argocd get application kagent` to report `Synced`/`Healthy`.
-`kagent-controller` CrashLoopBackOffs ~3 times on the way there; leave it alone. It
-runs its database migration before `kagent-postgresql` has endpoints and went 1/1
-within ~40-90 s in rehearsal. Still restarting after ~3 minutes? Read the logs.
-
-The ModelConfig defaults to host-side Ollama running `qwen3:1.7b`. The host address is
-already handled for you:
-
-<details>
-<summary>How the Ollama host address is set, verified, and what can still go wrong</summary>
-
-"The host" is `host.docker.internal` on the macOS/WSL2 Docker backend, `10.5.0.1`
-(`TALOS_SUBNET_GATEWAY`) on native-Linux Docker, and the cluster gateway
-`172.30.<n>.1` in a talos-box VM. You do not hand-edit it: `bootstrap-gitops.sh`
-recorded the address in configmap `kagent/cloudbox-host` in module 00, and the
-`kagent-ollama-host` PostSync hook patches the ModelConfig with it (the kagent
-Application `ignoreDifferences` that one field, so selfHeal leaves the patch alone).
-Verify:
-
-```bash
-kubectl -n kagent get modelconfig default-model-config -o jsonpath='{.spec.ollama.host}{"\n"}'
-```
-
-If it is not your host's address, the hook's log says why
-(`kubectl -n kagent logs job/kagent-ollama-host -c render-patch`). The same patch by
-hand:
-
-```bash
-kubectl -n kagent patch modelconfig default-model-config --type merge \
-  -p "{\"spec\":{\"ollama\":{\"host\":\"$(kubectl -n kagent get cm cloudbox-host -o jsonpath='{.data.ollama}')\"}}}"
-```
-
-Ollama must listen on that address, not only loopback. macOS/WSL2 needs nothing
-(those runtimes proxy `host.docker.internal` to the host's loopback; verified under
-Colima 2026-08-17). A plain bridge or VM gateway proxies nothing, so start Ollama as
-`OLLAMA_HOST=0.0.0.0 ollama serve` (or set it in the systemd unit) and confirm from
-inside the cluster:
-
-```bash
-# any pod with a shell will do; the kagent images are distroless, Gitea is not
-kubectl -n gitea exec deploy/gitea -c gitea -- wget -qO- \
-  "http://$(kubectl -n kagent get cm cloudbox-host -o jsonpath='{.data.gateway}'):11434/api/version"
-```
-
-Ollama also needs the model: `ollama list | grep qwen3` (~1.4 GB;
-`ollama pull qwen3:1.7b` if missing).
-</details>
-
-### Part 1: watch the local model flail, and write down how
-
-Inject any scenario (or reuse a live one). In the Console, open the demo component
-and click **Open investigation**. For the first two minutes the component reads
-Rolling out, not Degraded: a Deployment surges, the old version still serves, and the
-console waits for the rollout to stop progressing rather than guess from a ready
-count. Same trap the agent is about to fall into.
-
-Don't grade it on the right answer; it mostly won't get one. A local ≤4B model issues
-tool calls fine and loses the thread when an investigation must carry state across
-several calls. **Write down exactly how it fails**: a loop, a hypothesis with no
-evidence, a malformed follow-up. That sentence is part 1's deliverable.
-
-<details>
-<summary>Calibration: what qwen3:1.7b did across ten rehearsal runs (2026-08-18)</summary>
-
-It calls tools fine, 4 to 26 per run, all real, all answered. The failure is what
-happens to the evidence afterwards:
-
-- breadth instead of depth: one run issued `k8s_get_resources(all_namespaces=true)`
-  nineteen times and never asked the crashing pod for its logs;
-- it narrates the evidence instead of reading it ("this is a Kubernetes event log,
-  here is what each field means") while `demo-web` crashloops;
-- it diagnoses its own tooling: one run concluded a tool call had failed and "the
-  issue is likely localized to your environment";
-- it addresses things that don't exist (a pod name passed as a Deployment, a `demo`
-  pod looked up in `default`), takes `tool error:` back, and carries on.
-
-Roughly one run in ten lands on the real cause (`PORT=8080-canary`). Even then, read
-the verdict carefully: that run also asserted "the Service is configured to use
-8080-canary", which is false. Finding a correct headline with an invented supporting
-fact is worth more than the diagnosis.
-</details>
-
-> **"The investigation didn't complete"** is the model generating without stopping:
-> the stream is cut after 180 s, and a small model handed a large tool result runs
-> past that. The ModelConfig's `num_predict: "1200"` bounds each turn; if you
-> removed it, put it back.
-
-> **The same run from underneath:** `kubectl -n kagent logs deploy/k8s-agent -f`
-> shows both the model request (`POST http://<your host>:11434/api/chat`) and the
-> tool calls (`POST http://kagent-tools.kagent:8084/mcp`).
-
-### Part 2: one `ModelConfig` push to a hosted model
-
-Part 2 is the workshop's one documented exception to the offline rule: it needs the
-network, because small local models can't do multi-step triage. If the network is
-down, part 1 still works on 32 GB machines and the scenario path needs none.
-
-Sign up for a free [OpenCode Zen](https://opencode.ai/auth) key (module 00 prep). If
-the free models are gone, use the fallback below.
-
-Create the Secret imperatively; an API key never goes in Git, and `read -s` keeps it
-out of your shell history:
-
-```bash
-read -rsp 'OpenCode API key: ' OPENCODE_API_KEY; echo
-kubectl create secret generic kagent-zen -n kagent \
-  --from-literal="OPENCODE_API_KEY=$OPENCODE_API_KEY"
-unset OPENCODE_API_KEY
-```
-
-(Paste nothing and `kubectl` creates an empty key that fails later with an opaque
-auth error; check `kubectl -n kagent get secret kagent-zen -o jsonpath='{.data}'` if
-in doubt.)
-
-Then switch the same ModelConfig, via git, to Zen's OpenAI-compatible endpoint. Pick
-a model currently marked free at
-[opencode.ai/docs/zen](https://opencode.ai/docs/zen/) (at the time of writing:
-`deepseek-v4-flash-free`, `mimo-v2.5-free`, `nemotron-3-ultra-free`):
-
-```bash
-# in the same platform clone as above (cd back into it if you left)
-$EDITOR gitops/components/kagent/kagent.yaml   # find `kind: ModelConfig`, replace spec:
-```
-
-```yaml
-spec:
-  provider: OpenAI
-  model: deepseek-v4-flash-free
-  apiKeySecret: kagent-zen
-  apiKeySecretKey: OPENCODE_API_KEY
-  openAI:
-    baseUrl: "https://opencode.ai/zen/v1"
-```
-
-```bash
-git add gitops/components/kagent/kagent.yaml
-git commit -m "kagent: switch part 2 to OpenCode Zen"
-git push
-```
-
-Wait for ArgoCD to converge, then open a new investigation on the same fault. Same
-evidence, same read-only tool server; a model that can hold the thread across tool
-calls should now return a real hypothesis and an explicit kill-test. Verify that
-kill-test against the live cluster yourself, then `git revert` and push.
-
-In rehearsal the one-field push reached the live ModelConfig within 20 s and kagent
-rolled a new `k8s-agent` pod: Git is the write path for the agent's own brain too.
-
-**No Zen key?** Same shape, your own key:
-`kubectl create secret generic kagent-byo -n kagent --from-literal="API_KEY=$YOUR_KEY"`,
-then `apiKeySecret: kagent-byo` / `apiKeySecretKey: API_KEY` and either
-`provider: Anthropic` with a current Claude model and `anthropic: {}`, or
-`provider: OpenAI` with a current GPT model and `openAI: {}`. Neither needs `baseUrl`;
-that field only redirects the generic OpenAI provider to Zen. Reference:
-[kagent supported providers](https://kagent.dev/docs/kagent/supported-providers).
+Kagent, the platform's read-only agent, can run the same investigation and stream it
+into a Case file on the demo component's Console page. Work at least one scenario by
+hand first, then follow [KAGENT.md](KAGENT.md): part 1 watches a small local model
+flail at your fault while you write down how, part 2 switches the same agent to a
+hosted model with one git push and gets a diagnosis worth kill-testing.
 
 ## Explain-back
 
