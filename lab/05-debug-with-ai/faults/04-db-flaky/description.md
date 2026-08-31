@@ -1,12 +1,12 @@
-# Fault 04 — spoiler (the AI trap)
+# Fault 04: spoiler (the AI trap)
 
 **Symptom:** `orders-api` in `faultlab-04` logs `ERROR: connection to inventory-db:5432
-failed` — but only *some* of the time. Roughly every other check succeeds. The postgres
+failed`, but only *some* of the time. Roughly every other check succeeds. The postgres
 pod is Running, Ready, and its logs are clean.
 
 **Root cause:** the `session-cache` Deployment was copy-pasted from the database
 deployment and its pod template still carries the label `app: inventory-db`. The
-`inventory-db` Service selects `app: inventory-db` — so its endpoints contain **two**
+`inventory-db` Service selects `app: inventory-db`, so its endpoints contain **two**
 pods: the real postgres *and* the cache (which is not listening on 5432 at all). Every
 connection that lands on the cache pod is refused. ~50% failure, no unhealthy pod
 anywhere.
@@ -17,14 +17,14 @@ Feed the symptom ("connection to inventory-db:5432 failed, postgres pod is healt
 the *manifests of the client, service, and database* to an LLM and the high-probability
 answers are all plausible and all wrong:
 
-- "The Service port/targetPort doesn't match" — it does.
-- "Postgres isn't ready / crash-looping; add a readinessProbe to the database" — it's
+- "The Service port/targetPort doesn't match." It does.
+- "Postgres isn't ready / crash-looping; add a readinessProbe to the database." It's
   been Ready the whole time, and probing the DB changes nothing.
-- "It's a DNS / NetworkPolicy issue" — fresh off fault 03, doubly tempting. There is no
+- "It's a DNS / NetworkPolicy issue." Fresh off fault 03, doubly tempting. There is no
   policy in this namespace, and drops would time out rather than get refused.
-- "Postgres max_connections exhausted" — it's one client.
+- "Postgres max_connections exhausted." It's one client.
 
-The manifests the operator would *think to share* don't contain the bug — the cache
+The manifests the operator would *think to share* don't contain the bug: the cache
 deployment looks unrelated, so neither humans nor assistants get shown it. Text-level
 reasoning cannot find this fault. Only live state can.
 
@@ -48,7 +48,7 @@ change rolls out cleanly). Alternatives that also work: tighten the Service sele
 `role: database`.
 
 **Lesson:** an agent's (or your own) diagnosis is a *hypothesis*. Before acting: ask
-"what would I observe if this were true — and is that what I observe?" One `kubectl get
+"what would I observe if this were true, and is that what I observe?" One `kubectl get
 endpoints` beats a hundred lines of confident explanation. Selector/label collisions are
 invisible in per-file review; the cluster is the only place they exist.
 

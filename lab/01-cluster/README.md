@@ -205,7 +205,7 @@ randax/talos-box#482. After an in-guest reboot the node shows as `rebooted` in
 
 ```bash
 mise run cluster:create -- --skip-cilium
-kubectl get nodes                # NotReady — no CNI, by your own choice
+kubectl get nodes                # NotReady: no CNI, by your own choice
 
 # Give it a network yourself (hint 3 has the full command with values):
 source scripts/versions.env
@@ -226,7 +226,7 @@ helm upgrade --install cilium --server-side=false \
 kubectl get nodes -w             # NotReady -> Ready, live
 
 # On tbx (cat ~/.cloudbox/substrate) REPLACE the two docker lines above with
-# the tbx ending, then run the post step — the pool and policy the VIP needs:
+# the tbx ending, then run the post step, the pool and policy the VIP needs:
 #   --set ingressController.service.type=LoadBalancer \
 #   --set bpf.hostLegacyRouting=true
 # mise run cluster:create -- --post-cni

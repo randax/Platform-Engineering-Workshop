@@ -50,16 +50,15 @@ From the repository root:
 
 4. **Run the pre-flight gate**: `mise run preflight`. Fix what it flags (most common
    on Docker: Docker not running, or its memory limit below 10 GB). On tbx, run
-   `--check --deep` once before you travel, and at the venue flip
-   `tbx mirror offline on` so a missing image fails loudly instead of being quietly
-   pulled from the internet.
+   `./scripts/install.sh --check --deep` once before you travel, and at the venue flip
+   `tbx mirror offline on`: the mirror then stops fetching upstream, so a missing image
+   shows up as a visibly slow direct pull from the real registry (or a hard failure once
+   there is no WiFi) instead of being quietly patched over.
 
 5. Run `./verify.sh` in this directory.
 
 **Hardware:** 16 GB RAM minimum, 32 GB comfortable, 40 GB free disk. On Docker, ≥10 GB
-and ≥4 CPUs *allocatable to Docker*. Windows via WSL2 (Docker backend only) is our
-least-tested platform; if it fights you, take a lifeboat below instead of burning
-workshop time.
+and ≥4 CPUs *allocatable to Docker*. On Windows, run the Docker backend via WSL2.
 
 ## Backend fine print (tbx)
 

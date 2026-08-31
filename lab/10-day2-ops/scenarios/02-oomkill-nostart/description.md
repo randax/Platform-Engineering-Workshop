@@ -1,7 +1,7 @@
-# Scenario 02 — spoiler
+# Scenario 02: spoiler
 
 **Symptom:** `kubectl -n demo get pods -l app=demo-web` shows the two old pods still
-`1/1 Running` and one new pod stuck at `0/1 ContainerCreating` — for minutes, with
+`1/1 Running` and one new pod stuck at `0/1 ContainerCreating` for minutes, with
 `RESTARTS 0` and no logs at all. `kubectl -n demo rollout status deploy/demo-web` never
 completes. `kubectl -n demo describe pod <new-pod>` repeats one Event every ~12 seconds:
 
@@ -13,15 +13,15 @@ Warning  FailedCreatePodSandBox  kubelet  Failed to create pod sandbox: … runc
 
 **Root cause:** the rightsizing commit set the `web` container's memory request *and*
 limit to `2Mi`. The limit applies to the whole pod cgroup, and the container runtime's
-own `runc init` process has to live inside it before your program is ever executed — at
+own `runc init` process has to live inside it before your program is ever executed. At
 `2Mi` it gets OOM-killed while setting the container up, so no process of yours ever
 starts. Kubelet retries the sandbox forever. Because the *old* ReplicaSet is untouched,
 the Deployment stays `Available` on its two old replicas and the rolling update simply
 stalls: the app keeps serving while the release is stuck.
 
 **Why the commit looks reasonable:** its message says the observed idle RSS was ~2 MiB
-and aligns the request and the limit with it. That is a real number — `helloworld-go`
-really does idle in about that much — and it is exactly the reasoning a rightsizing bot
+and aligns the request and the limit with it. That is a real number; `helloworld-go`
+really does idle in about that much, and it is exactly the reasoning a rightsizing bot
 (or a human reading a memory graph) applies. What the number leaves out is the runtime's
 own overhead and any headroom for serving traffic. Rightsizing to the *observed idle
 floor* is a classic production incident.
@@ -44,8 +44,8 @@ floor* is a classic production incident.
    rightsizing commit, and `git show <sha>` confirms it changed only the `web`
    container's memory request and limit, nothing else.
 
-**Canonical fix:** revert the bad Git commit and push the revert — do not edit the live
-Deployment, because ArgoCD will reconcile it back to Git.
+**Canonical fix:** revert the bad Git commit and push the revert. Do not edit the live
+Deployment; ArgoCD will reconcile it back to Git.
 
 ```bash
 git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git
@@ -79,5 +79,5 @@ runtime starts your container inside.**
 
 **Why `cloudbox/demo-app` is a dead end:** it is only Go SOURCE for module 07's
 in-cluster build (seeded by `scripts/seed-gitea.sh`). Nothing in Kubernetes syncs it
-directly, and it carries no deploy manifests — investigating it will not explain this
+directly, and it carries no deploy manifests; investigating it will not explain this
 symptom.

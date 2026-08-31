@@ -16,16 +16,16 @@ reached.
 | 01 | [Your own cloud: Talos + Cilium](01-cluster/) | 35 min | core | 2 Kubernetes nodes Ready on eBPF networking, with no SSH and no kube-proxy anywhere |
 | 02 | [GitOps: Gitea + ArgoCD](02-gitops/) | 35 min | core | You push a commit to *your cluster's own git server* and watch it materialize |
 | 03 | [Data services: Postgres + S3](03-data/) | 35 min | core | `psql` into a database you provisioned via git; a presigned S3 URL that works |
-| 04 | [Self-service: Crossplane v2](04-self-service/) | 35 min | core | One 10-line YAML claim → database + bucket appear |
-| 05 | [Debug it (with or without AI)](05-debug-with-ai/) | 25 min | core | You found the seeded fault and proved your (or your AI's) diagnosis against live state |
+| 04 | [Self-service: Crossplane v2](04-self-service/) | 35 min | core | A name and a size in YAML → database + bucket appear |
+| 05 | [Debug it (with or without AI)](05-debug-with-ai/) | 25 min | core | You took seeded faults to a proven root cause, checking your (or your AI's) diagnosis against live state |
 | 06 | [Serverless: Knative](06-serverless/) | stretch | self-paced | `curl` cold-starts a pod from zero, then it scales back to zero |
 | 07 | [In-cluster CI: Workflows + BuildKit + Zot](07-ci/) | stretch | demo + self-paced | An image built *inside* your cluster, pushed to *your* registry, running as a pod |
 | 08 | [Portal: the Cloudbox Console](08-portal/) | stretch | self-paced + demo | Create a database through a portal *you can read the source of*, plus a Backstage presenter demo |
 | 09 | [Capstone: the picture pipeline](09-capstone/) | stretch | self-paced finale | Upload a photo → a resizer that didn't exist scales from zero → thumbnail, metadata, and the whole chain as one trace |
-| 10 | [Day-2 operations: roll back a bad release](10-day2-ops/) | stretch | self-paced | You used `git revert`, the only durable fix, to recover the release; kagent can assist the diagnosis |
+| 10 | [Day-2 operations: roll back a bad release](10-day2-ops/) | stretch | self-paced | You found a bad release, proved the diagnosis, and reverted it in git, the only fix that sticks; kagent can assist |
 
 Core = 00–05. Stretch modules are for the fast 20% and for home. The core path never
-depends on them, but they build on each other: 09 needs 06 and 08, 08's main task needs
+depends on them, but they build on each other: 09 needs 03, 06 and 08, 08's main task needs
 04's platform API, and 10 only needs 02.
 
 ## How every module works

@@ -119,19 +119,23 @@ file. No S3 client? Module 03 hint 4's in-cluster pattern works verbatim (endpoi
 
 Two `s5cmd` details `verify.sh` depends on: `ls --show-fullpath` is what prints whole
 keys, and `ls` on an empty prefix exits 1 with `no object found`, which here means
-"the resizer hasn't landed yet", not "broken". The apps themselves use `minio-go`;
-three clients, one API, and RustFS cannot tell them apart.
+"the resizer hasn't landed yet", not "broken". The apps themselves use `minio-go`:
+s5cmd in your terminal, minio-go in the pipeline, one S3 API, and RustFS cannot
+tell them apart.
 </details>
 
 <details>
 <summary>Hint 4: Prove the decoupling (what the explain-back is about)</summary>
 
-Scale the resizer away and upload anyway. Watch the Trigger retry in
-`kubectl -n knative-eventing logs deploy/imc-dispatcher -f`, then let the resizer come
-back and see the event land. Then the uncomfortable question: this Broker is backed by
-an **in-memory** channel. What happens to waiting events if `imc-dispatcher` itself
-restarts? (That's why production brokers ride on Kafka, and why this one deliberately
-doesn't; it's a lab.)
+The uploader never waits for the resizer: it logs the Broker's `202 Accepted` and is
+done, and the resizer's cold start happens after that (both visible in your `-w`
+watch). Now the uncomfortable question: this Broker is backed by an **in-memory**
+channel. A delivery the resizer answers with a non-2xx is retried, up to ~10
+attempts, but the events themselves live in the dispatcher's memory. Restart the
+middleman (`kubectl -n knative-eventing rollout restart deploy/imc-dispatcher`) and
+upload during the roll: an accepted event can vanish for good, with no error anywhere, and
+the fix is what you'd do in the gallery anyway, upload again. That's why production
+brokers ride on Kafka, and why this one deliberately doesn't; it's a lab.
 </details>
 
 <details>
@@ -167,7 +171,7 @@ git add . && git commit -m "module 09: eventing + picture pipeline" && git push
 kubectl -n pipeline get broker,trigger,ksvc          # wait for Ready True across the board
 
 kubectl -n pipeline get pods -w &                    # the watcher
-# → http://portal.cloudbox.k8s.test/gallery — upload a photo, watch 0 → 1 → 0 twice
+# open http://portal.cloudbox.k8s.test/gallery, upload a photo, watch 0 → 1 → 0 twice
 kill %1
 
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1

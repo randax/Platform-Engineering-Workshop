@@ -108,8 +108,8 @@ kubectl -n demo run s3 --rm -i --restart=Never \
     echo "hello from my own cloud" > /tmp/hello.txt
     /s5cmd --endpoint-url $EP cp /tmp/hello.txt s3://app-assets/hello.txt
     # mb/cp talk to the cluster; the presign is signed for the address YOUR
-    # browser uses. Signing is local maths over the URL and the key — no call
-    # is made to it — so the two can differ, and here they must.
+    # browser uses. Signing is local maths over the URL and the key; no call
+    # is made to it. So the two can differ, and here they must.
     /s5cmd --endpoint-url http://s3.cloudbox.k8s.test presign --expire 1h s3://app-assets/hello.txt'
 ```
 

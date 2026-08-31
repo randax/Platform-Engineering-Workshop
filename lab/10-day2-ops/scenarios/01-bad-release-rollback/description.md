@@ -1,10 +1,10 @@
-# Scenario 01 — spoiler
+# Scenario 01: spoiler
 
 **Symptom:** the new `demo-web` ReplicaSet never becomes Ready. Its pods repeatedly
 restart with `CrashLoopBackOff`, while pods from the previous ReplicaSet can remain up.
 
 **Root cause:** the release commit changed the `PORT` environment value from a valid
-port to `8080-canary`. The deployed image (`ghcr.io/knative/helloworld-go` — the same
+port to `8080-canary`. The deployed image (`ghcr.io/knative/helloworld-go`, the same
 pre-pulled image module 06's `hello-ksvc.yaml` uses) reads `PORT` and starts with
 `log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))`. Go's `net.Listen`
 rejects `:8080-canary` as an address, `log.Fatal` exits the process, and every new
@@ -31,8 +31,8 @@ becomes false with reason `ProgressDeadlineExceeded`.
    reveals the suspicious release commit; `git show <sha>` proves it changed only `PORT`
    in `gitops/components/demo/demo-web.yaml`.
 
-**Canonical fix:** revert the bad Git commit and push the revert — do not edit the live
-Deployment, because ArgoCD will reconcile it back to Git.
+**Canonical fix:** revert the bad Git commit and push the revert. Do not edit the live
+Deployment; ArgoCD will reconcile it back to Git.
 
 ```bash
 git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git
@@ -45,11 +45,11 @@ git push
 Or run `./restore.sh 1`, which performs that same forward `git revert` workflow.
 
 **Verify the fix:** `./verify.sh` requires a clean `gitops/components/demo/demo-web.yaml`
-(matching this module's own baseline byte-for-byte — not just "no poison substring") and
+(matching this module's own baseline byte-for-byte, not just "no poison substring") and
 a completed, stable `demo-web` rollout. The replacement pods must be healthy with no
 `CrashLoopBackOff` or accumulating restart count.
 
 **Why `cloudbox/demo-app` is a dead end:** it is only Go SOURCE for module 07's
 in-cluster build (seeded by `scripts/seed-gitea.sh`). Nothing in Kubernetes syncs it
-directly, and it carries no deploy manifests — investigating it will not explain this
+directly, and it carries no deploy manifests; investigating it will not explain this
 symptom.

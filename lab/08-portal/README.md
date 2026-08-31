@@ -74,7 +74,12 @@ Roughly one small Go file per page plus HTML templates, all in
 ./verify.sh
 ```
 
-Green once the portal answers and `console-db` is a real, Ready database.
+Green once the portal app is Healthy in ArgoCD, its Deployment and ServiceAccount
+exist, and the console answers over HTTP. `console-db` is the star task: verify names
+it when missing and fails only if it exists without becoming Ready. That lenience is
+deliberate, per principle 8 in [docs/PRINCIPLES.md](../../docs/PRINCIPLES.md)
+(checkpoint understanding, not completion): creating it through the form is a human
+moment, and `solve.sh` still creates it so CI regression-tests the check.
 
 ## Hints
 
@@ -133,8 +138,9 @@ cp "$WORKSHOP/lab/08-portal/portal-access.yaml" gitops/components/demo/
 git add . && git commit -m "module 08: enable the cloudbox console + grant it demo access" && git push
 
 kubectl -n portal rollout status deploy/portal --timeout=300s
-open http://portal.cloudbox.k8s.test   # explore, then: Databases → New database
-                                       # name: console-db, size: small → Create
+# in your browser: http://portal.cloudbox.k8s.test
+#   explore, then: Databases → New database
+#   name: console-db, size: small → Create
 
 kubectl -n demo get workshopdatabase console-db -w    # until SYNCED + READY
 kubectl -n demo get cluster console-db-pg             # the real database behind the form
@@ -160,7 +166,9 @@ scaffolder templates. A portal is a product decision, not a default.
 > *Presenter notes:* the CNOE image is amd64-only, so on Apple Silicon the demo
 > cluster must be the Docker backend (`CLOUDBOX_SUBSTRATE=docker`); tbx VMs emulate
 > nothing. Pre-enable `backstage.yaml` before the module; first boot is slow (~2 GB
-> image + CNPG database). Show guest sign-in at `http://backstage.cloudbox.k8s.test`,
+> image + CNPG database). The shipped config registers no template
+> (`catalog.locations` is empty): seed the template repo and register it in
+> `gitops/components/backstage/backstage.yaml` first, per the comment in that file. Show guest sign-in at `http://backstage.cloudbox.k8s.test`,
 > run the template, chase it through Gitea and ArgoCD. `backstage.yaml` stays in the
 > catalog for home.
 
