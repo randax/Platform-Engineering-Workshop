@@ -294,8 +294,13 @@ if have tbx && [[ "${CLOUDBOX_IGNORE_TBX:-}" != "1" ]]; then
   tbx_absent=0
   tbx_cluster_absent "${CLUSTER_NAME}" || tbx_absent=$?
   if [[ "${tbx_absent}" -eq 1 ]]; then
-    fail "A '${CLUSTER_NAME}' cluster already exists on the tbx substrate — its VMs are running."
-    die "Tear it down first: CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh"
+    # Same caveat as substrate/docker.sh: this proves tbx has a RECORD of the
+    # cluster, not that anything is running. An interrupted teardown leaves one.
+    fail "tbx still has a '${CLUSTER_NAME}' cluster recorded (its VMs may or may not be running)."
+    warn "Tear it down first:  CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh"
+    warn "If that fails because tbx is half-installed or its helper is gone, the record is"
+    warn "stale: remove it with 'tbx cluster destroy ${CLUSTER_NAME} --force', or skip tbx"
+    die  "entirely with CLOUDBOX_IGNORE_TBX=1 (persist it in mise.local.toml)."
   elif [[ "${tbx_absent}" -eq 2 ]] && tbx_local_evidence "${CLUSTER_NAME}"; then
     fail "tbx is installed but cannot be inspected, so whether a '${CLUSTER_NAME}' cluster"
     fail "already exists on the tbx substrate is unknown:"

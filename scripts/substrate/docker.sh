@@ -58,10 +58,17 @@ substrate_preflight() {
     local absent=0
     tbx_cluster_absent "${CLUSTER_NAME}" || absent=$?
     if [[ "${absent}" -eq 1 ]]; then
-      fail "A '${CLUSTER_NAME}' cluster already exists on the tbx substrate — its VMs are running."
+      # tbx_cluster_absent returns 1 when `tbx status` merely EXITS 0, which means
+      # tbx still has a record of the cluster. That record survives a teardown
+      # that was interrupted, so it does not prove any VM is running, and this
+      # message used to claim it did.
+      fail "tbx still has a '${CLUSTER_NAME}' cluster recorded (its VMs may or may not be running)."
       warn "Creating a docker cluster of the same name would leave two, with one talosconfig"
       warn "context between them and a destroy that can only find one."
-      die "Destroy it first: CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh"
+      warn "Destroy it first:  CLOUDBOX_SUBSTRATE=tbx ./scripts/destroy-cluster.sh"
+      warn "If that fails because tbx is half-installed or its helper is gone, the record is"
+      warn "stale: remove it with 'tbx cluster destroy ${CLUSTER_NAME} --force', or skip tbx"
+      die  "entirely with CLOUDBOX_IGNORE_TBX=1 (persist it in mise.local.toml)."
     elif [[ "${absent}" -eq 2 ]]; then
       # "Cannot inspect" is the state of a HALF-INSTALLED tbx: the binary is on
       # PATH (brew put it there) and tbxd has never run. That is the single most
