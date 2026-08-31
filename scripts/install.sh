@@ -380,6 +380,36 @@ else
   df_target="${HOME}"
   [[ -n "${docker_root}" && -d "${docker_root}" ]] && df_target="${docker_root}"
   check_free_disk "${df_target}"
+
+  # The VM disk CAP (Docker Desktop's DiskSizeMiB, .wslconfig) is invisible to
+  # every host-side df — the check above grades the host filesystem while the
+  # engine's images live inside a Docker.raw that may be far smaller. Rehearsal
+  # 9 (#227): a clean 32 GiB cap filled to 84% by module 05, kubelet's imagefs
+  # eviction tainted both nodes, and preflight had said all green. Measure the
+  # disk the ENGINE sees, from inside a running workshop container (an overlay
+  # / is backed by it); the mirror container is the one reliably up after init.
+  if docker ps -q --filter "name=^/${MIRROR_NAME}$" 2>/dev/null | grep -q .; then
+    docker_disk_line="$(docker exec "${MIRROR_NAME}" df -Pk / 2>/dev/null | awk 'NR==2 {print $2" "$5}')"
+    if [[ -n "${docker_disk_line}" ]]; then
+      docker_disk_kb="${docker_disk_line%% *}"
+      docker_disk_pct="${docker_disk_line##* }"; docker_disk_pct="${docker_disk_pct%\%}"
+      docker_disk_gb=$(( docker_disk_kb / 1024 / 1024 ))
+      if [[ "${docker_disk_gb}" -ge "${MIN_DOCKER_DISK_GB}" ]]; then
+        ok "Disk allocatable to Docker: ${docker_disk_gb} GB (need >= ${MIN_DOCKER_DISK_GB} GB)"
+      else
+        check_fail "Disk allocatable to Docker: ${docker_disk_gb} GB — need >= ${MIN_DOCKER_DISK_GB} GB. A 32 GB cap fills and kills the cluster around module 05 (#227)."
+        info "  Docker Desktop: Settings -> Resources -> Disk usage limit. WSL2: .wslconfig [wsl2] defaults are fine; check any custom cap."
+      fi
+      if [[ "${docker_disk_pct}" =~ ^[0-9]+$ && "${docker_disk_pct}" -ge 75 ]]; then
+        warn "Docker's disk is already ${docker_disk_pct}% full. The workshop needs ~8 GB of mirror plus"
+        warn "each node's own image copies; 'docker system prune' reclaims space other projects left."
+      fi
+    else
+      info "  (could not read the engine's disk from ${MIRROR_NAME}; VM disk-cap check skipped)"
+    fi
+  else
+    info "  (the VM disk cap is measured through the ${MIRROR_NAME} container — after 'mise run init', re-run preflight to grade it)"
+  fi
 fi
 
 # --- Host ports --------------------------------------------------------------------
