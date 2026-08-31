@@ -7,11 +7,6 @@ Your cluster builds its own container images: an Argo Workflow runs BuildKit
 in-cluster Gitea, pushes it to your in-cluster Zot registry, and a Deployment runs it.
 Git, build, registry, deploy: all on your laptop's cloud.
 
-> **Honesty note:** rootless BuildKit on Talos is pioneer territory (nobody has
-> published this combo). It has passed our rehearsals, but it is the path most
-> sensitive to machine and runtime differences: a presenter demo first, self-paced
-> lab second. If it fights you, watch the demo, file the scars, move on.
-
 ## Why this matters
 
 CI is the last thing teams believe they can self-host, but a build is just a pod with
