@@ -147,7 +147,7 @@ If the room is running late, this slide can be read in twenty seconds — it is 
 
 <div class="grid grid-cols-2 gap-3 mt-4">
   <div class="principle"><div class="ico"><span class="svgi i-target"></span></div><div class="name">Try before you open a hint</div><div class="tie">the labs give outcomes on purpose; a wrong guess teaches more than a right paste</div></div>
-  <div class="principle"><div class="ico"><span class="svgi i-fast-forward"></span></div><div class="name">Falling behind is designed for</div><div class="tie"><code>catch-up.sh &lt;n&gt;</code> is not failure, it is the safety net</div></div>
+  <div class="principle"><div class="ico"><span class="svgi i-fast-forward"></span></div><div class="name">Falling behind is designed for</div><div class="tie"><code>mise run catch-up &lt;n&gt;</code> is not failure, it is the safety net</div></div>
   <div class="principle"><div class="ico"><span class="svgi i-book-open"></span></div><div class="name">Explain it to your neighbour</div><div class="tie">a fix you cannot explain is not finished</div></div>
   <div class="principle"><div class="ico"><span class="svgi i-puzzle"></span></div><div class="name">Ask "why this, not that?"</div><div class="tie">every pick here beat a rejected alternative — make us defend them</div></div>
   <div class="principle col-span-2"><div class="ico"><span class="svgi i-sparkles"></span></div><div class="name">Don't just hand it to your AI companion</div><div class="tie">agents are welcome all day, as a <strong>tutor, not a chauffeur</strong> — a lab your agent solved is a lab you didn't learn, and you can't take that home</div></div>

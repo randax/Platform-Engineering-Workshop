@@ -45,7 +45,7 @@ Every timebox here is a soft target — we walk the solution when the timer ends
   <div class="principle"><div class="ico"><span class="svgi i-target"></span></div><div class="name">Outcome, not steps</div><div class="tie">the README says <em>reach state X</em></div></div>
   <div class="principle"><div class="ico"><span class="svgi i-layers"></span></div><div class="name">Layered hints</div><div class="tie">free, collapsible — last one is the answer</div></div>
   <div class="principle"><div class="ico"><span class="svgi i-check" style="color:var(--jz-run)"></span></div><div class="name"><code>./verify.sh</code></div><div class="tie">checks your live cluster → green = done</div></div>
-  <div class="principle"><div class="ico"><span class="svgi i-fast-forward"></span></div><div class="name"><code>catch-up.sh &lt;n&gt;</code></div><div class="tie">jump to any module's end-state</div></div>
+  <div class="principle"><div class="ico"><span class="svgi i-fast-forward"></span></div><div class="name"><code>mise run catch-up &lt;n&gt;</code></div><div class="tie">jump to any module's end-state</div></div>
 </div>
 
 <!--

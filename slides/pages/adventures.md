@@ -30,7 +30,7 @@ Say where help lives, honestly: the briefings are self-service by design — two
 </div>
 
 <div v-click class="mt-4 text-lg opacity-85 text-center">
-<code>adventures/</code> in the repo · <strong>take door 0 unless you already know which door you want</strong> · behind? <code>catch-up.sh &lt;module&gt;</code> teleports you<br>
+<code>adventures/</code> in the repo · <strong>take door 0 unless you already know which door you want</strong> · behind? <code>mise run catch-up &lt;module&gt;</code> teleports you<br>
 <span class="text-sm opacity-75">briefings are self-service — read your door's "Known traps" first · projector demos ~3:20 in-cluster build · ~3:35 Backstage, both optional<br>hard stop 10 min before the end — we close together</span>
 </div>
 

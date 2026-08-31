@@ -108,7 +108,7 @@ The sentence to land: "The complete outcome of today isn't 'you learned Kubernet
 # Take it home
 
 - Everything is public, pinned, Apache-2.0
-- `catch-up.sh <module>` — resume from anywhere
+- `mise run catch-up <module>` — resume from anywhere
 - Didn't finish your door? It's all still there
 - Your adventure briefing keeps going — `adventures/` was written for the couch
 - `git tag javazone-2026` = today, forever

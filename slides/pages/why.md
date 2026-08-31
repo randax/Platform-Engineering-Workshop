@@ -45,14 +45,20 @@ The tagline to plant: "Today, you are Bruktby's platform team. Your job for the 
 
 # Three bills came due
 
-<div class="grid grid-cols-1 gap-3 mt-2">
-  <div v-click class="story"><span class="tag">PRICE</span> &nbsp;Every listing photo is stored, then re-served on every browse. Storage + egress became Bruktby's biggest line item — and the renewal email wanted more.</div>
-  <div v-click class="story"><span class="tag">JURISDICTION</span> &nbsp;A big B2B partner asked one question: <em>can you prove our users' data never leaves Norway?</em> Post-Schrems II, "EU region" wasn't an answer.</div>
-  <div v-click class="story"><span class="tag">ROADMAP</span> &nbsp;The object store they built on had its open-source edition <strong>discontinued</strong> out from under them. The floor moved. (You'll meet this one for real in module 03.)</div>
+<div class="grid grid-cols-3 gap-3 mt-5">
+  <div v-click class="principle"><div class="ico"><span class="svgi i-receipt"></span></div>
+    <div class="name">Price</div>
+    <div class="tie">Every photo stored, then re-served on every browse. Storage and egress became the biggest line item, and the renewal email wanted more.</div></div>
+  <div v-click class="principle"><div class="ico"><span class="svgi i-lock"></span></div>
+    <div class="name">Jurisdiction</div>
+    <div class="tie">A B2B partner asked one question: <em>can you prove our users' data never leaves Norway?</em> Post-Schrems II, "EU region" was not an answer.</div></div>
+  <div v-click class="principle"><div class="ico"><span class="svgi i-triangle-alert"></span></div>
+    <div class="name">Roadmap</div>
+    <div class="tie">The object store's open-source edition was <strong>discontinued</strong> under them. The floor moved. You meet this one for real in module 03.</div></div>
 </div>
 
 <div v-click class="mt-6 text-xl opacity-80">
-Price. Jurisdiction. Roadmap. None hypothetical — all three hit Bruktby, and none of them were theirs to control.
+All three hit Bruktby. None of them were theirs to control.
 </div>
 
 <!--
