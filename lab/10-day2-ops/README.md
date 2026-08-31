@@ -420,7 +420,6 @@ kill-test against the live cluster yourself, then `git revert` and push.
 
 In rehearsal the one-field push reached the live ModelConfig within 20 s and kagent
 rolled a new `k8s-agent` pod: Git is the write path for the agent's own brain too.
-(Rehearsed without a Zen key, by switching between two local Ollama models.)
 
 **No Zen key?** Same shape, your own key:
 `kubectl create secret generic kagent-byo -n kagent --from-literal="API_KEY=$YOUR_KEY"`,
