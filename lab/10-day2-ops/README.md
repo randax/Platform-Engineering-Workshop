@@ -353,16 +353,13 @@ fact is worth more than the diagnosis.
 </details>
 
 > **"The investigation didn't complete"** is the model generating without stopping:
-> `kagent-controller` 0.9.12 cuts the A2A stream at a hardcoded 180 s, and a small
-> model handed a large tool result runs past it (single turns over 9,000 tokens). The
-> ModelConfig's `num_predict: "1200"` bounds each turn; if you removed it, put it
-> back.
+> the stream is cut after 180 s, and a small model handed a large tool result runs
+> past that. The ModelConfig's `num_predict: "1200"` bounds each turn; if you
+> removed it, put it back.
 
 > **The same run from underneath:** `kubectl -n kagent logs deploy/k8s-agent -f`
 > shows both the model request (`POST http://<your host>:11434/api/chat`) and the
-> tool calls (`POST http://kagent-tools.kagent:8084/mcp`). A portal image older than
-> cloudbox-portal v0.2.1 cannot read kagent 0.9.12's frames and wrongly reports an
-> unrecognized format.
+> tool calls (`POST http://kagent-tools.kagent:8084/mcp`).
 
 ### Part 2: one `ModelConfig` push to a hosted model
 
