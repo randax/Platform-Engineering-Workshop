@@ -2,38 +2,35 @@
 
 ## The goal
 
-At the end of this module your cluster builds its own container images: an Argo Workflow
-runs BuildKit (rootless) *inside* the cluster, builds the tiny app in [`app/`](app/) from
-your in-cluster Gitea, pushes it to your in-cluster Zot registry, and a Deployment runs
-it. Zero external services touched: git, build, registry, deploy all happen on your
-laptop's cloud.
+Your cluster builds its own container images: an Argo Workflow runs BuildKit
+(rootless) *inside* the cluster, builds the tiny app in [`app/`](app/) from your
+in-cluster Gitea, pushes it to your in-cluster Zot registry, and a Deployment runs it.
+Git, build, registry, deploy: all on your laptop's cloud.
 
-> **Honesty note:** this is the least-rehearsed path in the workshop (rootless BuildKit
-> on Talos is pioneer territory: nobody has published this combo). It's a presenter demo
-> first, self-paced lab second. If it fights you, watch the demo, file the scars, move on.
+> **Honesty note:** this is the least-rehearsed path in the workshop (rootless
+> BuildKit on Talos is pioneer territory: nobody has published this combo). It's a
+> presenter demo first, self-paced lab second. If it fights you, watch the demo, file
+> the scars, move on.
 
 ## Why this matters
 
-CI is the last thing teams believe they can self-host ("we need GitHub Actions!").
-But a build is just a pod with elevated filesystem tricks: BuildKit replaced the
-archived Kaniko as the 2026 in-cluster answer, and a registry is a single binary
-(Zot, CNCF). Once build → push → deploy closes inside your platform, the loop is yours.
+CI is the last thing teams believe they can self-host, but a build is just a pod with
+elevated filesystem tricks: BuildKit replaced the archived Kaniko as the 2026
+in-cluster answer, and a registry is a single binary (Zot, CNCF). Once
+build → push → deploy closes inside your platform, the loop is yours.
 
 ## The task
 
 1. Enable **two** catalog apps: `zot.yaml` (registry, NodePort 30500) and
    `argo-workflows.yaml` (workflow engine + the `build-and-push` WorkflowTemplate in
-   ns `builds`, a namespace labeled PSA-privileged because rootless BuildKit needs an
-   unconfined seccomp profile; find that label and understand why it's there).
-2. Look at [`app/`](app/): a Dockerfile and one HTML file. Your Gitea repo already
-   contains it (it was seeded with the whole workshop repo). Notice the `FROM` line:
-   it pulls the base image from *your* Zot, not from Docker Hub. Your platform builds
-   FROM your own registry, fully offline.
-3. **Seed the base image**: copy busybox into YOUR registry, host-side, through Zot's
-   ingress hostname. `crane copy` is a registry-to-registry copy; it never reads your
-   local docker. Source it from your own mirror, which already holds it from the
-   pre-pull, so this step needs no internet either. Which mirror depends on your
-   substrate (`cat ~/.cloudbox/substrate`):
+   ns `builds`, PSA-privileged because rootless BuildKit needs an unconfined seccomp
+   profile; find that label).
+2. Look at [`app/`](app/): a Dockerfile and one HTML file, already seeded into your
+   Gitea repo. The `FROM` line pulls from *your* Zot, not Docker Hub.
+3. **Seed the base image**: copy busybox into your registry through Zot's ingress
+   hostname. `crane copy` copies registry-to-registry from your own mirror (already
+   warm from the pre-pull), so no internet is needed. Which mirror depends on your
+   cluster backend (`cat ~/.cloudbox/substrate`):
 
    ```bash
    MIRROR=localhost:5001                 # docker / kind: the cloudbox-mirror container
@@ -51,25 +48,19 @@ archived Kaniko as the 2026 in-cluster answer, and a registry is a single binary
      "${MIRROR}/library/busybox:1.37.0" zot.cloudbox.k8s.test/library/busybox:1.37.0
    ```
 
-   This works the same on tbx: the mirror speaks plain HTTP, and `crane --insecure`
-   tries HTTPS first, gets an immediate non-TLS answer (~10 ms) and falls back. Nothing
-   in module 07 needs the internet on either backend. (If the mirror isn't reachable
-   at all, `docker.io/library/busybox:1.37.0` is always a valid source, but then you're
-   online.)
-
+   The mirror speaks plain HTTP; `crane --insecure` probes HTTPS, gets an immediate
+   non-TLS answer, and falls back. (If the mirror is unreachable,
+   `docker.io/library/busybox:1.37.0` works as a source, but then you're online.)
    That's the platform-team move: you decide what base images exist in your cloud.
 
    <details>
    <summary>If the copy hangs: no output, no error, just nothing</summary>
 
-   Do not wait it out. `crane` probes HTTPS before HTTP, and a registry that accepts
-   the connection without answering leaves it silently retrying
-   `net/http: TLS handshake timeout`. On tbx that means the mirror's listener accepted
-   but nothing answered: a stalled `tbxd`, not the mirror design. Check
-   `curl -m5 http://<gateway>:5055/v2/` and `tbx system status`, and
-   `tbx system restart` if the daemon is wedged (randax/talos-box#498 tracks the
-   observability gap). Ctrl-C and give the copy a deadline, so a bad source fails in
-   seconds instead of eating the module:
+   Don't wait it out. A registry that accepts the connection without answering leaves
+   `crane` silently retrying `net/http: TLS handshake timeout`. On tbx that means a
+   stalled `tbxd`: check `curl -m5 http://<gateway>:5055/v2/` and `tbx system status`,
+   then `tbx system restart` if the daemon is wedged (randax/talos-box#498). Ctrl-C
+   and give the copy a deadline so a bad source fails in seconds:
 
    ```bash
    # same copy, but it gives up instead of hanging (issue #215)
@@ -80,10 +71,11 @@ archived Kaniko as the 2026 in-cluster answer, and a registry is a single binary
    ```
    </details>
 4. Submit a build with [`workflow-run.yaml`](workflow-run.yaml) and follow it to
-   `Succeeded`. Then prove the artifact is real: ask Zot's API what's in the registry
-   (at `http://zot.cloudbox.k8s.test`, using standard OCI `/v2/` endpoints).
-5. Run the image: deliver [`hello-site.yaml`](hello-site.yaml) via GitOps, then curl the
-   page it serves.
+   `Succeeded`. Then prove the artifact is real: ask Zot's API
+   (`http://zot.cloudbox.k8s.test`, standard OCI `/v2/` endpoints) what's in the
+   registry.
+5. Run the image: deliver [`hello-site.yaml`](hello-site.yaml) via GitOps, then curl
+   the page it serves.
 6. Run `./verify.sh`.
 
 ## Check your work
@@ -91,11 +83,6 @@ archived Kaniko as the 2026 in-cluster answer, and a registry is a single binary
 ```bash
 ./verify.sh
 ```
-
-It checks: zot and argo-workflows apps Healthy (Synced is the happy path; sync is
-advisory); Zot's API answering at `http://zot.cloudbox.k8s.test`; at least one
-`build-hello-site-*` workflow **Succeeded**; the `hello-site` image present in Zot's
-catalog; and the hello-site Deployment Available and serving the page.
 
 ## Hints
 
@@ -110,36 +97,33 @@ kubectl -n builds get pods
 kubectl -n builds logs <pod> -f
 ```
 
-If it fails immediately with a parameter error, the template's inputs may differ. Read
-them: `kubectl -n builds get workflowtemplate build-and-push -o yaml | head -40`.
+A parameter error on submit means the template's inputs differ; read them:
+`kubectl -n builds get workflowtemplate build-and-push -o yaml | head -40`.
 
-If the *build step* fails resolving `zot.zot.svc.cluster.local:5000/library/busybox`:
-did you seed the base image (task step 3)? Check with
+If the *build step* fails resolving `zot.zot.svc.cluster.local:5000/library/busybox`,
+you skipped seeding (task step 3). Check with
 `curl -s http://zot.cloudbox.k8s.test/v2/library/busybox/tags/list`.
 </details>
 
 <details>
 <summary>Hint 2: Interrogating Zot</summary>
 
-Zot speaks the plain OCI registry API:
+Zot speaks the plain OCI registry API, and has a small web UI at
+`http://zot.cloudbox.k8s.test`:
 
 ```bash
 curl -s http://zot.cloudbox.k8s.test/v2/_catalog | jq .
 curl -s http://zot.cloudbox.k8s.test/v2/hello-site/tags/list | jq .
 ```
-
-Zot also has a small web UI at `http://zot.cloudbox.k8s.test`.
 </details>
 
 <details>
 <summary>Hint 3: The deployment can't pull the image?</summary>
 
-Mind the two vantage points: the *build* pushed to `zot.zot.svc.cluster.local:5000`
-(cluster DNS, which pods can resolve), but the *node* pulls via NodePort 30500
-(node-side),
-where cluster DNS doesn't exist. *You* reach Zot at `http://zot.cloudbox.k8s.test`.
-If the pull fails: first confirm the image exists in Zot
-(hint 2), then `kubectl -n demo describe pod` and read the exact pull error.
+Three views of one registry: the *build* pushed to `zot.zot.svc.cluster.local:5000`
+(cluster DNS), the *node* pulls via NodePort 30500 (no cluster DNS there), *you* browse
+`http://zot.cloudbox.k8s.test`. If the pull fails: confirm the image exists (hint 2),
+then `kubectl -n demo describe pod` and read the exact pull error.
 </details>
 
 <details>
@@ -180,16 +164,14 @@ cd "$WORKSHOP/lab/07-ci" && ./verify.sh
 
 ## Explain-back
 
-Tell your neighbor: list every network hop in your pipeline (git clone from ? → build
-runs where? → push to ? → kubelet pulls from ?). How many of those left your laptop?
-That's the sovereignty argument in one answer.
+List every network hop in your pipeline (clone from? build where? push to? pull
+from?). How many left your laptop? That's the sovereignty argument in one answer.
 
 ## Going deeper
 
-- **Rebuild `:v1` and watch nothing happen.** Change `app/index.html` and push it to
-  Gitea, because the build clones from there and not from your laptop. Submit the same
-  workflow again so it pushes `hello-site:v1` a second time, then refresh the page. Nothing
-  changed. Now ask Zot:
+- **Rebuild `:v1` and watch nothing happen.** Change `app/index.html`, push to Gitea
+  (the build clones from there, not your laptop), submit the same workflow again,
+  refresh the page. Nothing changed. Now compare:
 
   ```bash
   curl -sI http://zot.cloudbox.k8s.test/v2/hello-site/manifests/v1 \
@@ -198,18 +180,13 @@ That's the sovereignty argument in one answer.
     -o jsonpath='{.items[0].status.containerStatuses[0].imageID}'
   ```
 
-  New digest, same tag, and the node still runs the old bytes. Kubernetes defaults a
-  non-`:latest` tag to `IfNotPresent`, so an unchanged tag means it never looks again. A tag
-  is a lie you tell yourself. A digest is a fact. Module 08's Redeploy mints a fresh tag for
-  this reason, and module 10 pins digests for it.
-
-- Change `index.html` (v2!), push to Gitea, build `:v2`, and roll `hello-site` to it via
-  git. You've reinvented a release pipeline. How would you trigger the build on push?
-  (Gitea has webhooks; Argo has Events. At-home project.)
-- Inspect the build pod's securityContext while a build runs. What does
-  `--oci-worker-no-process-sandbox` trade away, and why did the `builds` namespace need
-  the PSA `privileged` label on a Talos cluster?
-- Point the module-06 ksvc at the node-side NodePort 30500 image-pull address. The
-  *node* pulls via that NodePort; *you* reach Zot at `http://zot.cloudbox.k8s.test` (the cluster's Knative
-  config already skips tag-resolution for the Zot registry names; find that setting in
-  `config-deployment`).
+  New digest, same tag, old bytes still running: a non-`:latest` tag defaults to
+  `IfNotPresent`, so the node never looks again. A tag is a lie you tell yourself; a
+  digest is a fact. Module 08's Redeploy mints a fresh tag for this reason, and module
+  10 pins digests for it.
+- Build `:v2` and roll `hello-site` to it via git: you've reinvented a release
+  pipeline. How would you trigger the build on push? (Gitea has webhooks; Argo has
+  Events.)
+- Inspect the build pod's securityContext mid-build. What does
+  `--oci-worker-no-process-sandbox` trade away, and why did `builds` need the PSA
+  `privileged` label on Talos?

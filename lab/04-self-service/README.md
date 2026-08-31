@@ -2,45 +2,42 @@
 
 ## The goal
 
-At the end of this module your platform exposes its own API: a developer writes a 10-line
-`WorkshopDatabase` resource and gets a Postgres cluster *and* an S3 bucket, provisioned,
-wired, and lifecycle-managed. You prove it by pushing exactly such a 10-liner and running
+Your platform exposes its own API: a developer writes a 10-line `WorkshopDatabase`
+resource and gets a Postgres cluster *and* an S3 bucket, provisioned, wired, and
+lifecycle-managed. You prove it by pushing exactly such a 10-liner and running
 `./verify.sh`.
 
 ## Why this matters
 
-Module 03 made *you* capable of provisioning databases. Your developers shouldn't need to
-know CNPG, storage classes, or RustFS endpoints. Platform engineering is building the
-abstraction: you define an API (`WorkshopDatabase`) and an implementation (a Crossplane
-Composition), developers consume the API. That is what `aws rds create-db-instance` is,
-except you own both sides now.
+Module 03 made *you* capable of provisioning databases; your developers shouldn't need
+to know CNPG, storage classes, or RustFS endpoints. You define an API
+(`WorkshopDatabase`) and an implementation (a Crossplane Composition); developers
+consume the API. That is what `aws rds create-db-instance` is, except you own both
+sides now.
 
 ⚠️ **A word about training data (yours and your AI's):** this is Crossplane **v2**.
-Claims are gone: you create namespaced XRs directly. Compositions are pipeline-mode only
-and emit *plain Kubernetes resources* (a CNPG `Cluster`, a `Job`) directly, no
-provider-kubernetes wrapping. Most tutorials online, and most LLM answers, still describe
-v1. If you see `kind: Claim`, `claimNames`, or `resources:` at the top level of a
-Composition, you're reading the past. If your assistant proposes any of those, paste it
-the XRD and Composition from this repo as context and ask it to stay within v2 semantics.
+Claims are gone (you create namespaced XRs directly), and Compositions are
+pipeline-mode only, emitting plain Kubernetes resources. Most tutorials and most LLM
+answers still describe v1. If you or your assistant produce `kind: Claim`,
+`claimNames`, or top-level `resources:` in a Composition, that's the past; paste this
+repo's XRD and Composition as context and ask for v2 semantics.
 
 ## The task
 
-1. Enable `crossplane.yaml` from the catalog (this installs Crossplane v2, the
-   patch-and-transform function, and RBAC allowing it to manage CNPG clusters and Jobs).
+1. Enable `crossplane.yaml` from the catalog (Crossplane v2, the patch-and-transform
+   function, and RBAC to manage CNPG clusters and Jobs).
 
-2. **Ship your platform API.** This lab dir contains the two halves under
-   [`platform/`](platform/):
-   - [`xrd.yaml`](platform/xrd.yaml): *what* developers may ask for (read the schema!)
-   - [`composition.yaml`](platform/composition.yaml): *how* it's implemented
-
-   Deliver them via your repo as a new component + Application (template:
-   [`platform-api-app.yaml`](platform-api-app.yaml)). Confirm the XRD becomes
+2. **Ship your platform API.** [`platform/`](platform/) has both halves:
+   [`xrd.yaml`](platform/xrd.yaml) is *what* developers may ask for (read the
+   schema!), [`composition.yaml`](platform/composition.yaml) is *how*. Deliver them
+   as a new component + Application (template:
+   [`platform-api-app.yaml`](platform-api-app.yaml)) until the XRD reports
    `ESTABLISHED`.
 
-3. **Be the developer.** Push [`examples/my-database.yaml`](examples/my-database.yaml)
-   into your demo component. Then watch the stack unfold: the XR, the composed CNPG
-   cluster (`my-db-pg`), its pods, and the bucket Job. How does Crossplane report the
-   whole tree?
+3. **Be the developer.** Push
+   [`examples/my-database.yaml`](examples/my-database.yaml) into your demo component
+   and watch the stack unfold: the XR, the composed CNPG cluster `my-db-pg`, its
+   pods, the bucket Job.
 
 4. Run `./verify.sh`.
 
@@ -49,12 +46,6 @@ the XRD and Composition from this repo as context and ask it to stay within v2 s
 ```bash
 ./verify.sh
 ```
-
-It checks: the crossplane and platform-api apps are Healthy (Synced is the happy path;
-sync is advisory); the `function-patch-and-transform` Function is installed and healthy;
-the XRD is Established; the Composition exists; `my-db` is Synced *and* Ready; the
-composed CNPG cluster `my-db-pg` is healthy; and the `my-db-assets` bucket really exists
-in RustFS.
 
 ## Hints
 
@@ -132,56 +123,38 @@ cd "$WORKSHOP/lab/04-self-service" && ./verify.sh
 
 ## Explain-back
 
-Tell your neighbor: your teammate asks "why not just give developers the CNPG YAML from
-module 03? It was only 30 lines." Give the two strongest answers you have. (Think:
-what can you change later without touching developers? what can developers *not* do
-through this API?)
+A teammate asks: "why not just give developers the CNPG YAML from module 03? It was
+only 30 lines." Give your two strongest answers.
 
-## One rule the schema cannot enforce for you
+## One rule the schema cannot enforce
 
-Module 08's `Application` XR composes a Knative Service whose URL is
-`<name>-<namespace>.kn.cloudbox.k8s.test`: **name and namespace share one DNS label**, so
-together they must fit in 63 characters, and a hyphen in the *namespace* makes the split
-ambiguous (`web-api` in `team` and `web` in `api-team` compose the same hostname).
-
-The XRD caps `metadata.name` at 40, and that is as far as a schema can go. A CRD
-validation rule cannot check the pair: CEL rules see only `metadata.name` and
-`metadata.generateName`, so `self.metadata.namespace` is not readable. (Crossplane also
-copies `x-kubernetes-validations` only from the XRD's `spec` and `status` sub-schemas; a
-root-level rule never reaches the generated CRD.) The Console enforces the pair in code
-and refuses hyphens in project names; `kubectl apply` of a hand-written XR does not.
-Keep namespaces short and hyphen-free. See [docs/HAZARDS.md](../../docs/HAZARDS.md).
+Module 08's `Application` XR composes a Knative Service whose URL puts name and
+namespace in one DNS label (`<name>-<namespace>.kn.cloudbox.k8s.test`): together they
+must fit in 63 characters, and a hyphen in the *namespace* makes the split ambiguous.
+The XRD caps `metadata.name` at 40, and that is as far as a schema can go: a CEL
+validation rule cannot read `metadata.namespace`. The Console enforces the pair in
+code; `kubectl apply` of a hand-written XR does not. Keep namespaces short and
+hyphen-free. Details in [docs/HAZARDS.md](../../docs/HAZARDS.md).
 
 ## Going further: the golden path
 
-This lab ships one more example you have not used: `examples/my-application.yaml`, an
-`Application` XR that composes a workload, a database and a bucket from a single
-manifest. That is the shape [Nav's nais.yaml](https://nais.io) has at national scale, and
-it is the warm-up for **adventure door 1** (`adventures/1-app-dev.md`), which starts
-exactly there. Deploy it now if you are ahead, or leave it for the doors. Either way, it
-answers "what would this look like if my whole app were one file?".
+One example remains unused: `examples/my-application.yaml`, an `Application` XR that
+composes a workload, a database and a bucket from a single manifest. That is the shape
+[Nav's nais.yaml](https://nais.io) has at national scale, and adventure door 1
+(`adventures/1-app-dev.md`) starts exactly there.
 
 ## Going deeper
 
-- **Upgrade Postgres by changing one line.** Do this on a throwaway database. Never
-  `my-db`, never one holding data you want. Create it at `version: "17"`, wait for it, then
-  change that line to `"18"` and push. CNPG starts an in-place major upgrade behind your own
-  API. Watch the `<name>-pg-1-major-upgrade` Job and read its logs. Prove the result with
+- **Upgrade Postgres by changing one line** (on a throwaway database, never `my-db`):
+  create it at `version: "17"`, change the line to `"18"`, push. CNPG runs an in-place
+  major upgrade behind your own API; watch the `<name>-pg-1-major-upgrade` Job, then
+  prove it with
   `kubectl -n demo exec <cluster>-1 -c postgres -- psql -U postgres -tAc "select version()"`.
-  If the Job fails, the cluster sits in `Upgrading Postgres major version` until you either
-  set the version back or delete the XR and start over. That failure is worth as much as the
-  success. Provisioning a database on day 1 is the easy half. Changing one on day 2, through
-  the same API a developer already knows, is what people are paying for. All four images are
-  pre-pulled, so this works offline. Delete the extra database when you are done, because a
-  laptop only has so much RAM.
-
-- Edit `my-database.yaml` to `size: medium` (or `large`) via git. Watch the **one knob**
-  ripple: the CNPG cluster gains replicas (2, then 3, HA) and storage, all from one word.
-  Then try `size: xlarge`. Where does the rejection come from? That's your API's T-shirt
-  enum doing policy. The developer never sees a CNPG field; the platform team owns what a
-  size *means* in the Composition. That's the facade (PRD-0006).
-- Delete `my-database.yaml` from the repo and push. Watch Crossplane tear down the whole
-  composed stack (prune → XR deleted → composed resources garbage-collected). Re-add it.
-- Add a `status` field: patch the composed cluster's readiness or connection Service name
-  back onto the XR (`ToCompositeFieldPath` patches) so developers can `kubectl get wdb`
-  and see where to connect.
+  If the Job fails, the cluster waits until you set the version back or delete the XR.
+  Day-2 changes through the API a developer already knows are what people pay for.
+  Delete the extra database when done.
+- Change `size: medium` via git and watch one knob ripple into replicas and storage.
+  Then try `size: xlarge`: where does the rejection come from? The T-shirt enum is your
+  policy layer (PRD-0006).
+- Delete `my-database.yaml` from the repo and push: the whole composed stack is
+  garbage-collected. Re-add it.

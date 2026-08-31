@@ -1,14 +1,12 @@
 # Labs: Cloud on Your Terms
 
-You are going to build a small but real cloud platform on your own laptop: an immutable
+You are going to build a small but real cloud platform on your laptop: an immutable
 Kubernetes OS, eBPF networking, GitOps delivery, database- and storage-as-a-service,
 a self-service platform API, and, if you're fast, serverless, in-cluster CI, a developer
-portal, and an event-driven picture pipeline that ties it all together. Everything keeps
-working when you leave the building. That's the point.
-
-From module 08 on, the platform shows its own progress: the Cloudbox Console's
-**Workshop** page at http://portal.cloudbox.k8s.test/workshop is a live dashboard of
-which modules your cluster has reached.
+portal, and an event-driven picture pipeline. Everything keeps working when you leave
+the building. That's the point. From module 08 on, the Cloudbox Console's Workshop page
+at http://portal.cloudbox.k8s.test/workshop shows live which modules your cluster has
+reached.
 
 ## Module overview
 
@@ -28,54 +26,38 @@ which modules your cluster has reached.
 
 Core = 00–05. Stretch modules are for the fast 20% and for home. The core path never
 depends on them, but they build on each other: 09 needs 06 and 08, 08's star task needs
-04's platform API, and 10 only needs 02. `mise run catch-up <module>` bridges any gap.
+04's platform API, and 10 only needs 02.
 
 ## How every module works
 
-Each module directory contains:
-
-- **`README.md`** states the *outcome*, not the steps: what must be true at the end and
-  roughly where to look. It does not hand you 12 commands to paste.
-- **Layered hints** in collapsed `<details>` blocks escalate from a guiding question to
-  the exact command. Open as many as you need; nobody is counting. The last block is
-  always the full solution. Using it is fine, *understanding* it is required.
-- **`verify.sh`** is the contract. Run it from the module directory at any time:
-
-  ```bash
-  ./verify.sh
-  ```
-
-  It runs many small checks against your *running cluster* (never against your files),
-  prints ✅ per passing check and `❌ FAIL: <what's wrong and where to look>` per failing
-  one, and exits 0 only when the module's outcome is fully true. Green verify = module done.
-- **`solve.sh`** is the full solution, runnable end-to-end. It exists for CI regression
-  against `verify.sh` (issue #10), and for you if you want to fast-forward.
-
-Fallen behind? `mise run catch-up <module>` force-pushes that module's canonical
-end-state to your in-cluster Gitea and lets ArgoCD converge (see [`solutions/`](../solutions/)).
+- **`README.md`** states the outcome: what must be true at the end, and roughly where
+  to look. Not 12 commands to paste.
+- **Hints** in collapsed `<details>` blocks escalate from a guiding question to the
+  exact command. Open as many as you need; nobody is counting. The last one is always
+  the full solution. Using it is fine, understanding it is required.
+- **`verify.sh`** is the contract. Run it from the module directory at any time. It
+  checks your *running cluster*, never your files, prints ✅ per pass and
+  `❌ FAIL: <what and where>` per failure, and exits 0 only when the outcome is true.
+  Green verify = module done.
+- **`solve.sh`** is the full solution, runnable end-to-end.
+- **Explain-back**: two minutes at the end of each module, tell your neighbor why it
+  works (each README suggests a prompt). A fix you can't explain isn't done yet.
+- Fallen behind? `mise run catch-up <module>` force-pushes that module's canonical
+  end-state to your in-cluster Gitea and lets ArgoCD converge
+  (see [`solutions/`](../solutions/)).
 
 ## AI assistants are welcome
 
-Claude Code, Copilot, kubectl-ai, anything you like, in every module. We designed for it.
-The goal was never "typed the commands yourself"; it is a running platform **plus** your
-ability to explain it. Two house rules:
-
-1. `verify.sh` and the explain-back are the finish line, not the last command.
-2. When an assistant tells you something about *your* cluster, check it against the
-   cluster before acting on it. Module 05 exists to make that instinct permanent.
-
-## Explain-backs
-
-At the end of each module: two minutes, tell your neighbor **why** it works (each README
-suggests a prompt). An AI-generated fix you can't explain isn't done yet.
+Claude Code, Copilot, kubectl-ai, anything you like, in every module. We designed for
+it. The finish line is a green `verify.sh` plus the explain-back, not the last command.
+And when an assistant tells you something about *your* cluster, check it against the
+cluster before acting on it. Module 05 exists to make that instinct permanent.
 
 ## Getting help in the room
 
-- 🟩 **Green sticky note** on your screen: "I'm fine / done".
-- 🟥 **Red/pink sticky note**: "stuck, please come by". Keep working on something else
-  while you wait (next hint layer, or a neighbor). One of the two presenters sweeps the
-  room during labs, so a red waits a few minutes. Still beats hand-raising.
-- Pair freely. If your laptop fails pre-flight, pair up or use the devcontainer/Codespaces
-  lifeboat (see [module 00](00-setup/)).
+- Green sticky note on your screen means "I'm fine". Red means "stuck, please come by";
+  keep working on a hint layer or with a neighbor while a presenter sweeps over.
+- Pair freely. If your laptop fails pre-flight, pair up or use the
+  devcontainer/Codespaces lifeboat ([module 00](00-setup/)).
 - When the room drifts apart, the presenter walks the solution on screen to re-sync.
   That's normal, not falling behind.

@@ -6,30 +6,25 @@
 
 ## The goal
 
-By the end of this module your laptop is provably ready for the whole workshop: all tools
-installed, Docker with enough resources, and every container image already on your machine.
-Proof: `mise run preflight` all green and this module's `./verify.sh` exiting 0.
-
-Nothing in this workshop downloads images at runtime, so everything has to be on your
-machine before the session starts. That is also platform-engineering lesson #1: a platform you
-can't stand up without the internet is someone else's platform. Do this module **at home
-before the workshop** if you can. The room's first 15 minutes are the safety net, not the plan.
+Your laptop provably ready for the whole workshop: tools installed, every container
+image already on your machine, `mise run preflight` all green. Nothing downloads images
+at runtime, and that is platform-engineering lesson #1: a platform you can't stand up
+without the internet is someone else's platform. Do this module **at home before the
+workshop**; the room's first 15 minutes are the safety net, not the plan.
 
 ## The task
 
 From the repository root:
 
-1. **Pick your cluster backend**: what your Talos nodes run on. Two choices. Real VMs
-   with real LoadBalancer addresses via [talos-box](https://github.com/randax/talos-box),
-   on Apple Silicon Macs and Linux with KVM. Or Docker containers, for everyone else
-   (Windows/WSL2, Codespaces, or any machine `tbx doctor` is unhappy with). Same
-   workshop either way. The scripts pick for you; force it with
-   `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`). Substrate is the scripts' name for the
-   cluster backend; you'll see it in script output too.
+1. **Pick your cluster backend**: what your Talos nodes run on. Real VMs via
+   [talos-box](https://github.com/randax/talos-box) on Apple Silicon Macs and Linux
+   with KVM; Docker containers for everyone else (Windows/WSL2, Codespaces, or any
+   machine `tbx doctor` is unhappy with). Same workshop either way. The scripts pick
+   for you; force it with `CLOUDBOX_SUBSTRATE=docker` (or `=tbx`). Substrate is the
+   scripts' name for the cluster backend.
 
-   The `tbx` binary comes with the tool chain in step 2, pinned in `mise.toml` like
-   everything else. The one thing you add by hand is the one-time privileged helper
-   that does the VM and network wiring:
+   The `tbx` binary comes with the tool chain in step 2. You add one privileged,
+   one-time helper for the VM and network wiring:
 
    ```bash
    ./scripts/dev-setup.sh          # step 2, installs tbx among the rest
@@ -39,77 +34,67 @@ From the repository root:
    ```
 
    Skip the helper and nothing breaks: `tbx doctor` fails and the scripts put you on
-   the Docker backend. **On tbx you do not need Docker at all**: the VMs pull every
-   image through talos-box's own mirror, which `cloudbox-init.sh` fills with
-   `tbx cache warm`. On the Docker backend the mirror is a container, so Docker must
-   run. tbx details that only hit some setups (Linux helper install, QEMU fallback,
+   the Docker backend. On tbx you do not need Docker at all; on the Docker backend
+   Docker must run. Setup-specific tbx details (Linux helper install, QEMU fallback,
    Ollama, Backstage) live under [Backend fine print](#backend-fine-print-tbx) below.
 
-2. **Install the tool chain**: `./scripts/dev-setup.sh` (uses
-   [mise](https://mise.jdx.dev/) with pinned versions, nothing floats). It ends by
-   offering to hook mise into your shell. **Say yes**: that puts the tools on your PATH
-   *and* points `KUBECONFIG` at a workshop-only file, `~/.kube/cloudbox.conf`, while you
-   are in this repo. Open a new terminal afterwards.
+2. **Install the tool chain**: `./scripts/dev-setup.sh` (pinned versions via
+   [mise](https://mise.jdx.dev/), nothing floats). When it offers to hook mise into
+   your shell, **say yes**: that puts the tools on your PATH and points `KUBECONFIG`
+   at a workshop-only file, `~/.kube/cloudbox.conf`, while you are in this repo. Open
+   a new terminal afterwards.
 
-3. **Pre-pull the workshop images**: `mise run init` (`scripts/cloudbox-init.sh`). On tbx
-   they land in talos-box's own mirror store (`tbx cache warm`); on Talos-in-Docker in a
-   local registry container, `cloudbox-mirror`, on port 5001. This is the slow step. Do
-   it on good WiFi.
+3. **Pre-pull the workshop images**: `mise run init`. On tbx they land in talos-box's
+   own mirror store; on Docker in a local registry container, `cloudbox-mirror`, on
+   port 5001. This is the slow step. Do it on good WiFi.
 
-4. **Run the pre-flight gate**: `mise run preflight`. It checks *everything*, including
-   the images from step 3, which is why it goes last. Fix what it flags (most common on
-   Docker: Docker not running, or its memory limit below 10 GB). On tbx, run
-   `--check --deep` once before you travel (it rehashes every cached blob), and at the
-   venue flip `tbx mirror offline on` so tbx's mirror stops fetching from upstream. A
-   missing image then shows up as a mirror miss (and, because the nodes keep
-   `skipFallback: false`, as a slow direct pull you will notice) rather than being
-   quietly filled over the conference WiFi.
+4. **Run the pre-flight gate**: `mise run preflight`. Fix what it flags (most common
+   on Docker: Docker not running, or its memory limit below 10 GB). On tbx, run
+   `--check --deep` once before you travel, and at the venue flip
+   `tbx mirror offline on` so a missing image fails loudly instead of being quietly
+   pulled over conference WiFi.
 
 5. Run `./verify.sh` in this directory.
 
-**Hardware reality check:** 16 GB RAM is the absolute minimum on both backends, 32 GB is
-comfortable, and you need 40 GB free disk (the image caches are most of it). On Docker you
-also need ≥10 GB and ≥4 CPUs *allocatable to Docker*. macOS and Linux are fully supported;
-Windows works via WSL2 (Docker backend only) but is our least-tested platform. If it
-fights you, use a lifeboat below rather than burning workshop time.
+**Hardware:** 16 GB RAM minimum, 32 GB comfortable, 40 GB free disk. On Docker, ≥10 GB
+and ≥4 CPUs *allocatable to Docker*. Windows via WSL2 (Docker backend only) is our
+least-tested platform; if it fights you, take a lifeboat below instead of burning
+workshop time.
 
 ## Backend fine print (tbx)
 
 <details>
 <summary>Linux: the helper installs from source, not via mise</summary>
 
-mise ships only the three binaries; the helper is a systemd unit set (units, sysusers,
-polkit rule) that talos-box's docs/linux.md installs from a source checkout. Check out
-the tag pinned as `TBX_VERSION` in `scripts/versions.env` so daemon and helper match the
-pinned client, and do not run `tbx system install` there (it is the macOS launchd
-installer). On either OS, never `sudo tbx …`: sudo's PATH can pick a different tbx than
-yours.
+mise ships only the three binaries; the helper is a systemd unit set that talos-box's
+docs/linux.md installs from a source checkout. Check out the tag pinned as
+`TBX_VERSION` in `scripts/versions.env` so daemon and helper match the client, and do
+not run `tbx system install` (macOS-only installer). On either OS, never `sudo tbx …`:
+sudo's PATH can pick a different tbx than yours.
 </details>
 
 <details>
 <summary>macOS: Virtualization.framework acts up on your machine</summary>
 
-tbx runs its VMs on Virtualization.framework by default. If that framework misbehaves,
-`brew install qemu` (macOS 15+) and create with `CLOUDBOX_TBX_HYPERVISOR=qemu` instead.
-The root README has the details, including why an existing cluster must be destroyed
-to switch.
+`brew install qemu` (macOS 15+) and create with `CLOUDBOX_TBX_HYPERVISOR=qemu`. The
+root README has the details, including why an existing cluster must be destroyed to
+switch.
 </details>
 
 <details>
 <summary>Planning module 10? Let Ollama listen on more than loopback</summary>
 
-On tbx the cluster reaches your laptop at `172.30.<n>.1`, and Ollama's default
-`127.0.0.1:11434` bind refuses that. `launchctl setenv OLLAMA_HOST 0.0.0.0` (then quit
-and reopen Ollama.app), or `OLLAMA_HOST=0.0.0.0 ollama serve`. `cloudbox-init.sh` warns
-you if it is still loopback-only.
+On tbx the cluster reaches your laptop at `172.30.<n>.1`, which Ollama's default
+`127.0.0.1:11434` bind refuses. `launchctl setenv OLLAMA_HOST 0.0.0.0` (then quit and
+reopen Ollama.app), or `OLLAMA_HOST=0.0.0.0 ollama serve`. `cloudbox-init.sh` warns if
+it is still loopback-only.
 </details>
 
 <details>
 <summary>Backstage (one catalog extra) does not run on tbx+arm64</summary>
 
-Backstage's CNOE image is amd64-only and a tbx VM emulates nothing, so that stretch item
-needs `CLOUDBOX_SUBSTRATE=docker`; `install.sh --check` says so. Nothing on the core
-path is affected.
+Backstage's CNOE image is amd64-only and a tbx VM emulates nothing; that stretch item
+needs `CLOUDBOX_SUBSTRATE=docker`. Nothing on the core path is affected.
 </details>
 
 ## If something misbehaves
@@ -117,15 +102,12 @@ path is affected.
 <details>
 <summary>Windows/WSL2: workshop URLs don't resolve, or stopped resolving overnight</summary>
 
-The workshop serves everything on `*.cloudbox.k8s.test`. `create-cluster.sh` adds those
-names to WSL's `/etc/hosts` for you, but your *Windows* browser reads
-`C:\Windows\System32\drivers\etc\hosts`. Paste the same lines there, as Administrator.
-Print them with `./scripts/install.sh --print-hosts`.
+Your *Windows* browser reads `C:\Windows\System32\drivers\etc\hosts`, not WSL's
+`/etc/hosts`. Print the needed lines with `./scripts/install.sh --print-hosts` and
+paste them there as Administrator.
 
-And WSL2 throws that block away on every restart: WSL regenerates `/etc/hosts` from the
-Windows hosts file at boot (`generateHosts` defaults to true), so a block written
-yesterday is simply gone this morning. The containers are still running, and every
-workshop URL stops resolving. Either turn the regeneration off once:
+WSL2 also regenerates `/etc/hosts` from the Windows file on every restart, deleting
+the block. Either turn that off once:
 
 ```ini
 # /etc/wsl.conf   (then, from Windows: wsl --shutdown)
@@ -134,75 +116,63 @@ generateHosts = false
 ```
 
 or re-run `./scripts/install.sh --write-hosts` after each restart. `install.sh --check`
-says which of the two you are in.
+says which state you are in.
 </details>
 
 <details>
 <summary>Declined the sudo password during create-cluster.sh?</summary>
 
-Nothing is lost: the hosts block is written at the very *end* of `create-cluster.sh`,
-after the cluster is up and healthy, and a refusal only costs you the hostnames. Run
-`./scripts/install.sh --write-hosts` when you are ready. Do **not** re-run
-`create-cluster.sh`, which will refuse to create over the cluster you already have.
+The hosts block is written at the very end, after the cluster is healthy, so a refusal
+only costs you the hostnames. Run `./scripts/install.sh --write-hosts` when ready. Do
+**not** re-run `create-cluster.sh`; it refuses to create over an existing cluster.
 </details>
 
 <details>
 <summary><code>tbx doctor</code> fails right after <code>tbx system install</code></summary>
 
-Give it a minute and run it again. The helper needs a moment to write
-`/etc/resolver/k8s.test` and settle its network wiring, and doctor run in the same
-breath as the install reports `FAIL resolver` and `FAIL forwarding` for state that is
-already on its way. In one rehearsal `sysctl` showed forwarding was *already* `1` while
-doctor still called it `0`. Two clean runs a minute apart is the real signal.
+The helper needs a minute to write `/etc/resolver/k8s.test` and settle its network
+wiring; run in the same breath as the install, doctor reports `FAIL resolver` and
+`FAIL forwarding` for state that is already on its way. Two clean runs a minute apart
+is the real signal.
 </details>
 
 <details>
 <summary>Everything hangs with no error, on a machine where <code>curl</code> works</summary>
 
-Check for a per-app outbound firewall (Little Snitch and friends). It prompts per
-binary, so `curl` can be allowed while `git` is not. A blocked `git` does not fail, it
-waits forever against `gitea.cloudbox.k8s.test` with no message at all. Approve `git`
-(and `helm`, `kubectl`, `talosctl`) once, or run the workshop with the firewall in
-silent-allow mode.
+A per-app outbound firewall (Little Snitch and friends) prompts per binary, so `curl`
+can be allowed while `git` is not; a blocked `git` waits forever with no message.
+Approve `git`, `helm`, `kubectl`, `talosctl` once, or use silent-allow mode.
 </details>
 
 <details>
 <summary>"tbx is installed but cannot be inspected"</summary>
 
-That is a half-installed talos-box: the binary is on your PATH but its helper daemon has
-never run (`tbx system install` not done on macOS / the systemd helper not set up on
-Linux, or the service is down). On the Docker backend the create continues by itself
-when this machine has never made a tbx cluster; there is nothing it could collide with.
-If you *have* used tbx here before, it stops instead, because two clusters called
-`cloudbox` is a mess you would meet an hour later. Either fix tbx (`tbx doctor`), or, if
-you know its VMs are not running, re-run with `CLOUDBOX_IGNORE_TBX=1 mise run cluster:create`.
+Half-installed talos-box: the binary is on PATH but its helper daemon has never run,
+or is down. If this machine has never made a tbx cluster, the Docker-backend create
+continues by itself. If it has, it stops (two clusters named `cloudbox` collide).
+Either fix tbx (`tbx doctor`) or, if you know its VMs are not running, re-run with
+`CLOUDBOX_IGNORE_TBX=1 mise run cluster:create`.
 </details>
 
 ## Optional: sign up for OpenCode Zen (module 10 prep)
 
-Module 10 (stretch) has a second beat that swaps a flailing local AI model for a free
-hosted one. Grab the key now while you have good WiFi: it takes two minutes and nothing
-else depends on it. Sign in at [opencode.ai/auth](https://opencode.ai/auth) and copy
-your API key somewhere safe. Signing up currently asks for billing details; the models
-module 10 uses are free, but don't be surprised by the form. You'll paste the key into a
-Kubernetes Secret when you get to module 10, never into git.
-
-Skip this if you're not sure you'll reach module 10. It ships a documented fallback for
-any personal Claude or OpenAI key, and its free tier is explicitly time-limited anyway.
+Module 10 (stretch) swaps a flailing local AI model for a free hosted one. Sign in at
+[opencode.ai/auth](https://opencode.ai/auth) now while you have good WiFi and save
+your API key; the signup form asks for billing details, but the models module 10 uses
+are free. The key goes into a Kubernetes Secret in module 10, never into git. Skip
+this if you won't reach module 10; it documents a fallback for any personal Claude or
+OpenAI key.
 
 ## If your laptop says no: the lifeboats
 
-- **Pair up.** The workshop is fully doable as a pair on one machine. Arguably better:
-  you'll talk through more. Red sticky note up, and we'll match you.
-- **Devcontainer / GitHub Codespaces.** The repo ships a `.devcontainer/` that runs the
-  same content in Codespaces or any devcontainer-capable editor. Same labs, same scripts,
-  someone else's hardware. Open the repo in Codespaces and start from step 2.
-  **One difference:** your browser is not on the machine running the cluster, and the
-  platform's ingress routes by hostname, so a forwarded port-80 preview 404s. Open
-  services from the **Ports tab**, which forwards a NodePort each (Gitea, ArgoCD, the
-  Console…). In the codespace's own terminal the hostnames work normally, so every
-  `verify.sh` behaves exactly as it does on a laptop. See the README's Plan B section
-  for the full table.
+- **Pair up.** Fully doable as a pair on one machine, and you'll talk through more.
+  Red sticky note up and we'll match you.
+- **Devcontainer / GitHub Codespaces.** The repo's `.devcontainer/` runs the same
+  labs and scripts on someone else's hardware; start from step 2. One difference:
+  your browser is not on the machine running the cluster, and the ingress routes by
+  hostname, so open services from the **Ports tab** (a forwarded NodePort each)
+  instead of a port-80 preview. In the codespace's own terminal every `verify.sh`
+  behaves exactly as on a laptop. The root README's Plan B section has the full table.
 
 ## Check your work
 
@@ -210,53 +180,40 @@ any personal Claude or OpenAI key, and its free tier is explicitly time-limited 
 ./verify.sh
 ```
 
-It checks: on Docker, the daemon up and with ≥10 GB memory and the `cloudbox-mirror`
-registry answering on port 5001; on tbx, host memory/CPUs, `tbx doctor` and the cached
-Talos disk image (Docker is not needed); on both, free disk, each required CLI present
-(`talosctl`, `kubectl`, `helm`, `cilium`, `jq`, `git`, `curl`) and `install.sh --check`
-passing.
-
 ## Hints
 
 <details>
 <summary>Hint 1: Docker has "enough memory installed" but the check still fails?</summary>
 
-Docker Desktop (macOS/Windows) and WSL2 give containers a *slice* of your RAM, not all of
-it. The check reads what Docker can actually use. Raise it in Docker Desktop → Settings →
-Resources (or `.wslconfig` on Windows, or use OrbStack on macOS which sizes dynamically).
-Target ≥10 GB.
+Docker Desktop and WSL2 give containers a *slice* of your RAM; the check reads what
+Docker can actually use. Raise it in Docker Desktop → Settings → Resources (or
+`.wslconfig` on Windows, or OrbStack on macOS which sizes dynamically). Target ≥10 GB.
 </details>
 
 <details>
 <summary>Hint 2: mise-installed tools "not found"?</summary>
 
-`dev-setup.sh` installs tools via mise, which activates through your shell. Either restart
-your shell, or check `mise doctor`: activation must be hooked into your shell rc (re-run
-`dev-setup.sh` and say yes when it offers). As a quick test:
-`mise exec -- talosctl version --client`.
+mise activates through your shell. Restart the shell, or check `mise doctor`:
+activation must be hooked into your shell rc (re-run `dev-setup.sh` and say yes).
+Quick test: `mise exec -- talosctl version --client`.
 </details>
 
 <details>
 <summary>Hint 3: which kubeconfig will my kubectl use?</summary>
 
-`mise.toml` sets `KUBECONFIG=~/.kube/cloudbox.conf` for this repo, so the cluster you
-build lands in a file of its own instead of among your real clusters, and tearing it
-down leaves nothing for `kubectl` to quietly fall through to. `echo $KUBECONFIG` shows
-which file you are on; empty means mise is not activated in this shell and everything
-goes to `~/.kube/config` instead, which also works.
-
-What does **not** work is half of each: `mise run` / `mise exec` for the scripts, bare
-`kubectl` in a shell without the pin. Then the cluster is in one file and your terminal
-reads another. `mise run preflight` prints the file in effect and fails if it
-catches you in that state. Note it is per-directory too: a terminal outside this repo
-does not get the pin.
+`mise.toml` sets `KUBECONFIG=~/.kube/cloudbox.conf` for this repo, keeping the
+workshop cluster out of your real ones. `echo $KUBECONFIG` shows the file in effect;
+empty means mise is not active in this shell and `~/.kube/config` is used, which also
+works. What breaks is half of each: scripts via `mise run`, bare `kubectl` in an
+unpinned shell, cluster in one file, terminal reading another. `mise run preflight`
+catches that state. The pin is per-directory; terminals outside this repo don't get it.
 </details>
 
 <details>
 <summary>Hint 4: cloudbox-init.sh is slow or flaky on this network</summary>
 
-It is doing the only big download of the whole workshop, by design. It's resumable:
-run it again and it skips images already in the mirror. Check progress with
+It is the only big download of the whole workshop, and it's resumable: run it again
+and it skips what's already mirrored. Check progress with
 `curl -s http://localhost:5001/v2/_catalog` (docker) or `tbx cache list` (tbx).
 </details>
 
@@ -274,16 +231,10 @@ cd lab/00-setup && ./verify.sh
 
 ## Explain-back
 
-Tell your neighbor: why does this workshop refuse to pull images from Docker Hub during
-the session? (Two reasons: one about the venue NAT, one about the message.)
+Why does this workshop refuse to pull from Docker Hub during the session? (Two
+reasons: one about the venue NAT, one about the message.)
 
 ## Going deeper
 
 - Peek at what got pre-pulled: `curl -s http://localhost:5001/v2/_catalog | jq .` (docker) or `tbx cache list` (tbx)
-- Read `scripts/install.sh`. A pre-flight gate is itself a platform artifact. What would
-  *your* team's version check?
-
-## AI assistants welcome
-
-If anything here fails, pasting the error into your AI assistant of choice is exactly the
-right move. This module has zero learning value in suffering. Get to green however you like.
+- Read `scripts/install.sh`. A pre-flight gate is itself a platform artifact. What would *your* team's check?

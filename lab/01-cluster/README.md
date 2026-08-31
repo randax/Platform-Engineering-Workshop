@@ -10,13 +10,11 @@ these nodes, and why.
 
 ## Why this matters
 
-Every cloud provider runs an OS under your Kubernetes that you never see. Today you own
-that layer. Talos Linux is an immutable, API-only operating system built solely to run
-Kubernetes: no shell, no SSH, no package manager. The whole machine is one declarative
-config document managed over a gRPC API (`talosctl`). Cilium replaces both the CNI and
-kube-proxy with eBPF programs in the kernel. This is what production-grade looks like in
-2026, and it fits on your laptop. `create-cluster.sh` picks the cluster backend for you
-(talos-box VMs, or Talos-in-Docker); everything below is the same on both.
+Every cloud provider runs an OS under your Kubernetes that you never see; today you own
+that layer. Talos Linux is an immutable, API-only OS built solely to run Kubernetes: no
+shell, no SSH, no package manager, the whole machine one declarative document managed
+over a gRPC API (`talosctl`). Cilium replaces both the CNI and kube-proxy with eBPF
+programs in the kernel.
 
 ## The task
 
@@ -26,35 +24,30 @@ kube-proxy with eBPF programs in the kernel. This is what production-grade looks
    mise run cluster:create -- --skip-cilium
    ```
 
-   While it runs (~2-3 min), read the script. It is short on purpose: everything it
-   does, you could type.
+   While it runs (~2-3 min), read the script. It is short on purpose.
 
-2. Look at what you own: `kubectl get nodes`. Both nodes are **NotReady**, and will stay
-   that way forever, because this cluster has no CNI. Convince yourself of why before
-   fixing it: `kubectl describe node` one of them and find the complaint; explain the
-   `Pending` pods in `kubectl -n kube-system get pods`; find the
-   `cluster.network.cni: none` decision in the Talos machine config (hint 2). A cloud
-   provider made this choice for you on every cluster you've ever used. Today it's yours.
+2. Look at what you own: `kubectl get nodes`. Both nodes are **NotReady** and will stay
+   that way, because this cluster has no CNI. Convince yourself of why before fixing it:
+   `kubectl describe node` one of them, explain the `Pending` pods in
+   `kubectl -n kube-system get pods`, find the `cluster.network.cni: none` decision in
+   the machine config (hint 2).
 
 3. **Give your cluster a network.** Install Cilium with Helm from the vendored chart at
    `scripts/manifests/`, no internet needed. The values are Talos-specific and matter;
    hint 3 builds up to the exact command. Keep `kubectl get nodes -w` running in a second
-   terminal and watch NotReady become Ready the moment the CNI lands. That transition is
-   the whole lesson.
+   terminal and watch NotReady become Ready the moment the CNI lands.
 
    (Behind, or rebuilding? Plain `mise run cluster:create` without the flag does this
-   step for you. That's what catch-up uses.)
+   step for you.)
 
-4. **Prove to yourself what you just built.** Answer these with `talosctl` and `kubectl`
-   (hints below if you want them):
+4. **Prove what you built.** Answer with `talosctl` and `kubectl` (hints below):
 
    - There is no SSH. What *is* the management plane? Show the machine's config document
      without logging into anything.
    - Open the Talos dashboard for a node. What is the machine doing right now?
    - Which cluster members does Talos itself know about (not Kubernetes, Talos)?
-   - Kubernetes says both nodes are `Ready`. What is doing the networking? Show that
-     Cilium is healthy, and that kube-proxy does not exist in this cluster. Who answers
-     Service traffic then?
+   - Both nodes are `Ready`. Show that Cilium is healthy and that kube-proxy does not
+     exist in this cluster. Who answers Service traffic then?
 
 5. Run `./verify.sh`.
 
@@ -64,21 +57,13 @@ kube-proxy with eBPF programs in the kernel. This is what production-grade looks
 ./verify.sh
 ```
 
-It checks: your two Talos nodes exist on whichever backend you are on (talos-box VMs
-via `tbx status`, Talos node containers via `docker ps`); both nodes are `Ready`; the
-Cilium DaemonSet is fully available; the Cilium operator is Available; Cilium reports
-kube-proxy replacement active; no kube-proxy is running anywhere; CoreDNS is Available;
-and the shared ingress holds the endpoint every `*.cloudbox.k8s.test` name lands on.
-
 <details>
 <summary>Docker backend: the /etc/hosts block, and the one sudo prompt</summary>
 
-On the Docker backend the `*.cloudbox.k8s.test` names need a line each in
-`/etc/hosts`, and that is the one step in this whole workshop that asks for your
-password. `create-cluster.sh` writes them for you, including on the `--skip-cilium`
-path you just took. If you declined the prompt, or the block never got written, every
-`*.cloudbox.k8s.test` URL fails from module 02 onward on a perfectly healthy cluster.
-Fix it any time, the cluster keeps running:
+On the Docker backend the `*.cloudbox.k8s.test` names need a line each in `/etc/hosts`,
+the one step in this workshop that asks for your password. `create-cluster.sh` writes
+them, including on the `--skip-cilium` path. If you declined the prompt, every workshop
+URL fails from module 02 onward on a perfectly healthy cluster. Fix it any time:
 
 ```bash
 ./scripts/install.sh --print-hosts    # exactly what would be added
@@ -93,12 +78,12 @@ On tbx nothing is written: talos-box's own resolver answers those names.
 <details>
 <summary>Hint 1: Where do I even start with talosctl?</summary>
 
-`talosctl` talks to the Talos API on the nodes. The create script set up your talosconfig
-and pointed the `cloudbox` context at your control plane, so you need no `-n` flag:
-`talosctl get members` already knows which node to ask. `talosctl config info` prints the
-endpoint and node it will use. The address differs per backend: a DHCP lease in a
-talos-box VM, an address in the Talos docker network. That is exactly why you read it
-rather than type it. `kubectl get nodes -o wide` shows the same addresses.
+`talosctl` talks to the Talos API on the nodes. The create script pointed the `cloudbox`
+context at your control plane, so you need no `-n` flag: `talosctl get members` already
+knows which node to ask. `talosctl config info` prints the endpoint and node in use. The
+address differs per backend (a DHCP lease in a talos-box VM, a Docker network address),
+which is why you read it rather than type it. `kubectl get nodes -o wide` shows the same
+addresses.
 </details>
 
 <details>
@@ -124,7 +109,7 @@ rather than type it. `kubectl get nodes -o wide` shows the same addresses.
   node-local API balancer on `localhost:7445`.
 - **Why the odd values?** Talos mounts cgroups itself (`cgroup.autoMount.enabled=false`,
   `hostRoot=/sys/fs/cgroup`) and its default PodSecurity needs the agent's capability
-  list spelled out. This is the documented Talos+Cilium recipe, not workshop magic:
+  list spelled out. This is the documented Talos+Cilium recipe:
   https://docs.siderolabs.com/kubernetes-guides/cni/deploying-cilium
 - **The command**, exactly as the script would run it. `create-cluster.sh` step 3 *is*
   the reference solution, and it's meant to be read:
@@ -153,57 +138,48 @@ helm upgrade --install cilium \
   --set ingressController.service.insecureNodePort="${NODEPORT_INGRESS}"
 ```
 
-(`l2announcements` and the raised client rate limit are set on both backends on
-purpose, so `cilium config view` reads the same on every laptop in the room; only tbx
-actually announces anything.)
+(`l2announcements` and the raised rate limit are set on both backends on purpose, so
+`cilium config view` reads the same on every laptop in the room; only tbx actually
+announces anything.)
 
-The last five flags are the shared **ingress**, and they are not optional: one
-Cilium ingress serves every `*.cloudbox.k8s.test` hostname you will use for the
-rest of the day, and `verify.sh` checks for it. The script builds them from
-`cilium_ingress_values()` in `scripts/lib.sh`, the single source it shares with
-the kind lifeboat.
+The last five flags are the shared **ingress**, and they are not optional: one Cilium
+ingress serves every `*.cloudbox.k8s.test` hostname for the rest of the day, and
+`verify.sh` checks for it. The script builds them from `cilium_ingress_values()` in
+`scripts/lib.sh`.
 
-Those two `service.*` lines are the **docker** shape. Check which backend you
-are on with `cat ~/.cloudbox/substrate`, because tbx needs a different ending:
-a real LoadBalancer instead of a NodePort (the L2 announcer already enabled above
-is what claims its VIP on the network), plus host routing so the VIP is reachable
-from your laptop:
+Those two `service.*` lines are the **docker** shape. Check which backend you are on
+with `cat ~/.cloudbox/substrate`; tbx needs a different ending, a real LoadBalancer
+plus host routing so its VIP is reachable from your laptop:
 
 ```bash
   --set ingressController.service.type=LoadBalancer \
-  --set bpf.hostLegacyRouting=true          # so the VIP is reachable from your laptop
+  --set bpf.hostLegacyRouting=true
 ```
 
-**And on tbx the flags alone are not enough.** A LoadBalancer Service needs an
-address to hand out, which means two more objects: a `CiliumLoadBalancerIPPool`
-and a `CiliumL2AnnouncementPolicy`. Without them `cilium-ingress` sits in
-`<pending>` forever and `verify.sh` fails with nothing to tell you why. They are
-the one part the script does for you rather than making you type subnet
-arithmetic. Once your Cilium is up, run
+**On tbx, one more step.** A LoadBalancer needs an address to hand out: a
+`CiliumLoadBalancerIPPool` and a `CiliumL2AnnouncementPolicy`. Without them
+`cilium-ingress` sits in `<pending>` forever. The script applies them for you:
 
 ```bash
 mise run cluster:create -- --post-cni
 ```
 
-It does exactly three things: applies the pool and the policy, waits for your
-Cilium rollout and the nodes, and proves `cilium-ingress` got `.200`. No
-preflight, no `tbx doctor`, no VM is touched. (Do not re-run the bare
-`mise run cluster:create`: on tbx it refuses because the cluster already exists.)
+It applies the pool and policy, waits for the rollout, and proves `cilium-ingress` got
+`.200`. (Don't re-run the bare `mise run cluster:create`: on tbx it refuses because the
+cluster already exists.)
 
 - Then watch: `kubectl -n kube-system rollout status ds/cilium` and your
   `kubectl get nodes -w` terminal.
 
-**If a node stays `NotReady` for more than a few minutes**, it is usually not
-Cilium. It is an image pull that stalled on the way into the VM. Ask the node
-itself:
+**A node stays `NotReady` for more than a few minutes?** Usually a stalled image pull,
+not Cilium. Ask the node:
 
 ```bash
 talosctl -n <node-ip> -e <node-ip> service kubelet    # or: service etcd
 ```
 
-A service sitting in `Preparing` whose byte count in the events has not moved
-between two looks is a stalled pull. Power-cycle that node. The disk survives,
-the pull restarts:
+A service in `Preparing` whose byte count hasn't moved between two looks is a stalled
+pull. Power-cycle the node; the disk survives, the pull restarts:
 
 ```bash
 talosctl -n <node-ip> -e <node-ip> reboot --wait=false
@@ -212,28 +188,24 @@ tbx node stop  cloudbox cloudbox-worker-1             # or cloudbox-cp-1
 tbx node start cloudbox cloudbox-worker-1
 ```
 
-then keep watching `kubectl get nodes -w`. (`tbx status cloudbox` also names a
-stalled service directly, and `tbx doctor` FAILs on one, randax/talos-box#482,
-so either is a shortcut to the same verdict; the `service` command above is the
-one that shows the byte count. The recovery is the same either way. After an
-in-guest reboot the node shows as `rebooted` in `tbx status` for 15 minutes;
-that is a configured node, not a problem.)
+(`tbx status cloudbox` and `tbx doctor` name a stalled service too,
+randax/talos-box#482. After an in-guest reboot the node shows as `rebooted` in
+`tbx status` for 15 minutes; that is a configured node, not a problem.)
 </details>
 
 <details>
 <summary>Hint 4: Proving the Cilium / no-kube-proxy story</summary>
 
-- Cilium health, without any extra tools:
-  `kubectl -n kube-system get pods -l k8s-app=cilium` and
-  `cilium status --wait` (the CLI reads cluster state).
-- kube-proxy is absent: `kubectl -n kube-system get ds,pods | grep -c kube-proxy` should
-  find nothing. Yet `kubectl get svc -A` shows Services with ClusterIPs that work.
+- Cilium health, without extra tools:
+  `kubectl -n kube-system get pods -l k8s-app=cilium` and `cilium status --wait`.
+- kube-proxy is absent: `kubectl -n kube-system get ds,pods | grep -c kube-proxy` finds
+  nothing. Yet `kubectl get svc -A` shows Services with ClusterIPs that work.
 - Ask Cilium who handles Services:
   `kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium-dbg status | grep -i kubeproxy`.
-  Look for `KubeProxyReplacement: True`. eBPF programs attached in the kernel are doing
-  what iptables rules used to do.
-- One more: Cilium reaches the API server via `localhost:7445`. That's Talos **KubePrism**,
-  a node-local API-server load balancer. Find it in the machine config.
+  Look for `KubeProxyReplacement: True`. eBPF programs in the kernel are doing what
+  iptables rules used to do.
+- One more: Cilium reaches the API server via `localhost:7445`. That's Talos
+  **KubePrism**, a node-local API-server load balancer. Find it in the machine config.
 </details>
 
 <details>
@@ -287,16 +259,12 @@ cd lab/01-cluster && ./verify.sh
 ## Explain-back
 
 Tell your neighbor: this node has no SSH and no package manager. Name two concrete
-*operational* problems that design deletes (think: patching, drift, attack surface, "who
-changed what").
+operational problems that design deletes.
 
 ## Going deeper
 
-- Break a node on purpose, then put it back. Watch `kubectl get nodes -w` in a second
-  terminal while you do it: the worker goes `NotReady` in ~40 s, and its pods are
-  rescheduled or stay Pending (there is only one other node, and it is the control plane).
-  Pick the half that matches your substrate, `cat ~/.cloudbox/substrate` if you are not
-  sure:
+- Break a node on purpose and put it back, with `kubectl get nodes -w` running: the
+  worker goes `NotReady` in ~40 s.
 
   <details>
   <summary>talos-box (VMs)</summary>
@@ -306,9 +274,6 @@ changed what").
   tbx status cloudbox                          # phase: stopped
   tbx node start cloudbox cloudbox-worker-1   # boot it again
   ```
-
-  Both verbs are upstream tbx (`tbx node start|stop <cluster> <node>`), and neither
-  touches the node's disk. This is a power cycle, not a re-create.
   </details>
 
   <details>
@@ -319,36 +284,24 @@ changed what").
   docker unpause cloudbox-worker-1   # Docker backend only
   ```
   </details>
-- `talosctl read /proc/version`: you can read files via the API, but try to
-  *write* something. What stops you?
-- Compare `kubectl -n kube-system get pods` on this cluster with any managed-cloud cluster
-  you have access to. What's missing here, and what does the cloud hide from you there?
+- `talosctl read /proc/version` works. Now try to *write* something. What stops you?
+- Compare `kubectl -n kube-system get pods` here with any managed-cloud cluster. What's
+  missing here, and what does the cloud hide there?
 
 ## If it goes wrong
 
-The cluster is cattle: destroying and recreating it takes ~5 minutes (images are already
-local). Name the backend on both halves:
+The cluster is cattle: destroy and recreate takes ~5 minutes (images are local). Name
+the backend on both halves, since the destroy removes `~/.cloudbox/substrate`:
 
 ```bash
 CLOUDBOX_SUBSTRATE=docker mise run cluster:destroy && \
 CLOUDBOX_SUBSTRATE=docker mise run cluster:create     # or =tbx, whichever you are on
 ```
 
-The destroy removes `~/.cloudbox/substrate` with the cluster, so a bare
-`create-cluster.sh` would decide again from scratch rather than rebuild what you had.
-`mise run preflight` prints which one you are on.
-
 If Talos-in-Docker fights your machine specifically, `mise run cluster:fallback` gives
-you a kind+Cilium cluster with the same ingress, the same hostnames and the same
-`/etc/hosts` block. You lose the Talos exploration but every later module works the
-same. Remove it afterwards with `./scripts/kind-fallback.sh --delete` (cluster, hosts
-block and the recorded identity). `destroy-cluster.sh` refuses there: it tears down
-cluster backends, and kind is not one. Rebuild the lifeboat with
-`./scripts/kind-fallback.sh --delete && ./scripts/kind-fallback.sh`.
-
-**On the lifeboat this module is not gradeable.** `./verify.sh` checks a *Talos*
-cluster: Talos node containers or tbx VMs, and the ingress shape the backend
-gives it. So it prints "kind lifeboat: module 01 is not gradeable here" and exits
-0 rather than failing a cluster that is working exactly as documented. That is the
-whole price of the lifeboat: module 02 onward is identical, and `verify.sh` in every
-later module grades you normally.
+you a kind+Cilium cluster with the same ingress and hostnames. You lose the Talos
+exploration but every later module works the same. Remove it with
+`./scripts/kind-fallback.sh --delete`; rebuild it by running the script again
+(`destroy-cluster.sh` refuses on kind, which is a lifeboat, not a backend). On the
+lifeboat this module's `verify.sh` prints "not gradeable here" and exits 0; every later
+module grades normally.

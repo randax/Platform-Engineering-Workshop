@@ -4,36 +4,31 @@
 
 Your platform offers two managed data services, both delivered via git: a PostgreSQL
 database (CloudNativePG operator) you can `psql` into, and an S3-compatible object store
-(RustFS) where you can create a bucket and share a working presigned URL. `./verify.sh`
-proves all of it.
+(RustFS) where you can create a bucket and share a working presigned URL.
 
 ## Why this matters
 
-"Managed database" is the single most-bought cloud product, and the thing teams miss most
-when leaving a hyperscaler. An operator like CloudNativePG *is* the managed service. The
-software that would run behind AWS's console runs in your cluster instead: provisioning,
-failover, backups as Kubernetes resources. Same story for object storage. Today you become
-the RDS and S3 team, and it's less magic than its price tag suggests.
+"Managed database" is the single most-bought cloud product, and the thing teams miss
+most when leaving a hyperscaler. An operator like CloudNativePG *is* the managed
+service: provisioning, failover, backups as Kubernetes resources, running in your
+cluster instead of behind AWS's console. Today you become the RDS and S3 team.
 
 ## The task
 
-Everything goes through the git workflow from module 02 (your Gitea clone).
+Everything goes through the module-02 write path: your Gitea clone, commit, push.
 
-1. **Enable the two platform components.** The repo has a catalog of ready-made ArgoCD
-   Applications in `gitops/catalog/`. Enabling one means copying it into `gitops/apps/`
-   and pushing. Enable `cnpg-operator.yaml` and `rustfs.yaml`. Watch them come up.
+1. **Enable `cnpg-operator.yaml` and `rustfs.yaml`** from `gitops/catalog/` (copy into
+   `gitops/apps/`, push). Watch them come up.
 
-2. **Self-service a database.** This lab dir has a reference manifest,
-   [`postgres-cluster.yaml`](postgres-cluster.yaml), a CNPG `Cluster` named `app-db`.
-   Read it (note `storageClass` and `instances`), then deliver it into the `demo`
-   namespace *via your repo* (where did module 02 put demo-namespace manifests?).
-   Wait for `Cluster in healthy state`, then get a psql prompt in it and run `SELECT 1`.
+2. **Self-service a database.** Read [`postgres-cluster.yaml`](postgres-cluster.yaml) in
+   this lab dir (note `storageClass` and `instances`), then deliver it into the `demo`
+   namespace *via your repo* (where did module 02 put demo-namespace manifests?). Wait
+   for `Cluster in healthy state`, then get a psql prompt in it and run `SELECT 1`.
 
-3. **Claim your object storage.** RustFS speaks S3 on NodePort **30900**
-   (access key `cloudbox`, secret `cloudbox123`). Using the `aws` CLI (or `mc`, or a
-   3-line script, dealer's choice): create a bucket `app-assets`, upload any file, and
-   generate a **presigned URL**. Open it in your browser. That URL is you handing a
-   download link to someone with zero AWS involved.
+3. **Claim your object storage.** RustFS speaks S3 with access key `cloudbox`, secret
+   `cloudbox123`. Using any S3 client: create a bucket `app-assets`, upload a file, and
+   generate a **presigned URL**. Open it in your browser. That URL is you handing out a
+   download link with zero AWS involved.
 
 4. Run `./verify.sh`.
 
@@ -42,12 +37,6 @@ Everything goes through the git workflow from module 02 (your Gitea clone).
 ```bash
 ./verify.sh
 ```
-
-It checks: the cnpg-operator and rustfs ArgoCD apps are Healthy (Synced is the happy
-path; sync is advisory); the CNPG operator deployment is up; `app-db` reports healthy
-with 1/1 ready instances; `SELECT 1` actually returns 1 from inside the database; RustFS
-answers S3 at `http://s3.cloudbox.k8s.test`; and bucket `app-assets` exists with at
-least one object.
 
 ## Hints
 
@@ -62,8 +51,8 @@ cp gitops/catalog/rustfs.yaml       gitops/apps/
 git add . && git commit -m "enable cnpg + rustfs" && git push
 ```
 
-Then watch `kubectl -n argocd get applications -w` (or the UI, Refresh to skip the poll).
-The operator lands in ns `cnpg-system`, RustFS in ns `rustfs`.
+Then watch `kubectl -n argocd get applications -w` (or the UI, Refresh to skip the
+poll). The operator lands in ns `cnpg-system`, RustFS in ns `rustfs`.
 </details>
 
 <details>
@@ -77,9 +66,9 @@ cp <workshop-repo>/lab/03-data/postgres-cluster.yaml gitops/components/demo/
 git add . && git commit -m "app-db postgres cluster" && git push
 ```
 
-Watch it: `kubectl -n demo get cluster app-db -w` (a CNPG cluster does init → one pod →
-healthy; first time takes a minute or two). If it sticks, `kubectl -n demo describe
-cluster app-db` and `kubectl -n demo get pvc,events`.
+Watch: `kubectl -n demo get cluster app-db -w` (init → one pod → healthy; the first
+time takes a minute or two). If it sticks, `kubectl -n demo describe cluster app-db`
+and `kubectl -n demo get pvc,events`.
 </details>
 
 <details>
@@ -91,23 +80,21 @@ Every CNPG pod contains psql, and local socket auth works for the postgres super
 kubectl -n demo exec -it app-db-1 -- psql -U postgres -d app
 ```
 
-App credentials (for connecting like an application would, via the `app-db-rw` Service)
-were generated for you: `kubectl -n demo get secret app-db-app -o yaml`. CNPG made
-`app-db-rw` / `app-db-ro` / `app-db-r` Services. rw always points at the primary.
+App credentials (for connecting like an application, via the `app-db-rw` Service) were
+generated for you: `kubectl -n demo get secret app-db-app -o yaml`. CNPG made
+`app-db-rw` / `app-db-ro` / `app-db-r` Services; rw always points at the primary.
 </details>
 
 <details>
 <summary>Hint 4: The S3 part, with a plain S3 client</summary>
 
-The interesting thing about this half of the module is how *boring* it is. RustFS is not
-"S3-like": it speaks the S3 API, so any S3 client points at it and works. Same
-`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION`, same signed requests, one
-`--endpoint-url` to say "not Amazon". We use [**s5cmd**](https://github.com/peak/s5cmd),
-a single 12 MiB Go binary, precisely to make that point without importing a cloud
-vendor's CLI into a workshop about *not* using one.
+RustFS is not "S3-like": it speaks the S3 API, so any S3 client works. Same
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION`, one `--endpoint-url` to
+say "not Amazon". We use [s5cmd](https://github.com/peak/s5cmd), a single Go binary,
+to make that point without importing a cloud vendor's CLI.
 
-Run the whole sequence in the cluster (`verify.sh` wants the uploaded object too, not
-just the bucket). This needs nothing installed on your laptop and no internet:
+In-cluster form, nothing installed on your laptop (`verify.sh` wants the uploaded
+object too, not just the bucket):
 
 ```bash
 kubectl -n demo run s3 --rm -i --restart=Never \
@@ -126,11 +113,11 @@ kubectl -n demo run s3 --rm -i --restart=Never \
     /s5cmd --endpoint-url http://s3.cloudbox.k8s.test presign --expire 1h s3://app-assets/hello.txt'
 ```
 
-(The image's `ENTRYPOINT` is the binary itself, so `--command -- /bin/sh -c` is what
-buys you a shell for the multi-step script; the binary is at `/s5cmd`.)
+(The image's `ENTRYPOINT` is the binary itself, so `--command -- /bin/sh -c` buys you a
+shell; the binary is at `/s5cmd`.)
 
-Got `s5cmd` on your laptop already (`brew install s5cmd`), or the AWS CLI, or `rclone`?
-Point any of them at the NodePort instead. That is the whole lesson:
+Got `s5cmd` locally (`brew install s5cmd`), or the AWS CLI, or `rclone`? Point any of
+them at the hostname instead:
 
 ```bash
 export AWS_ACCESS_KEY_ID=cloudbox AWS_SECRET_ACCESS_KEY=cloudbox123 AWS_REGION=eu-north-1
@@ -171,22 +158,20 @@ cd "$WORKSHOP/lab/03-data" && ./verify.sh
 
 ## Explain-back
 
-Tell your neighbor: when you pushed `postgres-cluster.yaml`, list the chain of actors that
-turned 30 lines of YAML into a running Postgres (git → ? → ? → pods, PVC, Services,
-Secrets). Which of those actors did *you* install, and via what?
+Tell your neighbor: what chain of actors turned 30 lines of pushed YAML into a running
+Postgres (git → ? → ? → pods)? Which of them did *you* install?
 
 ## Going deeper
 
 - Kill the database pod (`kubectl -n demo delete pod app-db-1`) and watch the operator
   rebuild it. Where did the data survive?
-- Scale to `instances: 3` **via git**, watch replicas join, then check
-  `kubectl -n demo get cluster app-db -o yaml` for who's primary. Scale back down (RAM!).
-- RustFS is beta software with a rough CVE history. We run it as an ephemeral lab
-  sandbox. Discuss: what would *you* need to see before running an S3 clone in prod?
-  (This is a real platform-team decision, not a rhetorical one.)
+- Scale to `instances: 3` **via git**, check who's primary in
+  `kubectl -n demo get cluster app-db -o yaml`, then scale back down (RAM!).
+- RustFS is beta with a rough CVE history; here it's an ephemeral lab sandbox. What
+  would *you* need to see before running an S3 clone in prod?
 
 ## A note on honesty
 
 MinIO's open-source edition was discontinued in 2025 (not "relicensed"). RustFS is an
 independent Apache-2.0 reimplementation of the S3 API, not a MinIO successor. We picked
-it to show the *pattern*: S3 is a protocol, and you can self-host a speaker of it.
+it to show the pattern: S3 is a protocol, and you can self-host a speaker of it.
