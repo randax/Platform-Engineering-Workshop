@@ -93,6 +93,15 @@ These are real — most were found by running the whole thing on clean machines.
 - *Windows attendee stuck* → they must be inside **WSL2** with Docker Desktop's
   WSL2 backend, running the Linux tools. If it's fighting them, pair up — don't
   burn 20 minutes on it.
+- *Windows: the URLs don't resolve* → there are **two** hosts files and neither
+  feeds the other. The browser needs the block in
+  `C:\Windows\System32\drivers\etc\hosts` (elevated editor, then
+  `ipconfig /flushdns` — a failed lookup from before the edit is cached), and WSL
+  needs its own, which `install.sh --write-hosts` writes. "It worked yesterday" is
+  WSL rewriting `/etc/hosts` at every distro start: `generateHosts = false` in
+  `/etc/wsl.conf`, then `wsl --shutdown`. The whole checklist is in
+  `lab/00-setup/README.md`, under the Windows/WSL2 fold — send them there rather
+  than reciting it.
 
 **Which kubeconfig am I even looking at? — read this before you diagnose anything**
 

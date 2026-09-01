@@ -375,12 +375,21 @@ Both additionally require that the identity they resolve to is the one
 on.
 
 **WSL2 deletes the block on every restart.** `generateHosts` defaults to true, so WSL
-regenerates `/etc/hosts` from the Windows hosts file at boot and the block written
+rewrites `/etc/hosts` at every distro start and the block written
 yesterday is gone this morning — with the containers still running, which makes it look
 like an ingress that broke overnight. `lab/00-setup` and the README give both fixes:
 `[network]\ngenerateHosts = false` in `/etc/wsl.conf`, or `--write-hosts` after each
 restart. `install.sh --check` detects it (WSL2 + a "This file was automatically generated"
 header + no block) and prints both.
+
+The rewrite *used* to seed the file from `C:\Windows\System32\drivers\etc\hosts`, and
+several places here said so. Since WSL 2.2.4 it does not
+([microsoft/WSL#11719](https://github.com/microsoft/WSL/issues/11719), open, still
+reproducing on 2.5.9.0): the generated file is localhost boilerplate and nothing else.
+The two hosts files are **independent in both directions** — nothing in WSL has ever
+written the Windows file either. That makes the "edit both" instruction stronger, not
+weaker, and it is the reason the WSL2 warning is worded around *the block is deleted*
+rather than around where the replacement content comes from.
 
 **What handles it.** `install.sh --check` names the missing lines and how many;
 `./scripts/install.sh --print-hosts` prints the block for hand-application, and on WSL2
@@ -741,6 +750,17 @@ the likely culprit and prints who holds it (`lsof -nP -iTCP:80 -sTCP:LISTEN`, or
 `CLOUDBOX_SUBSTRATE=tbx ./scripts/create-cluster.sh`. On macOS the holder can be
 inside the Docker/Colima VM, where the host's `lsof` cannot see it; the message
 says to check `docker ps --filter publish=80` too.
+
+**And it has to stay bound to the wildcard.** `--exposed-ports "…,80:${NODEPORT_INGRESS}/tcp"`
+publishes on `0.0.0.0`, which reads like sloppiness worth "tightening" to
+`127.0.0.1:80:…` some day. Do not: on WSL2 a connection from the distro's own
+shell arrives at Docker Desktop from the docker bridge (172.17.0.1), not from
+loopback, so a loopback-only publish is refused for every Windows attendee's
+`curl` and `verify.sh` while the Windows browser keeps working
+([microsoft/WSL#9515](https://github.com/microsoft/WSL/issues/9515),
+[docker/for-win#13182](https://github.com/docker/for-win/issues/13182), closed as
+known). The split — browser fine, shell refused — is about as misleading as a
+symptom gets.
 
 **Retired by:** nothing — a port-free hostname scheme on a substrate with no
 LoadBalancer costs exactly one privileged port. Rehearsal 5 step 13 runs the

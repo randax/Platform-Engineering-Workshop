@@ -92,21 +92,47 @@ needs `CLOUDBOX_SUBSTRATE=docker`. Nothing on the core path is affected.
 <details>
 <summary>Windows/WSL2: workshop URLs don't resolve, or stopped resolving overnight</summary>
 
-Your *Windows* browser reads `C:\Windows\System32\drivers\etc\hosts`, not WSL's
-`/etc/hosts`. Print the needed lines with `./scripts/install.sh --print-hosts` and
-paste them there as Administrator.
+**There are two hosts files, and they are independent.** Your *Windows* browser reads
+`C:\Windows\System32\drivers\etc\hosts` and nothing else; `curl` and every `verify.sh`
+run inside WSL and read WSL's `/etc/hosts`. WSL used to seed its file from the Windows
+one; since WSL 2.2.4 it does not
+([WSL#11719](https://github.com/microsoft/WSL/issues/11719)). Write both.
 
-WSL2 also regenerates `/etc/hosts` from the Windows file on every restart, deleting
-the block. Either turn that off once:
+`./scripts/install.sh --print-hosts` prints exactly what goes in either file. The WSL
+side is written for you by `create-cluster.sh` (or `--write-hosts`); the Windows side is
+yours, once:
+
+1. Open Notepad (or the PowerToys Hosts File Editor) **as Administrator** — a
+   non-elevated Notepad reports a successful save into a shadow copy and leaves the real
+   file untouched, which looks exactly like a hosts entry that doesn't work.
+2. Paste the block, save.
+3. `ipconfig /flushdns` in an elevated prompt. Windows caches *failed* lookups too, so a
+   name you tried before the edit stays broken until you flush.
+4. Still nothing in the browser? It keeps its own cache — restart it, or clear
+   `chrome://net-internals/#dns`.
+
+**It worked yesterday and not this morning.** WSL regenerates `/etc/hosts` on every
+distro start, which deletes the block while your containers keep running — an ingress
+that appears to have broken overnight. Turn the regeneration off once:
 
 ```ini
-# /etc/wsl.conf   (then, from Windows: wsl --shutdown)
+# /etc/wsl.conf   (then, from Windows: wsl --shutdown, and wait ~8s before restarting)
 [network]
 generateHosts = false
 ```
 
 or re-run `./scripts/install.sh --write-hosts` after each restart. `install.sh --check`
-says which state you are in.
+says which state you are in. `wsl --shutdown` is required for `/etc/wsl.conf` to take
+effect — a Windows "restart" with Fast Startup on is not a shutdown.
+
+**Use the Docker Desktop WSL2 backend** (Settings → Resources → WSL integration), not a
+`docker.io` you installed inside the distro. With Desktop, the published port 80 is held
+by a Windows process, so `127.0.0.1` in the Windows browser reaches it directly. With
+docker inside the distro, the browser depends on WSL's localhost relay, which has a long
+tail of "works, then silently stops" bugs that will eat your workshop.
+
+**On a corporate VPN, disconnect it.** It rarely breaks a `127.0.0.1` hosts entry, but it
+does break DNS and image pulls, and that gets misdiagnosed as this.
 </details>
 
 <details>

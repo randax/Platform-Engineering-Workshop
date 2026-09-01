@@ -68,6 +68,7 @@ case "${1:-}" in
       echo "# WSL2: these lines belong in BOTH the WSL2 /etc/hosts and the Windows"
       printf '%s\n' '#       C:\Windows\System32\drivers\etc\hosts (edit as Administrator) —'
       echo "#       the Windows browser resolves names itself, and only reads that file."
+      echo "#       Then run 'ipconfig /flushdns': Windows caches failed lookups too."
       echo "# tbx substrate: not needed — talos-box's resolver answers ${CLOUDBOX_DOMAIN}."
     } >&2
     exit 0 ;;
@@ -77,8 +78,8 @@ case "${1:-}" in
   # it is the answer to every "the names stopped resolving" state:
   #   * create-cluster.sh's sudo was declined — the cluster is up and healthy,
   #     and re-running the create is refused by preflight (its own containers);
-  #   * WSL2 regenerated /etc/hosts from the Windows file at restart and threw
-  #     the block away (see lab/00-setup: /etc/wsl.conf generateHosts = false);
+  #   * WSL2 rewrote /etc/hosts at distro start and threw the block away
+  #     (see lab/00-setup: /etc/wsl.conf generateHosts = false);
   #   * a name was removed from the extras file and its 127.0.0.1 line is still
   #     in /etc/hosts.
   # Idempotent: with a correct block it writes nothing and asks for no password.
@@ -526,17 +527,22 @@ else
   echo "     See: ./scripts/install.sh --print-hosts   # what belongs in it"
 fi
 
-# WSL2 throws /etc/hosts away. `generateHosts` defaults to true, so on every
-# restart WSL regenerates the file from the Windows hosts file plus its own
-# entries — and the CloudBox block, written on a previous boot, is simply gone.
-# The cluster containers survive a restart; the names do not, so this looks like
-# an ingress that broke overnight. Only worth saying on WSL2, and only when the
-# generated header is there and our block is not.
+# WSL2 throws /etc/hosts away. `generateHosts` defaults to true, so WSL rewrites
+# the file on every distro start — and the CloudBox block, written on a previous
+# boot, is simply gone. The cluster containers survive a restart; the names do
+# not, so this looks like an ingress that broke overnight. Only worth saying on
+# WSL2, and only when the generated header is there and our block is not.
+#
+# The rewrite used to seed the file from the Windows hosts file; since WSL 2.2.4
+# it does not (microsoft/WSL#11719, open). Do not tell anyone the two files feed
+# each other in either direction — they are independent, and lab/00-setup says
+# so. What survives that change is the only part this warning depends on: the
+# block is deleted.
 if is_wsl2 \
    && [[ -r "${CLOUDBOX_HOSTS_FILE}" ]] \
    && grep -qi 'automatically generated' "${CLOUDBOX_HOSTS_FILE}" \
    && ! hosts_block_present; then
-  warn "This ${CLOUDBOX_HOSTS_FILE} is WSL-generated — WSL rewrites it from the Windows hosts file on every restart, which deletes the CloudBox block."
+  warn "This ${CLOUDBOX_HOSTS_FILE} is WSL-generated — WSL rewrites it on every restart, which deletes the CloudBox block."
   info "  Keep it: add to /etc/wsl.conf, then 'wsl --shutdown' from Windows —"
   info "    [network]"
   info "    generateHosts = false"

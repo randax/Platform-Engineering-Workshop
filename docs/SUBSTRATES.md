@@ -106,8 +106,9 @@ block in `/etc/hosts`, written via `sudo tee` at the end of `mise run cluster:cr
 belong in `C:\Windows\System32\drivers\etc\hosts`, edited as Administrator). Decline the
 password and every `*.cloudbox.k8s.test` URL fails on a perfectly healthy cluster; the
 cluster stays up, and `./scripts/install.sh --write-hosts` writes the block whenever you are
-ready. That is also the fix when the names stop resolving: **WSL2 regenerates `/etc/hosts`
-on every restart** unless you tell it not to (see `lab/00-setup`). *Every*
+ready. That is also the fix when the names stop resolving: **WSL2 rewrites `/etc/hosts`
+on every restart** unless you tell it not to, and its file and the Windows one are
+independent — neither seeds the other (see `lab/00-setup`). *Every*
 `mise run cluster:destroy` on the Docker substrate *asks* to remove the block, not only
 `--purge-mirror`, which also forgets the extra names you added with `--add-hosts`;
 decline that prompt and the teardown still finishes, saying which lines remain. On tbx
