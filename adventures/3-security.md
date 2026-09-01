@@ -7,6 +7,9 @@ supply chain your own platform signs.
 **Prerequisites:** module 09 (the pipeline is your victim). Module 07 unlocks
 the signing arc. `./scripts/catch-up.sh 9` covers everything.
 
+**Where you work:** your Gitea clone (`~/cloudbox-platform`), never the workshop
+checkout — that copy is inert. [Why](../lab/README.md#two-repos-and-which-one-is-live).
+
 ## The mission
 
 The platform works. Nothing about it is locked down: every pod can talk to

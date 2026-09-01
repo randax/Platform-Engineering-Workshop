@@ -18,7 +18,9 @@ asserting cluster state cannot grade.
 ## Enable Kagent and point it at your platform
 
 ```bash
-git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git ~/cloudbox-platform 2>/dev/null \
+  || (cd ~/cloudbox-platform && git fetch origin && git reset --hard origin/main)
+cd ~/cloudbox-platform && mise trust
 cp gitops/catalog/kagent.yaml gitops/apps/
 git add gitops/apps/kagent.yaml
 git commit -m "enable kagent"
@@ -151,6 +153,7 @@ spec:
 ```
 
 ```bash
+cd ~/cloudbox-platform   # your Gitea clone, from the top of this page
 git add gitops/components/kagent/kagent.yaml
 git commit -m "kagent: switch part 2 to OpenCode Zen"
 git push

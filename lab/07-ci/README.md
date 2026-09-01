@@ -16,6 +16,8 @@ build → push → deploy closes inside your platform, the loop is yours.
 
 ## The task
 
+Everything goes through the module-02 write path: your Gitea clone, commit, push.
+
 1. Enable **two** catalog apps: `zot.yaml` (registry, NodePort 30500) and
    `argo-workflows.yaml` (workflow engine + the `build-and-push` WorkflowTemplate in
    ns `builds`, PSA-privileged because rootless BuildKit needs an unconfined seccomp

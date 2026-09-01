@@ -114,8 +114,8 @@ mise run gitops:bootstrap
 mise run gitops:seed
 
 WORKSHOP="$(git rev-parse --show-toplevel)"
-git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git /tmp/platform
-cd /tmp/platform && mise trust
+git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git ~/cloudbox-platform
+cd ~/cloudbox-platform && mise trust
 cp "$WORKSHOP/lab/02-gitops/demo-app.yaml" gitops/apps/demo.yaml
 mkdir -p gitops/components/demo
 sed 's/CHANGE ME/Ada Lovelace/' "$WORKSHOP/lab/02-gitops/welcome.yaml" \

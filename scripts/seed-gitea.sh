@@ -174,8 +174,10 @@ echo
 echo "  Browse it:      ${GITEA_HOST_URL}/${PLATFORM_REPO_PATH}"
 echo "  Watch ArgoCD:   ${ARGOCD_HOST_URL}"
 echo
-info "The GitOps loop from here on:"
-echo "   edit gitops/...  ->  git commit  ->  git push cloudbox main  ->  watch ArgoCD"
+info "The GitOps loop from here on — in the repo ArgoCD watches, ${PLATFORM_REPO_PATH}:"
+echo "   edit gitops/...  ->  git commit  ->  push to Gitea  ->  watch ArgoCD"
+echo "   Module 02 sets up how you write to it: a clone (~/cloudbox-platform), or the"
+echo "   'cloudbox' remote below. Editing gitops/ in this checkout changes nothing."
 echo
 # The credentials belong IN this URL, unlike the pushes above (which use
 # GIT_ASKPASS). This one is typed by a human who then runs a bare `git push`,

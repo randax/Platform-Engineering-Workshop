@@ -7,6 +7,9 @@ Ship an app, get its dependencies by declaring them, never file a ticket.
 07 (in-cluster CI) and 09 (the pipeline). `./scripts/catch-up.sh 9` gets you
 everything.
 
+**Where you work:** your Gitea clone (`~/cloudbox-platform`), never the workshop
+checkout — that copy is inert. [Why](../lab/README.md#two-repos-and-which-one-is-live).
+
 ## The mission
 
 Bruktby's platform team (you, until now) hands the keys to Bruktby's product

@@ -144,6 +144,7 @@ brokers ride on Kafka, and why this one deliberately doesn't; it's a lab.
 All five Applications go in one push:
 
 ```bash
+cd ~/cloudbox-platform   # your Gitea clone from module 02
 cp gitops/catalog/victoria-metrics.yaml gitops/catalog/victoria-logs.yaml \
    gitops/catalog/victoria-traces.yaml gitops/catalog/grafana.yaml \
    gitops/catalog/otel-collector.yaml gitops/apps/

@@ -7,6 +7,9 @@ every laptop already has.
 **Prerequisites:** module 01. That's it. (`./scripts/catch-up.sh 5` if you want
 workloads to observe while you operate.)
 
+**Where you work:** your Gitea clone (`~/cloudbox-platform`), never the workshop
+checkout — that copy is inert. [Why](../lab/README.md#two-repos-and-which-one-is-live).
+
 ## The mission
 
 Operate the cluster like it's production: read and patch the machine config,

@@ -7,6 +7,9 @@ discoverable in the catalog, ideally self-service.
 **Prerequisites:** module 02 (GitOps). Module 04 (Crossplane) unlocks the last
 level. `./scripts/catch-up.sh 4` covers both.
 
+**Where you work:** your Gitea clone (`~/cloudbox-platform`), never the workshop
+checkout — that copy is inert. [Why](../lab/README.md#two-repos-and-which-one-is-live).
+
 ## The mission
 
 Every capability on this platform is the same shape: manifests in

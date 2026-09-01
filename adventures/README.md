@@ -34,6 +34,18 @@ from module 05 to any door is supported, not a cheat.
 ./scripts/catch-up.sh 7    # e.g. everything through module 07, ~2 minutes
 ```
 
+Run that from your **workshop checkout**. Everything a briefing tells you to enable,
+vendor or push goes the other way — into your **Gitea clone**, the copy ArgoCD watches
+(`~/cloudbox-platform`, from module 02):
+
+```bash
+cd ~/cloudbox-platform && git fetch origin && git reset --hard origin/main
+```
+
+The reset matters after a `catch-up`: it force-pushes, so a clone made earlier no
+longer shares history with what your cluster is running. Editing `gitops/` in the
+workshop checkout instead does nothing — see [lab/README.md](../lab/README.md#two-repos-and-which-one-is-live).
+
 ## Door 0 — the marked trail
 
 Modules 07, 08 and 10, the three the guided day does not reach. 06 and 09 are core now.

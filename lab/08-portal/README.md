@@ -224,6 +224,7 @@ Knative `Service`. The page unlocks with `knative-serving`; building also needs
 `argo-workflows` and one more scoped grant (same pattern as step 3):
 
 ```bash
+cd ~/cloudbox-platform   # your Gitea clone; WORKSHOP=path to your workshop checkout
 cp "$WORKSHOP/lab/08-portal/portal-functions-access.yaml" gitops/components/demo/
 git add . && git commit -m "grant portal: create Workflows + Knative Services" && git push
 ```
@@ -241,6 +242,7 @@ create shows a *forbidden* flash.
 S3 bucket. It unlocks once `application-xr` is enabled, and needs one scoped grant:
 
 ```bash
+cd ~/cloudbox-platform   # your Gitea clone; WORKSHOP=path to your workshop checkout
 cp "$WORKSHOP/lab/08-portal/portal-applications-access.yaml" gitops/components/demo/
 git add . && git commit -m "grant portal: create Applications" && git push
 ```
@@ -279,6 +281,7 @@ provisions a namespace and binds the portal's tenant grant into it. Grant via gi
 act via console ([DR-0004](../../docs/prd/0004-console-write-model.md)):
 
 ```bash
+cd ~/cloudbox-platform   # your Gitea clone; WORKSHOP=path to your workshop checkout
 cp "$WORKSHOP/lab/08-portal/portal-projects-access.yaml" gitops/components/demo/
 git add . && git commit -m "grant portal: create projects (scoped)" && git push
 ```
