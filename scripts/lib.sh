@@ -1209,6 +1209,55 @@ cloudbox_add_extra_host() {
 # ${CLOUDBOX_EXTRA_HOSTS_FILE} and rewrites the block), a `curl -H Host:`, or
 # NodePort 31080. lab/06 and lab/08 say so, and their verifiers read the Knative
 # Service's published .status.url rather than assuming the shape.
+# assert_gitea_reachable — probe Gitea and, when it does not answer, say WHICH
+# of the four very different things went wrong. Everything that talks to the
+# platform repo (catch-up.sh, seed-gitea.sh) hits the same four, and they need
+# opposite fixes: a name that does not resolve is a /etc/hosts problem, a
+# refused connection is a dead cluster or ingress, a timeout is usually a VPN,
+# and a 404 means Gitea is up and the repo simply is not there yet.
+#
+# "Is the platform seeded? Run seed-gitea.sh" was the single answer for all of
+# them, and it is the WRONG one for three: seed-gitea.sh force-pushes the whole
+# checkout, so an attendee whose ingress blipped would have followed that advice
+# and reset their platform to nothing enabled. docs/HAZARDS.md, "recovery
+# tooling that lies".
+#
+# curl's exit code carries the distinction and needs no extra tool: 6 = could
+# not resolve, 7 = could not connect, 28 = timed out, 22 = HTTP >= 400.
+# gitea_answers — the quiet half: is Gitea serving right now? (Callers that want
+# the diagnosis use assert_gitea_reachable, which is this plus an explanation.)
+gitea_answers() { curl -fsS -m 5 "${GITEA_HOST_URL}/api/healthz" >/dev/null 2>&1; }
+
+assert_gitea_reachable() {
+  local rc=0 host
+  gitea_answers || rc=$?
+  [[ "${rc}" -eq 0 ]] && return 0
+  host="${GITEA_HOST_URL#*://}"; host="${host%%[:/]*}"
+  fail "Gitea is not answering at ${GITEA_HOST_URL}"
+  case "${rc}" in
+    6)
+      warn "The name '${host}' does not resolve — this is the /etc/hosts block, not your cluster."
+      warn "  ./scripts/install.sh --write-hosts     # rewrite it (docker/kind; needs sudo)"
+      warn "  ./scripts/install.sh --print-hosts     # what belongs in it"
+      is_wsl2 && warn "  WSL2: also check the Windows hosts file — see lab/00-setup, the Windows/WSL2 section." ;;
+    7)
+      warn "The name resolves but nothing is listening — the cluster or its ingress is down."
+      warn "  kubectl get nodes && kubectl -n gitea get pods"
+      warn "  kubectl -n kube-system get pods -l k8s-app=cilium    # the ingress lives here" ;;
+    28)
+      warn "The connection timed out rather than being refused — a VPN or firewall is the usual cause."
+      warn "  Disconnect the VPN and retry; docs/HAZARDS.md has the full-tunnel entry." ;;
+    22)
+      warn "Gitea answered with an HTTP error, so it is running but unhealthy."
+      warn "  kubectl -n gitea logs deploy/gitea --tail=50" ;;
+    *)
+      warn "curl exited ${rc}." ;;
+  esac
+  warn "Nothing has been changed. Fix the above and re-run; do NOT re-seed to work around it"
+  warn "(seed-gitea.sh force-pushes your whole checkout and resets your platform)."
+  return 1
+}
+
 cloudbox_hostnames() {
   local url host
   for url in "${GITEA_HOST_URL}" "${ARGOCD_HOST_URL}" "${PORTAL_HOST_URL}" \

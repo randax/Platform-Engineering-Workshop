@@ -46,8 +46,10 @@ depends on them, but they build on each other: 09 needs 03, 06 and 08, 08's main
   end-state to your in-cluster Gitea and lets ArgoCD converge
   (see [`solutions/`](../solutions/)). It is **cumulative**: `catch-up 7` gives you
   everything through module 07, not module 07 alone, so there is never a reason to
-  run it once per module. Run it from your workshop checkout — not from the Gitea
-  clone below, which it refuses.
+  run it once per module. It also installs Gitea + ArgoCD for you if your cluster
+  does not have them yet, so `catch-up 4` works on a cluster that only finished
+  module 01. Run it from your workshop checkout — not from the Gitea clone below,
+  which it refuses.
 
 ## Two repos, and which one is live
 

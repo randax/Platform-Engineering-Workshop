@@ -6,6 +6,8 @@
 # in-cluster Gitea and lets ArgoCD converge (principle 11: catch-up is
 # scripted state, not hope):
 #
+#   0. Installs Gitea + ArgoCD first if this cluster has none (module 02) —
+#      being behind is the whole reason you are here
 #   1. Clones your platform repo from Gitea into a temp dir
 #   2. REPLACES gitops/apps and gitops/components with the canonical state:
 #      solutions/module-0N/apps/* (each module's dir is cumulative — it
@@ -149,10 +151,30 @@ CLONE_URL="${GITEA_HOST_URL}/${PLATFORM_REPO_PATH}.git"
 
 # --- 1. Clone the attendee's platform repo from Gitea -----------------------------
 step "Cloning your platform repo from Gitea"
+# Probe BEFORE the clone. git_as_gitea_admin retries three times, so an
+# unreachable Gitea costs three failures and then reported the one cause that
+# was almost certainly wrong ("is the platform seeded?"). assert_gitea_reachable
+# separates does-not-resolve / refused / timed-out / unhealthy, which need
+# different fixes — and none of them is re-seeding.
+# A cluster with no GitOps on it is not an error here, it is module 02 not having
+# happened yet — and catch-up is the command people reach for precisely when they
+# are behind. --rebuild already runs these two; a bare cluster needs exactly the
+# same thing, so do it instead of sending someone away with an error. Only when
+# Gitea is genuinely ABSENT: if its Deployment exists and still will not answer,
+# that is a broken cluster and gets the diagnosis, not a second install.
+if ! gitea_answers; then
+  if have kubectl && ! kubectl -n gitea get deploy gitea >/dev/null 2>&1; then
+    info "No GitOps on this cluster yet (module 02) — installing Gitea + ArgoCD first."
+    "${SCRIPT_DIR}/bootstrap-gitops.sh"
+    "${SCRIPT_DIR}/seed-gitea.sh"
+  fi
+  assert_gitea_reachable || die "Cannot reach Gitea, so there is nothing to catch up to yet."
+fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 if ! git_as_gitea_admin clone --quiet --depth 1 --branch main "${CLONE_URL}" "${TMP_DIR}/platform"; then
-  die "Could not clone from Gitea. Is the platform seeded? Run ./scripts/seed-gitea.sh first."
+  # Gitea answered its health check a moment ago, so this is about the REPO.
+  die "Gitea is up but '${PLATFORM_REPO_PATH}' could not be cloned — it has not been seeded yet. Run ./scripts/seed-gitea.sh."
 fi
 
 # --- 2. Enable the module's applications --------------------------------------------
