@@ -1395,6 +1395,38 @@ was the *diagnosis*, not the action. In a workshop that teaches people to check
 what a tool tells them, tooling that is confidently wrong about a working machine
 is the failure mode to hunt first.
 
+## TRAP — `catch-up.sh` run from the Gitea clone restores the attendee's own drift
+
+`seed-gitea.sh` pushes the **whole repository**, so the platform repo in Gitea
+carries `scripts/`, `solutions/` and a `mise.toml`. The clone lab 02 tells people
+to make (`git clone … cloudbox/platform`, then `mise trust`) is therefore a
+runnable copy of this workshop — and `mise run catch-up 4` inside it works,
+prints every success line, and is wrong.
+
+`catch-up.sh` treats `${REPO_ROOT}` — the checkout it lives in — as canonical and
+force-pushes it to Gitea. From the clone, "canonical" is whatever state that
+attendee's platform is already in. Seen on 2026-09-01 at module 04: the *apps*
+came back correctly (they are read from `solutions/`, which is identical in
+either checkout) while `gitops/components/demo/hello-site.yaml` survived the
+replace, so `demo` sat `Synced Degraded` on module 07's not-yet-built image and
+the convergence wait ran its full ten minutes before dying. The attendee sees a
+recovery command that appears to succeed and then hangs — the lying-recovery
+failure mode of the entry above, one layer up.
+
+**What handles it.** `catch-up.sh` refuses when `origin` points at the platform
+repo, before the `--rebuild` branch, so nothing is destroyed or pushed first.
+Detection is positive-only and deliberately narrow: a Gitea host, or an origin
+path ending in `cloudbox/platform[.git]` (the NodePort clone form included). **No
+origin at all is not evidence** — a tarball, a devcontainer or a detached copy
+still runs, exactly as before. The `cloudbox` remote a workshop checkout
+legitimately has pointing at the same Gitea is not consulted; only `origin` is.
+The convergence timeout also now lists the not-Running pods and names a
+later-module workload left in `gitops/components/` as the cause.
+
+**Retired by:** nothing. The guard ships in the script, which means a clone made
+*before* this fix carries the old copy and cannot warn — the message has to come
+from the workshop checkout the next time that attendee runs anything.
+
 ## TRAP — a green `bootstrap-test.yaml` means "the workshop works on Linux"
 
 `bootstrap-test.yaml` runs on `ubuntu-latest`, where the host routes straight

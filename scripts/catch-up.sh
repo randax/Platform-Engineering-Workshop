@@ -58,6 +58,43 @@ APPS_DIR="${SOLUTION_DIR}/apps"
 [[ -d "${SOLUTION_DIR}" ]] || die "No solutions/module-${MODULE} in this repo."
 [[ -d "${APPS_DIR}" ]] || die "solutions/module-${MODULE} has no apps/ directory (nothing to enable)."
 
+# --- Am I reading the canonical state, or the attendee's own drift? -------------------
+# Everything below treats ${REPO_ROOT} — the checkout this script lives in — as
+# canonical, and force-pushes it over the platform repo in Gitea. seed-gitea.sh
+# pushes the WHOLE repository, so the Gitea clone (lab 02: `git clone …
+# cloudbox/platform`, then `mise trust`) contains scripts/, solutions/ and a
+# mise.toml too: `mise run catch-up 4` runs there perfectly happily, and then
+# restores the attendee's own module-09 components as "canonical" while printing
+# every success line. Seen on 2026-09-01: the apps came back to module 04 (they
+# come from solutions/, correct in either checkout) while
+# gitops/components/demo/hello-site.yaml survived, so `demo` sat Degraded on an
+# image that module 07 had not built yet and the convergence wait below ran its
+# full ten minutes.
+#
+# Positive detection only, and never on a guess: an `origin` that points at the
+# platform repo is proof. No origin at all (a tarball, a devcontainer, a
+# detached copy) is NOT evidence and is left alone, and neither is the `cloudbox`
+# remote a workshop checkout legitimately has pointing at the same Gitea.
+catchup_origin="$(git -C "${REPO_ROOT}" remote get-url origin 2>/dev/null || true)"
+case "${catchup_origin}" in
+  *"gitea.${CLOUDBOX_DOMAIN}"*|*"/${PLATFORM_REPO_PATH}.git"|*"/${PLATFORM_REPO_PATH}")
+    fail "This is your platform repo (the Gitea clone), not the workshop checkout."
+    warn "  ${REPO_ROOT}"
+    warn "  origin: ${catchup_origin}"
+    echo
+    warn "catch-up reads the canonical module state from the checkout it lives in and"
+    warn "force-pushes it to Gitea. Run from here, 'canonical' means whatever state your"
+    warn "own platform repo is already in — it would push your drift back over itself and"
+    warn "report success. The clone has scripts/ and solutions/ only because seed-gitea.sh"
+    warn "pushes the whole repository."
+    echo
+    warn "Run it from the workshop checkout instead — the one you cloned from GitHub, with"
+    warn "lab/ and docs/ in it:"
+    warn "  cd <your workshop checkout> && ./scripts/catch-up.sh ${MODULE}"
+    die "Nothing has been changed."
+    ;;
+esac
+
 # --- Optional: nuke and rebuild first ------------------------------------------
 if [[ "${REBUILD}" == "true" ]]; then
   step "REBUILD requested — destroying and recreating the whole platform"
@@ -207,9 +244,26 @@ wait_app_converged() { # <app-name>
   done
   if [[ "${st}" == "Synced Healthy" ]]; then
     ok "${app}: Synced/Healthy"
-  else
-    die "Application '${app}' is still '${st:-missing}' after $((timeout / 60)) minutes — inspect it at ${ARGOCD_HOST_URL}, then re-run this catch-up."
+    return 0
   fi
+  fail "Application '${app}' is still '${st:-missing}' after $((timeout / 60)) minutes."
+  # "Synced" means git got what it asked for, so the manifests are not the
+  # question — a workload in them is. Name the pods rather than sending someone
+  # to the UI to find them, and name the cause this actually had: a workload
+  # from a LATER module still in gitops/components/, whose image or dependency
+  # this module has not built yet (hello-site's image does not exist until
+  # module 07's in-cluster build runs, so it sits ImagePullBackOff forever).
+  if [[ "${st}" == Synced* ]]; then
+    warn "It is Synced, so Gitea has what this module asked for — something in it will not run:"
+    kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null \
+      | awk 'NR==1 || NF>=5' | sed 's/^/   /' || true
+    warn "A workload from a LATER module left in gitops/components/ does exactly this. Check"
+    warn "what the '${app}' Application still carries:"
+    warn "  kubectl -n argocd get applications.argoproj.io ${app} -o jsonpath='{range .status.resources[*]}{.kind}/{.name}{\"\\n\"}{end}'"
+    warn "If it lists workloads this module does not own, catch-up read its canonical state"
+    warn "from the wrong checkout — run it from your workshop checkout, not the Gitea clone."
+  fi
+  die "Inspect it at ${ARGOCD_HOST_URL}, then re-run this catch-up."
 }
 
 # --- 4. Nudge ArgoCD (it would poll within ~3 min anyway) ------------------------------
