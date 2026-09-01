@@ -177,5 +177,24 @@ echo
 info "The GitOps loop from here on:"
 echo "   edit gitops/...  ->  git commit  ->  git push cloudbox main  ->  watch ArgoCD"
 echo
-info "Add the remote for convenient pushing:"
-echo "   git remote add cloudbox ${PUSH_URL}"
+# The credentials belong IN this URL, unlike the pushes above (which use
+# GIT_ASKPASS). This one is typed by a human who then runs a bare `git push`,
+# and a credential-less http remote sends git to its credential helper chain
+# first — macOS osxkeychain, Windows GCM, Linux libsecret — where it finds the
+# attendee's own GitHub credentials and offers those to Gitea. The symptom is a
+# 401, or a GUI passphrase dialog for a credential nobody created, on a healthy
+# cluster. Workshop-grade creds on an ephemeral local cluster; they are already
+# printed in lab/02-gitops.
+REMOTE_URL="${GITEA_HOST_URL/http:\/\//http://${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}@}/${PLATFORM_REPO_PATH}.git"
+existing_remote="$(git -C "${REPO_ROOT}" remote get-url cloudbox 2>/dev/null || true)"
+if [[ -z "${existing_remote}" ]]; then
+  info "Add the remote for convenient pushing:"
+  echo "   git remote add cloudbox ${REMOTE_URL}"
+elif [[ "${existing_remote}" != *"@"* ]]; then
+  warn "Your 'cloudbox' remote carries no credentials, so 'git push cloudbox' will ask"
+  warn "your system credential helper — which answers with your own GitHub login, not"
+  warn "this cluster's. Fix it:"
+  echo "   git remote set-url cloudbox ${REMOTE_URL}"
+else
+  ok "Remote 'cloudbox' is set up for pushing."
+fi

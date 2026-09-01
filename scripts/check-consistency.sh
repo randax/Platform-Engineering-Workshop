@@ -642,6 +642,30 @@ else
 fi
 [[ "${FAILURES}" -eq "${before_fail}" ]] || true
 
+# --- 12a. every attendee-facing Gitea clone carries the workshop credentials ---
+# A credential-less http remote does not simply prompt: git consults the
+# credential helper chain FIRST — osxkeychain on macOS, GCM on Windows,
+# libsecret on Linux — which answers with the attendee's own GitHub login and
+# offers it to Gitea. The result is a 401, or a GUI passphrase dialog for a
+# credential nobody created, against a perfectly healthy cluster. scripts/ push
+# through git_as_gitea_admin (GIT_ASKPASS + an emptied helper chain) and are
+# exempt; anything a human copies and then runs a bare `git push` from needs the
+# credentials in the URL. Same reasoning as lib.sh's `-c credential.helper=`.
+before_fail=${FAILURES}
+bare_clone="$(grep -rn "git clone [^ ]*http://gitea\.${CLOUDBOX_DOMAIN}" \
+  --include='*.md' --include='*.sh' lab adventures solutions docs/RUNBOOK.md 2>/dev/null \
+  | grep -v '@' || true)"
+if [[ -n "${bare_clone}" ]]; then
+  bad "a Gitea clone URL carries no credentials — a bare 'git push' from it reaches for the attendee's own GitHub login:"
+  printf '   %s\n' "${bare_clone}" | head -20
+fi
+# The remote seed-gitea.sh tells people to add is the same hazard, one step later.
+# shellcheck disable=SC2016  # the literal `${...}` IS the pattern being grepped for
+grep -qF 'GITEA_ADMIN_USER}:${GITEA_ADMIN_PASSWORD}@' scripts/seed-gitea.sh \
+  || bad "scripts/seed-gitea.sh no longer prints a credentialed 'cloudbox' remote — 'git push cloudbox' would go to the system credential helper"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "every attendee-facing Gitea clone/remote carries the workshop credentials"
+
 # --- 12b. no bare NodePort prose in attendee-facing lab material -------------
 # Browser URLs must name the shared hostname. A NodePort is only meaningful
 # here when its line explicitly identifies the Docker substrate or node-side

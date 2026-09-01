@@ -18,7 +18,7 @@ asserting cluster state cannot grade.
 ## Enable Kagent and point it at your platform
 
 ```bash
-git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 cp gitops/catalog/kagent.yaml gitops/apps/
 git add gitops/apps/kagent.yaml
 git commit -m "enable kagent"

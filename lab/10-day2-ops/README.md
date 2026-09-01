@@ -113,7 +113,7 @@ commits to `gitops/components/demo/demo-web.yaml` in a clone of `cloudbox/platfo
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].env}'
 kubectl -n demo rollout history deploy/demo-web
-git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -169,7 +169,7 @@ cause. Then the `web` container's memory allocation in the Git-managed Deploymen
 kubectl -n demo describe pod <new-pod>
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].resources}'
-git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
@@ -223,7 +223,7 @@ and keyed by registry, so the answer is the opposite: see the scenario briefing.
 ```bash
 kubectl -n demo get deploy demo-web \
   -o jsonpath='{.spec.template.spec.containers[0].image}'
-git clone http://gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
+git clone http://gitea_admin:cloudbox123@gitea.cloudbox.k8s.test/cloudbox/platform.git && cd platform && mise trust
 git log --oneline -3 -- gitops/components/demo/demo-web.yaml
 git show <suspicious-sha>
 ```
