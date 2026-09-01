@@ -176,7 +176,17 @@ it, by name.
   endpoints`. Let them sit with it; that's the lesson.
 
 **Anything, anywhere**
-- *One weird broken thing, no time to debug* → `catch-up.sh <their module>`.
+- *One weird broken thing, no time to debug* → `catch-up.sh <their module>`. It is
+  cumulative — module N carries everything through N — and it must be run from their
+  **workshop checkout**: from the Gitea clone (which has a copy of `scripts/`, because
+  seeding pushes the whole repo) "canonical" would mean their own drifted state. The
+  script refuses there now; a clone made before that fix carries the old copy and will
+  not warn.
+- *"How do I get the fix you just described?"* → `git pull` in the workshop checkout is
+  the whole answer for labs, scripts and docs. Only `gitops/`, `lab/07-ci/app` and
+  module 10's scenarios are read out of Gitea, and `catch-up <their module>` is what
+  refreshes those. **Not** `seed-gitea.sh` — that resets their platform to nothing
+  enabled.
 - *Cluster wedged* → `catch-up.sh <module> --rebuild`.
 - *Docker Hub rate-limit errors mid-run* → the room shares one venue IP.
   Everything should come from the local mirror; if something's pulling from
@@ -204,7 +214,7 @@ mise run preflight                    # is this laptop ready?
 mise run cluster:create               # module 01
 mise run gitops:bootstrap             # module 02
 mise run gitops:seed                  # module 02
-mise run catch-up <N>                 # jump to end of module N
+mise run catch-up <N>                 # jump to end of module N (cumulative: N covers 1..N)
 mise run catch-up <N> -- --rebuild    # nuke + rebuild to module N
 ./lab/NN-*/verify.sh                  # did this module's outcome happen?
 kubectl get pods -A                   # the first thing to look at, always

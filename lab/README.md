@@ -44,7 +44,52 @@ depends on them, but they build on each other: 09 needs 03, 06 and 08, 08's main
   works (each README suggests a prompt). A fix you can't explain isn't done yet.
 - Fallen behind? `mise run catch-up <module>` force-pushes that module's canonical
   end-state to your in-cluster Gitea and lets ArgoCD converge
-  (see [`solutions/`](../solutions/)).
+  (see [`solutions/`](../solutions/)). It is **cumulative**: `catch-up 7` gives you
+  everything through module 07, not module 07 alone, so there is never a reason to
+  run it once per module. Run it from your workshop checkout — not from the Gitea
+  clone below, which it refuses.
+
+## Two repos, and which one is live
+
+This trips people up, so it is worth thirty seconds now:
+
+| | what it is | what reads it |
+|---|---|---|
+| **Workshop checkout** — where you are now | cloned from GitHub; has `lab/`, `scripts/`, `docs/`, `solutions/` | you, and every script you run |
+| **Platform repo** — `cloudbox/platform` in your in-cluster Gitea | your cluster's own copy, seeded from the checkout | **ArgoCD**, module 07's in-cluster build, module 10's scenarios |
+
+ArgoCD only ever watches the second one. An edit under `gitops/` in your workshop
+checkout is inert — it commits cleanly and changes nothing, which is the single most
+common way to lose ten minutes here. Module 02 sets up how you write to the platform
+repo, and every later module uses that same path.
+
+Because `seed-gitea.sh` pushes the *whole* repository, the platform repo also contains
+a copy of `scripts/` and `solutions/`. Ignore it: run scripts from your workshop
+checkout. `catch-up` refuses to run from the clone, because there "the canonical state"
+would mean your own.
+
+### Getting fixes from the workshop repo
+
+Updates to labs, scripts and docs reach you with one command, in the workshop checkout:
+
+```bash
+git pull
+```
+
+That is the whole story for anything you *read* or *run*. Only three things are read
+out of Gitea — `gitops/`, `lab/07-ci/app` (the in-cluster build clones it) and module
+10's scenarios — and updated manifests reach those the same way you got them the first
+time:
+
+```bash
+mise run catch-up <the module you are on>    # replaces gitops/* with the canonical state
+```
+
+`./scripts/seed-gitea.sh` is **not** the update command: it force-pushes your whole
+checkout over the platform repo, which resets your platform to nothing enabled. If you
+also keep a local clone of the platform repo, pick up the new state with
+`git fetch origin && git reset --hard origin/main` — both commands above rewrite its
+history, so a plain `git pull` will not do it.
 
 ## AI assistants are welcome
 
