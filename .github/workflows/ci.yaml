@@ -55,7 +55,7 @@ jobs:
           shellcheck -x --source-path=SCRIPTDIR scripts/*.sh scripts/substrate/*.sh
 
   yaml-syntax:
-    name: YAML syntax (gitops/, lab/, solutions/)
+    name: YAML syntax (gitops/, lab/, solutions/, issue templates)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -67,9 +67,12 @@ jobs:
           import pathlib, sys
           import yaml  # PyYAML is preinstalled on GitHub runners
 
-          roots = [p for p in ("gitops", "lab", "solutions") if pathlib.Path(p).is_dir()]
+          # .github/ISSUE_TEMPLATE is in the list because an issue form that does not
+          # parse fails silently on GitHub — the template simply stops being offered.
+          roots = [p for p in ("gitops", "lab", "solutions", ".github/ISSUE_TEMPLATE")
+                   if pathlib.Path(p).is_dir()]
           if not roots:
-              print("no gitops/lab/solutions directories yet — nothing to validate")
+              print("none of the validated directories exist yet — nothing to validate")
               sys.exit(0)
 
           errors = 0

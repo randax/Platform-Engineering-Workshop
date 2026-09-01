@@ -306,6 +306,10 @@ GUARD_EXEMPT_SCRIPTS=(
                                   # kubeconfig + kubectl config use-context)
   "scripts/dev-setup.sh"          # pre-cluster: kubectl version --client only
   "scripts/install.sh"            # pre-cluster preflight: likewise
+  "scripts/collect-debug.sh"      # runs the guard NON-fatally and skips every
+                                  # kubectl section when it refuses — a wrong
+                                  # context is often what is being reported.
+                                  # The call is asserted below, not waived
 )
 count=0
 while IFS= read -r f; do
@@ -316,6 +320,15 @@ while IFS= read -r f; do
   grep -qE '^[[:space:]]*require_workshop_context[[:space:]]*$' "${f}" \
     || bad "${f} uses kubectl but never calls require_workshop_context — it would happily run against whatever cluster kubectl fell through to"
 done < <(grep -rl --include='*.sh' 'kubectl' scripts solutions | sort)
+
+# collect-debug.sh is exempt from the bare-call form, not from the guard: it
+# must still consult it before asking any cluster a question, or a debug bundle
+# could carry an employer cluster's namespaces into a public GitHub issue.
+before_fail=${FAILURES}
+grep -q 'require_workshop_context' scripts/collect-debug.sh \
+  || bad "scripts/collect-debug.sh no longer consults require_workshop_context — its kubectl sections could run against someone else's cluster and end up in a public issue"
+[[ "${FAILURES}" -eq "${before_fail}" ]] \
+  && ok "collect-debug.sh gates its cluster questions on the context guard"
 
 # The two pre-cluster preflights are exempt only for as long as they stay
 # client-side. `kubectl version --client` needs no cluster and no kubeconfig,

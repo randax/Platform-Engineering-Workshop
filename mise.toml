@@ -125,6 +125,12 @@ run = [
   "kubectl get pods -A",
 ]
 
+[tasks.debug]
+# Takes an optional module number: `mise run debug 3` adds that lab's verify.sh
+# output. mise appends extra CLI args, so no templating is needed.
+description = "🆘 Collect a redacted debug bundle to attach to a help request"
+run = "./scripts/collect-debug.sh"
+
 # =============================================================================
 # Presentation (Slidev)
 # =============================================================================

@@ -1,0 +1,53 @@
+name: "🆘 Workshop help — something isn't working on my laptop"
+description: "For attendees: report a stuck module, a failing script, or a verify.sh that won't go green."
+title: "Module <NN>: "
+labels: ["workshop-help"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Run this first** — it collects everything we would otherwise ask you for,
+        redacts your home directory and credential-shaped strings, and writes one file:
+
+        ```bash
+        mise run debug          # or: ./scripts/collect-debug.sh
+        mise run debug 3        # add module 3's verify.sh output
+        ```
+
+        Skim the file it names, then paste its contents below. Nothing is sent anywhere
+        until you submit this form.
+
+        If you are stuck **during** the workshop, don't wait for an answer here:
+        red sticky on the laptop lid, and `mise run catch-up <module>` gets you moving again.
+  - type: input
+    id: module
+    attributes:
+      label: Which module or script?
+      placeholder: "lab/03-data, or scripts/create-cluster.sh"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What did you expect, and what happened instead?
+      description: The last command you ran and the error it printed is usually enough.
+      placeholder: |
+        I ran `./verify.sh` and expected it to pass. It said:
+        FAIL: no ArgoCD Application named 'postgres'
+    validations:
+      required: true
+  - type: textarea
+    id: bundle
+    attributes:
+      label: Debug bundle
+      description: Paste the contents of the file `mise run debug` wrote (~/.cloudbox/debug-*.md).
+      render: markdown
+    validations:
+      required: false
+  - type: checkboxes
+    id: tried
+    attributes:
+      label: Before filing
+      options:
+        - label: I opened the hints in the lab's README (the last one is the full solution).
+        - label: I skimmed the debug bundle for anything I don't want to post publicly.

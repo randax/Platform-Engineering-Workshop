@@ -81,7 +81,10 @@ That is a working platform; the [labs](#lab-overview) take it from here. Fell be
 broke something interesting? `mise run catch-up <module>` force-pushes that module's
 canonical state to your Gitea and lets ArgoCD converge. If neither substrate cooperates,
 `mise run cluster:fallback` builds a [kind lifeboat](docs/SUBSTRATES.md#the-kind-lifeboat) meeting the same
-contract. Everything below is reference.
+contract. Hit something that looks like *our* bug? `mise run debug` writes one redacted
+file with everything we would ask you for, and the
+[help form](https://github.com/randax/Platform-Engineering-Workshop/issues/new?template=workshop-help.yml)
+takes it from there. Everything below is reference.
 
 ## Lab overview
 

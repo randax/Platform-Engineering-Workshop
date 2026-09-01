@@ -172,6 +172,13 @@ it, by name.
 - *Docker Hub rate-limit errors mid-run* → the room shares one venue IP.
   Everything should come from the local mirror; if something's pulling from
   docker.io live, it's an image we missed pre-pulling — note it, that's a repo bug.
+- *It's ours, not theirs* → `mise run debug <module>` on their laptop writes one
+  redacted bundle (`~/.cloudbox/debug-*.md`) with platform, tool versions, cluster and
+  ArgoCD state, the logs of every not-Running pod and that module's `verify.sh` output.
+  Two people cannot take notes for a room: have them paste it into the
+  [help form](https://github.com/randax/Platform-Engineering-Workshop/issues/new?template=workshop-help.yml)
+  and move on with `catch-up.sh`. It sends nothing on its own, and it refuses to ask a
+  non-workshop cluster anything — a wrong context comes back as the bundle's finding.
 
 ## What to tell people about AI
 
@@ -192,6 +199,7 @@ mise run catch-up <N>                 # jump to end of module N
 mise run catch-up <N> -- --rebuild    # nuke + rebuild to module N
 ./lab/NN-*/verify.sh                  # did this module's outcome happen?
 kubectl get pods -A                   # the first thing to look at, always
+mise run debug [N]                    # redacted bundle for a bug report (nothing is sent)
 
 echo "$KUBECONFIG"                    # empty = mise's pin is not in this shell
 export KUBECONFIG=~/.kube/cloudbox.conf   # "my cluster vanished" — try this BEFORE rebuilding

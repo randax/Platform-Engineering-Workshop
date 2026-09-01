@@ -61,3 +61,9 @@ cluster before acting on it. Module 05 exists to make that instinct permanent.
   devcontainer/Codespaces lifeboat ([module 00](00-setup/)).
 - When the room drifts apart, the presenter walks the solution on screen to re-sync.
   That's normal, not falling behind.
+- Something is broken in a way that isn't yours to fix — a script, a lab, a pinned
+  image? `mise run debug` (or `mise run debug <module>`) writes one redacted file with
+  everything we would ask you for: platform, tool versions, cluster state, the logs of
+  whatever isn't running, and the module's `verify.sh` output. It sends nothing.
+  Paste it into the [help form](https://github.com/randax/Platform-Engineering-Workshop/issues/new?template=workshop-help.yml)
+  — during the workshop or on the train home.
